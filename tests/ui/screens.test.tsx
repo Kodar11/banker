@@ -1,7 +1,9 @@
 /// <reference types="jest" />
 import { act, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react-native';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, usePathname } from 'expo-router';
 import Home from '../../app/index';
+import * as rootLayout from '../../app/_layout';
+import PropertyRoute from '../../app/property/[key]';
 import CreateGame from '../../app/create-game';
 import JoinGame from '../../app/join-game';
 import { ConnectionBanner, ErrorState, NoticeToast } from '@/components/ui';
@@ -18,6 +20,8 @@ import { gameApi } from '@/lib/gameApi';
 import { useGameStore } from '@/store/gameStore';
 import { useSessionStore } from '@/store/sessionStore';
 import { netWorth, outstandingDebt } from '@/engine/index.ts';
+import { openProperty } from '@/utils/navigation';
+import { startupRouting } from '@/utils/startupRouting';
 import { Fixture, ok } from './fixtures';
 
 const api = gameApi as jest.Mocked<typeof gameApi>;
@@ -44,18 +48,83 @@ beforeEach(() => {
   useGameStore.getState().reset(null);
 });
 
-describe('Home', () => {
-  it('offers create and join; resume only when a session exists', async () => {
+describe('Home & startup navigation', () => {
+  beforeEach(() => startupRouting.reset());
+
+  it('no active game: Home with CREATE and JOIN, no resume, no redirect', async () => {
     await render(<Home />);
     expect(screen.getByTestId('create-game')).toBeTruthy();
     expect(screen.getByTestId('join-game')).toBeTruthy();
     expect(screen.queryByTestId('resume-game')).toBeNull();
+    expect(router.replace).not.toHaveBeenCalled();
     await fireEvent.press(screen.getByTestId('create-game'));
     expect(router.push).toHaveBeenCalledWith('/create-game');
+    await fireEvent.press(screen.getByTestId('join-game'));
+    expect(router.push).toHaveBeenCalledWith('/join-game');
+  });
 
-    await act(async () => useSessionStore.setState({ session: { gameId: 'g1', playerId: 'p1', token: 't' } }));
+  it('active game restored at startup → opens game/[gameId] once; RESUME offered afterwards', async () => {
+    const f = new Fixture().loadAs('Asha');
+    await render(<Home />);
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith(`/game/${f.state.id}`));
+    expect(router.replace).toHaveBeenCalledTimes(1);
     await fireEvent.press(screen.getByTestId('resume-game'));
-    expect(router.push).toHaveBeenCalledWith('/game/g1');
+    expect(router.push).toHaveBeenCalledWith(`/game/${f.state.id}`);
+    // Coming back to Home later never bounces the player again.
+    await render(<Home />);
+    expect(router.replace).toHaveBeenCalledTimes(1);
+  });
+
+  it('active lobby restored at startup → opens lobby/[gameId]', async () => {
+    const f = new Fixture(['Asha', 'Bilal'], { start: false }).loadAs('Bilal');
+    await render(<Home />);
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith(`/lobby/${f.state.id}`));
+    expect(screen.getByText('BACK TO LOBBY')).toBeTruthy();
+  });
+
+  it('waits for the server before deciding; a game that is gone is forgotten', async () => {
+    useSessionStore.setState({ session: { gameId: 'g1', playerId: 'p1', token: 'a'.repeat(64) }, hydrated: true });
+    useGameStore.getState().reset('g1');
+    await render(<Home />);
+    expect(router.replace).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('resume-game')).toBeNull();
+    await act(async () => useGameStore.getState().setLoadError({ code: 'GAME_EXPIRED', message: 'expired' }));
+    await waitFor(() => expect(useSessionStore.getState().session).toBeNull());
+    expect(router.replace).not.toHaveBeenCalled();
+  });
+
+  it('finished game: stays on Home, no resume', async () => {
+    new Fixture().act('Asha', { type: 'END_GAME' }).loadAs('Asha');
+    await render(<Home />);
+    expect(screen.queryByTestId('resume-game')).toBeNull();
+    expect(router.replace).not.toHaveBeenCalled();
+  });
+
+  it('a deep link on top of Home (e.g. join QR) is respected', async () => {
+    new Fixture().loadAs('Asha');
+    (usePathname as jest.Mock).mockReturnValueOnce('/join-game');
+    await render(<Home />);
+    expect(router.replace).not.toHaveBeenCalled();
+  });
+
+  it('the root stack is anchored on Home, so property/[key] can never be the initial route', () => {
+    expect(rootLayout.unstable_settings).toEqual({ anchor: 'index' });
+  });
+
+  it('property route with an invalid key shows an error (only reachable by a bad link) and goes Home', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({ key: 'NOWHERE' });
+    (router.canGoBack as jest.Mock).mockReturnValueOnce(false);
+    await render(<PropertyRoute />);
+    expect(screen.getByText('Unknown property')).toBeTruthy();
+    await fireEvent.press(screen.getByText('Back'));
+    expect(router.replace).toHaveBeenCalledWith('/');
+  });
+
+  it('the app only opens property screens for real board keys', () => {
+    openProperty('MUMBAI');
+    expect(router.push).toHaveBeenCalledWith('/property/MUMBAI');
+    openProperty('undefined');
+    expect(router.push).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -135,8 +204,6 @@ describe('Lobby', () => {
 describe('Main game', () => {
   it('my turn: big ROLL DICE sends the action with the version I saw', async () => {
     const f = new Fixture().loadAs('Asha');
-    const after = new Fixture();
-    after.roll('Asha', 3, 2);
     api.action.mockResolvedValue(ok(f.snapshot()));
     await render(<GameScreen view={viewFor(f, 'Asha')} />);
     expect(screen.getByText('YOUR TURN')).toBeTruthy();
@@ -155,7 +222,7 @@ describe('Main game', () => {
   });
 
   it('after rolling: dice result, destination and BUY ₹9,500 / DECLINE', async () => {
-    const f = new Fixture().roll('Asha', 3, 2).loadAs('Asha');
+    const f = new Fixture().roll('Asha', 1, 2).loadAs('Asha');
     api.action.mockResolvedValue(ok(f.snapshot()));
     await render(<GameScreen view={viewFor(f, 'Asha')} />);
     expect(screen.getByTestId('destination')).toHaveTextContent(/Railway/);
@@ -166,7 +233,7 @@ describe('Main game', () => {
   });
 
   it('double-tapping BUY sends only one request', async () => {
-    const f = new Fixture().roll('Asha', 3, 2).loadAs('Asha');
+    const f = new Fixture().roll('Asha', 1, 2).loadAs('Asha');
     api.action.mockImplementation(() => new Promise((r) => setTimeout(() => r(ok(f.snapshot())), 20)));
     const { result } = await renderHook(() => useGameAction());
     await act(async () => {
@@ -176,7 +243,7 @@ describe('Main game', () => {
   });
 
   it('BUY is disabled while an action is in flight', async () => {
-    const f = new Fixture().roll('Asha', 3, 2).loadAs('Asha');
+    const f = new Fixture().roll('Asha', 1, 2).loadAs('Asha');
     useGameStore.getState().setPending('BUY_PROPERTY');
     await render(<GameScreen view={viewFor(f, 'Asha')} />);
     expect(screen.getByTestId('buy-button').props.accessibilityState).toMatchObject({ disabled: true, busy: true });
@@ -184,8 +251,8 @@ describe('Main game', () => {
 
   it('pay rent: shows owner and amount; shortfall offers loan and bankruptcy', async () => {
     const f = new Fixture();
-    f.roll('Asha', 3, 2).act('Asha', { type: 'BUY_PROPERTY' }).act('Asha', { type: 'END_TURN' });
-    f.roll('Bilal', 3, 2).loadAs('Bilal');
+    f.roll('Asha', 1, 2).act('Asha', { type: 'BUY_PROPERTY' }).act('Asha', { type: 'END_TURN' });
+    f.roll('Bilal', 1, 2).loadAs('Bilal');
     await render(<GameScreen view={viewFor(f, 'Bilal')} />);
     expect(screen.getByText('Owned by Asha')).toBeTruthy();
     expect(screen.getByText('PAY RENT ₹1,000')).toBeTruthy();
@@ -193,9 +260,9 @@ describe('Main game', () => {
 
     // Same situation, but Bilal is broke.
     const broke = new Fixture();
-    broke.roll('Asha', 3, 2).act('Asha', { type: 'BUY_PROPERTY' }).act('Asha', { type: 'END_TURN' });
+    broke.roll('Asha', 1, 2).act('Asha', { type: 'BUY_PROPERTY' }).act('Asha', { type: 'END_TURN' });
     broke.act('Bilal', { type: 'TRANSFER_MONEY', toPlayerId: broke.ids.Asha!, amount: 24500 });
-    broke.roll('Bilal', 3, 2).loadAs('Bilal');
+    broke.roll('Bilal', 1, 2).loadAs('Bilal');
     await render(<GameScreen view={viewFor(broke, 'Bilal')} />);
     expect(screen.getByText('You’re ₹500 short.')).toBeTruthy();
     expect(screen.getByTestId('raise-loan')).toBeTruthy();
@@ -204,7 +271,7 @@ describe('Main game', () => {
   });
 
   it('income tax shows PAY ₹1,000 and END TURN appears after paying', async () => {
-    const f = new Fixture().roll('Asha', 2, 2).loadAs('Asha');
+    const f = new Fixture().roll('Asha', 2, 3).loadAs('Asha'); // Income Tax (square 5)
     await render(<GameScreen view={viewFor(f, 'Asha')} />);
     expect(within(screen.getByTestId('payment-card')).getByText('Income Tax')).toBeTruthy();
     expect(screen.getByText('PAY ₹1,000')).toBeTruthy();
@@ -231,7 +298,7 @@ describe('Main game', () => {
   it('undo request asks the counterparty to approve', async () => {
     const f = new Fixture();
     f.act('Asha', { type: 'TRANSFER_MONEY', toPlayerId: f.ids.Bilal!, amount: 500 });
-    f.act('Asha', { type: 'REQUEST_UNDO', targetActionId: f.state.lastUndoable!.actionId }).loadAs('Bilal');
+    f.act('Asha', { type: 'REQUEST_UNDO', targetActionId: f.state.undoStack.at(-1)!.actionId }).loadAs('Bilal');
     api.action.mockResolvedValue(ok(f.snapshot()));
     await render(<GameScreen view={viewFor(f, 'Bilal')} />);
     expect(screen.getByTestId('undo-banner')).toBeTruthy();
@@ -243,7 +310,7 @@ describe('Main game', () => {
 describe('Auction', () => {
   function auctionFixture(as: string) {
     const f = new Fixture(['Asha', 'Bilal', 'Chitra']);
-    f.roll('Asha', 3, 2).act('Asha', { type: 'DECLINE_PROPERTY' }).loadAs(as);
+    f.roll('Asha', 1, 2).act('Asha', { type: 'DECLINE_PROPERTY' }).loadAs(as);
     return f;
   }
 
@@ -279,13 +346,15 @@ describe('Auction', () => {
 });
 
 describe('Loan', () => {
-  it('shows interest and total, then requests the loan', async () => {
+  it('shows the full amount now and interest at the next Start, then requests the loan', async () => {
     const f = new Fixture().loadAs('Asha');
     api.action.mockResolvedValue(ok(f.snapshot()));
     const send = jest.fn(async () => ({ ok: true }));
     await render(<LoanSheet visible onClose={jest.fn()} view={viewFor(f, 'Asha')} send={send} />);
     await fireEvent.changeText(screen.getByTestId('loan-amount'), '5000');
-    expect(screen.getByText('₹5,500')).toBeTruthy();
+    expect(screen.getByText('Interest at next Start (10%)')).toBeTruthy();
+    expect(screen.getByText('₹500')).toBeTruthy();
+    expect(screen.queryByText('₹5,500')).toBeNull();
     await fireEvent.press(screen.getByTestId('loan-confirm'));
     expect(send).toHaveBeenCalledWith({ type: 'REQUEST_LOAN', amount: 5000 }, expect.anything());
   });
@@ -303,7 +372,7 @@ describe('Loan', () => {
 describe('Wallet', () => {
   it('shows balance, properties, loans and history in ₹', async () => {
     const f = new Fixture();
-    f.roll('Asha', 3, 2).act('Asha', { type: 'BUY_PROPERTY' }).act('Asha', { type: 'REQUEST_LOAN', amount: 2000 }).loadAs('Asha');
+    f.roll('Asha', 1, 2).act('Asha', { type: 'BUY_PROPERTY' }).act('Asha', { type: 'REQUEST_LOAN', amount: 2000 }).loadAs('Asha');
     await render(<PlayerView view={viewFor(f, 'Asha')} playerId={f.ids.Asha!} />);
     expect(screen.getByTestId('wallet-balance')).toHaveTextContent('₹17,500');
     expect(screen.getByTestId('property-RAILWAY')).toBeTruthy();
@@ -315,7 +384,7 @@ describe('Wallet', () => {
 
 describe('Errors and reconnection', () => {
   it('a rejected action shows a human-readable toast', async () => {
-    const f = new Fixture().roll('Asha', 3, 2).loadAs('Asha');
+    const f = new Fixture().roll('Asha', 1, 2).loadAs('Asha');
     api.action.mockResolvedValue({ ok: false, error: { code: 'ALREADY_OWNED', message: 'That property was already purchased.' } });
     await render(
       <>
@@ -328,7 +397,7 @@ describe('Errors and reconnection', () => {
   });
 
   it('a stale action refetches authoritative state', async () => {
-    const f = new Fixture().roll('Asha', 3, 2).loadAs('Asha');
+    const f = new Fixture().roll('Asha', 1, 2).loadAs('Asha');
     api.action.mockResolvedValue({ ok: false, error: { code: 'STALE_STATE', message: 'The game just changed — check the screen and try again.' } });
     api.state.mockResolvedValue(ok(f.snapshot()));
     await render(<GameScreen view={viewFor(f, 'Asha')} />);

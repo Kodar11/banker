@@ -3,6 +3,8 @@
 // Inputs (env): OP, SUPABASE_URL, SUPABASE_KEY, CODE, NAME, BID
 var URL_ = SUPABASE_URL + '/functions/v1/game-action';
 
+var PAY_ACTION = { RENT: 'PAY_RENT', TAX: 'PAY_TAX', CARD: 'PAY_CARD', LOAN_INTEREST: 'PAY_INTEREST', CLUB: 'PAY_CLUB' };
+
 function call(body) {
   var res = http.post(URL_, {
     headers: { 'Content-Type': 'application/json', apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY },
@@ -62,7 +64,9 @@ if (OP === 'play') {
     var p = s.turn.pending;
     if (phase === 'AWAITING_ROLL') act(s, { type: 'ROLL_DICE' });
     else if (phase === 'AWAITING_DECISION') act(s, { type: 'BUY_PROPERTY' }).ok || act(state(), { type: 'DECLINE_PROPERTY' });
-    else if (phase === 'AWAITING_PAYMENT') act(s, { type: 'PAY_' + p.reason }).ok || act(state(), { type: 'DECLARE_BANKRUPTCY' });
+    else if (phase === 'AWAITING_PAYMENT' && p.kind === 'TAX_ENTRY') act(s, { type: 'PAY_TAX', amount: 1000 });
+    else if (phase === 'AWAITING_PAYMENT')
+      act(s, { type: PAY_ACTION[p.reason] }).ok || act(state(), { type: 'DECLARE_BANKRUPTCY' });
     else if (phase === 'AWAITING_CARD') act(s, { type: 'RESOLVE_CARD', resolution: 'NONE' });
     else if (phase === 'AUCTION') act(s, { type: 'PASS_AUCTION', auctionId: s.auction.id });
     else if (phase === 'TURN_COMPLETE') act(s, { type: 'END_TURN' });

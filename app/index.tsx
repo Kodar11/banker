@@ -1,20 +1,59 @@
+import { useEffect } from 'react';
 import { Text, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, usePathname } from 'expo-router';
 import { Button, Screen } from '@/components/ui';
+import { activeGameRoute } from '@/utils/navigation';
+import { startupRouting } from '@/utils/startupRouting';
 import { isSupabaseConfigured } from '@/lib/supabase';
+import { useGameStore } from '@/store/gameStore';
 import { useSessionStore } from '@/store/sessionStore';
 
 export default function Home() {
   const session = useSessionStore((s) => s.session);
   const hydrated = useSessionStore((s) => s.hydrated);
+  const clearSession = useSessionStore((s) => s.clearSession);
+  const status = useGameStore((s) => (s.snapshot && s.snapshot.state.id === session?.gameId ? s.snapshot.state.status : null));
+  const loadError = useGameStore((s) => s.loadError);
+  const gone = !!loadError && ['FORBIDDEN', 'NOT_FOUND', 'GAME_EXPIRED'].includes(loadError.code);
+  const target = session && status ? activeGameRoute(session.gameId, status) : null;
+  const pathname = usePathname();
+
+  // Startup restoration: an active lobby/game opens directly; a game that is gone is forgotten.
+  useEffect(() => {
+    if (!hydrated || startupRouting.isDone()) return;
+    // Opened via a deep link (e.g. a join QR code) on top of Home: respect it, don't redirect.
+    if (pathname !== '/') {
+      startupRouting.markDone();
+      return;
+    }
+    if (!session) {
+      startupRouting.markDone();
+      return;
+    }
+    if (gone) {
+      startupRouting.markDone();
+      useGameStore.getState().reset(null);
+      void clearSession();
+      return;
+    }
+    if (!status) return; // wait for the server snapshot (fetched by GameSyncHost)
+    startupRouting.markDone();
+    if (target) router.replace(target);
+  }, [hydrated, session, status, gone, target, clearSession, pathname]);
 
   return (
     <Screen
       testID="home-screen"
       footer={
         <>
-          {hydrated && session ? (
-            <Button title="RESUME GAME" subtitle="Rejoin your table" testID="resume-game" variant="success" onPress={() => router.push(`/game/${session.gameId}`)} />
+          {target ? (
+            <Button
+              title={status === 'WAITING' ? 'BACK TO LOBBY' : 'RESUME GAME'}
+              subtitle="Rejoin your table"
+              testID="resume-game"
+              variant="success"
+              onPress={() => router.push(target)}
+            />
           ) : null}
           <Button title="CREATE GAME" subtitle="You're the host" testID="create-game" onPress={() => router.push('/create-game')} />
           <Button title="JOIN GAME" subtitle="Scan QR or enter code" testID="join-game" variant="secondary" onPress={() => router.push('/join-game')} />

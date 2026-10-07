@@ -13,6 +13,5 @@ export function parseJoinCode(value: string): string | null {
   return bare?.[1] ?? null;
 }
 
-/** Safety-net refresh interval while the realtime channel is healthy / unhealthy. */
-export const POLL_MS_LIVE = 30_000;
+/** Fallback refresh interval, used ONLY while the realtime channel is not live (never while healthy). */
 export const POLL_MS_DEGRADED = 5_000;

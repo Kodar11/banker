@@ -21,6 +21,8 @@ export interface ButtonProps {
   testID?: string;
   accessibilityHint?: string;
   className?: string;
+  /** Keep the title on one line (shrinks to fit instead of wrapping). Default for size "sm". */
+  singleLine?: boolean;
 }
 
 /** Big, chunky, tactile button. Large touch targets for game night. */
@@ -35,7 +37,9 @@ export function Button({
   testID,
   accessibilityHint,
   className = '',
+  singleLine,
 }: ButtonProps) {
+  const oneLine = singleLine ?? size === 'sm';
   const v = VARIANTS[variant];
   const inactive = disabled || loading;
   const pad = size === 'lg' ? 'min-h-[64px] px-6 py-4' : size === 'md' ? 'min-h-[52px] px-5 py-3' : 'min-h-[44px] px-4 py-2';
@@ -56,7 +60,14 @@ export function Button({
         <ActivityIndicator color={v.spinner} />
       ) : (
         <View className="items-center">
-          <Text className={`${textSize} font-extrabold tracking-wide ${v.text}`}>{title}</Text>
+          <Text
+            className={`${textSize} font-extrabold tracking-wide ${v.text}`}
+            numberOfLines={oneLine ? 1 : undefined}
+            adjustsFontSizeToFit={oneLine}
+            minimumFontScale={0.75}
+          >
+            {title}
+          </Text>
           {subtitle ? <Text className={`text-sm font-semibold opacity-80 ${v.text}`}>{subtitle}</Text> : null}
         </View>
       )}

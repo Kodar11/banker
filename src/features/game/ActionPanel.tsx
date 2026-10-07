@@ -100,14 +100,16 @@ export function ActionPanel({ view, send, onOpenLoan }: ActionPanelProps) {
     }
 
     case 'AWAITING_PAYMENT': {
+      if (turn.pending?.kind === 'TAX_ENTRY') return <TaxEntry view={view} send={send} label={turn.pending.label} />;
       if (turn.pending?.kind !== 'PAYMENT') return null;
       const p = turn.pending;
-      const type = p.reason === 'RENT' ? 'PAY_RENT' : p.reason === 'TAX' ? 'PAY_TAX' : 'PAY_CARD';
+      const type = PAY_ACTION[p.reason];
       const short = p.amount - me.balance;
-      const heading = p.reason === 'RENT' ? `Owned by ${playerName(p.toPlayerId)}` : p.reason === 'TAX' ? 'Income Tax' : 'Card';
+      const heading =
+        p.reason === 'RENT' ? `Owned by ${playerName(p.toPlayerId)}` : p.reason === 'TAX' ? p.label : p.reason === 'LOAN_INTEREST' ? 'Loan interest' : p.reason === 'CLUB' ? 'Club' : 'Card';
       return (
         <Card testID="payment-card">
-          <Pill tone="warn">{p.reason === 'RENT' ? 'Rent due' : p.reason === 'TAX' ? 'Tax due' : 'Pay the bank'}</Pill>
+          <Pill tone="warn">{PAY_PILL[p.reason]}</Pill>
           <Text className="mt-2 text-2xl font-black text-ink">{heading}</Text>
           {p.label !== heading ? <Text className="text-base text-stone-600">{p.label}</Text> : null}
           <View className="mt-4 gap-3">
@@ -172,7 +174,52 @@ export function ActionPanel({ view, send, onOpenLoan }: ActionPanelProps) {
   }
 }
 
-/** Unverified card entry: the player reads the physical card and enters the money effect. */
+const PAY_ACTION = {
+  RENT: 'PAY_RENT',
+  TAX: 'PAY_TAX',
+  CARD: 'PAY_CARD',
+  LOAN_INTEREST: 'PAY_INTEREST',
+  CLUB: 'PAY_CLUB',
+} as const;
+
+const PAY_PILL = {
+  RENT: 'Rent due',
+  TAX: 'Tax due',
+  CARD: 'Card',
+  LOAN_INTEREST: 'Interest due at Start',
+  CLUB: 'Club',
+} as const;
+
+/** Tax square with no configured amount (Wealth Taxes): enter the amount printed on the board. */
+function TaxEntry({ view, send, label }: { view: GameView; send: ActionPanelProps['send']; label: string }) {
+  const [amount, setAmount] = useState('');
+  const pending = useGameStore((s) => s.pendingAction);
+  const value = Number.parseInt(amount, 10);
+  const valid = Number.isInteger(value) && value > 0 && value <= BUSINESS_MVP_RULES.cards.manualMaxAmount;
+  return (
+    <Card testID="tax-entry-card">
+      <Pill tone="warn">Tax due</Pill>
+      <Text className="mt-2 text-2xl font-black text-ink">{label}</Text>
+      <Text className="mt-1 text-sm text-stone-600">Enter the amount printed on your board for {label}.</Text>
+      <View className="mt-3 rounded-2xl bg-felt p-3">
+        <TextField label="Amount (₹)" keyboardType="number-pad" value={amount} onChangeText={setAmount} testID="tax-amount" />
+      </View>
+      <Button
+        className="mt-3"
+        title={valid ? `PAY ${formatINR(value)}` : 'PAY'}
+        testID="tax-pay"
+        disabled={!valid || !!pending}
+        loading={pending === 'PAY_TAX'}
+        onPress={() => send({ type: 'PAY_TAX', amount: value })}
+      />
+      {view.me && valid && value > view.me.balance ? (
+        <Text className="mt-2 text-center text-sm font-semibold text-brick">More than your cash — you’ll need to raise money.</Text>
+      ) : null}
+    </Card>
+  );
+}
+
+/** Card entry missing from the supplied data: the player reads the physical card and enters the money effect. */
 function ManualCard({ view, send }: { view: GameView; send: ActionPanelProps['send'] }) {
   const [amount, setAmount] = useState('');
   const pending = useGameStore((s) => s.pendingAction);
@@ -182,12 +229,13 @@ function ManualCard({ view, send }: { view: GameView; send: ActionPanelProps['se
   if (!card) return null;
   return (
     <Card testID="manual-card">
-      <Pill tone="gold">{DECK_LABELS[card.deck]} · rolled {card.rollTotal}</Pill>
+      <Pill tone="gold">
+        {DECK_LABELS[card.deck]} · {card.table.toLowerCase()} {card.rollTotal}
+      </Pill>
       <Text className="mt-2 text-xl font-black text-ink">
         Read entry {card.rollTotal} on your physical {DECK_LABELS[card.deck]} card
       </Text>
-      {card.text.startsWith('Not captured') ? null : <Text className="mt-1 text-base text-stone-700">{card.text}</Text>}
-      <Text className="mt-1 text-sm text-stone-600">This entry wasn’t legible in the photos, so enter what it says.</Text>
+      <Text className="mt-1 text-sm text-stone-600">This entry isn’t in the app’s card data, so enter what your card says.</Text>
       <View className="mt-3 gap-3 rounded-2xl bg-felt p-3">
         <TextField label="Amount on the card (₹)" keyboardType="number-pad" value={amount} onChangeText={setAmount} testID="card-amount" />
       </View>

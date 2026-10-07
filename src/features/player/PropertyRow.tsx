@@ -1,16 +1,16 @@
 import { memo } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { router } from 'expo-router';
 import { getDeed, type PropertyState } from '@/engine/index.ts';
 import { GROUP_COLORS } from '@/constants/theme';
 import { formatINR } from '@/utils/currency';
+import { openProperty } from '@/utils/navigation';
 
 export const PropertyRow = memo(function PropertyRow({ prop }: { prop: PropertyState }) {
   const deed = getDeed(prop.key);
   const dev = prop.hotel ? '🏨 Hotel' : prop.houses > 0 ? '🏠'.repeat(prop.houses) : '';
   return (
     <Pressable
-      onPress={() => router.push(`/property/${prop.key}`)}
+      onPress={() => openProperty(prop.key)}
       accessibilityRole="button"
       accessibilityLabel={`${deed.name}${prop.mortgaged ? ', mortgaged' : ''}`}
       testID={`property-${prop.key}`}

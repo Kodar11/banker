@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Text, View } from 'react-native';
-import { BUSINESS_MVP_RULES, loanTerms, outstandingPrincipal, type GameAction } from '@/engine/index.ts';
+import { BUSINESS_MVP_RULES, loanTerms, nextInterestCircuit, outstandingPrincipal, type GameAction } from '@/engine/index.ts';
 import { Button, Card, Label, Pill, Sheet, TextField } from '@/components/ui';
 import type { GameView } from '@/features/game/useGameView';
 import { useGameStore } from '@/store/gameStore';
@@ -38,7 +38,8 @@ export function LoanSheet({ visible, onClose, view, send }: LoanSheetProps) {
   return (
     <Sheet visible={visible} onClose={onClose} title="Bank loan" testID="loan-sheet">
       <Text className="text-sm text-stone-600">
-        {RULES.interestRatePercent}% flat interest, added when you borrow. (House rule — verify against your rulebook.)
+        You get the full amount now. {RULES.interestRatePercent}% interest is paid when you next reach or pass Start
+        {RULES.interestEveryCircuit ? ', and again every Start while the loan is open' : ''}.
       </Text>
       <View className="flex-row flex-wrap gap-2">
         {QUICK.filter((q) => q <= room).map((q) => (
@@ -49,9 +50,9 @@ export function LoanSheet({ visible, onClose, view, send }: LoanSheetProps) {
         <TextField label="Borrow amount (₹)" keyboardType="number-pad" value={amount} onChangeText={setAmount} error={error} testID="loan-amount" />
       </View>
       <Card className="bg-white">
-        <Row label="You receive" value={formatINR(value)} />
-        <Row label={`Interest (${RULES.interestRatePercent}%)`} value={formatINR(terms.interest)} />
-        <Row label="You repay" value={formatINR(terms.totalOwed)} bold />
+        <Row label="You receive now" value={formatINR(value)} />
+        <Row label={`Interest at next Start (${RULES.interestRatePercent}%)`} value={formatINR(terms.interest)} />
+        <Row label="Principal to repay" value={formatINR(terms.totalOwed)} bold />
       </Card>
       <Button
         title={`BORROW ${formatINR(value)}`}
@@ -71,8 +72,11 @@ export function LoanSheet({ visible, onClose, view, send }: LoanSheetProps) {
             <Text className="text-lg font-bold text-ink">Owed {formatINR(loan.outstanding)}</Text>
             <Pill tone="warn">Active</Pill>
           </View>
-          <Text className="text-sm text-stone-500">
-            Borrowed {formatINR(loan.principal)} · total {formatINR(loan.totalOwed)}
+          <Text className="text-sm text-stone-500" testID="loan-interest-status">
+            Borrowed {formatINR(loan.principal)} ·{' '}
+            {nextInterestCircuit(loan) !== null
+              ? `${formatINR(loan.interestAmount)} interest due at your next Start`
+              : `interest paid ${formatINR(loan.interestPaid)}`}
           </Text>
           <View className="flex-row gap-2">
             {loan.outstanding > 1000 ? (

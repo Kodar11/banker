@@ -1,7 +1,7 @@
 import { goBack } from '@/utils/navigation';
 import { Alert, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { BUSINESS_MVP_RULES, MVP_ASSUMPTIONS, RULES_VERSION } from '@/engine/index.ts';
+import { BUSINESS_MVP_RULES, CONFIRMED_RULES, MVP_ASSUMPTIONS, RULES_VERSION } from '@/engine/index.ts';
 import { Button, Card, Label, Screen } from '@/components/ui';
 import { useGameStore } from '@/store/gameStore';
 import { useSessionStore } from '@/store/sessionStore';
@@ -14,11 +14,22 @@ export default function Settings() {
     <Screen scroll testID="settings-screen">
       <Button size="sm" variant="ghost" title="‹ Back" className="self-start" onPress={() => goBack('/')} />
       <Text className="text-4xl font-black text-cream">House rules</Text>
+      <Card testID="confirmed-rules" className="border-2 border-green-600">
+        <Text className="text-base font-bold text-ink">✅ Confirmed for your physical board</Text>
+        <View className="mt-3 gap-3">
+          {CONFIRMED_RULES.map((r) => (
+            <View key={r.title}>
+              <Text className="text-base font-extrabold text-ink">{r.title}</Text>
+              <Text className="text-sm text-stone-600">{r.detail}</Text>
+            </View>
+          ))}
+        </View>
+      </Card>
       <Card className="border-2 border-amber-400">
-        <Text className="text-base font-bold text-ink">⚠️ These are configured MVP assumptions — verify against your physical rulebook.</Text>
+        <Text className="text-base font-bold text-ink">⚠️ Configured assumptions — verify against your physical rulebook.</Text>
         <Text className="mt-1 text-sm text-stone-600">
-          Property prices, rents, building costs, mortgage values and the known Chance / Community Chest entries come from your
-          photographed cards. Everything below is a default the app uses until the real rules are confirmed.
+          Prices, rents, building costs and mortgage values come from your title deeds, and the board order and card tables are confirmed.
+          Everything below is a default the app uses until the real rule is confirmed.
         </Text>
       </Card>
       <Card testID="assumptions-list">

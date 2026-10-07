@@ -1,7 +1,7 @@
 import { goBack } from '@/utils/navigation';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
-import { buildingCount, netWorth, outstandingDebt, ownedBy } from '@/engine/index.ts';
+import { buildingCount, netWorth, nextInterestCircuit, outstandingDebt, ownedBy } from '@/engine/index.ts';
 import { Button, Card, Label, Pill, Screen } from '@/components/ui';
 import type { GameView } from '@/features/game/useGameView';
 import { useGameAction } from '@/features/game/useGameAction';
@@ -73,7 +73,8 @@ export function PlayerView({ view, playerId }: { view: GameView; playerId: strin
                 <View>
                   <Text className="text-base font-bold text-ink">Borrowed {formatINR(l.principal)}</Text>
                   <Text className="text-xs text-stone-500">
-                    {l.interestRatePercent}% · total {formatINR(l.totalOwed)} · left {formatINR(l.outstanding)}
+                    {l.interestRatePercent}% · left {formatINR(l.outstanding)} ·{' '}
+                    {nextInterestCircuit(l) !== null ? `${formatINR(l.interestAmount)} interest at next Start` : `interest paid ${formatINR(l.interestPaid)}`}
                   </Text>
                 </View>
                 <Pill tone={l.status === 'ACTIVE' ? 'warn' : l.status === 'REPAID' ? 'good' : 'bad'}>{l.status.toLowerCase()}</Pill>

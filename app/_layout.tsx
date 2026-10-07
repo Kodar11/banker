@@ -8,6 +8,16 @@ import { COLORS } from '@/constants/theme';
 import { GameSyncHost } from '@/features/game/sync';
 import { useSessionStore } from '@/store/sessionStore';
 
+/**
+ * Home is the root of the stack. Without this, Expo Router orders explicitly
+ * declared <Stack.Screen>s first — the old layout declared only property/[key],
+ * so whenever the navigator had no URL-derived state (cold start, reload) its
+ * first route was property/[key] with no key → "Unknown property".
+ */
+export const unstable_settings = {
+  anchor: 'index',
+};
+
 export default function RootLayout() {
   const hydrate = useSessionStore((s) => s.hydrate);
   useEffect(() => {
@@ -19,6 +29,7 @@ export default function RootLayout() {
       <GameSyncHost />
       <StatusBar style="light" />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: COLORS.felt }, animation: 'fade_from_bottom' }}>
+        <Stack.Screen name="index" />
         <Stack.Screen name="property/[key]" options={{ presentation: 'modal' }} />
       </Stack>
       <NoticeToast />

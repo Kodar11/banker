@@ -34,7 +34,13 @@ jest.mock('react-native-qrcode-svg', () => () => null);
 
 jest.mock('expo-router', () => {
   const router = { push: jest.fn(), replace: jest.fn(), back: jest.fn(), canGoBack: jest.fn(() => true) };
-  return { router, useRouter: () => router, useLocalSearchParams: jest.fn(() => ({})), Stack: () => null };
+  return {
+    router,
+    useRouter: () => router,
+    useLocalSearchParams: jest.fn(() => ({})),
+    usePathname: jest.fn(() => '/'),
+    Stack: Object.assign(() => null, { Screen: () => null }),
+  };
 });
 
 jest.mock('@/lib/realtime', () => ({

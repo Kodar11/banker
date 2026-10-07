@@ -19,7 +19,7 @@ App (Expo Router)  ──POST action──▶  Edge Function `game-action`  ─�
 * **Money integrity.** Balances change only through `Draft.transfer`, which always appends a transaction. The ledger is append-only (DB triggers). Undo = compensating transactions.
 * **Idempotency.** Every tap has an `action_id`; retries reuse it; the server applies it once (`game_actions` primary key).
 * **Stale actions.** Decision actions carry the `state_version` the player saw; if the game moved on, the server rejects with “The game just changed”.
-* **Realtime.** Broadcast pings carry only the new version; clients refetch authoritative state. On reconnect, foreground, or every 5–30 s as a safety net, clients reconcile.
+* **Realtime.** Broadcast pings carry only the new version; a client refetches only when the ping is *ahead* of its snapshot. It also reconciles once after a reconnect and once when the app returns from the background. Polling (every 5 s) runs **only while realtime is down** — a healthy idle connection does no work (`src/features/game/sync.ts`, dev counters in `src/lib/syncStats.ts`).
 * **No accounts.** Each phone generates a random device token; the server stores only its SHA-256.
 
 ## Project structure
@@ -38,8 +38,8 @@ app/                     Routes only (Expo Router)
   settings.tsx           House-rule assumptions, leave game
 src/
   components/ui/         Button, Card, Screen, Sheet, TextField, toasts/banners
-  features/              game, lobby, auction, loan, player, transactions
-  engine/                Pure game logic + Business V1 data + rules config + API contract
+  features/              game, lobby, auction, loan, trade, player, transactions
+  engine/                Pure game logic + Business board/card data + rules config + API contract
   lib/                   supabase client, game API, realtime, device ids
   store/                 Zustand: sessionStore (device credentials), gameStore (server snapshot)
   constants/ utils/
@@ -54,12 +54,13 @@ tests/
 .maestro/                Maestro E2E flows (+ bot script that plays the second seat)
 ```
 
-## Business V1 data vs. assumptions
+## Business data (BUSINESS_V2) vs. assumptions
 
-* `src/engine/businessBoard.ts` — **authoritative** title-deed values from the photographed cards (prices, rents, house/hotel costs, mortgage values, paired transport/utility rules).
-* `src/engine/cards.ts` — Chance / Community Chest entries that the photos establish. Unreadable entries are `verified: false` and resolved by hand in the app (no invented effects).
-* `src/engine/rules.ts` — **`BUSINESS_MVP_RULES`**: every rule the photos don't establish (starting cash, Start reward, tax, jail, rest house, auctions, loans, bankruptcy, winning…). Each is a *configured MVP assumption — verify against physical rules*. Players can read them in-app under **House rules**.
-* `BOARD_LAYOUT` in `businessBoard.ts` is an **assumed square order** — edit it to match your board before playtesting.
+* `src/engine/businessBoard.ts` — the single board source of truth:
+  * **title deeds** (prices, rents, house/hotel costs, mortgage values, paired transport/utility rules), from the photographed cards;
+  * **`BOARD_ROWS`** — the four sides of the physical board exactly as dictated (corner → corner). The 36-square cycle `BOARD_LAYOUT` is *derived* from the rows by `deriveBoardCycle`, which validates shared corners, closure back to Start and duplicates at module load. The DB catalog is generated from this file (`scripts/print-catalog-sql.ts`) and a test keeps them in sync.
+* `src/engine/cards.ts` — the confirmed Chance / Community Chest **EVEN and ODD tables** (dice total picks the table and the entry). The only total with no entry (Chance odd 11) is resolved by hand.
+* `src/engine/rules.ts` — **`BUSINESS_MVP_RULES`**, each value marked ✅ confirmed (₹25,000 start, ₹1,500 at Start, 3+ same colour ×2 rent, loan interest at next Start, trading, multi-undo) or ⚠️ assumption (Income Tax amount, Wealth Taxes amount, Club rule, jail, auctions, building sell-back rate, how buildings are valued on mortgage, …). Players see both lists in-app under **House rules**.
 
 ## Setup
 

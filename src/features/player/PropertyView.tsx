@@ -4,7 +4,9 @@ import {
   computeRent,
   getDeed,
   GROUP_LABELS,
+  mortgageResolution,
   propertyActionBlocker,
+  rentMultiplier,
   rentTable,
   sellBuildingRefund,
   unmortgageCost,
@@ -35,7 +37,12 @@ export function PropertyView({ view, propertyKey }: { view: GameView; propertyKe
     actions.push({ kind: 'BUILD_HOTEL', title: `Build hotel ${formatINR(deed.hotelCost)}`, variant: 'success' });
     actions.push({ kind: 'SELL_BUILDING', title: `Sell ${prop.hotel ? 'hotel' : 'house'} +${formatINR(sellBuildingRefund(propertyKey, prop))}`, variant: 'secondary' });
   }
-  actions.push({ kind: 'MORTGAGE_PROPERTY', title: `Mortgage +${formatINR(deed.mortgageValue)}`, variant: 'secondary' });
+  const mortgage = mortgageResolution(prop);
+  actions.push({
+    kind: 'MORTGAGE_PROPERTY',
+    title: mortgage.buildingValue > 0 ? `Mortgage +${formatINR(mortgage.payout)} (buildings returned)` : `Mortgage +${formatINR(mortgage.payout)}`,
+    variant: 'secondary',
+  });
   actions.push({ kind: 'UNMORTGAGE_PROPERTY', title: `Unmortgage ${formatINR(unmortgageCost(propertyKey))}`, variant: 'primary' });
   actions.push({ kind: 'SELL_PROPERTY', title: `Sell to bank +${formatINR(deed.mortgageValue)}`, variant: 'danger' });
   // Only show what the player can actually do right now.
@@ -67,6 +74,11 @@ export function PropertyView({ view, propertyKey }: { view: GameView; propertyKe
               <Text className="text-2xl font-black text-ink" testID="current-rent">
                 {deed.kind === 'TRANSPORT_UTILITY' && deed.rent.type === 'DICE_MULTIPLIER' ? `${formatINR(currentRent)} on a ${lastDice}` : formatINR(currentRent)}
               </Text>
+              {rentMultiplier(state, propertyKey) > 1 && currentRent > 0 ? (
+                <Text className="text-sm font-bold text-green-700" testID="rent-doubled">
+                  ×2 — owner has 3+ {GROUP_LABELS[deed.group]} properties
+                </Text>
+              ) : null}
             </View>
           ) : null}
           <View className="gap-1 rounded-2xl bg-white p-3">
