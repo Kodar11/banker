@@ -150,13 +150,16 @@ describe('board squares', () => {
     expect(spaces.filter((s) => s.propertyKey)).toHaveLength(26);
   });
 
-  it('marks ownership with the owner colour + initial (never the whole card), and nothing on available ones', async () => {
+  it('marks ownership with only a thin owner-colour strip (never the whole card), and nothing on available ones', async () => {
     const f = new Fixture(['Tanmay', 'Shamin']);
     f.state.properties.MUMBAI.ownerId = f.ids.Tanmay!;
     await render(<ClassicBoard state={f.state} size={360} />);
     const orange = playerColor(player(f, 'Tanmay')).color;
     expect(StyleSheet.flatten(screen.getByTestId('board-owner-strip-MUMBAI').props.style).backgroundColor).toBe(orange);
-    expect(screen.getByTestId('board-owner-MUMBAI')).toHaveTextContent('T');
+    // No owner stamp; name and price stay visible.
+    expect(screen.queryByTestId('board-owner-MUMBAI')).toBeNull();
+    expect(screen.getByTestId('board-price-MUMBAI')).toHaveTextContent('₹8,500');
+    expect(screen.getByTestId(`board-square-${positionOfProperty('MUMBAI')}`)).toHaveTextContent(/Mumbai/);
     // Card keeps its group identity.
     expect(StyleSheet.flatten(screen.getByTestId('board-band-MUMBAI').props.style).backgroundColor).toBe(PROPERTY_DARK_BLUE);
     expect(StyleSheet.flatten(screen.getByTestId(`board-square-${positionOfProperty('MUMBAI')}`).props.style).backgroundColor).toBe(PROPERTY_GROUP_THEME.BLUE.tint);

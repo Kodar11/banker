@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { Text, View, type ViewStyle } from 'react-native';
 import type { PropertyKey, SpecialSpaceType } from '@/engine/index.ts';
-import { COLORS, PROPERTY_GROUP_THEME, playerColor, playerInitial } from '@/constants/theme';
+import { COLORS, PROPERTY_GROUP_THEME, playerColor } from '@/constants/theme';
 import { formatINR } from '@/utils/currency';
 import type { BoardSide, BoardSpaceViewModel, SquareSlot } from './boardModel';
 
@@ -75,7 +75,7 @@ function describe(space: BoardSpaceViewModel): string {
 /**
  * One square of the physical board. Purely visual: no handlers, no state.
  * Property group colour = what the property is (tint + inner colour band);
- * player colour = who owns it (thin outer strip + initial badge).
+ * player colour = who owns it (thin outer strip).
  */
 export const BoardSquare = memo(function BoardSquare({ space, slot, metrics }: { space: BoardSpaceViewModel; slot: SquareSlot; metrics: SquareMetrics }) {
   const frame: ViewStyle = {
@@ -134,7 +134,7 @@ export const BoardSquare = memo(function BoardSquare({ space, slot, metrics }: {
   const transportIcon = space.propertyKey ? TRANSPORT_ICONS[space.propertyKey] : undefined;
   const bandFont = band * 0.72;
   const pad = 1.5;
-  // Two-line names must also leave room (across the square) for the icon / price / owner chip.
+  // Two-line names must also leave room (across the square) for the icon / price.
   const below = space.purchasePrice !== null ? metrics.priceFont * 1.7 : icon ? metrics.nameFont * 1.8 : 0;
   const lines = space.name.includes(' ') ? 2 : 1;
   const nameFont = Math.min(fitFont(space.name, length - 2 * pad, metrics.nameFont), (thickness - 2 - below) / (lines * 1.25));
@@ -194,26 +194,7 @@ export const BoardSquare = memo(function BoardSquare({ space, slot, metrics }: {
         >
           {space.name}
         </Text>
-        {space.owner && ownerColor ? (
-          // Owned: the owner's initial chip stands where the price was (a price = still on the market).
-          <View
-            testID={`board-owner-${space.propertyKey}`}
-            style={{
-              marginTop: 1,
-              minWidth: metrics.priceFont * 1.6,
-              height: metrics.priceFont * 1.6,
-              borderRadius: metrics.priceFont,
-              paddingHorizontal: 2,
-              backgroundColor: ownerColor.color,
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Text style={{ color: ownerColor.onColor, fontSize: metrics.priceFont * 1.05, fontWeight: '900', lineHeight: metrics.priceFont * 1.3 }}>
-              {playerInitial(space.owner.name)}
-            </Text>
-          </View>
-        ) : space.purchasePrice !== null ? (
+        {space.purchasePrice !== null ? (
           <Text
             testID={`board-price-${space.propertyKey}`}
             style={{ fontSize: Math.min(metrics.priceFont, (length - 2 * pad) / 4.6), color: '#5B5347', fontWeight: '600', marginTop: 1 }}
