@@ -21,6 +21,7 @@ export type GameErrorCode =
   | 'MORTGAGE_NOT_ALLOWED'
   | 'LOAN_NOT_ALLOWED'
   | 'UNDO_NOT_ALLOWED'
+  | 'TRADE_NOT_ALLOWED'
   | 'STALE_STATE';
 
 export class GameError extends Error {

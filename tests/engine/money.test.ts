@@ -7,7 +7,7 @@ const START = BUSINESS_MVP_RULES.startingCash;
 describe('property purchase', () => {
   it('buys an unowned property: money to bank, ownership set, transaction recorded', () => {
     const g = new TestGame();
-    g.roll('Asha', 3, 2); // Railway 9500
+    g.roll('Asha', 1, 2); // Railway (square 3) 9500
     expect(g.state.turn.pending).toEqual({ kind: 'BUY', propertyKey: 'RAILWAY', price: 9500 });
     const r = g.act('Asha', { type: 'BUY_PROPERTY' });
     expect(g.state.properties.RAILWAY.ownerId).toBe(g.id('Asha'));
@@ -18,7 +18,7 @@ describe('property purchase', () => {
 
   it('a second BUY (double tap) is rejected and charges nothing', () => {
     const g = new TestGame();
-    g.roll('Asha', 3, 2);
+    g.roll('Asha', 1, 2);
     g.act('Asha', { type: 'BUY_PROPERTY' });
     expect(() => g.act('Asha', { type: 'BUY_PROPERTY' })).toThrow('There is no property to buy right now.');
     expect(g.balance('Asha')).toBe(START - 9500);
@@ -37,7 +37,7 @@ describe('property purchase', () => {
   it('a property has at most one owner — landing on an owned property never offers it for sale', () => {
     const g = new TestGame();
     g.give('Bilal', 'RAILWAY');
-    g.roll('Asha', 3, 2);
+    g.roll('Asha', 1, 2);
     expect(g.state.turn.pending?.kind).toBe('PAYMENT');
     expect(() => g.act('Asha', { type: 'BUY_PROPERTY' })).toThrow();
     expect(g.state.properties.RAILWAY.ownerId).toBe(g.id('Bilal'));
@@ -53,7 +53,8 @@ describe('rent', () => {
     expect(g.state.turn.pending).toMatchObject({ kind: 'PAYMENT', reason: 'RENT', amount: 1200, toPlayerId: g.id('Bilal') });
     const r = g.act('Asha', { type: 'PAY_RENT' });
     expect(r.transactions).toMatchObject([{ type: 'RENT_PAYMENT', amount: 1200, fromPlayerId: g.id('Asha'), toPlayerId: g.id('Bilal') }]);
-    expect(g.balance('Asha')).toBe(START - 1200);
+    // Mumbai is square 1, so reaching it from behind passes Start (+₹1,500).
+    expect(g.balance('Asha')).toBe(START + BUSINESS_MVP_RULES.start.passReward - 1200);
     expect(g.balance('Bilal')).toBe(START + 1200);
     expect(() => g.act('Asha', { type: 'PAY_RENT' })).toThrow('There is nothing to pay right now.');
   });
@@ -70,7 +71,7 @@ describe('rent', () => {
   it('no rent when landing on your own property or a mortgaged one', () => {
     const g = new TestGame();
     g.give('Asha', 'RAILWAY');
-    g.roll('Asha', 3, 2);
+    g.roll('Asha', 1, 2);
     expect(g.state.turn.phase).toBe('TURN_COMPLETE');
     g.act('Asha', { type: 'END_TURN' });
     g.give('Asha', 'MUMBAI', { mortgaged: true });
@@ -82,8 +83,8 @@ describe('rent', () => {
   it('cannot pay rent without enough money; must raise funds or go bankrupt', () => {
     const g = new TestGame();
     g.give('Bilal', 'MUMBAI', { houses: 0, hotel: true }); // 9000
-    g.act('Asha', { type: 'TRANSFER_MONEY', toPlayerId: g.id('Chitra'), amount: START - 5000 });
-    g.placeBefore('Asha', 'MUMBAI', 6);
+    g.act('Asha', { type: 'TRANSFER_MONEY', toPlayerId: g.id('Chitra'), amount: START - 3500 });
+    g.placeBefore('Asha', 'MUMBAI', 6); // passes Start: 3,500 + 1,500 = 5,000
     g.roll('Asha', 3, 3);
     expect(() => g.act('Asha', { type: 'PAY_RENT' })).toThrow(/Not enough money/);
     g.act('Asha', { type: 'REQUEST_LOAN', amount: 5000 });
@@ -95,7 +96,7 @@ describe('rent', () => {
 describe('tax and transfers', () => {
   it('Income Tax creates a payment to the bank', () => {
     const g = new TestGame();
-    g.roll('Asha', 2, 2); // position 4
+    g.roll('Asha', 2, 3); // Income Tax (square 5)
     expect(g.state.turn.pending).toMatchObject({ reason: 'TAX', amount: BUSINESS_MVP_RULES.incomeTax.amount, toPlayerId: null });
     const r = g.act('Asha', { type: 'PAY_TAX' });
     expect(r.transactions[0]).toMatchObject({ type: 'TAX_PAYMENT', toPlayerId: null });
@@ -104,7 +105,7 @@ describe('tax and transfers', () => {
 
   it('PAY_RENT cannot be used to settle a tax (types must match)', () => {
     const g = new TestGame();
-    g.roll('Asha', 2, 2);
+    g.roll('Asha', 2, 3);
     expect(() => g.act('Asha', { type: 'PAY_RENT' })).toThrow('There is nothing to pay right now.');
   });
 
@@ -174,10 +175,10 @@ describe('houses, hotels, mortgage', () => {
     expect(g.ledger.map((t) => t.type)).toContain('UNMORTGAGE');
   });
 
-  it('cannot mortgage with buildings; sell property to bank for mortgage value', () => {
+  it('sell property to bank for mortgage value (buildings must be sold first)', () => {
     const g = new TestGame();
     g.give('Asha', 'AGRA', { houses: 1 });
-    expect(() => g.act('Asha', { type: 'MORTGAGE_PROPERTY', propertyKey: 'AGRA' })).toThrow('Sell the buildings first.');
+    expect(() => g.act('Asha', { type: 'SELL_PROPERTY', propertyKey: 'AGRA' })).toThrow('Sell the buildings first.');
     g.give('Asha', 'PATNA');
     g.act('Asha', { type: 'SELL_PROPERTY', propertyKey: 'PATNA' });
     expect(g.state.properties.PATNA.ownerId).toBeNull();
@@ -190,7 +191,8 @@ describe('net worth', () => {
     const g = new TestGame();
     g.give('Asha', 'INDORE', { houses: 2 });
     g.act('Asha', { type: 'REQUEST_LOAN', amount: 1000 });
-    expect(netWorth(g.state, g.id('Asha'))).toBe(START + 1000 + 1500 + 2 * 2000 - 1100);
+    // Loan interest is not owed until the next Start, so the debt is the principal.
+    expect(netWorth(g.state, g.id('Asha'))).toBe(START + 1000 + 1500 + 2 * 2000 - 1000);
   });
 });
 
@@ -214,6 +216,28 @@ describe('money invariant under random play', () => {
             if (others.length) g.act(who, { type: 'TRANSFER_MONEY', toPlayerId: pick(others).id, amount: 1 + Math.floor(rand() * 3000) });
             continue;
           }
+          if (rand() < 0.05) {
+            // Off-turn trades and their answers, mortgages and loans interleave with turns.
+            const others = g.state.players.filter((p) => p.status === 'ACTIVE' && p.name !== who);
+            const mine = Object.values(g.state.properties).filter((p) => p.ownerId === g.id(who));
+            const open = g.state.trades.find((t) => t.status === 'PENDING');
+            if (open) {
+              const to = g.state.players.find((p) => p.id === open.toPlayerId)!.name;
+              g.act(to, { type: rand() < 0.6 ? 'ACCEPT_TRADE' : 'REJECT_TRADE', tradeId: open.id });
+            } else if (others.length && mine.length) {
+              g.act(who, {
+                type: 'CREATE_TRADE',
+                toPlayerId: pick(others).id,
+                offeredPropertyKeys: [pick(mine).key],
+                requestedPropertyKeys: [],
+                offeredMoney: 0,
+                requestedMoney: 100 + Math.floor(rand() * 20) * 100,
+              });
+            }
+            if (mine.length && rand() < 0.5) g.act(who, { type: 'MORTGAGE_PROPERTY', propertyKey: pick(mine).key });
+            if (rand() < 0.3) g.act(who, { type: 'REQUEST_LOAN', amount: 1000 });
+            continue;
+          }
           if (phase === 'AWAITING_ROLL') g.roll(who, 1 + Math.floor(rand() * 6), 1 + Math.floor(rand() * 6));
           else if (phase === 'AWAITING_DECISION') g.act(who, { type: rand() < 0.6 ? 'BUY_PROPERTY' : 'DECLINE_PROPERTY' });
           else if (phase === 'AUCTION') {
@@ -226,8 +250,11 @@ describe('money invariant under random play', () => {
               g.advance(60);
               g.act(name, { type: 'CLOSE_AUCTION', auctionId: a.id });
             }
+          } else if (phase === 'AWAITING_PAYMENT' && pending?.kind === 'TAX_ENTRY') {
+            g.act(who, { type: 'PAY_TAX', amount: 500 + Math.floor(rand() * 4) * 500 });
           } else if (phase === 'AWAITING_PAYMENT' && pending?.kind === 'PAYMENT') {
-            if (g.balance(who) >= pending.amount) g.act(who, { type: `PAY_${pending.reason}` as 'PAY_RENT' });
+            const pay = { RENT: 'PAY_RENT', TAX: 'PAY_TAX', CARD: 'PAY_CARD', LOAN_INTEREST: 'PAY_INTEREST', CLUB: 'PAY_CLUB' } as const;
+            if (g.balance(who) >= pending.amount) g.act(who, { type: pay[pending.reason] });
             else if (rand() < 0.5) g.act(who, { type: 'REQUEST_LOAN', amount: 1000 });
             else g.act(who, { type: 'DECLARE_BANKRUPTCY' });
           } else if (phase === 'AWAITING_CARD') {

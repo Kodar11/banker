@@ -30,14 +30,14 @@ describe('dice', () => {
     const r = g.roll('Asha', 3, 2);
     expect(g.state.turn.roll).toEqual({ dice: [3, 2], total: 5, isDouble: false });
     expect(g.player('Asha').position).toBe(5);
-    expect(r.events.find((e) => e.type === 'DICE_ROLLED')?.message).toBe('Asha rolled 5 → Railway');
+    expect(r.events.find((e) => e.type === 'DICE_ROLLED')?.message).toBe('Asha rolled 5 → Income Tax');
   });
 
   it('passing Start pays the reward via a transaction', () => {
     const g = new TestGame();
     g.player('Asha').position = 33;
     const before = g.balance('Asha');
-    const r = g.roll('Asha', 2, 2); // 33 + 4 = 37 → 1 (Indore)
+    const r = g.roll('Asha', 2, 2); // 33 + 4 = 37 → 1 (Mumbai)
     expect(g.player('Asha').position).toBe(1);
     expect(r.transactions.find((t) => t.type === 'START_REWARD')?.amount).toBe(BUSINESS_MVP_RULES.start.passReward);
     expect(g.balance('Asha')).toBe(before + BUSINESS_MVP_RULES.start.passReward);
@@ -81,15 +81,15 @@ describe('turn order', () => {
 
   it('cannot end turn while a decision is pending', () => {
     const g = new TestGame();
-    g.roll('Asha', 3, 2); // Railway, unowned
+    g.roll('Asha', 1, 2); // Railway, unowned
     expect(g.state.turn.phase).toBe('AWAITING_DECISION');
     expect(() => g.act('Asha', { type: 'END_TURN' })).toThrow('Finish your current action first.');
   });
 
   it('skips a player who landed on Rest House', () => {
     const g = new TestGame();
-    g.player('Asha').position = 12;
-    g.roll('Asha', 3, 3); // 18 Rest House
+    g.player('Asha').position = 21;
+    g.roll('Asha', 3, 3); // 27 Rest House
     expect(g.player('Asha').skipTurns).toBe(1);
     g.act('Asha', { type: 'END_TURN' });
     for (const who of ['Bilal', 'Chitra']) {
@@ -139,7 +139,7 @@ describe('turn order', () => {
 describe('state machine', () => {
   it('follows the documented path for a property landing', () => {
     const g = new TestGame();
-    const r = g.roll('Asha', 3, 2);
+    const r = g.roll('Asha', 1, 2);
     expect(r.transitions).toEqual([
       { from: 'AWAITING_ROLL', to: 'MOVING' },
       { from: 'MOVING', to: 'RESOLVING' },
@@ -164,8 +164,12 @@ describe('state machine', () => {
       expect(RESTING_PHASES.has(phase)).toBe(true);
       if (phase === 'AWAITING_DECISION') g.act(who, { type: 'BUY_PROPERTY' });
       else if (phase === 'AWAITING_PAYMENT') {
-        const reason = g.state.turn.pending?.kind === 'PAYMENT' ? g.state.turn.pending.reason : 'TAX';
-        g.act(who, { type: `PAY_${reason}` as 'PAY_TAX' });
+        const pending = g.state.turn.pending;
+        if (pending?.kind === 'TAX_ENTRY') g.act(who, { type: 'PAY_TAX', amount: 1000 });
+        else if (pending?.kind === 'PAYMENT') {
+          const pay = { RENT: 'PAY_RENT', TAX: 'PAY_TAX', CARD: 'PAY_CARD', LOAN_INTEREST: 'PAY_INTEREST', CLUB: 'PAY_CLUB' } as const;
+          g.act(who, { type: pay[pending.reason] });
+        }
       } else if (phase === 'AWAITING_CARD') g.act(who, { type: 'RESOLVE_CARD', resolution: 'NONE' });
       g.act(who, { type: 'END_TURN' });
     }
@@ -194,13 +198,13 @@ describe('pause / resume', () => {
     expect(() => g.act('Asha', { type: 'PAUSE_GAME' })).toThrow('Game is paused.');
     g.act('Chitra', { type: 'RESUME_GAME' });
     expect(g.state.status).toBe('ACTIVE');
-    g.roll('Asha', 3, 2);
+    g.roll('Asha', 1, 2);
     expect(g.state.turn.phase).toBe('AWAITING_DECISION');
   });
 
   it('resuming extends an open auction by the paused time', () => {
     const g = new TestGame();
-    g.roll('Asha', 3, 2);
+    g.roll('Asha', 1, 2);
     g.act('Asha', { type: 'DECLINE_PROPERTY' });
     const endsAt = Date.parse(g.state.auction!.endsAt);
     g.act('Bilal', { type: 'PAUSE_GAME' });

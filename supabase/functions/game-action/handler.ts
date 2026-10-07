@@ -12,6 +12,7 @@ import {
   isGameError,
   joinGame,
   applyAction,
+  RULES_VERSION,
   STALE_SENSITIVE_ACTIONS,
   type ApiRequest,
   type ApiResponse,
@@ -86,6 +87,13 @@ export async function handleRequest(rawBody: unknown, deps: HandlerDeps): Promis
     }
     console.error('game-action failed', error);
     return errorResult('SERVER_ERROR', 'Something went wrong. Please try again.', 500);
+  }
+}
+
+/** Games created by an older engine (V1 placeholder board) can't be loaded by this one. */
+function assertCurrentRules(game: Record<string, unknown>): void {
+  if (game.rules_version !== RULES_VERSION) {
+    throw new GameError('GAME_EXPIRED', 'This game was created with an older version of the board. Start a new game.');
   }
 }
 
@@ -168,6 +176,7 @@ async function joinOp(
     if (!game) throw new GameError('NOT_FOUND', 'Game not found.');
     const prior = await priorAction(tx, req.actionId);
     if (prior) return { duplicate: prior };
+    assertCurrentRules(game);
     const playerId = newId();
     const state = await loadState(tx, game);
     const result = joinGame(state, { playerId, name: req.name }, { actionId: req.actionId, now: now(), random, newId });
@@ -193,6 +202,7 @@ async function stateOp(req: Extract<ApiRequest, { op: 'state' }>, deps: HandlerD
     await authenticate(tx, req.gameId, req.playerId, req.token);
     const [game] = await tx`select * from public.games where id = ${req.gameId}`;
     if (!game) throw new GameError('NOT_FOUND', 'Game not found.');
+    assertCurrentRules(game);
     return loadSnapshot(tx, game);
   });
   return { status: 200, body: { ok: true, gameId: req.gameId, playerId: req.playerId, snapshot } };
@@ -221,6 +231,7 @@ async function actionOp(
       return { duplicate: true as const, snapshot: await loadSnapshot(tx, game) };
     }
 
+    assertCurrentRules(game);
     const currentVersion = game.state_version as number;
     if (
       typeof actionType === 'string' &&

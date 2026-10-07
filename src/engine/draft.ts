@@ -38,6 +38,8 @@ export class Draft {
   readonly events: GameEventRecord[] = [];
   readonly bids: BidRecord[] = [];
   readonly transitions: { from: TurnPhase; to: TurnPhase }[] = [];
+  /** Loan interest that fell due during this action's movement, settled before landing is resolved. */
+  dueInterest: { loanId: string; amount: number }[] = [];
 
   constructor(state: GameState, ctx: EngineContext) {
     this.state = structuredClone(state);

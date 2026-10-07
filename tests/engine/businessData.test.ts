@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  BOARD_LAYOUT,
-  BOARD_SIZE,
-  CHANCE_CARDS,
-  COMMUNITY_CHEST_CARDS,
-  findCard,
   getDeed,
   groupMembers,
   PROPERTY_DEEDS,
@@ -22,7 +17,7 @@ const CITY_DEEDS: Record<string, [string, number, number[], number, number, numb
   CALCUTTA: ['BLUE', 6500, [800, 3200, 4500, 6500], 8000, 6000, 6000, 3250],
   HYDERABAD: ['BLUE', 3500, [300, 1200, 3000, 4500], 6000, 5000, 5000, 1750],
   DARJEELING: ['BLUE', 2500, [200, 1200, 2600, 3500], 5000, 3000, 3000, 1250],
-  SIMLA: ['PURPLE', 2200, [200, 1000, 2750, 4500], 6000, 3500, 3500, 1100],
+  SHIMLA: ['PURPLE', 2200, [200, 1000, 2750, 4500], 6000, 3500, 3500, 1100],
   MADRAS: ['PURPLE', 7000, [900, 3500, 5000, 7000], 8500, 6500, 6500, 3500],
   AMRITSAR: ['PURPLE', 3300, [300, 1400, 2800, 4000], 5000, 4500, 4500, 1050],
   SRINAGAR: ['PURPLE', 5000, [550, 3500, 5000, 7000], 8000, 6000, 6000, 2500],
@@ -36,7 +31,7 @@ const CITY_DEEDS: Record<string, [string, number, number[], number, number, numb
   CHANDIGARH: ['PINK', 2500, [200, 900, 1600, 2500], 3500, 3000, 3000, 1250],
   COCHIN: ['PINK', 3000, [300, 1200, 2000, 4250], 5500, 4000, 4000, 1500],
   OOTACAMUND: ['PINK', 2500, [200, 1000, 2250, 3500], 4500, 3000, 3000, 1250],
-  MARGOA: ['PINK', 4000, [400, 2200, 3500, 5000], 6500, 4500, 4500, 2000],
+  MARGAO: ['PINK', 4000, [400, 2200, 3500, 5000], 6500, 4500, 4500, 2000],
 };
 
 /** Board property list purchase prices (spec §8). */
@@ -48,13 +43,13 @@ const BOARD_LIST_PRICES: Partial<Record<PropertyKey, number>> = {
   HYDERABAD: 3500,
   MADRAS: 7000,
   BANGALORE: 4000,
-  MARGOA: 4000,
+  MARGAO: 4000,
   MOTOR_BOAT: 5500,
   BEST: 3500,
   ELECTRIC_COMPANY: 2500,
   CHANDIGARH: 2500,
   DELHI: 6000,
-  SIMLA: 2200,
+  SHIMLA: 2200,
   SRINAGAR: 5000,
   AMRITSAR: 3300,
   WATER_WORKS: 3200,
@@ -118,56 +113,5 @@ describe('Business V1 title deeds — exact photographed values', () => {
     for (const g of ['BLUE', 'PURPLE', 'GREEN', 'PINK'] as const) expect(groupMembers(g)).toHaveLength(5);
     expect(groupMembers('TRANSPORT_UTILITY')).toHaveLength(6);
     for (const k of PROPERTY_KEYS) expect(PROPERTY_DEEDS[k].key).toBe(k);
-  });
-});
-
-describe('board layout (assumed order) integrity', () => {
-  it('contains every property exactly once', () => {
-    const keys = BOARD_LAYOUT.flatMap((s) => (s.kind === 'PROPERTY' ? [s.propertyKey] : []));
-    expect(keys.sort()).toEqual([...PROPERTY_KEYS].sort());
-  });
-
-  it('starts at START and has one Jail, Rest House and Income Tax', () => {
-    expect(BOARD_LAYOUT[0]).toMatchObject({ kind: 'SPECIAL', type: 'START' });
-    const count = (t: string) => BOARD_LAYOUT.filter((s) => s.kind === 'SPECIAL' && s.type === t).length;
-    expect(count('START')).toBe(1);
-    expect(count('JAIL')).toBe(1);
-    expect(count('REST_HOUSE')).toBe(1);
-    expect(count('INCOME_TAX')).toBeGreaterThanOrEqual(1);
-    expect(count('CHANCE')).toBeGreaterThanOrEqual(1);
-    expect(count('COMMUNITY_CHEST')).toBeGreaterThanOrEqual(1);
-    expect(BOARD_SIZE).toBe(BOARD_LAYOUT.length);
-  });
-});
-
-describe('cards — photographed entries', () => {
-  it('Chance known entries', () => {
-    expect(findCard('CHANCE', 2).effects).toEqual([{ type: 'PAY_BANK', amount: 2000 }]);
-    expect(findCard('CHANCE', 3).effects).toEqual([{ type: 'PAY_BANK', amount: 1500 }]);
-    expect(findCard('CHANCE', 4).effects).toEqual([{ type: 'PAY_BANK', amount: 1500 }]);
-    expect(findCard('CHANCE', 5).effects).toEqual([{ type: 'PAY_BANK', amount: 3000 }]);
-    expect(findCard('CHANCE', 10).effects).toEqual([{ type: 'GO_TO_JAIL' }]);
-    expect(findCard('CHANCE', 12).effects).toEqual([
-      { type: 'MOVE_TO', destination: 'REST_HOUSE', resolveLanding: false },
-      { type: 'SKIP_TURNS', count: 1 },
-    ]);
-  });
-
-  it('Community Chest known entries', () => {
-    expect(findCard('COMMUNITY_CHEST', 1).effects).toEqual([{ type: 'PAY_BANK', amount: 1000 }]);
-    expect(findCard('COMMUNITY_CHEST', 3).effects).toEqual([{ type: 'PAY_BANK', amount: 200 }]);
-    expect(findCard('COMMUNITY_CHEST', 5).effects).toEqual([{ type: 'GO_TO_JAIL' }]);
-    expect(findCard('COMMUNITY_CHEST', 9).effects).toEqual([{ type: 'PAY_PER_BUILDING', perHouse: 100, perHotel: 500 }]);
-    expect(findCard('COMMUNITY_CHEST', 11).effects).toEqual([{ type: 'PAY_BANK', amount: 1500 }]);
-  });
-
-  it('every entry for totals 2–12 exists; unverified entries are MANUAL only (nothing invented)', () => {
-    for (const deck of [CHANCE_CARDS, COMMUNITY_CHEST_CARDS]) {
-      for (let total = 2; total <= 12; total += 1) expect(deck.some((c) => c.rollTotal === total)).toBe(true);
-      for (const c of deck) {
-        if (!c.verified) expect(c.effects).toEqual([{ type: 'MANUAL' }]);
-        else expect(c.effects.some((e) => e.type === 'MANUAL')).toBe(false);
-      }
-    }
   });
 });

@@ -1,5 +1,6 @@
 import {
   applyAction,
+  BOARD_SIZE,
   createGame,
   joinGame,
   ledgerViolations,
@@ -104,6 +105,23 @@ export class TestGame {
     return this.absorb(applyAction(this.state, this.id(name), action, this.ctx(actionId)));
   }
 
+  /** Absorb a result produced outside `act` (e.g. applyCardDefinition). */
+  absorbResult(result: EngineResult): EngineResult {
+    return this.absorb(result);
+  }
+
+  /** Roll a total (2–12) with some pair of faces. */
+  rollTotal(name: string, total: number): EngineResult {
+    const [a, b] = facesFor(total);
+    return this.roll(name, a, b);
+  }
+
+  /** Put `name` `total` squares before `position` and roll exactly `total`. */
+  landOn(name: string, position: number, total: number): EngineResult {
+    this.placeAt(name, (position - total + BOARD_SIZE * 2) % BOARD_SIZE);
+    return this.rollTotal(name, total);
+  }
+
   /** Roll with fixed dice faces. */
   roll(name: string, a: number, b: number): EngineResult {
     this.queueDice(a, b);
@@ -113,7 +131,12 @@ export class TestGame {
   /** Teleport a player so their next roll of `a + b` lands on `key` (test setup only). */
   placeBefore(name: string, key: PropertyKey, total: number): void {
     const target = positionOfProperty(key);
-    this.player(name).position = (target - total + 36 * 2) % 36;
+    this.player(name).position = (target - total + BOARD_SIZE * 2) % BOARD_SIZE;
+  }
+
+  /** Teleport a player to a board index (test setup only — no Start reward). */
+  placeAt(name: string, position: number): void {
+    this.player(name).position = position;
   }
 
   /** Test-only state surgery that bypasses the ledger (use for ownership setup only). */
@@ -126,4 +149,10 @@ export class TestGame {
     const props = propertyViolations(this.state);
     if (money.length || props.length) throw new Error(`Invariant violated:\n${[...money, ...props].join('\n')}`);
   }
+}
+
+/** Dice faces that sum to `total` (2–12). */
+export function facesFor(total: number): [number, number] {
+  const a = Math.min(6, total - 1);
+  return [a, total - a];
 }

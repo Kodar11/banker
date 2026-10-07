@@ -2,14 +2,16 @@ import { GameActionSchema, PlayerNameSchema, type GameAction } from './actions.t
 import {
   BOARD_SIZE,
   getDeed,
+  normalizePosition,
   positionOfSpecial,
+  positionOfSquare,
   PROPERTY_KEYS,
   RULES_VERSION,
   spaceAt,
   spaceName,
   type PropertyKey,
 } from './businessBoard.ts';
-import { DECK_LABELS, findCard, type CardDefinition, type Deck } from './cards.ts';
+import { DECK_LABELS, findCard, type CardDefinition, type Deck, type MoveDirection } from './cards.ts';
 import { Draft } from './draft.ts';
 import { fail, GameError } from './errors.ts';
 import { formatINR } from './format.ts';
@@ -17,15 +19,32 @@ import { BUSINESS_MVP_RULES as RULES } from './rules.ts';
 import {
   buildingCount,
   computeRent,
+  loansWithInterestDue,
   loanTerms,
+  mortgageResolution,
   netWorth,
   outstandingPrincipal,
   propertyActionBlocker,
   sellBuildingRefund,
+  topUndoable,
+  tradeBlocker,
+  undoBlocker,
   unmortgageCost,
   type PropertyActionKind,
 } from './selectors.ts';
-import type { EngineContext, EngineResult, GameState, PlayerState, PropertyState, TurnState } from './types.ts';
+import type {
+  EngineContext,
+  EngineResult,
+  FollowUp,
+  GameState,
+  PaymentReason,
+  Pending,
+  PlayerState,
+  PropertyState,
+  TradeOffer,
+  TransactionRecord,
+  TurnState,
+} from './types.ts';
 
 // ---------------------------------------------------------------------------
 // Creation & lobby
@@ -50,13 +69,14 @@ function freshTurn(): TurnState {
     toPosition: null,
     passedStart: false,
     pending: null,
+    followUp: null,
     card: null,
     consecutiveDoubles: 0,
   };
 }
 
 function newPlayer(id: string, name: string, seat: number, isHost: boolean): PlayerState {
-  return { id, name, seat, isHost, ready: isHost, balance: 0, position: 0, status: 'ACTIVE', skipTurns: 0, inJail: false };
+  return { id, name, seat, isHost, ready: isHost, balance: 0, position: 0, status: 'ACTIVE', skipTurns: 0, inJail: false, circuits: 0 };
 }
 
 export function createGame(
@@ -83,8 +103,9 @@ export function createGame(
     loans: [],
     auction: null,
     turn: freshTurn(),
-    lastUndoable: null,
+    undoStack: [],
     undoRequest: null,
+    trades: [],
     createdAt: ctx.now,
     expiresAt: addHours(ctx.now, RULES.session.ttlHours),
   };
@@ -95,7 +116,7 @@ export function createGame(
 }
 
 export function joinGame(state: GameState, input: { playerId: string; name: string }, ctx: EngineContext): EngineResult {
-  assertNotExpired(state, ctx);
+  assertLoadable(state, ctx);
   if (state.status !== 'WAITING') fail('GAME_NOT_ACTIVE', 'This game has already started.');
   const name = PlayerNameSchema.safeParse(input.name);
   if (!name.success) fail('VALIDATION', name.error.issues[0]?.message ?? 'Invalid name.');
@@ -115,7 +136,10 @@ export function joinGame(state: GameState, input: { playerId: string; name: stri
 // Action dispatch
 // ---------------------------------------------------------------------------
 
-function assertNotExpired(state: GameState, ctx: EngineContext): void {
+function assertLoadable(state: GameState, ctx: EngineContext): void {
+  if (state.rulesVersion !== RULES_VERSION) {
+    fail('GAME_EXPIRED', 'This game was created with an older version of the board. Start a new game.');
+  }
   if (state.status !== 'FINISHED' && Date.parse(ctx.now) > Date.parse(state.expiresAt)) {
     fail('GAME_EXPIRED', 'This game has expired. Start a new one.');
   }
@@ -134,6 +158,8 @@ const TURN_ACTIONS = new Set<GameAction['type']>([
   'PAY_RENT',
   'PAY_TAX',
   'PAY_CARD',
+  'PAY_INTEREST',
+  'PAY_CLUB',
   'RESOLVE_CARD',
   'END_TURN',
   'DECLARE_BANKRUPTCY',
@@ -141,7 +167,8 @@ const TURN_ACTIONS = new Set<GameAction['type']>([
 
 /**
  * Apply one player action to the authoritative state.
- * Pure: returns a new state plus the transactions/events it produced. Throws GameError when invalid.
+ * Pure: returns a new state plus the transactions/events it produced. Throws GameError when invalid,
+ * in which case nothing at all changes (the caller discards the draft).
  */
 export function applyAction(state: GameState, actorId: string, rawAction: unknown, ctx: EngineContext): EngineResult {
   const parsed = GameActionSchema.safeParse(rawAction);
@@ -150,7 +177,7 @@ export function applyAction(state: GameState, actorId: string, rawAction: unknow
 
   if (!state.players.some((p) => p.id === actorId)) fail('FORBIDDEN', 'You are not in this game.');
   if (state.status === 'FINISHED') fail('GAME_FINISHED', 'This game has finished.');
-  assertNotExpired(state, ctx);
+  assertLoadable(state, ctx);
 
   if (state.status === 'WAITING') {
     if (action.type !== 'SET_READY' && action.type !== 'START_GAME') {
@@ -193,10 +220,17 @@ export function applyAction(state: GameState, actorId: string, rawAction: unknow
       payPending(d, actor, 'RENT');
       break;
     case 'PAY_TAX':
-      payPending(d, actor, 'TAX');
+      if (d.state.turn.pending?.kind === 'TAX_ENTRY') payEnteredTax(d, actor, action.amount);
+      else payPending(d, actor, 'TAX');
       break;
     case 'PAY_CARD':
       payPending(d, actor, 'CARD');
+      break;
+    case 'PAY_INTEREST':
+      payPending(d, actor, 'LOAN_INTEREST');
+      break;
+    case 'PAY_CLUB':
+      payPending(d, actor, 'CLUB');
       break;
     case 'RESOLVE_CARD':
       resolveManualCard(d, actor, action.resolution, action.amount ?? 0);
@@ -232,6 +266,16 @@ export function applyAction(state: GameState, actorId: string, rawAction: unknow
       break;
     case 'DECLARE_BANKRUPTCY':
       declareBankruptcy(d, actor);
+      break;
+    case 'CREATE_TRADE':
+      createTrade(d, actor, action);
+      break;
+    case 'ACCEPT_TRADE':
+      acceptTrade(d, actor, action.tradeId);
+      break;
+    case 'REJECT_TRADE':
+    case 'CANCEL_TRADE':
+      closeTrade(d, actor, action.tradeId, action.type === 'REJECT_TRADE' ? 'REJECTED' : 'CANCELLED');
       break;
     case 'REQUEST_UNDO':
       requestUndo(d, actor, action.targetActionId);
@@ -301,42 +345,143 @@ function rollDice(d: Draft, actor: PlayerState): void {
   turn.consecutiveDoubles = isDouble ? turn.consecutiveDoubles + 1 : 0;
   turn.card = null;
   d.setPhase('MOVING');
-  const from = actor.position;
-  const to = moveForward(d, actor, total, 'roll');
-  turn.fromPosition = from;
-  turn.toPosition = to;
-  d.event('DICE_ROLLED', actor.id, `${actor.name} rolled ${total} → ${spaceName(to)}`, {
+  const move = movePlayer(d, actor, { steps: total, direction: 'FORWARD', collectStart: true });
+  turn.fromPosition = move.from;
+  turn.toPosition = move.to;
+  d.event('DICE_ROLLED', actor.id, `${actor.name} rolled ${total} → ${spaceName(move.to)}`, {
     dice,
     total,
-    from,
-    to,
-    destination: spaceName(to),
+    from: move.from,
+    to: move.to,
+    destination: spaceName(move.to),
   });
   d.setPhase('RESOLVING');
+  if (!settleDueInterest(d, actor, { kind: 'RESOLVE_LANDING', rollTotal: total, depth: 0 })) return;
   resolveLanding(d, actor, total, 0);
 }
 
-/** Moves forward `steps` squares, paying the START reward if START is passed or landed on. */
-function moveForward(d: Draft, player: PlayerState, steps: number, reason: 'roll' | 'card'): number {
+interface MoveOutcome {
+  from: number;
+  to: number;
+  passedStart: boolean;
+}
+
+/**
+ * THE movement function. Every legitimate move (dice, card "move to", card
+ * "move n squares", forward or backward) goes through here.
+ *
+ * Start crossing is decided from the movement itself: a FORWARD move whose path
+ * reaches index 0 (passes it or lands exactly on it) completes a circuit and
+ * pays the Start reward. BACKWARD moves and direct moves (collectStart=false,
+ * e.g. Go to Jail) never do. Merely being at index 0 pays nothing.
+ *
+ * A completed circuit is also the loan-interest checkpoint: interest that falls
+ * due is queued on the draft and settled by settleDueInterest().
+ */
+function movePlayer(
+  d: Draft,
+  player: PlayerState,
+  move: { steps: number; direction: MoveDirection; collectStart: boolean } | { to: number; direction: MoveDirection; collectStart: boolean },
+): MoveOutcome {
   const from = player.position;
-  const raw = from + steps;
-  const to = raw % BOARD_SIZE;
-  const passed = steps > 0 && raw >= BOARD_SIZE;
+  const steps =
+    'steps' in move
+      ? Math.abs(move.steps)
+      : move.direction === 'FORWARD'
+        ? normalizePosition(move.to - from)
+        : normalizePosition(from - move.to);
+  const forward = move.direction === 'FORWARD';
+  const to = normalizePosition(forward ? from + steps : from - steps);
+  // Direct moves (collectStart = false) jump to the square without "passing" Start.
+  const passedStart = move.collectStart && forward && steps > 0 && from + steps >= BOARD_SIZE;
   player.position = to;
-  d.state.turn.passedStart = passed;
-  if (passed && (reason === 'roll' || RULES.cards.forwardMovePassesStart)) {
-    d.transfer({ type: 'START_REWARD', from: null, to: player.id, amount: RULES.start.passReward, memo: 'Passed Start' });
-    d.event('PASSED_START', player.id, `${player.name} collected ${formatINR(RULES.start.passReward)} for passing Start`);
+  d.state.turn.passedStart = d.state.turn.passedStart || passedStart;
+  if (passedStart) completeCircuit(d, player);
+  return { from, to, passedStart };
+}
+
+function completeCircuit(d: Draft, player: PlayerState): void {
+  player.circuits += 1;
+  d.transfer({ type: 'START_REWARD', from: null, to: player.id, amount: RULES.start.passReward, memo: 'Passed Start' });
+  d.event('PASSED_START', player.id, `${player.name} collected ${formatINR(RULES.start.passReward)} for passing Start`);
+  for (const loan of loansWithInterestDue(d.state.loans, player.id, player.circuits)) {
+    loan.interestCharges += 1;
+    d.dueInterest.push({ loanId: loan.id, amount: loan.interestAmount });
+    d.event('LOAN_INTEREST_DUE', player.id, `Loan interest of ${formatINR(loan.interestAmount)} is due`, {
+      loanId: loan.id,
+      amount: loan.interestAmount,
+    });
   }
-  return to;
+}
+
+/**
+ * Pays loan interest that fell due during this action's movement. If the
+ * player can't afford it, the turn rests in AWAITING_PAYMENT (normal
+ * insufficient-funds rules: raise money or declare bankruptcy) and `followUp`
+ * continues the turn after payment. Returns true when the turn can continue now.
+ */
+function settleDueInterest(d: Draft, player: PlayerState, followUp: FollowUp | null): boolean {
+  const due = d.dueInterest;
+  if (due.length === 0) return true;
+  d.dueInterest = [];
+  const amount = due.reduce((s, x) => s + x.amount, 0);
+  const loanIds = due.map((x) => x.loanId);
+  if (player.balance >= amount) {
+    payLoanInterest(d, player, amount, loanIds);
+    return true;
+  }
+  d.state.turn.pending = {
+    kind: 'PAYMENT',
+    reason: 'LOAN_INTEREST',
+    amount,
+    toPlayerId: null,
+    propertyKey: null,
+    label: 'Loan interest',
+    cardId: null,
+    loanIds,
+  };
+  d.state.turn.followUp = followUp;
+  d.setPhase('AWAITING_PAYMENT');
+  return false;
+}
+
+function payLoanInterest(d: Draft, player: PlayerState, amount: number, loanIds: string[]): void {
+  d.transfer({ type: 'LOAN_INTEREST', from: player.id, to: null, amount, memo: 'Loan interest (due at Start)' });
+  let remaining = amount;
+  for (const id of loanIds) {
+    const loan = d.state.loans.find((l) => l.id === id);
+    if (!loan) continue;
+    const part = Math.min(remaining, loan.interestAmount);
+    loan.interestPaid += part;
+    remaining -= part;
+  }
+  d.event('LOAN_INTEREST_PAID', player.id, `${player.name} paid ${formatINR(amount)} loan interest`, { amount, loanIds });
 }
 
 function sendToJail(d: Draft, player: PlayerState): void {
-  player.position = positionOfSpecial('JAIL');
+  movePlayer(d, player, {
+    to: positionOfSpecial('JAIL'),
+    direction: 'FORWARD',
+    collectStart: !RULES.cards.jailAndRestHouseMovesAreDirect,
+  });
   player.inJail = true;
   player.skipTurns += RULES.jail.turnsSkipped;
   d.state.turn.toPosition = player.position;
   d.event('SENT_TO_JAIL', player.id, `${player.name} goes to Jail`);
+}
+
+function sendToRestHouse(d: Draft, player: PlayerState): void {
+  movePlayer(d, player, {
+    to: positionOfSpecial('REST_HOUSE'),
+    direction: 'FORWARD',
+    collectStart: !RULES.cards.jailAndRestHouseMovesAreDirect,
+  });
+  d.state.turn.toPosition = player.position;
+  d.event('MOVED', player.id, `${player.name} goes to the Rest House`, { to: player.position });
+}
+
+function paymentPending(reason: PaymentReason, amount: number, label: string, extra: Partial<Extract<Pending, { kind: 'PAYMENT' }>> = {}): Pending {
+  return { kind: 'PAYMENT', reason, amount, toPlayerId: null, propertyKey: null, label, cardId: null, ...extra };
 }
 
 function resolveLanding(d: Draft, player: PlayerState, rollTotal: number, depth: number): void {
@@ -363,15 +508,7 @@ function resolveLanding(d: Draft, player: PlayerState, rollTotal: number, depth:
       d.setPhase('TURN_COMPLETE');
       return;
     }
-    turn.pending = {
-      kind: 'PAYMENT',
-      reason: 'RENT',
-      amount: rent,
-      toPlayerId: prop.ownerId,
-      propertyKey: key,
-      label: `Rent for ${deed.name}`,
-      cardId: null,
-    };
+    turn.pending = paymentPending('RENT', rent, `Rent for ${deed.name}`, { toPlayerId: prop.ownerId, propertyKey: key });
     d.setPhase('AWAITING_PAYMENT');
     return;
   }
@@ -381,16 +518,16 @@ function resolveLanding(d: Draft, player: PlayerState, rollTotal: number, depth:
       d.setPhase('TURN_COMPLETE');
       return;
     case 'INCOME_TAX':
-      turn.pending = {
-        kind: 'PAYMENT',
-        reason: 'TAX',
-        amount: RULES.incomeTax.amount,
-        toPlayerId: null,
-        propertyKey: null,
-        label: 'Income Tax',
-        cardId: null,
-      };
+      turn.pending = paymentPending('TAX', RULES.incomeTax.amount, 'Income Tax');
       d.setPhase('AWAITING_PAYMENT');
+      return;
+    case 'WEALTH_TAX':
+      turn.pending =
+        RULES.wealthTax.amount === null ? { kind: 'TAX_ENTRY', label: space.label } : paymentPending('TAX', RULES.wealthTax.amount, space.label);
+      d.setPhase('AWAITING_PAYMENT');
+      return;
+    case 'CLUB':
+      resolveClub(d, player);
       return;
     case 'JAIL':
       if (RULES.jail.landingByRollSendsToJail) sendToJail(d, player);
@@ -404,24 +541,67 @@ function resolveLanding(d: Draft, player: PlayerState, rollTotal: number, depth:
       return;
     case 'CHANCE':
     case 'COMMUNITY_CHEST':
-      drawCard(d, player, space.type, rollTotal, depth);
+      resolveCard(d, player, space.type, rollTotal, depth);
       return;
   }
 }
 
-function drawCard(d: Draft, player: PlayerState, deck: Deck, rollTotal: number, depth: number): void {
+/** Club — rule is configurable (BUSINESS_MVP_RULES.club); the default does nothing. */
+function resolveClub(d: Draft, player: PlayerState): void {
+  const rule = RULES.club.rule;
+  const others = d.activePlayers().filter((p) => p.id !== player.id);
+  switch (rule.type) {
+    case 'NONE':
+      d.event('CLUB', player.id, `${player.name} is at the Club`);
+      d.setPhase('TURN_COMPLETE');
+      return;
+    case 'RECEIVE_FROM_BANK':
+      d.transfer({ type: 'CLUB_PAYMENT', from: null, to: player.id, amount: rule.amount, memo: 'Club' });
+      d.setPhase('TURN_COMPLETE');
+      return;
+    case 'PAY_BANK':
+      d.state.turn.pending = paymentPending('CLUB', rule.amount, 'Club');
+      d.setPhase('AWAITING_PAYMENT');
+      return;
+    case 'PAY_EACH_PLAYER':
+      if (others.length === 0) {
+        d.setPhase('TURN_COMPLETE');
+        return;
+      }
+      d.state.turn.pending = paymentPending('CLUB', rule.amount * others.length, `Club — ${formatINR(rule.amount)} to each player`, {
+        payeeIds: others.map((p) => p.id),
+      });
+      d.setPhase('AWAITING_PAYMENT');
+      return;
+  }
+}
+
+/**
+ * Resolves a Chance / Community Chest card as ONE atomic step of the action:
+ * the dice total picks the EVEN/ODD table and the entry; every effect is applied
+ * in card order (movement through movePlayer, so Start reward + loan interest
+ * apply); then loan interest is settled; then any money owed is requested, or
+ * the destination square is resolved.
+ */
+function resolveCard(d: Draft, player: PlayerState, deck: Deck, rollTotal: number, depth: number, override?: CardDefinition): void {
   const turn = d.state.turn;
-  const card: CardDefinition = findCard(deck, rollTotal);
-  turn.card = { cardId: card.id, deck, rollTotal, text: card.text, verified: card.verified };
+  const card: CardDefinition = override ?? findCard(deck, rollTotal);
+  turn.card = { cardId: card.id, deck, table: card.table, rollTotal, text: card.text, verified: card.verified };
   const cardMessage = card.verified ? card.text : 'check the physical card';
-  d.event('CARD_DRAWN', player.id, `${DECK_LABELS[deck]} (${rollTotal}): ${cardMessage}`, {
+  d.event('CARD_DRAWN', player.id, `${DECK_LABELS[deck]} (${card.table.toLowerCase()} ${rollTotal}): ${cardMessage}`, {
     cardId: card.id,
     deck,
+    table: card.table,
     rollTotal,
     verified: card.verified,
   });
 
+  const txStart = d.transactions.length;
+  const cardTxIds = new Set<string>();
+  const track = (tx: TransactionRecord) => cardTxIds.add(tx.id);
   let payment = 0;
+  let payEach = 0;
+  let landing = false;
   for (const effect of card.effects) {
     switch (effect.type) {
       case 'MANUAL':
@@ -437,52 +617,102 @@ function drawCard(d: Draft, player: PlayerState, deck: Deck, rollTotal: number, 
         break;
       }
       case 'RECEIVE_FROM_BANK':
-        d.transfer({ type: 'CARD_REWARD', from: null, to: player.id, amount: effect.amount, memo: card.text });
+        track(d.transfer({ type: 'CARD_REWARD', from: null, to: player.id, amount: effect.amount, memo: card.text }));
+        break;
+      case 'COLLECT_FROM_EACH_PLAYER':
+        for (const other of d.activePlayers()) {
+          if (other.id === player.id) continue;
+          const amount = Math.min(effect.amount, other.balance);
+          if (amount > 0) {
+            track(d.transfer({ type: 'CARD_COLLECTION', from: other.id, to: player.id, amount, memo: card.text }));
+          }
+          if (amount < effect.amount) {
+            d.event('CARD_SHORTFALL', other.id, `${other.name} could only pay ${formatINR(amount)} of ${formatINR(effect.amount)}`);
+          }
+        }
+        break;
+      case 'PAY_EACH_PLAYER':
+        payEach += effect.amount;
         break;
       case 'GO_TO_JAIL':
+        d.setPhase('MOVING');
         sendToJail(d, player);
+        d.setPhase('RESOLVING');
+        break;
+      case 'GO_TO_REST_HOUSE':
+        d.setPhase('MOVING');
+        sendToRestHouse(d, player);
+        d.setPhase('RESOLVING');
         break;
       case 'SKIP_TURNS':
         player.skipTurns += effect.count;
         break;
-      case 'MOVE_TO': {
-        if (effect.destination === 'JAIL') {
-          sendToJail(d, player);
-          break;
-        }
-        const target = positionOfSpecial(effect.destination);
-        const steps = (target - player.position + BOARD_SIZE) % BOARD_SIZE;
+      case 'MOVE_TO':
+      case 'MOVE_STEPS': {
         d.setPhase('MOVING');
-        moveForward(d, player, steps, 'card');
-        turn.toPosition = player.position;
-        d.event('MOVED', player.id, `${player.name} moves to ${spaceName(player.position)}`, { to: player.position });
+        const move =
+          effect.type === 'MOVE_TO'
+            ? movePlayer(d, player, { to: positionOfSquare(effect.target), direction: effect.direction, collectStart: true })
+            : movePlayer(d, player, { steps: effect.steps, direction: effect.steps < 0 ? 'BACKWARD' : 'FORWARD', collectStart: true });
+        turn.toPosition = move.to;
+        d.event('MOVED', player.id, `${player.name} moves to ${spaceName(move.to)}`, {
+          from: move.from,
+          to: move.to,
+          passedStart: move.passedStart,
+        });
         d.setPhase('RESOLVING');
-        if (effect.resolveLanding && depth < 2) {
-          resolveLanding(d, player, rollTotal, depth + 1);
-          return;
-        }
+        if (effect.resolveLanding) landing = true;
         break;
       }
     }
   }
 
+  // Automatic card money (rewards, birthday) is undoable as one entry.
+  const cardTx = d.transactions.slice(txStart).filter((t) => cardTxIds.has(t.id));
+  if (cardTx.length) recordUndoable(d, { actionType: 'CARD_EFFECT', actorId: player.id, description: `${DECK_LABELS[deck]}: ${card.text}`, transactions: cardTx });
+
+  const others = d.activePlayers().filter((p) => p.id !== player.id);
+  if (payEach > 0 && others.length > 0) {
+    if (payment > 0) fail('INVALID_PHASE', 'A card cannot charge both the bank and every player.');
+    payment = payEach * others.length;
+  }
   if (payment > 0) {
-    turn.pending = {
-      kind: 'PAYMENT',
-      reason: 'CARD',
-      amount: payment,
-      toPlayerId: null,
-      propertyKey: null,
-      label: card.text,
+    if (landing) fail('INVALID_PHASE', 'A card cannot both move to a square and charge money.');
+    const cardPayment: Pending = paymentPending('CARD', payment, card.text, {
       cardId: card.id,
-    };
+      ...(payEach > 0 ? { payeeIds: others.map((p) => p.id) } : {}),
+    });
+    // Loan interest due from this card's movement is settled first; the card payment follows.
+    if (!settleDueInterest(d, player, { kind: 'PAYMENT', pending: cardPayment })) return;
+    turn.pending = cardPayment;
     d.setPhase('AWAITING_PAYMENT');
     return;
   }
   if (card.effects.some((e) => e.type === 'PAY_PER_BUILDING')) {
     d.event('CARD_NOTHING_TO_PAY', player.id, `${player.name} has no buildings — nothing to pay`);
   }
+  if (landing && depth < 2) {
+    if (!settleDueInterest(d, player, { kind: 'RESOLVE_LANDING', rollTotal, depth: depth + 1 })) return;
+    resolveLanding(d, player, rollTotal, depth + 1);
+    return;
+  }
+  if (!settleDueInterest(d, player, null)) return;
   d.setPhase('TURN_COMPLETE');
+}
+
+/**
+ * Resolves an arbitrary card definition for the current player as if they had
+ * just landed on its deck's square with `rollTotal`. NOT reachable through the
+ * action API (GameActionSchema has no such action) — it exists so engine tests
+ * can exercise card effects (e.g. backward movement) that no physical card uses.
+ */
+export function applyCardDefinition(state: GameState, card: CardDefinition, rollTotal: number, ctx: EngineContext): EngineResult {
+  const d = new Draft(state, ctx);
+  const player = d.player(d.state.turn.playerId ?? '');
+  d.state.turn.phase = 'RESOLVING';
+  resolveCard(d, player, card.deck, rollTotal, 0, card);
+  bumpVersion(d);
+  return d.result();
 }
 
 function endTurn(d: Draft, actor: PlayerState): void {
@@ -548,6 +778,7 @@ function buyProperty(d: Draft, actor: PlayerState): void {
   if (prop.ownerId !== null) fail('ALREADY_OWNED', 'That property was already purchased.');
   const deed = getDeed(pending.propertyKey);
   if (actor.balance < deed.price) fail('INSUFFICIENT_FUNDS', 'Not enough money for this purchase.');
+  const before = snapshotProps(d, [deed.key]);
   d.setPhase('TRANSACTION');
   d.transfer({
     type: 'PROPERTY_PURCHASE',
@@ -562,7 +793,7 @@ function buyProperty(d: Draft, actor: PlayerState): void {
   d.event('PROPERTY_PURCHASED', actor.id, `${actor.name} bought ${deed.name} for ${formatINR(deed.price)}`, {
     propertyKey: deed.key,
   });
-  recordUndoable(d, 'BUY_PROPERTY', actor.id, `${actor.name} bought ${deed.name}`, deed.key);
+  recordUndoable(d, { actionType: 'BUY_PROPERTY', actorId: actor.id, description: `${actor.name} bought ${deed.name}`, propertyKey: deed.key, before });
   d.setPhase('TURN_COMPLETE');
 }
 
@@ -692,7 +923,15 @@ function finalizeAuction(d: Draft): void {
 // Payments, cards, bankruptcy
 // ---------------------------------------------------------------------------
 
-function payPending(d: Draft, actor: PlayerState, reason: 'RENT' | 'TAX' | 'CARD'): void {
+const PAYMENT_TX = {
+  RENT: 'RENT_PAYMENT',
+  TAX: 'TAX_PAYMENT',
+  CARD: 'CARD_PAYMENT',
+  LOAN_INTEREST: 'LOAN_INTEREST',
+  CLUB: 'CLUB_PAYMENT',
+} as const;
+
+function payPending(d: Draft, actor: PlayerState, reason: PaymentReason): void {
   const turn = d.state.turn;
   const pending = turn.pending;
   if (turn.phase !== 'AWAITING_PAYMENT' || pending?.kind !== 'PAYMENT' || pending.reason !== reason) {
@@ -701,25 +940,74 @@ function payPending(d: Draft, actor: PlayerState, reason: 'RENT' | 'TAX' | 'CARD
   if (actor.balance < pending.amount) {
     fail('INSUFFICIENT_FUNDS', `Not enough money — you need ${formatINR(pending.amount)}. Mortgage, sell or take a loan.`);
   }
-  const type = reason === 'RENT' ? 'RENT_PAYMENT' : reason === 'TAX' ? 'TAX_PAYMENT' : 'CARD_PAYMENT';
   d.setPhase('TRANSACTION');
-  d.transfer({
-    type,
-    from: actor.id,
-    to: pending.toPlayerId,
-    amount: pending.amount,
-    propertyKey: pending.propertyKey,
-    memo: pending.label,
-  });
+  if (reason === 'LOAN_INTEREST') {
+    // Interest (+ any card payment folded into it) — not undoable: it is a loan obligation.
+    payLoanInterest(d, actor, pending.amount, pending.loanIds ?? []);
+  } else if (pending.payeeIds?.length) {
+    const share = Math.floor(pending.amount / pending.payeeIds.length);
+    for (const id of pending.payeeIds) {
+      d.transfer({ type: PAYMENT_TX[reason], from: actor.id, to: id, amount: share, memo: pending.label });
+    }
+  } else {
+    d.transfer({
+      type: PAYMENT_TX[reason],
+      from: actor.id,
+      to: pending.toPlayerId,
+      amount: pending.amount,
+      propertyKey: pending.propertyKey,
+      memo: pending.label,
+    });
+  }
   turn.pending = null;
-  const to = d.name(pending.toPlayerId);
+  const to = pending.payeeIds?.length ? 'other players' : d.name(pending.toPlayerId);
   d.event('PAYMENT_MADE', actor.id, `${actor.name} paid ${formatINR(pending.amount)} to ${to} (${pending.label})`, {
     reason,
     amount: pending.amount,
     toPlayerId: pending.toPlayerId,
   });
-  recordUndoable(d, `PAY_${reason}`, actor.id, `${actor.name} paid ${formatINR(pending.amount)} to ${to}`, pending.propertyKey);
+  if (reason !== 'LOAN_INTEREST') {
+    recordUndoable(d, {
+      actionType: `PAY_${reason}`,
+      actorId: actor.id,
+      description: `${actor.name} paid ${formatINR(pending.amount)} to ${to}`,
+      propertyKey: pending.propertyKey,
+    });
+  }
+  continueAfterPayment(d, actor);
+}
+
+/** After an obligation is settled: resume deferred work (e.g. resolve the landing square) or finish the turn. */
+function continueAfterPayment(d: Draft, actor: PlayerState): void {
+  const followUp = d.state.turn.followUp;
+  d.state.turn.followUp = null;
+  if (followUp?.kind === 'RESOLVE_LANDING') {
+    d.setPhase('RESOLVING');
+    resolveLanding(d, actor, followUp.rollTotal, followUp.depth);
+    return;
+  }
+  if (followUp?.kind === 'PAYMENT') {
+    d.state.turn.pending = followUp.pending;
+    d.setPhase('AWAITING_PAYMENT');
+    return;
+  }
   d.setPhase('TURN_COMPLETE');
+}
+
+/** Tax square with no configured amount (Wealth Taxes by default): the player enters the printed amount. */
+function payEnteredTax(d: Draft, actor: PlayerState, amount: number | undefined): void {
+  const turn = d.state.turn;
+  const pending = turn.pending;
+  if (turn.phase !== 'AWAITING_PAYMENT' || pending?.kind !== 'TAX_ENTRY') fail('INVALID_PHASE', 'There is nothing to pay right now.');
+  if (amount === undefined) fail('VALIDATION', `Enter the ${pending.label} amount shown on the board.`);
+  if (amount > RULES.cards.manualMaxAmount) fail('VALIDATION', `Entered amounts are limited to ${formatINR(RULES.cards.manualMaxAmount)}.`);
+  turn.pending = paymentPending('TAX', amount, pending.label);
+  if (actor.balance < amount) {
+    // Becomes a normal payment: raise money or declare bankruptcy.
+    d.event('TAX_ENTERED', actor.id, `${pending.label}: ${formatINR(amount)} due`);
+    return;
+  }
+  payPending(d, actor, 'TAX');
 }
 
 function resolveManualCard(d: Draft, actor: PlayerState, resolution: 'PAY' | 'RECEIVE' | 'NONE', amount: number): void {
@@ -745,6 +1033,7 @@ function resolveManualCard(d: Draft, actor: PlayerState, resolution: 'PAY' | 'RE
     d.setPhase('TRANSACTION');
     d.transfer({ type: 'CARD_REWARD', from: null, to: actor.id, amount, memo: label });
     d.event('CARD_RESOLVED', actor.id, `${actor.name} received ${formatINR(amount)} (${label})`);
+    recordUndoable(d, { actionType: 'CARD_EFFECT', actorId: actor.id, description: `${actor.name} received ${formatINR(amount)} (${label})` });
     d.setPhase('TURN_COMPLETE');
     return;
   }
@@ -752,19 +1041,11 @@ function resolveManualCard(d: Draft, actor: PlayerState, resolution: 'PAY' | 'RE
     d.setPhase('TRANSACTION');
     d.transfer({ type: 'CARD_PAYMENT', from: actor.id, to: null, amount, memo: label });
     d.event('CARD_RESOLVED', actor.id, `${actor.name} paid ${formatINR(amount)} (${label})`);
-    recordUndoable(d, 'PAY_CARD', actor.id, `${actor.name} paid ${formatINR(amount)} to Bank`, null);
+    recordUndoable(d, { actionType: 'PAY_CARD', actorId: actor.id, description: `${actor.name} paid ${formatINR(amount)} to Bank` });
     d.setPhase('TURN_COMPLETE');
     return;
   }
-  turn.pending = {
-    kind: 'PAYMENT',
-    reason: 'CARD',
-    amount,
-    toPlayerId: null,
-    propertyKey: null,
-    label,
-    cardId: pending.cardId,
-  };
+  turn.pending = paymentPending('CARD', amount, label, { cardId: pending.cardId });
   d.setPhase('AWAITING_PAYMENT');
 }
 
@@ -779,7 +1060,7 @@ function declareBankruptcy(d: Draft, actor: PlayerState): void {
     d.transfer({
       type: 'BANKRUPTCY_SETTLEMENT',
       from: actor.id,
-      to: pending.toPlayerId,
+      to: pending.payeeIds?.length ? null : pending.toPlayerId,
       amount: actor.balance,
       memo: `Bankruptcy settlement (${pending.label})`,
     });
@@ -799,10 +1080,15 @@ function declareBankruptcy(d: Draft, actor: PlayerState): void {
       loan.closedAt = d.ctx.now;
     }
   }
+  expireTrades(d, (t) => t.fromPlayerId === actor.id || t.toPlayerId === actor.id);
+  // Ownership was reset wholesale: no earlier action can be compensated safely.
+  d.state.undoStack = [];
+  d.state.undoRequest = null;
   actor.status = 'BANKRUPT';
   actor.skipTurns = 0;
   actor.inJail = false;
   turn.pending = null;
+  turn.followUp = null;
   d.event('PLAYER_BANKRUPT', actor.id, `${actor.name} is bankrupt`);
   d.setPhase('TURN_COMPLETE');
   if (RULES.endGame.lastPlayerStandingWins && d.activePlayers().length <= 1) {
@@ -817,6 +1103,9 @@ function finishGame(d: Draft, reason: 'HOST_ENDED' | 'LAST_PLAYER_STANDING'): vo
   d.setStatus('FINISHED');
   d.state.pausedFrom = null;
   d.state.pausedAt = null;
+  expireTrades(d, () => true);
+  d.state.undoStack = [];
+  d.state.undoRequest = null;
   const ranked = d
     .activePlayers()
     .map((p) => ({ p, worth: netWorth(d.state, p.id) }))
@@ -857,13 +1146,16 @@ function propertyAction(d: Draft, actor: PlayerState, key: PropertyKey, kind: Pr
   }
   const prop = d.state.properties[key];
   const deed = getDeed(key);
+  const before = snapshotProps(d, [key]);
+  const undoable = (description: string) =>
+    recordUndoable(d, { actionType: kind, actorId: actor.id, description, propertyKey: key, before });
   switch (kind) {
     case 'BUILD_HOUSE': {
       if (deed.kind !== 'CITY') return;
       d.transfer({ type: 'HOUSE_PURCHASE', from: actor.id, to: null, amount: deed.houseCost, propertyKey: key, memo: `House on ${deed.name}` });
       prop.houses += 1;
       d.event('HOUSE_BUILT', actor.id, `${actor.name} built a house on ${deed.name}`, { propertyKey: key, houses: prop.houses });
-      recordUndoable(d, 'BUILD_HOUSE', actor.id, `${actor.name} built a house on ${deed.name}`, key);
+      undoable(`${actor.name} built a house on ${deed.name}`);
       return;
     }
     case 'BUILD_HOTEL': {
@@ -872,7 +1164,7 @@ function propertyAction(d: Draft, actor: PlayerState, key: PropertyKey, kind: Pr
       prop.houses = 0;
       prop.hotel = true;
       d.event('HOTEL_BUILT', actor.id, `${actor.name} built a hotel on ${deed.name}`, { propertyKey: key });
-      recordUndoable(d, 'BUILD_HOTEL', actor.id, `${actor.name} built a hotel on ${deed.name}`, key);
+      undoable(`${actor.name} built a hotel on ${deed.name}`);
       return;
     }
     case 'SELL_BUILDING': {
@@ -897,6 +1189,7 @@ function propertyAction(d: Draft, actor: PlayerState, key: PropertyKey, kind: Pr
       d.event('BUILDING_SOLD', actor.id, `${actor.name} sold a ${wasHotel ? 'hotel' : 'house'} on ${deed.name} for ${formatINR(refund)}`, {
         propertyKey: key,
       });
+      undoable(`${actor.name} sold a ${wasHotel ? 'hotel' : 'house'} on ${deed.name}`);
       return;
     }
     case 'SELL_PROPERTY': {
@@ -904,14 +1197,33 @@ function propertyAction(d: Draft, actor: PlayerState, key: PropertyKey, kind: Pr
       d.transfer({ type: 'PROPERTY_SALE', from: null, to: actor.id, amount, propertyKey: key, memo: `Sold ${deed.name} to the bank` });
       prop.ownerId = null;
       d.event('PROPERTY_SOLD', actor.id, `${actor.name} sold ${deed.name} to the bank for ${formatINR(amount)}`, { propertyKey: key });
+      undoable(`${actor.name} sold ${deed.name} to the bank`);
       return;
     }
     case 'MORTGAGE_PROPERTY': {
-      d.transfer({ type: 'MORTGAGE', from: null, to: actor.id, amount: deed.mortgageValue, propertyKey: key, memo: `Mortgaged ${deed.name}` });
+      const m = mortgageResolution(prop);
+      if (m.buildingValue > 0) {
+        d.transfer({
+          type: m.hotelReturned ? 'HOTEL_SALE' : 'HOUSE_SALE',
+          from: null,
+          to: actor.id,
+          amount: m.buildingValue,
+          propertyKey: key,
+          memo: `Buildings on ${deed.name} returned to the bank (mortgage)`,
+        });
+      }
+      d.transfer({ type: 'MORTGAGE', from: null, to: actor.id, amount: m.mortgageValue, propertyKey: key, memo: `Mortgaged ${deed.name}` });
+      prop.houses = 0;
+      prop.hotel = false;
       prop.mortgaged = true;
-      d.event('PROPERTY_MORTGAGED', actor.id, `${actor.name} mortgaged ${deed.name} for ${formatINR(deed.mortgageValue)}`, {
-        propertyKey: key,
-      });
+      const buildings = m.hotelReturned ? 'hotel' : m.housesReturned > 0 ? `${m.housesReturned} house${m.housesReturned > 1 ? 's' : ''}` : null;
+      d.event(
+        'PROPERTY_MORTGAGED',
+        actor.id,
+        `${actor.name} mortgaged ${deed.name} for ${formatINR(m.payout)}${buildings ? ` (incl. ${formatINR(m.buildingValue)} for the ${buildings})` : ''}`,
+        { propertyKey: key, payout: m.payout, buildingValue: m.buildingValue, mortgageValue: m.mortgageValue },
+      );
+      undoable(`${actor.name} mortgaged ${deed.name}`);
       return;
     }
     case 'UNMORTGAGE_PROPERTY': {
@@ -919,6 +1231,7 @@ function propertyAction(d: Draft, actor: PlayerState, key: PropertyKey, kind: Pr
       d.transfer({ type: 'UNMORTGAGE', from: actor.id, to: null, amount: cost, propertyKey: key, memo: `Unmortgaged ${deed.name}` });
       prop.mortgaged = false;
       d.event('PROPERTY_UNMORTGAGED', actor.id, `${actor.name} unmortgaged ${deed.name} for ${formatINR(cost)}`, { propertyKey: key });
+      undoable(`${actor.name} unmortgaged ${deed.name}`);
       return;
     }
   }
@@ -933,7 +1246,7 @@ function transferMoney(d: Draft, actor: PlayerState, toPlayerId: string, amount:
   const note = memo?.trim() || 'Payment';
   d.transfer({ type: 'PLAYER_TRANSFER', from: actor.id, to: to.id, amount, memo: note });
   d.event('MONEY_TRANSFERRED', actor.id, `${actor.name} paid ${to.name} ${formatINR(amount)}`, { toPlayerId: to.id, amount, memo: note });
-  recordUndoable(d, 'TRANSFER_MONEY', actor.id, `${actor.name} paid ${to.name} ${formatINR(amount)}`, null);
+  recordUndoable(d, { actionType: 'TRANSFER_MONEY', actorId: actor.id, description: `${actor.name} paid ${to.name} ${formatINR(amount)}` });
 }
 
 function requestLoan(d: Draft, actor: PlayerState, amount: number): void {
@@ -950,18 +1263,22 @@ function requestLoan(d: Draft, actor: PlayerState, amount: number): void {
     playerId: actor.id,
     principal: terms.principal,
     interestRatePercent: rules.interestRatePercent,
+    interestAmount: terms.interest,
     totalOwed: terms.totalOwed,
     outstanding: terms.totalOwed,
     status: 'ACTIVE' as const,
+    createdAtCircuit: actor.circuits,
+    interestCharges: 0,
+    interestPaid: 0,
     createdAt: d.ctx.now,
     closedAt: null,
   };
   d.state.loans.push(loan);
-  d.transfer({ type: 'LOAN_DISBURSEMENT', from: null, to: actor.id, amount, memo: `Bank loan (${formatINR(terms.totalOwed)} to repay)` });
+  d.transfer({ type: 'LOAN_DISBURSEMENT', from: null, to: actor.id, amount, memo: `Bank loan (${formatINR(terms.interest)} interest due at next Start)` });
   d.event('LOAN_TAKEN', actor.id, `${actor.name} borrowed ${formatINR(amount)} from the bank`, {
     loanId: loan.id,
     principal: amount,
-    totalOwed: terms.totalOwed,
+    interestDueAtNextStart: terms.interest,
   });
 }
 
@@ -985,35 +1302,178 @@ function repayLoan(d: Draft, actor: PlayerState, loanId: string, amount: number)
 }
 
 // ---------------------------------------------------------------------------
-// Undo (compensating transactions only — history is never rewritten)
+// Trades (player ↔ player; executed atomically on accept)
 // ---------------------------------------------------------------------------
 
-function recordUndoable(d: Draft, actionType: string, actorId: string, description: string, propertyKey: PropertyKey | null): void {
-  const moves = d.transactions.map((t) => ({ transactionId: t.id, fromPlayerId: t.fromPlayerId, toPlayerId: t.toPlayerId, amount: t.amount }));
+const KEEP_RESOLVED_TRADES = 20;
+
+function pruneTrades(d: Draft): void {
+  const resolved = d.state.trades.filter((t) => t.status !== 'PENDING');
+  if (resolved.length <= KEEP_RESOLVED_TRADES) return;
+  const drop = new Set(resolved.slice(0, resolved.length - KEEP_RESOLVED_TRADES).map((t) => t.id));
+  d.state.trades = d.state.trades.filter((t) => !drop.has(t.id));
+}
+
+function describeTradeSide(keys: PropertyKey[], money: number): string {
+  const parts = keys.map((k) => getDeed(k).name);
+  if (money > 0) parts.push(formatINR(money));
+  return parts.join(' + ');
+}
+
+function createTrade(d: Draft, actor: PlayerState, input: Extract<GameAction, { type: 'CREATE_TRADE' }>): void {
+  if (d.state.trades.filter((t) => t.status === 'PENDING').length >= RULES.trades.maxPendingPerGame) {
+    fail('TRADE_NOT_ALLOWED', 'Too many open trade offers. Answer some first.');
+  }
+  const trade: TradeOffer = {
+    id: d.ctx.newId(),
+    fromPlayerId: actor.id,
+    toPlayerId: input.toPlayerId,
+    offeredPropertyKeys: input.offeredPropertyKeys,
+    requestedPropertyKeys: input.requestedPropertyKeys,
+    offeredMoney: input.offeredMoney,
+    requestedMoney: input.requestedMoney,
+    status: 'PENDING',
+    createdAt: d.ctx.now,
+    resolvedAt: null,
+  };
+  const why = tradeBlocker(d.state, trade);
+  if (why) fail('TRADE_NOT_ALLOWED', why);
+  d.state.trades.push(trade);
+  const to = d.player(trade.toPlayerId);
+  d.event(
+    'TRADE_OFFERED',
+    actor.id,
+    `${actor.name} offered ${to.name}: ${describeTradeSide(trade.offeredPropertyKeys, trade.offeredMoney)} ⇄ ${describeTradeSide(trade.requestedPropertyKeys, trade.requestedMoney)}`,
+    { tradeId: trade.id, toPlayerId: to.id },
+  );
+}
+
+function pendingTrade(d: Draft, tradeId: string): TradeOffer {
+  const trade = d.state.trades.find((t) => t.id === tradeId);
+  if (!trade) fail('NOT_FOUND', 'Trade offer not found.');
+  if (trade.status !== 'PENDING') fail('TRADE_NOT_ALLOWED', `This offer was already ${trade.status.toLowerCase()}.`);
+  return trade;
+}
+
+/**
+ * Re-validates EVERYTHING against the current state (players, ownership,
+ * buildings, mortgage rules, both players' cash) and then performs the whole
+ * exchange inside this one action. Any failure throws before the draft is
+ * committed, so either everything changes or nothing does.
+ */
+function acceptTrade(d: Draft, actor: PlayerState, tradeId: string): void {
+  const trade = pendingTrade(d, tradeId);
+  if (trade.toPlayerId !== actor.id) fail('FORBIDDEN', 'Only the player this offer was made to can accept it.');
+  const why = tradeBlocker(d.state, trade);
+  if (why) fail('TRADE_NOT_ALLOWED', `Trade can't go through: ${why}`);
+  const from = d.player(trade.fromPlayerId);
+  const keys = [...trade.offeredPropertyKeys, ...trade.requestedPropertyKeys];
+  const before = snapshotProps(d, keys);
+  const label = `Trade ${from.name} ⇄ ${actor.name}`;
+  if (trade.offeredMoney > 0) d.transfer({ type: 'TRADE_PAYMENT', from: from.id, to: actor.id, amount: trade.offeredMoney, memo: label });
+  if (trade.requestedMoney > 0) d.transfer({ type: 'TRADE_PAYMENT', from: actor.id, to: from.id, amount: trade.requestedMoney, memo: label });
+  for (const key of trade.offeredPropertyKeys) d.state.properties[key].ownerId = actor.id;
+  for (const key of trade.requestedPropertyKeys) d.state.properties[key].ownerId = from.id;
+  trade.status = 'ACCEPTED';
+  trade.resolvedAt = d.ctx.now;
+  const summary = `${from.name} gave ${describeTradeSide(trade.offeredPropertyKeys, trade.offeredMoney)} for ${describeTradeSide(trade.requestedPropertyKeys, trade.requestedMoney)}`;
+  d.event('TRADE_ACCEPTED', actor.id, `${actor.name} accepted: ${summary}`, {
+    tradeId: trade.id,
+    fromPlayerId: from.id,
+    toPlayerId: actor.id,
+    offeredPropertyKeys: trade.offeredPropertyKeys,
+    requestedPropertyKeys: trade.requestedPropertyKeys,
+    offeredMoney: trade.offeredMoney,
+    requestedMoney: trade.requestedMoney,
+  });
+  recordUndoable(d, { actionType: 'ACCEPT_TRADE', actorId: actor.id, description: `Trade: ${summary}`, before });
+  pruneTrades(d);
+}
+
+function closeTrade(d: Draft, actor: PlayerState, tradeId: string, status: 'REJECTED' | 'CANCELLED'): void {
+  const trade = pendingTrade(d, tradeId);
+  if (status === 'REJECTED' && trade.toPlayerId !== actor.id) fail('FORBIDDEN', 'Only the player this offer was made to can reject it.');
+  if (status === 'CANCELLED' && trade.fromPlayerId !== actor.id) fail('FORBIDDEN', 'Only the player who made the offer can cancel it.');
+  trade.status = status;
+  trade.resolvedAt = d.ctx.now;
+  d.event(status === 'REJECTED' ? 'TRADE_REJECTED' : 'TRADE_CANCELLED', actor.id, `${actor.name} ${status.toLowerCase()} a trade offer`, {
+    tradeId,
+  });
+  pruneTrades(d);
+}
+
+function expireTrades(d: Draft, match: (t: TradeOffer) => boolean): void {
+  for (const t of d.state.trades) {
+    if (t.status === 'PENDING' && match(t)) {
+      t.status = 'EXPIRED';
+      t.resolvedAt = d.ctx.now;
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Undo history (compensating transactions only — history is never rewritten)
+// ---------------------------------------------------------------------------
+
+function snapshotProps(d: Draft, keys: readonly PropertyKey[]): PropertyState[] {
+  return keys.map((k) => ({ ...d.state.properties[k] }));
+}
+
+/**
+ * Pushes an undo entry for the current action. `transactions` defaults to every
+ * transaction of this action; `before` = property state before the action (the
+ * matching "after" is captured now).
+ */
+function recordUndoable(
+  d: Draft,
+  input: {
+    actionType: string;
+    actorId: string;
+    description: string;
+    propertyKey?: PropertyKey | null;
+    before?: PropertyState[];
+    transactions?: TransactionRecord[];
+  },
+): void {
+  const txs = input.transactions ?? d.transactions;
+  const moves = txs.map((t) => ({ transactionId: t.id, fromPlayerId: t.fromPlayerId, toPlayerId: t.toPlayerId, amount: t.amount }));
+  const before = input.before ?? [];
+  const after = snapshotProps(
+    d,
+    before.map((p) => p.key),
+  );
   const counterparties = new Set<string>();
   for (const m of moves) {
-    for (const pid of [m.fromPlayerId, m.toPlayerId]) if (pid && pid !== actorId) counterparties.add(pid);
+    for (const pid of [m.fromPlayerId, m.toPlayerId]) if (pid && pid !== input.actorId) counterparties.add(pid);
   }
-  d.state.lastUndoable = {
+  for (const p of [...before, ...after]) if (p.ownerId && p.ownerId !== input.actorId) counterparties.add(p.ownerId);
+  d.state.undoStack.push({
     actionId: d.ctx.actionId,
-    actionType,
-    actorId,
-    description,
+    actionType: input.actionType,
+    actorId: input.actorId,
+    description: input.description,
     transactionIds: moves.map((m) => m.transactionId),
     moves,
-    propertyKey,
+    propertyKey: input.propertyKey ?? null,
+    propertiesBefore: before,
+    propertiesAfter: after,
     counterpartyIds: [...counterparties],
-  };
+    createdAt: d.ctx.now,
+  });
+  if (d.state.undoStack.length > RULES.undo.maxDepth) d.state.undoStack.splice(0, d.state.undoStack.length - RULES.undo.maxDepth);
+  // A waiting request targeted an entry that is no longer the newest.
   d.state.undoRequest = null;
 }
 
 function requestUndo(d: Draft, actor: PlayerState, targetActionId: string): void {
-  const last = d.state.lastUndoable;
-  if (!last || last.actionId !== targetActionId) {
-    fail('UNDO_NOT_ALLOWED', 'Only the most recent payment or purchase can be undone.');
+  const top = topUndoable(d.state);
+  if (!top || top.actionId !== targetActionId) {
+    fail('UNDO_NOT_ALLOWED', d.state.undoStack.some((r) => r.actionId === targetActionId) ? 'Undo newer actions first.' : 'That action can no longer be undone.');
   }
-  const involved = [last.actorId, ...last.counterpartyIds];
+  const involved = [top.actorId, ...top.counterpartyIds];
   if (!involved.includes(actor.id)) fail('FORBIDDEN', 'Only players involved can ask to undo this.');
+  const blocked = undoBlocker(d.state, top);
+  if (blocked) fail('UNDO_NOT_ALLOWED', blocked);
   const pendingReq = d.state.undoRequest;
   if (pendingReq && pendingReq.targetActionId === targetActionId) fail('UNDO_NOT_ALLOWED', 'An undo request is already waiting.');
   const activeIds = new Set(d.activePlayers().map((p) => p.id));
@@ -1024,48 +1484,39 @@ function requestUndo(d: Draft, actor: PlayerState, targetActionId: string): void
     id: d.ctx.newId(),
     targetActionId,
     requestedBy: actor.id,
-    description: last.description,
+    description: top.description,
     approverIds: approvers,
     createdAt: d.ctx.now,
   };
-  d.event('UNDO_REQUESTED', actor.id, `${actor.name} asked to undo: ${last.description}`, { targetActionId });
+  d.event('UNDO_REQUESTED', actor.id, `${actor.name} asked to undo: ${top.description}`, { targetActionId });
 }
 
+/**
+ * Applies the newest undo entry: verifies it was not superseded, restores the
+ * properties it changed, and posts compensating UNDO_REVERSAL transactions in
+ * reverse order. Never rolls dice, never moves tokens, never deletes history.
+ */
 function approveUndo(d: Draft, actor: PlayerState, requestId: string): void {
   const req = d.state.undoRequest;
   if (!req || req.id !== requestId) fail('UNDO_NOT_ALLOWED', 'That undo request is no longer open.');
   if (!req.approverIds.includes(actor.id)) fail('FORBIDDEN', 'Another player needs to approve this.');
-  const last = d.state.lastUndoable;
-  if (!last || last.actionId !== req.targetActionId) {
+  const top = topUndoable(d.state);
+  if (!top || top.actionId !== req.targetActionId) {
     fail('UNDO_NOT_ALLOWED', 'Too late to undo — something else happened since.');
   }
+  const blocked = undoBlocker(d.state, top);
+  if (blocked) fail('UNDO_NOT_ALLOWED', blocked);
 
-  // Reverse property effects first (validates nothing changed since).
-  if (last.propertyKey) {
-    const prop = d.state.properties[last.propertyKey];
-    if (last.actionType === 'BUY_PROPERTY') {
-      if (prop.ownerId !== last.actorId || prop.houses > 0 || prop.hotel || prop.mortgaged) {
-        fail('UNDO_NOT_ALLOWED', 'The property has changed since — can’t undo.');
-      }
-      prop.ownerId = null;
-    } else if (last.actionType === 'BUILD_HOUSE') {
-      if (prop.hotel || prop.houses === 0) fail('UNDO_NOT_ALLOWED', 'The buildings have changed since — can’t undo.');
-      prop.houses -= 1;
-    } else if (last.actionType === 'BUILD_HOTEL') {
-      if (!prop.hotel) fail('UNDO_NOT_ALLOWED', 'The buildings have changed since — can’t undo.');
-      prop.hotel = false;
-      prop.houses = RULES.building.maxHouses;
-    }
-  }
+  for (const before of top.propertiesBefore) d.state.properties[before.key] = { ...before };
 
-  for (const move of [...last.moves].reverse()) {
+  for (const move of [...top.moves].reverse()) {
     try {
       d.transfer({
         type: 'UNDO_REVERSAL',
         from: move.toPlayerId,
         to: move.fromPlayerId,
         amount: move.amount,
-        memo: `Undo: ${last.description}`,
+        memo: `Undo: ${top.description}`,
         reversesTransactionId: move.transactionId,
       });
     } catch (error) {
@@ -1075,9 +1526,9 @@ function approveUndo(d: Draft, actor: PlayerState, requestId: string): void {
       throw error;
     }
   }
-  d.state.lastUndoable = null;
+  d.state.undoStack.pop();
   d.state.undoRequest = null;
-  d.event('UNDO_APPLIED', actor.id, `Undone: ${last.description} (approved by ${actor.name})`, { targetActionId: last.actionId });
+  d.event('UNDO_APPLIED', actor.id, `Undone: ${top.description} (approved by ${actor.name})`, { targetActionId: top.actionId });
 }
 
 function rejectUndo(d: Draft, actor: PlayerState, requestId: string): void {

@@ -1,5 +1,5 @@
 import type { PropertyKey } from './businessBoard.ts';
-import type { Deck } from './cards.ts';
+import type { CardTable, Deck } from './cards.ts';
 
 export type GameStatus = 'WAITING' | 'ACTIVE' | 'PAUSED' | 'FINISHED';
 
@@ -33,6 +33,8 @@ export interface PlayerState {
   /** Turns this player will skip (Rest House / Jail). */
   skipTurns: number;
   inJail: boolean;
+  /** Completed circuits (times this player passed or landed on Start by a forward move). */
+  circuits: number;
 }
 
 export interface PropertyState {
@@ -45,14 +47,29 @@ export interface PropertyState {
 
 export type LoanStatus = 'ACTIVE' | 'REPAID' | 'DEFAULTED';
 
+/**
+ * A bank loan. The principal is repaid with REPAY_LOAN; interest is NOT added
+ * when borrowing — it becomes payable (in cash, to the bank) when the borrower
+ * next reaches/passes Start (see BUSINESS_MVP_RULES.loans).
+ */
 export interface LoanState {
   id: string;
   playerId: string;
   principal: number;
   interestRatePercent: number;
+  /** Interest charged at each interest checkpoint (principal × rate). */
+  interestAmount: number;
+  /** Amount to repay (= principal; interest is paid separately at Start). */
   totalOwed: number;
+  /** Principal still owed. */
   outstanding: number;
   status: LoanStatus;
+  /** Borrower's `circuits` when the loan was taken; interest is due at circuit + 1 (+ n). */
+  createdAtCircuit: number;
+  /** Number of interest checkpoints already charged. */
+  interestCharges: number;
+  /** Total interest paid so far. */
+  interestPaid: number;
   createdAt: string;
   closedAt: string | null;
 }
@@ -82,7 +99,7 @@ export interface DiceRoll {
   isDouble: boolean;
 }
 
-export type PaymentReason = 'RENT' | 'TAX' | 'CARD';
+export type PaymentReason = 'RENT' | 'TAX' | 'CARD' | 'LOAN_INTEREST' | 'CLUB';
 
 export type Pending =
   | { kind: 'BUY'; propertyKey: PropertyKey; price: number }
@@ -95,12 +112,25 @@ export type Pending =
       propertyKey: PropertyKey | null;
       label: string;
       cardId: string | null;
+      /** LOAN_INTEREST: loans whose interest this payment settles. */
+      loanIds?: string[];
+      /** Split equally between these players instead of toPlayerId (e.g. "pay each player"). */
+      payeeIds?: string[];
     }
-  | { kind: 'CARD_MANUAL'; cardId: string; deck: Deck; rollTotal: number };
+  | { kind: 'CARD_MANUAL'; cardId: string; deck: Deck; rollTotal: number }
+  /** A tax square whose amount is not configured: the player enters the amount printed on the board. */
+  | { kind: 'TAX_ENTRY'; label: string };
+
+/** Work left after the current obligation is paid (e.g. resolve the square after paying loan interest). */
+export type FollowUp =
+  | { kind: 'RESOLVE_LANDING'; rollTotal: number; depth: number }
+  /** Another obligation to request next (e.g. a card payment after loan interest). */
+  | { kind: 'PAYMENT'; pending: Pending };
 
 export interface DrawnCard {
   cardId: string;
   deck: Deck;
+  table: CardTable;
   rollTotal: number;
   text: string;
   verified: boolean;
@@ -116,10 +146,17 @@ export interface TurnState {
   toPosition: number | null;
   passedStart: boolean;
   pending: Pending | null;
+  /** Continues the turn once `pending` is paid. */
+  followUp: FollowUp | null;
   card: DrawnCard | null;
   consecutiveDoubles: number;
 }
 
+/**
+ * One entry of the undo history. Undo applies compensating transactions for
+ * `moves` and restores `propertiesBefore` — but only while every property still
+ * equals `propertiesAfter` (otherwise a later action superseded it).
+ */
 export interface UndoableRecord {
   actionId: string;
   actionType: string;
@@ -129,8 +166,29 @@ export interface UndoableRecord {
   /** Snapshot of the money moves to reverse. */
   moves: { transactionId: string; fromPlayerId: string | null; toPlayerId: string | null; amount: number }[];
   propertyKey: PropertyKey | null;
-  /** Players (other than actor) whose money was touched. */
+  /** Property state right before the action (restored by undo). */
+  propertiesBefore: PropertyState[];
+  /** Property state right after the action (must still hold for undo to be allowed). */
+  propertiesAfter: PropertyState[];
+  /** Players (other than actor) whose money or property was touched. */
   counterpartyIds: string[];
+  createdAt: string;
+}
+
+export type TradeStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'CANCELLED' | 'EXPIRED';
+
+/** A player-to-player trade offer. Executed atomically on ACCEPT_TRADE after full revalidation. */
+export interface TradeOffer {
+  id: string;
+  fromPlayerId: string;
+  toPlayerId: string;
+  offeredPropertyKeys: PropertyKey[];
+  requestedPropertyKeys: PropertyKey[];
+  offeredMoney: number;
+  requestedMoney: number;
+  status: TradeStatus;
+  createdAt: string;
+  resolvedAt: string | null;
 }
 
 export interface UndoRequest {
@@ -159,8 +217,11 @@ export interface GameState {
   loans: LoanState[];
   auction: AuctionState | null;
   turn: TurnState;
-  lastUndoable: UndoableRecord | null;
+  /** Undo history, oldest first. Only the last entry can be undone (then the one before, …). */
+  undoStack: UndoableRecord[];
   undoRequest: UndoRequest | null;
+  /** Open trade offers plus recently resolved ones. */
+  trades: TradeOffer[];
   createdAt: string;
   expiresAt: string;
 }
@@ -180,8 +241,12 @@ export type TransactionType =
   | 'LOAN_DISBURSEMENT'
   | 'LOAN_REPAYMENT'
   | 'START_REWARD'
+  | 'LOAN_INTEREST'
   | 'CARD_PAYMENT'
   | 'CARD_REWARD'
+  | 'CARD_COLLECTION'
+  | 'CLUB_PAYMENT'
+  | 'TRADE_PAYMENT'
   | 'MORTGAGE'
   | 'UNMORTGAGE'
   | 'BANKRUPTCY_SETTLEMENT'

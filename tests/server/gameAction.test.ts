@@ -176,7 +176,7 @@ describe.skipIf(!DATABASE_URL)('game-action handler (Postgres)', () => {
     it('duplicate buy charges once', async () => {
       const g = await setupGame();
       ok(await g.act('Asha', { type: 'START_GAME' }));
-      queuedDice = [3, 2]; // Railway
+      queuedDice = [1, 2]; // Railway (square 3)
       ok(await g.act('Asha', { type: 'ROLL_DICE' }));
       const actionId = randomUUID();
       const v = g.version;
@@ -194,7 +194,7 @@ describe.skipIf(!DATABASE_URL)('game-action handler (Postgres)', () => {
     it('duplicate payment, loan and transfer apply once', async () => {
       const g = await setupGame();
       ok(await g.act('Asha', { type: 'START_GAME' }));
-      queuedDice = [2, 2]; // Income Tax
+      queuedDice = [2, 3]; // Income Tax (square 5)
       ok(await g.act('Asha', { type: 'ROLL_DICE' }));
       const pay = randomUUID();
       ok(await g.act('Asha', { type: 'PAY_TAX' }, { actionId: pay }));
@@ -215,7 +215,7 @@ describe.skipIf(!DATABASE_URL)('game-action handler (Postgres)', () => {
     it('duplicate bid is recorded once', async () => {
       const g = await setupGame();
       ok(await g.act('Asha', { type: 'START_GAME' }));
-      queuedDice = [3, 2];
+      queuedDice = [1, 2];
       ok(await g.act('Asha', { type: 'ROLL_DICE' }));
       ok(await g.act('Asha', { type: 'DECLINE_PROPERTY' }));
       const auctionId = (await state(g.gameId, g.seats.Asha!)).state.auction!.id;
@@ -232,7 +232,7 @@ describe.skipIf(!DATABASE_URL)('game-action handler (Postgres)', () => {
     it('rejects a stale-sensitive action against an old version, allows side actions', async () => {
       const g = await setupGame();
       ok(await g.act('Asha', { type: 'START_GAME' }));
-      queuedDice = [3, 2];
+      queuedDice = [1, 2];
       ok(await g.act('Asha', { type: 'ROLL_DICE' }));
       const seen = g.version;
       ok(await g.act('Bilal', { type: 'TRANSFER_MONEY', toPlayerId: g.seats.Chitra!.playerId, amount: 10 }));
@@ -246,7 +246,7 @@ describe.skipIf(!DATABASE_URL)('game-action handler (Postgres)', () => {
     it('two simultaneous equal bids: exactly one wins, auction stays consistent', async () => {
       const g = await setupGame(['Asha', 'Bilal', 'Chitra', 'Dev']);
       ok(await g.act('Asha', { type: 'START_GAME' }));
-      queuedDice = [3, 2];
+      queuedDice = [1, 2];
       ok(await g.act('Asha', { type: 'ROLL_DICE' }));
       ok(await g.act('Asha', { type: 'DECLINE_PROPERTY' }));
       const auctionId = (await state(g.gameId, g.seats.Asha!)).state.auction!.id;
@@ -286,18 +286,18 @@ describe.skipIf(!DATABASE_URL)('game-action handler (Postgres)', () => {
   it('full turn: rent between players, auction win, loan, pause/resume, undo, finish', async () => {
     const g = await setupGame(['Asha', 'Bilal']);
     ok(await g.act('Asha', { type: 'START_GAME' }));
-    queuedDice = [3, 2];
+    queuedDice = [1, 2];
     ok(await g.act('Asha', { type: 'ROLL_DICE' }));
     ok(await g.act('Asha', { type: 'BUY_PROPERTY' }));
     ok(await g.act('Asha', { type: 'END_TURN' }));
-    queuedDice = [3, 2]; // Bilal → Railway, owned by Asha
+    queuedDice = [1, 2]; // Bilal → Railway, owned by Asha
     ok(await g.act('Bilal', { type: 'ROLL_DICE' }));
     let snap = await state(g.gameId, g.seats.Bilal!);
     expect(snap.state.turn.pending).toMatchObject({ reason: 'RENT', amount: 1000 });
     ok(await g.act('Bilal', { type: 'PAY_RENT' }));
     // Undo the rent with Asha's approval.
     snap = await state(g.gameId, g.seats.Bilal!);
-    ok(await g.act('Bilal', { type: 'REQUEST_UNDO', targetActionId: snap.state.lastUndoable!.actionId }));
+    ok(await g.act('Bilal', { type: 'REQUEST_UNDO', targetActionId: snap.state.undoStack.at(-1)!.actionId }));
     snap = await state(g.gameId, g.seats.Asha!);
     ok(await g.act('Asha', { type: 'APPROVE_UNDO', requestId: snap.state.undoRequest!.id }));
     snap = await state(g.gameId, g.seats.Asha!);
@@ -319,7 +319,7 @@ describe.skipIf(!DATABASE_URL)('game-action handler (Postgres)', () => {
   it('auction win is persisted atomically with ownership', async () => {
     const g = await setupGame(['Asha', 'Bilal']);
     ok(await g.act('Asha', { type: 'START_GAME' }));
-    queuedDice = [3, 2];
+    queuedDice = [1, 2];
     ok(await g.act('Asha', { type: 'ROLL_DICE' }));
     ok(await g.act('Asha', { type: 'DECLINE_PROPERTY' }));
     const auctionId = (await state(g.gameId, g.seats.Asha!)).state.auction!.id;
@@ -371,7 +371,25 @@ describe.skipIf(!DATABASE_URL)('game-action handler (Postgres)', () => {
         else if (r < 0.15) {
           const mine = Object.values(s.properties).filter((x) => x.ownerId === g.seats[who]!.playerId);
           res = mine.length ? await g.act(who, { type: pick(['BUILD_HOUSE', 'MORTGAGE_PROPERTY', 'SELL_BUILDING', 'UNMORTGAGE_PROPERTY'] as const), propertyKey: pick(mine).key }) : await g.act(who, { type: 'END_TURN' });
-        } else if (r < 0.18 && s.lastUndoable) res = await g.act(nameOf(s.lastUndoable.actorId), { type: 'REQUEST_UNDO', targetActionId: s.lastUndoable.actionId });
+        } else if (r < 0.18 && s.undoStack.length) {
+          const top = s.undoStack.at(-1)!;
+          res = await g.act(nameOf(top.actorId), { type: 'REQUEST_UNDO', targetActionId: top.actionId });
+        } else if (r < 0.22) {
+          const open = s.trades.find((t) => t.status === 'PENDING');
+          const mine = Object.values(s.properties).filter((x) => x.ownerId === g.seats[who]!.playerId);
+          const other = pick(names.filter((n) => n !== who && s.players.find((x) => x.name === n)?.status === 'ACTIVE'));
+          if (open) res = await g.act(nameOf(open.toPlayerId), { type: rand() < 0.6 ? 'ACCEPT_TRADE' : 'REJECT_TRADE', tradeId: open.id });
+          else if (mine.length && other) {
+            res = await g.act(who, {
+              type: 'CREATE_TRADE',
+              toPlayerId: g.seats[other]!.playerId,
+              offeredPropertyKeys: [pick(mine).key],
+              requestedPropertyKeys: [],
+              offeredMoney: 0,
+              requestedMoney: 500,
+            });
+          } else res = await g.act(who, { type: 'END_TURN' });
+        }
         else if (r < 0.2 && s.undoRequest) res = await g.act(nameOf(s.undoRequest.approverIds[0]!), { type: 'APPROVE_UNDO', requestId: s.undoRequest.id });
         else if (s.turn.phase === 'AWAITING_ROLL') res = await g.act(who, { type: 'ROLL_DICE' });
         else if (s.turn.phase === 'AWAITING_DECISION') res = await g.act(who, { type: rand() < 0.6 ? 'BUY_PROPERTY' : 'DECLINE_PROPERTY' });
@@ -381,9 +399,12 @@ describe.skipIf(!DATABASE_URL)('game-action handler (Postgres)', () => {
           res = bidder
             ? await g.act(nameOf(bidder), rand() < 0.5 ? { type: 'PLACE_BID', auctionId: a.id, amount: (a.highBid ?? 0) + 100 } : { type: 'PASS_AUCTION', auctionId: a.id })
             : await g.act(who, { type: 'CLOSE_AUCTION', auctionId: a.id });
+        } else if (s.turn.phase === 'AWAITING_PAYMENT' && p?.kind === 'TAX_ENTRY') {
+          res = await g.act(who, { type: 'PAY_TAX', amount: 1000 });
         } else if (s.turn.phase === 'AWAITING_PAYMENT' && p?.kind === 'PAYMENT') {
           const me = s.players.find((x) => x.id === s.turn.playerId)!;
-          res = await g.act(who, me.balance >= p.amount ? { type: `PAY_${p.reason}` as 'PAY_RENT' } : { type: 'DECLARE_BANKRUPTCY' });
+          const pay = { RENT: 'PAY_RENT', TAX: 'PAY_TAX', CARD: 'PAY_CARD', LOAN_INTEREST: 'PAY_INTEREST', CLUB: 'PAY_CLUB' } as const;
+          res = await g.act(who, me.balance >= p.amount ? { type: pay[p.reason] } : { type: 'DECLARE_BANKRUPTCY' });
         } else if (s.turn.phase === 'AWAITING_CARD') res = await g.act(who, { type: 'RESOLVE_CARD', resolution: pick(['PAY', 'RECEIVE', 'NONE'] as const), amount: 300 });
         else res = await g.act(who, { type: 'END_TURN' });
         if (!res.ok) expect(res.error.code).not.toBe('SERVER_ERROR');
@@ -391,6 +412,163 @@ describe.skipIf(!DATABASE_URL)('game-action handler (Postgres)', () => {
       await ledgerOk(g.gameId);
     }
   }, 120_000);
+
+  describe('BUSINESS_V2 rules through the server', () => {
+    const playerRow = (g: { seats: Record<string, Seat> }, name: string) => g.seats[name]!.playerId;
+
+    it('Start crossing pays ₹1,500 and the loan interest falls due there (persisted)', async () => {
+      const g = await setupGame(['Asha', 'Bilal']);
+      ok(await g.act('Asha', { type: 'START_GAME' }));
+      ok(await g.act('Asha', { type: 'REQUEST_LOAN', amount: 5000 }));
+      let snap = await state(g.gameId, g.seats.Asha!);
+      expect(snap.state.loans[0]).toMatchObject({ principal: 5000, totalOwed: 5000, interestAmount: 500, interestCharges: 0 });
+      await sql`update public.players set position = 34 where id = ${playerRow(g, 'Asha')}`;
+      queuedDice = [2, 3]; // 34 → 3 Railway, passing Start
+      ok(await g.act('Asha', { type: 'ROLL_DICE' }));
+      snap = await state(g.gameId, g.seats.Asha!);
+      const asha = snap.state.players.find((p) => p.name === 'Asha')!;
+      expect(asha).toMatchObject({ position: 3, circuits: 1, balance: 25000 + 5000 + 1500 - 500 });
+      expect(snap.state.loans[0]).toMatchObject({ interestCharges: 1, interestPaid: 500 });
+      expect(snap.transactions.map((t) => t.type)).toEqual(expect.arrayContaining(['START_REWARD', 'LOAN_INTEREST']));
+      const [loan] = await sql`select interest_charges, interest_paid from public.loans where game_id = ${g.gameId}`;
+      expect(loan).toMatchObject({ interest_charges: 1, interest_paid: 500 });
+      await ledgerOk(g.gameId);
+    });
+
+    it('card effects: Community Chest Birthday collects from each player atomically', async () => {
+      const g = await setupGame(['Asha', 'Bilal', 'Chitra']);
+      ok(await g.act('Asha', { type: 'START_GAME' }));
+      await sql`update public.players set position = 14 where id = ${playerRow(g, 'Asha')}`;
+      queuedDice = [1, 1]; // 14 + 2 = 16 Community Chest, even 2 → Birthday
+      ok(await g.act('Asha', { type: 'ROLL_DICE' }));
+      const snap = await state(g.gameId, g.seats.Bilal!);
+      expect(snap.state.turn.card).toMatchObject({ cardId: 'COMMUNITY_CHEST_EVEN_2' });
+      expect(snap.state.players.map((p) => [p.name, p.balance])).toEqual([
+        ['Asha', 26000],
+        ['Bilal', 24500],
+        ['Chitra', 24500],
+      ]);
+      expect(snap.transactions.filter((t) => t.type === 'CARD_COLLECTION')).toHaveLength(2);
+      await ledgerOk(g.gameId);
+    });
+
+    it('mortgage with buildings: buildings returned, payout includes them, state persisted', async () => {
+      const g = await setupGame(['Asha', 'Bilal']);
+      ok(await g.act('Asha', { type: 'START_GAME' }));
+      await sql`update public.players set position = 3 where id = ${playerRow(g, 'Asha')}`;
+      queuedDice = [1, 2]; // 3 + 3 = 6 Indore
+      ok(await g.act('Asha', { type: 'ROLL_DICE' }));
+      ok(await g.act('Asha', { type: 'BUY_PROPERTY' }));
+      ok(await g.act('Asha', { type: 'BUILD_HOUSE', propertyKey: 'INDORE' }));
+      ok(await g.act('Asha', { type: 'BUILD_HOUSE', propertyKey: 'INDORE' }));
+      ok(await g.act('Asha', { type: 'MORTGAGE_PROPERTY', propertyKey: 'INDORE' }));
+      const [prop] = await sql`select houses, hotel, mortgaged from public.properties where game_id = ${g.gameId} and property_key = 'INDORE'`;
+      expect(prop).toMatchObject({ houses: 0, hotel: false, mortgaged: true });
+      const snap = await state(g.gameId, g.seats.Asha!);
+      // 25,000 − 1,500 − 2×2,000 + (2×1,000 + 750)
+      expect(snap.state.players.find((p) => p.name === 'Asha')!.balance).toBe(25000 - 1500 - 4000 + 2750);
+      await ledgerOk(g.gameId);
+    });
+
+    it('trade: create → accept executes once (same action id twice) and persists ownership + money', async () => {
+      const g = await setupGame(['Asha', 'Bilal']);
+      ok(await g.act('Asha', { type: 'START_GAME' }));
+      queuedDice = [1, 2];
+      ok(await g.act('Asha', { type: 'ROLL_DICE' }));
+      ok(await g.act('Asha', { type: 'BUY_PROPERTY' })); // Railway
+      ok(
+        await g.act('Asha', {
+          type: 'CREATE_TRADE',
+          toPlayerId: playerRow(g, 'Bilal'),
+          offeredPropertyKeys: ['RAILWAY'],
+          requestedPropertyKeys: [],
+          offeredMoney: 0,
+          requestedMoney: 6000,
+        }),
+      );
+      let snap = await state(g.gameId, g.seats.Bilal!);
+      const trade = snap.state.trades.find((t) => t.status === 'PENDING')!;
+      expect(trade).toMatchObject({ requestedMoney: 6000, offeredPropertyKeys: ['RAILWAY'] });
+      const accept = randomUUID();
+      const [a, b] = await Promise.all([
+        g.act('Bilal', { type: 'ACCEPT_TRADE', tradeId: trade.id }, { actionId: accept }),
+        g.act('Bilal', { type: 'ACCEPT_TRADE', tradeId: trade.id }, { actionId: accept }),
+      ]);
+      expect(a.ok && b.ok).toBe(true);
+      snap = await state(g.gameId, g.seats.Bilal!);
+      expect(snap.transactions.filter((t) => t.type === 'TRADE_PAYMENT')).toHaveLength(1);
+      expect(snap.state.properties.RAILWAY.ownerId).toBe(playerRow(g, 'Bilal'));
+      expect(snap.state.players.map((p) => p.balance)).toEqual([25000 - 9500 + 6000, 25000 - 6000]);
+      const [row] = await sql`select status, resolved_at from public.trade_offers where id = ${trade.id}`;
+      expect(row!.status).toBe('ACCEPTED');
+      expect(row!.resolved_at).not.toBeNull();
+      // A second accept with a NEW action id is refused by the engine.
+      expect(await g.act('Bilal', { type: 'ACCEPT_TRADE', tradeId: trade.id })).toMatchObject({ ok: false, error: { code: 'TRADE_NOT_ALLOWED' } });
+      await ledgerOk(g.gameId);
+    });
+
+    it('trade: reject, and accept after the property moved fails without any change', async () => {
+      const g = await setupGame(['Asha', 'Bilal']);
+      ok(await g.act('Asha', { type: 'START_GAME' }));
+      queuedDice = [1, 2];
+      ok(await g.act('Asha', { type: 'ROLL_DICE' }));
+      ok(await g.act('Asha', { type: 'BUY_PROPERTY' }));
+      const create = () =>
+        g.act('Asha', {
+          type: 'CREATE_TRADE',
+          toPlayerId: playerRow(g, 'Bilal'),
+          offeredPropertyKeys: ['RAILWAY'],
+          requestedPropertyKeys: [],
+          offeredMoney: 0,
+          requestedMoney: 100,
+        });
+      ok(await create());
+      let snap = await state(g.gameId, g.seats.Bilal!);
+      ok(await g.act('Bilal', { type: 'REJECT_TRADE', tradeId: snap.state.trades.at(-1)!.id }));
+      ok(await create());
+      snap = await state(g.gameId, g.seats.Bilal!);
+      const t2 = snap.state.trades.find((t) => t.status === 'PENDING')!;
+      ok(await g.act('Asha', { type: 'SELL_PROPERTY', propertyKey: 'RAILWAY' }));
+      const before = await sql`select count(*)::int as n from public.transactions where game_id = ${g.gameId}`;
+      expect(await g.act('Bilal', { type: 'ACCEPT_TRADE', tradeId: t2.id })).toMatchObject({ ok: false, error: { code: 'TRADE_NOT_ALLOWED' } });
+      const after = await sql`select count(*)::int as n from public.transactions where game_id = ${g.gameId}`;
+      expect(after[0]!.n).toBe(before[0]!.n);
+      const rows = await sql`select status from public.trade_offers where game_id = ${g.gameId} order by created_at`;
+      expect(rows.map((r) => r.status)).toEqual(['REJECTED', 'PENDING']);
+      await expect(sql`update public.trade_offers set requested_money = 1 where id = ${t2.id}`).rejects.toThrow(/immutable/);
+    });
+
+    it('multi-undo through the server: two undos in a row, versions + broadcasts advance', async () => {
+      const g = await setupGame(['Asha', 'Bilal']);
+      ok(await g.act('Asha', { type: 'START_GAME' }));
+      ok(await g.act('Asha', { type: 'TRANSFER_MONEY', toPlayerId: playerRow(g, 'Bilal'), amount: 100 }));
+      ok(await g.act('Asha', { type: 'TRANSFER_MONEY', toPlayerId: playerRow(g, 'Bilal'), amount: 200 }));
+      for (const expected of [25000 - 100, 25000]) {
+        let snap = await state(g.gameId, g.seats.Asha!);
+        ok(await g.act('Asha', { type: 'REQUEST_UNDO', targetActionId: snap.state.undoStack.at(-1)!.actionId }));
+        snap = await state(g.gameId, g.seats.Bilal!);
+        const before = broadcasts.length;
+        const v = g.version;
+        const res = ok(await g.act('Bilal', { type: 'APPROVE_UNDO', requestId: snap.state.undoRequest!.id }));
+        expect(res.snapshot.state.version).toBe(v + 1);
+        expect(broadcasts.slice(before).at(-1)).toMatchObject({ gameId: g.gameId, payload: { version: v + 1 } });
+        expect(res.snapshot.state.players.find((p) => p.name === 'Asha')!.balance).toBe(expected);
+      }
+      const [row] = await sql`select jsonb_array_length(undo_stack) as n from public.games where id = ${g.gameId}`;
+      expect(row!.n).toBe(0);
+      await ledgerOk(g.gameId);
+    });
+
+    it('games from the old V1 engine are reported as expired, not loaded', async () => {
+      const g = await setupGame(['Asha', 'Bilal']);
+      await sql`update public.games set rules_version = 'BUSINESS_V1' where id = ${g.gameId}`;
+      expect(await call({ op: 'state', gameId: g.gameId, playerId: g.seats.Asha!.playerId, token: g.seats.Asha!.token })).toMatchObject({
+        ok: false,
+        error: { code: 'GAME_EXPIRED' },
+      });
+      expect(await g.act('Asha', { type: 'START_GAME' })).toMatchObject({ ok: false, error: { code: 'GAME_EXPIRED' } });
+    });
+  });
 
   describe('database guards', () => {
     it('ledger tables are append-only', async () => {

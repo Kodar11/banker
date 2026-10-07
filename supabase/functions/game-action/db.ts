@@ -13,6 +13,7 @@ import {
   type PlayerState,
   type PropertyKey,
   type PropertyState,
+  type TradeOffer,
   type TransactionRecord,
 } from '../_shared/engine/index.ts';
 
@@ -49,6 +50,7 @@ function mapPlayer(r: Row): PlayerState {
     status: r.status as PlayerState['status'],
     skipTurns: r.skip_turns as number,
     inJail: r.in_jail as boolean,
+    circuits: Number(r.circuits ?? 0),
   };
 }
 
@@ -58,9 +60,13 @@ function mapLoan(r: Row): LoanState {
     playerId: r.player_id as string,
     principal: Number(r.principal),
     interestRatePercent: Number(r.interest_rate_percent),
+    interestAmount: Number(r.interest_amount),
     totalOwed: Number(r.total_owed),
     outstanding: Number(r.outstanding),
     status: r.status as LoanState['status'],
+    createdAtCircuit: Number(r.created_at_circuit),
+    interestCharges: Number(r.interest_charges),
+    interestPaid: Number(r.interest_paid),
     createdAt: iso(r.created_at),
     closedAt: isoOrNull(r.closed_at),
   };
@@ -83,6 +89,24 @@ function mapAuction(r: Row): AuctionState {
     closedAt: isoOrNull(r.closed_at),
   };
 }
+
+function mapTrade(r: Row): TradeOffer {
+  return {
+    id: r.id as string,
+    fromPlayerId: r.from_player_id as string,
+    toPlayerId: r.to_player_id as string,
+    offeredPropertyKeys: (r.offered_property_keys as PropertyKey[]) ?? [],
+    requestedPropertyKeys: (r.requested_property_keys as PropertyKey[]) ?? [],
+    offeredMoney: Number(r.offered_money),
+    requestedMoney: Number(r.requested_money),
+    status: r.status as TradeOffer['status'],
+    createdAt: iso(r.created_at),
+    resolvedAt: isoOrNull(r.resolved_at),
+  };
+}
+
+/** Same bound the engine keeps in state (reducer.ts KEEP_RESOLVED_TRADES). */
+const RESOLVED_TRADES_LOADED = 20;
 
 function mapTransaction(r: Row): TransactionRecord {
   return {
@@ -119,12 +143,16 @@ export async function lockGame(tx: Tx, gameId: string): Promise<Row | undefined>
 /** Assembles the authoritative engine state from the normalized tables. */
 export async function loadState(tx: Tx, game: Row): Promise<GameState> {
   const id = game.id as string;
-  const [players, props, loans, auctions] = await Promise.all([
+  const [players, props, loans, auctions, pendingTrades, resolvedTrades] = await Promise.all([
     tx`select * from public.players where game_id = ${id} order by seat`,
     tx`select * from public.properties where game_id = ${id}`,
     tx`select * from public.loans where game_id = ${id} order by created_at, id`,
     game.current_auction_id ? tx`select * from public.auctions where id = ${game.current_auction_id as string}` : Promise.resolve([]),
+    tx`select * from public.trade_offers where game_id = ${id} and status = 'PENDING' order by created_at, id`,
+    tx`select * from public.trade_offers where game_id = ${id} and status <> 'PENDING'
+       order by resolved_at desc, id limit ${RESOLVED_TRADES_LOADED}`,
   ]);
+  const trades = [...resolvedTrades.reverse(), ...pendingTrades].map(mapTrade);
   const properties = Object.fromEntries(
     PROPERTY_KEYS.map((key): [PropertyKey, PropertyState] => [key, { key, ownerId: null, houses: 0, hotel: false, mortgaged: false }]),
   ) as Record<PropertyKey, PropertyState>;
@@ -154,8 +182,9 @@ export async function loadState(tx: Tx, game: Row): Promise<GameState> {
     loans: loans.map(mapLoan),
     auction: auctionRow ? mapAuction(auctionRow) : null,
     turn: game.turn as GameState['turn'],
-    lastUndoable: (game.last_undoable as GameState['lastUndoable']) ?? null,
+    undoStack: (game.undo_stack as GameState['undoStack']) ?? [],
     undoRequest: (game.undo_request as GameState['undoRequest']) ?? null,
+    trades,
     createdAt: iso(game.created_at),
     expiresAt: iso(game.expires_at),
   };
@@ -190,9 +219,10 @@ export async function insertNewGame(tx: Tx, result: EngineResult, hostTokenHash:
 
 export async function insertPlayer(tx: Tx, gameId: string, p: PlayerState, tokenHash: string): Promise<void> {
   await tx`
-    insert into public.players (id, game_id, name, seat, is_host, ready, balance, position, status, skip_turns, in_jail, token_hash)
+    insert into public.players (id, game_id, name, seat, is_host, ready, balance, position, status, skip_turns, in_jail,
+      circuits, token_hash)
     values (${p.id}, ${gameId}, ${p.name}, ${p.seat}, ${p.isHost}, ${p.ready}, ${p.balance}, ${p.position},
-      ${p.status}, ${p.skipTurns}, ${p.inJail}, ${tokenHash})`;
+      ${p.status}, ${p.skipTurns}, ${p.inJail}, ${p.circuits}, ${tokenHash})`;
 }
 
 async function insertLedger(tx: Tx, gameId: string, result: EngineResult): Promise<void> {
@@ -260,7 +290,7 @@ export async function persistResult(tx: Tx, prevVersion: number, result: EngineR
       turn = ${json(s.turn)},
       paused_from = ${s.pausedFrom},
       paused_at = ${s.pausedAt},
-      last_undoable = ${json(s.lastUndoable)},
+      undo_stack = ${tx.json(s.undoStack as unknown as postgres.JSONValue)},
       undo_request = ${json(s.undoRequest)},
       current_auction_id = ${s.auction?.id ?? null},
       expires_at = ${s.expiresAt},
@@ -276,13 +306,14 @@ export async function persistResult(tx: Tx, prevVersion: number, result: EngineR
     status: p.status,
     skip_turns: p.skipTurns,
     in_jail: p.inJail,
+    circuits: p.circuits,
   }));
   await tx`
     update public.players p set
       ready = x.ready, balance = x.balance, position = x.position, status = x.status,
-      skip_turns = x.skip_turns, in_jail = x.in_jail
+      skip_turns = x.skip_turns, in_jail = x.in_jail, circuits = x.circuits
     from jsonb_to_recordset(${json(playerRows)}) as x(
-      id uuid, ready boolean, balance bigint, position int, status text, skip_turns int, in_jail boolean)
+      id uuid, ready boolean, balance bigint, position int, status text, skip_turns int, in_jail boolean, circuits int)
     where p.id = x.id and p.game_id = ${s.id}`;
 
   const propRows = PROPERTY_KEYS.map((k) => {
@@ -300,14 +331,26 @@ export async function persistResult(tx: Tx, prevVersion: number, result: EngineR
 
   for (const l of s.loans) {
     await tx`
-      insert into public.loans (id, game_id, player_id, principal, interest_rate_percent, total_owed, outstanding,
-        status, created_at, closed_at)
-      values (${l.id}, ${s.id}, ${l.playerId}, ${l.principal}, ${l.interestRatePercent}, ${l.totalOwed},
-        ${l.outstanding}, ${l.status}, ${l.createdAt}, ${l.closedAt})
+      insert into public.loans (id, game_id, player_id, principal, interest_rate_percent, interest_amount, total_owed,
+        outstanding, status, created_at_circuit, interest_charges, interest_paid, created_at, closed_at)
+      values (${l.id}, ${s.id}, ${l.playerId}, ${l.principal}, ${l.interestRatePercent}, ${l.interestAmount}, ${l.totalOwed},
+        ${l.outstanding}, ${l.status}, ${l.createdAtCircuit}, ${l.interestCharges}, ${l.interestPaid}, ${l.createdAt}, ${l.closedAt})
       on conflict (id) do update set outstanding = excluded.outstanding, status = excluded.status,
-        closed_at = excluded.closed_at
+        closed_at = excluded.closed_at, interest_charges = excluded.interest_charges, interest_paid = excluded.interest_paid
       where public.loans.outstanding is distinct from excluded.outstanding
-         or public.loans.status is distinct from excluded.status`;
+         or public.loans.status is distinct from excluded.status
+         or public.loans.interest_charges is distinct from excluded.interest_charges
+         or public.loans.interest_paid is distinct from excluded.interest_paid`;
+  }
+
+  for (const t of s.trades) {
+    await tx`
+      insert into public.trade_offers (id, game_id, from_player_id, to_player_id, offered_property_keys,
+        requested_property_keys, offered_money, requested_money, status, created_at, resolved_at)
+      values (${t.id}, ${s.id}, ${t.fromPlayerId}, ${t.toPlayerId}, ${t.offeredPropertyKeys}::text[],
+        ${t.requestedPropertyKeys}::text[], ${t.offeredMoney}, ${t.requestedMoney}, ${t.status}, ${t.createdAt}, ${t.resolvedAt})
+      on conflict (id) do update set status = excluded.status, resolved_at = excluded.resolved_at
+      where public.trade_offers.status is distinct from excluded.status`;
   }
 
   await insertLedger(tx, s.id, result);

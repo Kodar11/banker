@@ -2,7 +2,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { PROPERTY_DEEDS, PROPERTY_KEYS } from '@/engine/index.ts';
+import { PROPERTY_DEEDS, PROPERTY_KEYS, RULES_VERSION } from '@/engine/index.ts';
 
 const root = join(__dirname, '..', '..');
 
@@ -21,7 +21,7 @@ describe('server/client share one engine', () => {
       .filter((f) => f.endsWith('_catalog.sql'))
       .map((f) => readFileSync(join(dir, f), 'utf8'))
       .join('\n');
-    const rows = [...sql.matchAll(/\('BUSINESS_V1', '([A-Z_]+)', '([^']+)', '([A-Z_]+)'\)/g)].map((m) => [m[1], m[2], m[3]]);
+    const rows = [...sql.matchAll(new RegExp(`\\('${RULES_VERSION}', '([A-Z_]+)', '([^']+)', '([A-Z_]+)'\\)`, 'g'))].map((m) => [m[1], m[2], m[3]]);
     expect(rows).toEqual(PROPERTY_KEYS.map((k) => [k, PROPERTY_DEEDS[k].name, PROPERTY_DEEDS[k].group]));
   });
 });

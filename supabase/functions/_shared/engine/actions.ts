@@ -4,6 +4,7 @@ import { PROPERTY_KEYS, type PropertyKey } from './businessBoard.ts';
 const propertyKey = z.enum(PROPERTY_KEYS as [PropertyKey, ...PropertyKey[]]);
 const id = z.string().uuid();
 const rupees = z.number().int().positive().max(10_000_000);
+const money = z.number().int().min(0).max(10_000_000);
 
 const bare = <T extends string>(type: T) => z.object({ type: z.literal(type) }).strict();
 const onProperty = <T extends string>(type: T) => z.object({ type: z.literal(type), propertyKey }).strict();
@@ -16,8 +17,11 @@ export const GameActionSchema = z.discriminatedUnion('type', [
   bare('DECLINE_PROPERTY'),
   bare('START_AUCTION'),
   bare('PAY_RENT'),
-  bare('PAY_TAX'),
+  /** amount: only for a tax square without a configured amount (player enters the printed amount). */
+  z.object({ type: z.literal('PAY_TAX'), amount: z.number().int().positive().max(10_000_000).optional() }).strict(),
   bare('PAY_CARD'),
+  bare('PAY_INTEREST'),
+  bare('PAY_CLUB'),
   z
     .object({
       type: z.literal('RESOLVE_CARD'),
@@ -46,6 +50,19 @@ export const GameActionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('CLOSE_AUCTION'), auctionId: id }).strict(),
   bare('END_TURN'),
   bare('DECLARE_BANKRUPTCY'),
+  z
+    .object({
+      type: z.literal('CREATE_TRADE'),
+      toPlayerId: id,
+      offeredPropertyKeys: z.array(propertyKey).max(26),
+      requestedPropertyKeys: z.array(propertyKey).max(26),
+      offeredMoney: money,
+      requestedMoney: money,
+    })
+    .strict(),
+  z.object({ type: z.literal('ACCEPT_TRADE'), tradeId: id }).strict(),
+  z.object({ type: z.literal('REJECT_TRADE'), tradeId: id }).strict(),
+  z.object({ type: z.literal('CANCEL_TRADE'), tradeId: id }).strict(),
   z.object({ type: z.literal('REQUEST_UNDO'), targetActionId: id }).strict(),
   z.object({ type: z.literal('APPROVE_UNDO'), requestId: id }).strict(),
   z.object({ type: z.literal('REJECT_UNDO'), requestId: id }).strict(),
@@ -71,6 +88,8 @@ export const STALE_SENSITIVE_ACTIONS: ReadonlySet<GameActionType> = new Set<Game
   'PAY_RENT',
   'PAY_TAX',
   'PAY_CARD',
+  'PAY_INTEREST',
+  'PAY_CLUB',
   'RESOLVE_CARD',
   'PLACE_BID',
   'END_TURN',

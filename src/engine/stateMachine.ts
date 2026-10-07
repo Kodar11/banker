@@ -7,6 +7,7 @@ import type { GameStatus, TurnPhase } from './types.ts';
  * AWAITING_DECISION → TRANSACTION (buy) | AUCTION (decline) | TURN_COMPLETE (decline, no auction)
  * AUCTION → TRANSACTION (winner pays) | TURN_COMPLETE (unsold)
  * TRANSACTION → TURN_COMPLETE | AWAITING_PAYMENT (card: pay after other effects)
+ *             | RESOLVING (loan interest paid at Start → now resolve the square landed on)
  * TURN_COMPLETE → AWAITING_ROLL (next player)
  */
 export const TURN_TRANSITIONS: Readonly<Record<TurnPhase, readonly TurnPhase[]>> = {
@@ -17,7 +18,7 @@ export const TURN_TRANSITIONS: Readonly<Record<TurnPhase, readonly TurnPhase[]>>
   AWAITING_PAYMENT: ['TRANSACTION', 'TURN_COMPLETE'],
   AWAITING_CARD: ['TRANSACTION', 'AWAITING_PAYMENT', 'TURN_COMPLETE'],
   AUCTION: ['TRANSACTION', 'TURN_COMPLETE'],
-  TRANSACTION: ['TURN_COMPLETE', 'AWAITING_PAYMENT', 'MOVING'],
+  TRANSACTION: ['TURN_COMPLETE', 'AWAITING_PAYMENT', 'MOVING', 'RESOLVING'],
   TURN_COMPLETE: ['AWAITING_ROLL'],
 };
 
