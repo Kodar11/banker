@@ -183,10 +183,11 @@ function ManualCard({ view, send }: { view: GameView; send: ActionPanelProps['se
   return (
     <Card testID="manual-card">
       <Pill tone="gold">{DECK_LABELS[card.deck]} · rolled {card.rollTotal}</Pill>
-      <Text className="mt-2 text-lg font-bold text-ink">{card.text}</Text>
-      <Text className="mt-1 text-sm text-stone-600">
-        This card entry wasn’t captured yet. Read your physical card and enter what it says.
+      <Text className="mt-2 text-xl font-black text-ink">
+        Read entry {card.rollTotal} on your physical {DECK_LABELS[card.deck]} card
       </Text>
+      {card.text.startsWith('Not captured') ? null : <Text className="mt-1 text-base text-stone-700">{card.text}</Text>}
+      <Text className="mt-1 text-sm text-stone-600">This entry wasn’t legible in the photos, so enter what it says.</Text>
       <View className="mt-3 gap-3 rounded-2xl bg-felt p-3">
         <TextField label="Amount on the card (₹)" keyboardType="number-pad" value={amount} onChangeText={setAmount} testID="card-amount" />
       </View>

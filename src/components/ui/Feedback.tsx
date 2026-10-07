@@ -21,8 +21,15 @@ export function NoticeToast() {
   return (
     <Animated.View
       pointerEvents="box-none"
-      style={{ opacity: anim, transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [-20, 0] }) }] }}
-      className="absolute left-4 right-4 top-14 z-50"
+      style={{
+        position: 'absolute',
+        left: 16,
+        right: 16,
+        top: 56,
+        zIndex: 50,
+        opacity: anim,
+        transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [-20, 0] }) }],
+      }}
     >
       <Pressable onPress={dismiss} accessibilityRole="alert" testID="notice-toast" className={`rounded-2xl px-5 py-4 shadow-lg ${tone}`}>
         <Text className="text-center text-base font-bold text-white">{notice.message}</Text>

@@ -76,7 +76,7 @@ export function LobbyView({ view }: { view: GameView }) {
                   {p.id === me?.id ? ' (you)' : ''}
                 </Text>
               </View>
-              {p.isHost ? <Pill tone="gold">Host</Pill> : p.ready ? <Pill tone="good">Ready</Pill> : <Pill>Joining</Pill>}
+              {p.isHost ? <Pill tone="gold">Host</Pill> : p.ready ? <Pill tone="good">Ready</Pill> : <Pill>Not ready</Pill>}
             </View>
           ))}
         </View>

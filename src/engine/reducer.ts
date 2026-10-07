@@ -413,7 +413,8 @@ function drawCard(d: Draft, player: PlayerState, deck: Deck, rollTotal: number, 
   const turn = d.state.turn;
   const card: CardDefinition = findCard(deck, rollTotal);
   turn.card = { cardId: card.id, deck, rollTotal, text: card.text, verified: card.verified };
-  d.event('CARD_DRAWN', player.id, `${DECK_LABELS[deck]} (${rollTotal}): ${card.text}`, {
+  const cardMessage = card.verified ? card.text : 'check the physical card';
+  d.event('CARD_DRAWN', player.id, `${DECK_LABELS[deck]} (${rollTotal}): ${cardMessage}`, {
     cardId: card.id,
     deck,
     rollTotal,

@@ -4,6 +4,7 @@ import { POLL_MS_DEGRADED, POLL_MS_LIVE } from '@/constants/app';
 import { gameApi, type Credentials } from '@/lib/gameApi';
 import { subscribeToGame } from '@/lib/realtime';
 import { useGameStore } from '@/store/gameStore';
+import { useSessionStore } from '@/store/sessionStore';
 
 const inFlight = new Map<string, Promise<void>>();
 
@@ -92,4 +93,11 @@ export function useGameSync(credentials: Credentials | null): void {
       appSub.remove();
     };
   }, [gameId, playerId, token]);
+}
+
+/** Mounted once in the root layout: syncs whichever game this device is in. */
+export function GameSyncHost(): null {
+  const session = useSessionStore((s) => s.session);
+  useGameSync(session);
+  return null;
 }

@@ -8,6 +8,7 @@ import { ConnectionBanner, ErrorState, NoticeToast } from '@/components/ui';
 import { AuctionView } from '@/features/auction/AuctionView';
 import { GameGate } from '@/features/game/GameGate';
 import { GameScreen } from '@/features/game/GameScreen';
+import { GameSyncHost } from '@/features/game/sync';
 import { useGameAction } from '@/features/game/useGameAction';
 import type { GameView } from '@/features/game/useGameView';
 import { LobbyView } from '@/features/lobby/LobbyView';
@@ -354,7 +355,14 @@ describe('Errors and reconnection', () => {
   it('GameGate shows an error state when the game cannot be loaded', async () => {
     useSessionStore.setState({ session: { gameId: 'g-1', playerId: 'p-1', token: 'a'.repeat(64) }, hydrated: true });
     api.state.mockResolvedValue({ ok: false, error: { code: 'GAME_EXPIRED', message: 'This game has expired. Start a new one.' } });
-    await render(<GameGate gameId="g-1" area="game">{() => null}</GameGate>);
+    await render(
+      <>
+        <GameSyncHost />
+        <GameGate gameId="g-1" area="game">
+          {() => null}
+        </GameGate>
+      </>,
+    );
     expect(await screen.findByText('This game has expired. Start a new one.')).toBeTruthy();
     expect(screen.getByText('Leave game')).toBeTruthy();
   });

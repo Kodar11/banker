@@ -19,7 +19,7 @@ export const DiceResult = memo(function DiceResult({ state, playerName }: { stat
   if (!roll) return null;
   return (
     <View className="items-center gap-1 rounded-3xl bg-felt-dark px-4 py-4" testID="dice-result" accessibilityLiveRegion="polite">
-      <Animated.View style={{ transform: [{ scale }] }} className="flex-row items-center gap-3">
+      <Animated.View style={{ transform: [{ scale }], flexDirection: 'row', alignItems: 'center', gap: 12 }}>
         {roll.dice.map((d, i) => (
           <Text key={i} className="text-6xl text-cream" accessibilityLabel={`Die ${d}`}>
             {dieFace(d)}

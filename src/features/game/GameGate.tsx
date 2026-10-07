@@ -3,15 +3,14 @@ import { router } from 'expo-router';
 import { Button, ErrorState, LoadingState } from '@/components/ui';
 import { useGameStore } from '@/store/gameStore';
 import { useSessionStore } from '@/store/sessionStore';
-import { useGameSync } from './sync';
 import { useGameView, type GameView } from './useGameView';
 
 type Area = 'lobby' | 'game' | 'any';
 
 /**
- * Wraps every in-game route: checks this device is in the game, keeps state
- * synced, renders loading/error states, and moves players between lobby and
- * game as the server status changes.
+ * Wraps every in-game route: checks this device is in the game, renders
+ * loading/error states, and moves players between lobby and game as the server
+ * status changes. Syncing itself happens once, in GameSyncHost (root layout).
  */
 export function GameGate({ gameId, area, children }: { gameId: string; area: Area; children: (view: GameView) => ReactNode }) {
   const session = useSessionStore((s) => s.session);
@@ -19,7 +18,6 @@ export function GameGate({ gameId, area, children }: { gameId: string; area: Are
   const clearSession = useSessionStore((s) => s.clearSession);
   const loadError = useGameStore((s) => s.loadError);
   const belongs = !!session && session.gameId === gameId;
-  useGameSync(belongs ? session : null);
   const view = useGameView();
   const status = view?.snapshot.state.status;
 
