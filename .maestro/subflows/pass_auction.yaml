@@ -1,0 +1,24 @@
+appId: com.boardgamebank.businessbanker
+---
+- extendedWaitUntil:
+    visible:
+      id: auction-screen
+    timeout: 15000
+- runScript:
+    file: ../scripts/bot.js
+    env:
+      OP: bid
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_KEY: ${SUPABASE_KEY}
+- extendedWaitUntil:
+    visible: '(?i)highest bid.*priya.*'
+    timeout: 20000
+- tapOn:
+    id: pass-button
+- extendedWaitUntil:
+    visible: '(?i)sold to priya'
+    timeout: 15000
+- extendedWaitUntil:
+    visible:
+      id: game-screen
+    timeout: 15000

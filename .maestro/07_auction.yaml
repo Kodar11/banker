@@ -1,0 +1,26 @@
+# 7. Auction: app declines a property, bot bids, app passes, bot wins and pays.
+appId: com.boardgamebank.businessbanker
+---
+- runFlow: subflows/host_game_with_bot.yaml
+- repeat:
+    times: 12
+    while:
+      notVisible:
+        id: buy-card
+    commands:
+      - tapOn:
+          id: roll-button
+      - extendedWaitUntil:
+          visible:
+            id: dice-result
+          timeout: 15000
+      - runFlow:
+          when:
+            notVisible:
+              id: buy-card
+          commands:
+            - runFlow: subflows/finish_my_turn.yaml
+- tapOn:
+    id: decline-button
+- runFlow: subflows/pass_auction.yaml
+- assertVisible: '(?i)priya won .* for ₹.*'

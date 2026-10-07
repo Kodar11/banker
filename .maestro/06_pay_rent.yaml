@@ -1,0 +1,26 @@
+# 6. Pay rent: the bot buys everything it lands on; play until the app owes rent, then pay it.
+appId: com.boardgamebank.businessbanker
+---
+- runFlow: subflows/host_game_with_bot.yaml
+- repeat:
+    times: 30
+    while:
+      notVisible: '(?i)pay rent ₹.*'
+    commands:
+      - tapOn:
+          id: roll-button
+      - extendedWaitUntil:
+          visible:
+            id: dice-result
+          timeout: 15000
+      - runFlow:
+          when:
+            notVisible: '(?i)pay rent ₹.*'
+          commands:
+            - runFlow: subflows/finish_my_turn.yaml
+- assertVisible: '(?i)owned by priya'
+- tapOn:
+    id: pay-button
+- extendedWaitUntil:
+    visible: '(?i)tanmay paid ₹.* to priya \(rent for .*\)'
+    timeout: 15000

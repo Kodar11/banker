@@ -1,0 +1,25 @@
+# 1. Create game: host picks Business, enters a name, gets a 6-digit code + QR.
+appId: com.boardgamebank.businessbanker
+---
+- launchApp:
+    clearState: true
+- assertVisible:
+    id: create-game
+- tapOn:
+    id: create-game
+- assertVisible:
+    id: game-option-business
+- tapOn:
+    id: create-confirm
+- assertVisible: Enter a name
+- tapOn:
+    id: host-name
+- inputText: Tanmay
+- tapOn:
+    id: create-confirm
+- extendedWaitUntil:
+    visible:
+      id: lobby-screen
+    timeout: 15000
+- assertVisible: '\d{6}'
+- assertVisible: '(?i)tanmay \(you\)'

@@ -1,0 +1,30 @@
+# 5. Buy property: play turns until the app lands on an unowned property, then buy it.
+appId: com.boardgamebank.businessbanker
+---
+- runFlow: subflows/host_game_with_bot.yaml
+- repeat:
+    times: 15
+    while:
+      notVisible:
+        id: buy-button
+    commands:
+      - tapOn:
+          id: roll-button
+      - extendedWaitUntil:
+          visible:
+            id: dice-result
+          timeout: 15000
+      - runFlow:
+          when:
+            notVisible:
+              id: buy-button
+          commands:
+            - runFlow: subflows/finish_my_turn.yaml
+- assertVisible: '(?i)property available'
+- tapOn:
+    id: buy-button
+- extendedWaitUntil:
+    visible: '(?i)tanmay bought .* for ₹.*'
+    timeout: 15000
+- assertVisible:
+    id: end-turn-button

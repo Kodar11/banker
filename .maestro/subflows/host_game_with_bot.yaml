@@ -1,0 +1,35 @@
+# App creates a game as "Tanmay", the bot joins, app starts it.
+appId: com.boardgamebank.businessbanker
+---
+- launchApp:
+    clearState: true
+- tapOn:
+    id: create-game
+- tapOn:
+    id: host-name
+- inputText: Tanmay
+- tapOn:
+    id: create-confirm
+- extendedWaitUntil:
+    visible:
+      id: game-code
+    timeout: 15000
+- copyTextFrom:
+    id: game-code
+- runScript:
+    file: ../scripts/bot.js
+    env:
+      OP: join
+      CODE: ${maestro.copiedText}
+      NAME: Priya
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_KEY: ${SUPABASE_KEY}
+- extendedWaitUntil:
+    visible: Priya
+    timeout: 20000
+- tapOn:
+    id: start-game-button
+- extendedWaitUntil:
+    visible:
+      id: game-screen
+    timeout: 20000

@@ -1,0 +1,33 @@
+# 2. Join game: a bot hosts; the app joins with the 6-digit code.
+appId: com.boardgamebank.businessbanker
+---
+- runScript:
+    file: scripts/bot.js
+    env:
+      OP: host
+      NAME: Arjun
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_KEY: ${SUPABASE_KEY}
+- launchApp:
+    clearState: true
+- tapOn:
+    id: join-game
+- tapOn:
+    id: join-code
+- inputText: ${output.code}
+- tapOn:
+    id: join-name
+- inputText: Meera
+- tapOn:
+    id: join-confirm
+- extendedWaitUntil:
+    visible:
+      id: lobby-screen
+    timeout: 15000
+- assertVisible: Arjun
+- assertVisible: '(?i)meera \(you\)'
+- tapOn:
+    id: ready-button
+- extendedWaitUntil:
+    visible: "I'M READY ✓"
+    timeout: 10000

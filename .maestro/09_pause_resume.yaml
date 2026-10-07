@@ -1,0 +1,18 @@
+# 9. Pause/resume: no gameplay while paused; resume restores the turn.
+appId: com.boardgamebank.businessbanker
+---
+- runFlow: subflows/host_game_with_bot.yaml
+- tapOn:
+    id: pause-button
+- extendedWaitUntil:
+    visible:
+      id: paused-card
+    timeout: 15000
+- assertNotVisible:
+    id: roll-button
+- tapOn:
+    id: resume-button
+- extendedWaitUntil:
+    visible:
+      id: roll-button
+    timeout: 15000

@@ -1,0 +1,8 @@
+# 3. Start game: bot joins the app's game; host starts; everyone gets starting cash.
+appId: com.boardgamebank.businessbanker
+---
+- runFlow: subflows/host_game_with_bot.yaml
+- assertVisible: YOUR TURN
+- assertVisible: '₹25,000'
+- assertVisible:
+    id: roll-button

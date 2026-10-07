@@ -1,0 +1,22 @@
+# 10. Finish game: host ends the game; winner by net worth is shown.
+appId: com.boardgamebank.businessbanker
+---
+- runFlow: subflows/host_game_with_bot.yaml
+- tapOn:
+    id: roll-button
+- extendedWaitUntil:
+    visible:
+      id: dice-result
+    timeout: 15000
+- runFlow: subflows/finish_my_turn.yaml
+- scrollUntilVisible:
+    element:
+      id: end-game-button
+- tapOn:
+    id: end-game-button
+- tapOn: End game
+- extendedWaitUntil:
+    visible:
+      id: finished-card
+    timeout: 15000
+- assertVisible: '(?i).* wins!'

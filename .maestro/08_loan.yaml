@@ -1,0 +1,20 @@
+# 8. Loan: borrow ₹5,000 at the configured flat interest, then repay it all.
+appId: com.boardgamebank.businessbanker
+---
+- runFlow: subflows/host_game_with_bot.yaml
+- tapOn:
+    id: open-loan
+- tapOn: '₹5,000'
+- assertVisible: '₹5,500'
+- tapOn:
+    id: loan-confirm
+- extendedWaitUntil:
+    visible: '₹30,000'
+    timeout: 15000
+- tapOn:
+    id: open-loan
+- tapOn:
+    id: loan-repay-all
+- extendedWaitUntil:
+    visible: 'Loan cleared!'
+    timeout: 15000

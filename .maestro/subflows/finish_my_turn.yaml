@@ -1,0 +1,72 @@
+# Resolves whatever the app player's roll produced, ends the turn, then the bot plays.
+appId: com.boardgamebank.businessbanker
+---
+- runFlow:
+    when:
+      visible:
+        id: buy-button
+        enabled: true
+    commands:
+      - tapOn:
+          id: buy-button
+      - extendedWaitUntil:
+          notVisible:
+            id: buy-card
+          timeout: 15000
+- runFlow:
+    when:
+      visible:
+        id: buy-card
+    commands:
+      - tapOn:
+          id: decline-button
+      - runFlow: pass_auction.yaml
+- runFlow:
+    when:
+      visible:
+        id: pay-button
+        enabled: true
+    commands:
+      - tapOn:
+          id: pay-button
+- runFlow:
+    when:
+      visible:
+        id: card-none
+    commands:
+      - tapOn:
+          id: card-none
+- extendedWaitUntil:
+    visible:
+      id: end-turn-button
+    timeout: 15000
+- tapOn:
+    id: end-turn-button
+- runScript:
+    file: ../scripts/bot.js
+    env:
+      OP: play
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_KEY: ${SUPABASE_KEY}
+# If the bot declined a property, this phone is taken to the auction: pass, let the bot finish.
+- runFlow:
+    when:
+      visible:
+        id: auction-screen
+    commands:
+      - tapOn:
+          id: pass-button
+      - extendedWaitUntil:
+          visible:
+            id: game-screen
+          timeout: 15000
+      - runScript:
+          file: ../scripts/bot.js
+          env:
+            OP: play
+            SUPABASE_URL: ${SUPABASE_URL}
+            SUPABASE_KEY: ${SUPABASE_KEY}
+- extendedWaitUntil:
+    visible:
+      id: roll-button
+    timeout: 30000

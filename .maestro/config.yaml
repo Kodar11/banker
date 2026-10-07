@@ -1,0 +1,9 @@
+# Maestro E2E — run against a development build (not Expo Go):
+#   eas build --profile development   (or: npx expo run:android)
+#   maestro test -e SUPABASE_URL=https://<project>.supabase.co -e SUPABASE_KEY=<publishable key> .maestro
+# The "bot" (scripts/bot.js) plays the other seat through the same game-action Edge Function.
+flows:
+  - "0*.yaml"
+  - "1*.yaml"
+executionOrder:
+  continueOnFailure: false
