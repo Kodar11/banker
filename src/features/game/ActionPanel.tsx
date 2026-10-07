@@ -52,6 +52,7 @@ export function ActionPanel({ view, send, onOpenLoan }: ActionPanelProps) {
 
   switch (turn.phase) {
     case 'AWAITING_ROLL':
+      if (me.inJail) return <JailChoice view={view} send={send} onOpenLoan={onOpenLoan} />;
       return (
         <Button
           title="ROLL DICE"
@@ -100,7 +101,6 @@ export function ActionPanel({ view, send, onOpenLoan }: ActionPanelProps) {
     }
 
     case 'AWAITING_PAYMENT': {
-      if (turn.pending?.kind === 'TAX_ENTRY') return <TaxEntry view={view} send={send} label={turn.pending.label} />;
       if (turn.pending?.kind !== 'PAYMENT') return null;
       const p = turn.pending;
       const type = PAY_ACTION[p.reason];
@@ -190,31 +190,48 @@ const PAY_PILL = {
   CLUB: 'Club',
 } as const;
 
-/** Tax square with no configured amount (Wealth Taxes): enter the amount printed on the board. */
-function TaxEntry({ view, send, label }: { view: GameView; send: ActionPanelProps['send']; label: string }) {
-  const [amount, setAmount] = useState('');
+/** In Jail at the start of my turn: pay the fine and play, or miss this turn. */
+function JailChoice({ view, send, onOpenLoan }: ActionPanelProps) {
   const pending = useGameStore((s) => s.pendingAction);
-  const value = Number.parseInt(amount, 10);
-  const valid = Number.isInteger(value) && value > 0 && value <= BUSINESS_MVP_RULES.cards.manualMaxAmount;
+  const me = view.me;
+  if (!me) return null;
+  const { fine, maxTurns } = BUSINESS_MVP_RULES.jail;
+  const turnInJail = maxTurns - me.jailTurnsLeft + 1;
+  const lastTurn = me.jailTurnsLeft <= 1;
+  const short = fine - me.balance;
   return (
-    <Card testID="tax-entry-card">
-      <Pill tone="warn">Tax due</Pill>
-      <Text className="mt-2 text-2xl font-black text-ink">{label}</Text>
-      <Text className="mt-1 text-sm text-stone-600">Enter the amount printed on your board for {label}.</Text>
-      <View className="mt-3 rounded-2xl bg-felt p-3">
-        <TextField label="Amount (₹)" keyboardType="number-pad" value={amount} onChangeText={setAmount} testID="tax-amount" />
+    <Card testID="jail-card">
+      <Pill tone="bad">In Jail</Pill>
+      <Text className="mt-2 text-3xl font-black text-ink">Jail · turn {turnInJail} of {maxTurns}</Text>
+      <Text className="mt-1 text-base text-stone-600">
+        {lastTurn ? 'Stay this turn and you’re free next turn.' : `Stay to miss this turn, or pay ${formatINR(fine)} to leave now.`}
+      </Text>
+      <View className="mt-4 gap-3">
+        <Button
+          title={`PAY ${formatINR(fine)} & ROLL`}
+          subtitle="Leave Jail now"
+          testID="jail-pay"
+          loading={pending === 'PAY_JAIL_FINE'}
+          disabled={!!pending || short > 0}
+          onPress={() => send({ type: 'PAY_JAIL_FINE' })}
+        />
+        {short > 0 ? (
+          <View className="flex-row items-center gap-3 rounded-2xl bg-red-50 p-3">
+            <Text className="flex-1 text-sm font-bold text-brick">You’re {formatINR(short)} short.</Text>
+            <Button size="sm" variant="secondary" title="Take a loan" onPress={onOpenLoan} />
+          </View>
+        ) : null}
+        <Button
+          title="STAY IN JAIL"
+          subtitle={lastTurn ? 'Released after this turn' : `Miss this turn · ${me.jailTurnsLeft - 1} more after this`}
+          variant="secondary"
+          size="md"
+          testID="jail-stay"
+          loading={pending === 'STAY_IN_JAIL'}
+          disabled={!!pending}
+          onPress={() => send({ type: 'STAY_IN_JAIL' })}
+        />
       </View>
-      <Button
-        className="mt-3"
-        title={valid ? `PAY ${formatINR(value)}` : 'PAY'}
-        testID="tax-pay"
-        disabled={!valid || !!pending}
-        loading={pending === 'PAY_TAX'}
-        onPress={() => send({ type: 'PAY_TAX', amount: value })}
-      />
-      {view.me && valid && value > view.me.balance ? (
-        <Text className="mt-2 text-center text-sm font-semibold text-brick">More than your cash — you’ll need to raise money.</Text>
-      ) : null}
     </Card>
   );
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BUSINESS_MVP_RULES } from '@/engine/index.ts';
+import { BUSINESS_MVP_RULES, positionOfSpecial } from '@/engine/index.ts';
 import { TestGame } from './harness.ts';
 
 const top = (g: TestGame) => g.state.undoStack[g.state.undoStack.length - 1]!;
@@ -216,7 +216,7 @@ describe('undo history (multiple undo, newest first)', () => {
     const g = new TestGame();
     g.act('Bilal', { type: 'TRANSFER_MONEY', toPlayerId: g.id('Chitra'), amount: 100 });
     g.act('Asha', { type: 'TRANSFER_MONEY', toPlayerId: g.id('Chitra'), amount: START - 100 });
-    g.roll('Asha', 2, 3);
+    g.landOn('Asha', positionOfSpecial('CLUB'), 5); // Club ₹200 > ₹100
     g.act('Asha', { type: 'DECLARE_BANKRUPTCY' });
     expect(g.state.undoStack).toHaveLength(0);
   });

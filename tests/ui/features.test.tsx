@@ -254,17 +254,19 @@ describe('Loans UI', () => {
 });
 
 describe('Special squares & cards', () => {
-  it('Wealth Taxes asks for the amount printed on the board', async () => {
+  it('Wealth Taxes shows the computed amount and what was counted', async () => {
     const f = new Fixture();
+    f.state.properties.MUMBAI = { ...f.state.properties.MUMBAI, ownerId: f.ids.Asha!, hotel: true };
+    f.state.properties.DELHI = { ...f.state.properties.DELHI, ownerId: f.ids.Asha!, houses: 2 };
     f.state.players.find((p) => p.name === 'Asha')!.position = 27;
     f.roll('Asha', 2, 2).loadAs('Asha'); // 27 + 4 = 31 Wealth Taxes
     api.action.mockResolvedValue(ok(f.snapshot()));
     await render(<GameScreen view={viewFor(f, 'Asha')} />);
-    expect(screen.getByTestId('tax-entry-card')).toHaveTextContent(/Wealth Taxes/);
-    expect(screen.getByTestId('tax-pay').props.accessibilityState.disabled).toBe(true);
-    await fireEvent.changeText(screen.getByTestId('tax-amount'), '1500');
-    await fireEvent.press(screen.getByTestId('tax-pay'));
-    await waitFor(() => expect(api.action.mock.calls[0]![3]).toEqual({ type: 'PAY_TAX', amount: 1500 }));
+    expect(screen.getByTestId('payment-card')).toHaveTextContent(/Wealth Taxes — 2 houses × ₹100 \+ 1 hotel × ₹200/);
+    expect(screen.getByText('PAY ₹400')).toBeTruthy();
+    expect(screen.queryByTestId('tax-amount')).toBeNull(); // nothing to type in any more
+    await fireEvent.press(screen.getByTestId('pay-button'));
+    await waitFor(() => expect(api.action.mock.calls[0]![3]).toEqual({ type: 'PAY_TAX' }));
   });
 
   it('card payment shows the exact card text (Chance even 8 — fire in godown ₹3,000)', async () => {
@@ -278,12 +280,15 @@ describe('Special squares & cards', () => {
 });
 
 describe('Settings', () => {
-  it('separates confirmed rules from configured assumptions (Club / Wealth Taxes listed)', async () => {
+  it('lists the finalized Classic rules as confirmed, not as assumptions', async () => {
     await render(<Settings />);
-    expect(within(screen.getByTestId('confirmed-rules')).getByText('Colour sets')).toBeTruthy();
+    const confirmed = screen.getByTestId('confirmed-rules');
+    for (const title of ['Colour sets', 'Income Tax', 'Wealth Taxes', 'Club', 'Jail', 'Rest House', 'Auction timer']) {
+      expect(within(confirmed).getByText(title)).toBeTruthy();
+    }
     const assumptions = screen.getByTestId('assumptions-list');
-    expect(within(assumptions).getByText('Club')).toBeTruthy();
-    expect(within(assumptions).getByText('Wealth Taxes')).toBeTruthy();
+    expect(within(assumptions).queryByText('Club')).toBeNull();
+    expect(within(assumptions).queryByText('Jail')).toBeNull();
   });
 });
 

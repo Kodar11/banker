@@ -23,6 +23,8 @@ export const TRANSACTION_LABELS: Record<TransactionType, string> = {
   CARD_REWARD: 'Card',
   CARD_COLLECTION: 'Card (from player)',
   CLUB_PAYMENT: 'Club',
+  REST_HOUSE_COLLECTION: 'Rest House',
+  JAIL_FINE: 'Left Jail',
   TRADE_PAYMENT: 'Trade',
   MORTGAGE: 'Mortgage',
   UNMORTGAGE: 'Unmortgage',

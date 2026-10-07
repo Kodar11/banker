@@ -62,9 +62,10 @@ if (OP === 'play') {
     if (s.status !== 'ACTIVE' || s.turn.playerId !== output.botPlayerId) break;
     var phase = s.turn.phase;
     var p = s.turn.pending;
-    if (phase === 'AWAITING_ROLL') act(s, { type: 'ROLL_DICE' });
+    var me = s.players.filter(function (x) { return x.id === output.botPlayerId; })[0];
+    if (phase === 'AWAITING_ROLL' && me && me.inJail) act(s, { type: 'STAY_IN_JAIL' });
+    else if (phase === 'AWAITING_ROLL') act(s, { type: 'ROLL_DICE' });
     else if (phase === 'AWAITING_DECISION') act(s, { type: 'BUY_PROPERTY' }).ok || act(state(), { type: 'DECLINE_PROPERTY' });
-    else if (phase === 'AWAITING_PAYMENT' && p.kind === 'TAX_ENTRY') act(s, { type: 'PAY_TAX', amount: 1000 });
     else if (phase === 'AWAITING_PAYMENT')
       act(s, { type: PAY_ACTION[p.reason] }).ok || act(state(), { type: 'DECLARE_BANKRUPTCY' });
     else if (phase === 'AWAITING_CARD') act(s, { type: 'RESOLVE_CARD', resolution: 'NONE' });

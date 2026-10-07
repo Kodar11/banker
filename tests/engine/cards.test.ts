@@ -122,9 +122,9 @@ describe('Chance — EVEN', () => {
     expect(g.state.turn.phase).toBe('TURN_COMPLETE');
   });
 
-  it('Chance 10: go to Jail (skip 1 turn, no Start reward)', () => {
+  it('Chance 10: go to Jail (trapped for up to 3 turns, no Start reward)', () => {
     const { g } = landOnCard(CHANCE, 10);
-    expect(g.player('Asha')).toMatchObject({ position: positionOfSpecial('JAIL'), inJail: true, skipTurns: 1 });
+    expect(g.player('Asha')).toMatchObject({ position: positionOfSpecial('JAIL'), inJail: true, jailTurnsLeft: 3, skipTurns: 0 });
     expect(g.state.turn.phase).toBe('TURN_COMPLETE');
     expect(g.ledger.some((t) => t.type === 'START_REWARD')).toBe(false);
   });
@@ -134,7 +134,7 @@ describe('Chance — EVEN', () => {
     expect(g.player('Asha')).toMatchObject({ position: positionOfSpecial('REST_HOUSE'), skipTurns: 1 });
     g.act('Asha', { type: 'END_TURN' });
     for (const n of ['Bilal', 'Chitra']) {
-      g.landOn(n, positionOfSpecial('JAIL'), 4);
+      g.landOn(n, positionOfSpecial('WEALTH_TAX'), 4); // no buildings: nothing to pay
       g.act(n, { type: 'END_TURN' });
     }
     expect(g.current).toBe('Bilal'); // Asha's turn skipped
@@ -225,13 +225,15 @@ describe('Community Chest — EVEN', () => {
     const { g } = landOnCard(29, 8);
     expect(g.player('Asha')).toMatchObject({ position: positionOfSpecial('REST_HOUSE'), skipTurns: 1, circuits: 0 });
     expect(g.ledger.some((t) => t.type === 'START_REWARD')).toBe(false);
+    // Card rules unchanged: the card only skips the turn — collecting is for landing on Rest House by a roll.
+    expect(g.ledger.some((t) => t.type === 'REST_HOUSE_COLLECTION')).toBe(false);
   });
 });
 
 describe('Community Chest — ODD', () => {
   it('3: go to Jail', () => {
     const { g } = landOnCard(CHEST, 3);
-    expect(g.player('Asha')).toMatchObject({ inJail: true, position: positionOfSpecial('JAIL'), skipTurns: 1 });
+    expect(g.player('Asha')).toMatchObject({ inJail: true, position: positionOfSpecial('JAIL'), jailTurnsLeft: 3 });
   });
 
   it.each([

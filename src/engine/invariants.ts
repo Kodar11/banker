@@ -1,4 +1,5 @@
 import { PROPERTY_KEYS } from './businessBoard.ts';
+import { BUSINESS_MVP_RULES as RULES } from './rules.ts';
 import type { GameState, TransactionRecord } from './types.ts';
 
 /**
@@ -37,6 +38,18 @@ export function propertyViolations(state: Pick<GameState, 'players' | 'propertie
     if (prop.houses < 0 || prop.houses > 3) problems.push(`${key}: invalid house count ${prop.houses}`);
     if (prop.hotel && prop.houses !== 0) problems.push(`${key}: hotel with houses`);
     if (prop.mortgaged && (prop.houses > 0 || prop.hotel)) problems.push(`${key}: mortgaged with buildings`);
+  }
+  return problems;
+}
+
+/** Structural invariants on player turn state (Jail / Rest House). */
+export function playerViolations(state: Pick<GameState, 'players'>): string[] {
+  const problems: string[] = [];
+  for (const p of state.players) {
+    if (p.inJail !== p.jailTurnsLeft > 0) problems.push(`${p.name}: inJail=${p.inJail} but jailTurnsLeft=${p.jailTurnsLeft}`);
+    if (p.jailTurnsLeft < 0 || p.jailTurnsLeft > RULES.jail.maxTurns) problems.push(`${p.name}: invalid jailTurnsLeft ${p.jailTurnsLeft}`);
+    if (p.skipTurns < 0) problems.push(`${p.name}: negative skipTurns`);
+    if (p.status === 'BANKRUPT' && (p.inJail || p.skipTurns > 0)) problems.push(`${p.name}: bankrupt but still in Jail / resting`);
   }
   return problems;
 }

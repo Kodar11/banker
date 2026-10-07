@@ -67,6 +67,17 @@ appId: com.boardgamebank.businessbanker
             SUPABASE_URL: ${SUPABASE_URL}
             SUPABASE_KEY: ${SUPABASE_KEY}
 - extendedWaitUntil:
+    visible: 'YOUR TURN'
+    timeout: 30000
+# In Jail (landed on Jail last turn): pay ₹500 to leave so the flow can keep rolling.
+- runFlow:
+    when:
+      visible:
+        id: jail-card
+    commands:
+      - tapOn:
+          id: jail-pay
+- extendedWaitUntil:
     visible:
       id: roll-button
     timeout: 30000

@@ -270,11 +270,13 @@ describe('Main game', () => {
     expect(screen.getByTestId('pay-button').props.accessibilityState.disabled).toBe(true);
   });
 
-  it('income tax shows PAY ₹1,000 and END TURN appears after paying', async () => {
-    const f = new Fixture().roll('Asha', 2, 3).loadAs('Asha'); // Income Tax (square 5)
+  it('income tax shows the computed amount (3 properties → ₹150) and END TURN appears after paying', async () => {
+    const f = new Fixture();
+    for (const key of ['DELHI', 'SHIMLA', 'RAILWAY'] as const) f.state.properties[key] = { ...f.state.properties[key], ownerId: f.ids.Asha! };
+    f.roll('Asha', 2, 3).loadAs('Asha'); // Income Tax (square 5)
     await render(<GameScreen view={viewFor(f, 'Asha')} />);
-    expect(within(screen.getByTestId('payment-card')).getByText('Income Tax')).toBeTruthy();
-    expect(screen.getByText('PAY ₹1,000')).toBeTruthy();
+    expect(within(screen.getByTestId('payment-card')).getByText('Income Tax — 3 properties × ₹50')).toBeTruthy();
+    expect(screen.getByText('PAY ₹150')).toBeTruthy();
     f.act('Asha', { type: 'PAY_TAX' });
     await render(<GameScreen view={viewFor(f, 'Asha')} />);
     expect(screen.getByTestId('end-turn-button')).toBeTruthy();

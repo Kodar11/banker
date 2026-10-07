@@ -10,10 +10,11 @@ import type { GameView } from '@/features/game/useGameView';
 import { useGameStore } from '@/store/gameStore';
 import { formatINR } from '@/utils/currency';
 
-/** Current time on the server's clock (corrects phone clock skew), ticking 4×/s. */
-function useServerNow(serverTime: string): number | null {
+/** Current time on the server's clock (corrects phone clock skew), ticking 4×/s. Display only — the server decides. */
+function useServerNow(serverTime: string): number {
   const offset = useRef(0);
-  const [now, setNow] = useState<number | null>(null);
+  // Until the first tick, the snapshot's server time is the best estimate of "now".
+  const [now, setNow] = useState(() => Date.parse(serverTime));
   useEffect(() => {
     offset.current = Date.parse(serverTime) - Date.now();
   }, [serverTime]);
@@ -24,31 +25,40 @@ function useServerNow(serverTime: string): number | null {
   return now;
 }
 
+const MAX_CLOSE_ATTEMPTS = 5;
+
 export function AuctionView({ view, auctionId }: { view: GameView; auctionId: string }) {
   const send = useGameAction();
   const pending = useGameStore((s) => s.pendingAction);
   const { state, serverTime } = view.snapshot;
   const auction = state.auction?.id === auctionId ? state.auction : null;
   const now = useServerNow(serverTime);
-  const closeSent = useRef(false);
+  const endsAt = auction?.endsAt ?? null;
+  const liveAuctionId = auction?.id ?? null;
+  // Close attempts per deadline: a new deadline (someone bid) re-arms the automatic close.
+  const [attempts, setAttempts] = useState<{ endsAt: string | null; n: number }>({ endsAt: null, n: 0 });
+  const closeAttempt = attempts.endsAt === endsAt ? attempts.n : 0;
 
-  // A new deadline (someone bid) re-arms the automatic close.
-  useEffect(() => {
-    closeSent.current = false;
-  }, [auction?.endsAt]);
-
-  // Until the first tick, show the full timer rather than "0s".
-  const secondsLeft = auction ? (now === null ? 99 : Math.max(0, Math.ceil((Date.parse(auction.endsAt) - now) / 1000))) : 0;
+  const secondsLeft = endsAt ? Math.max(0, Math.ceil((Date.parse(endsAt) - now) / 1000)) : 0;
   const open = auction?.status === 'OPEN' && state.status === 'ACTIVE';
+  const expired = open && secondsLeft === 0;
 
-  // When the timer runs out, any device may ask the server to close; the server checks the time.
+  // When the countdown runs out, any device may ask the server to close; the server checks the
+  // time and closes exactly once (others get AUCTION_CLOSED). If it says "still running" (clock
+  // skew) or the request didn't go through, try again shortly — until the realtime update arrives.
   useEffect(() => {
-    if (!open || secondsLeft > 0 || closeSent.current || !auction) return;
-    closeSent.current = true;
-    const jitter = (view.me?.seat ?? 0) * 300;
-    const t = setTimeout(() => void send({ type: 'CLOSE_AUCTION', auctionId: auction.id }, { silent: true }), jitter);
-    return () => clearTimeout(t);
-  }, [open, secondsLeft, auction, send, view.me?.seat]);
+    if (!expired || !liveAuctionId || closeAttempt >= MAX_CLOSE_ATTEMPTS) return;
+    let cancelled = false;
+    const delay = closeAttempt === 0 ? (view.me?.seat ?? 0) * 300 : 1000;
+    const t = setTimeout(async () => {
+      const res = await send({ type: 'CLOSE_AUCTION', auctionId: liveAuctionId }, { silent: true });
+      if (!cancelled && !res.ok && res.error.code !== 'AUCTION_CLOSED') setAttempts({ endsAt, n: closeAttempt + 1 });
+    }, delay);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [expired, liveAuctionId, endsAt, closeAttempt, send, view.me?.seat]);
 
   useEffect(() => {
     if (auction && auction.status === 'CLOSED') {
@@ -90,18 +100,41 @@ export function AuctionView({ view, auctionId }: { view: GameView; auctionId: st
             {auction.highBid === null ? '—' : formatINR(auction.highBid)}
           </Text>
           {open ? (
-            <Text className={`text-2xl font-black ${secondsLeft <= 5 ? 'text-brick' : 'text-ink'}`} testID="auction-timer">
-              ⏱ {secondsLeft}s
-            </Text>
+            <View
+              className="mt-2 items-center"
+              testID="auction-timer"
+              accessibilityLiveRegion="polite"
+              accessibilityLabel={expired ? 'Bidding closed' : `${secondsLeft} seconds left`}
+            >
+              {expired ? (
+                <Text className="text-4xl font-black text-brick" testID="auction-countdown">
+                  CLOSING…
+                </Text>
+              ) : (
+                <>
+                  <Text className={`text-6xl font-black ${secondsLeft <= 3 ? 'text-brick' : 'text-ink'}`} testID="auction-countdown">
+                    {secondsLeft}
+                  </Text>
+                  <Text className="text-xs font-extrabold uppercase tracking-widest text-stone-500">
+                    {secondsLeft === 1 ? 'second left' : 'seconds left'}
+                  </Text>
+                </>
+              )}
+            </View>
           ) : (
-            <Pill tone={auction.winnerId ? 'good' : 'neutral'}>
-              {auction.winnerId ? `Sold to ${view.playerName(auction.winnerId)}` : 'Unsold — stays with the bank'}
-            </Pill>
+            <View className="mt-2 items-center gap-2" testID="auction-result">
+              <Text className={`text-4xl font-black ${auction.winnerId ? 'text-green-700' : 'text-stone-600'}`}>
+                {auction.winnerId ? 'SOLD' : 'CLOSED'}
+              </Text>
+              <Pill tone={auction.winnerId ? 'good' : 'neutral'}>
+                {auction.winnerId ? `Sold to ${view.playerName(auction.winnerId)}` : 'Unsold — stays with the bank'}
+              </Pill>
+            </View>
           )}
         </View>
       </Card>
 
-      {open && amIn && !leading ? (
+      {open && !expired && amIn && !leading ? (
         <View className="gap-3">
           <Text className="text-center text-sm font-semibold text-cream/80">Minimum next bid {formatINR(min)}</Text>
           {bids.length === 0 ? <Text className="text-center text-base font-bold text-amber-300">Not enough money to bid.</Text> : null}

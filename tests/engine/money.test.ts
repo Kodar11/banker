@@ -96,15 +96,18 @@ describe('rent', () => {
 describe('tax and transfers', () => {
   it('Income Tax creates a payment to the bank', () => {
     const g = new TestGame();
+    g.give('Asha', 'DELHI');
+    g.give('Asha', 'SHIMLA');
     g.roll('Asha', 2, 3); // Income Tax (square 5)
-    expect(g.state.turn.pending).toMatchObject({ reason: 'TAX', amount: BUSINESS_MVP_RULES.incomeTax.amount, toPlayerId: null });
+    expect(g.state.turn.pending).toMatchObject({ reason: 'TAX', amount: 100, toPlayerId: null });
     const r = g.act('Asha', { type: 'PAY_TAX' });
-    expect(r.transactions[0]).toMatchObject({ type: 'TAX_PAYMENT', toPlayerId: null });
-    expect(g.balance('Asha')).toBe(START - BUSINESS_MVP_RULES.incomeTax.amount);
+    expect(r.transactions[0]).toMatchObject({ type: 'TAX_PAYMENT', toPlayerId: null, amount: 100 });
+    expect(g.balance('Asha')).toBe(START - 100);
   });
 
   it('PAY_RENT cannot be used to settle a tax (types must match)', () => {
     const g = new TestGame();
+    g.give('Asha', 'DELHI');
     g.roll('Asha', 2, 3);
     expect(() => g.act('Asha', { type: 'PAY_RENT' })).toThrow('There is nothing to pay right now.');
   });
@@ -238,7 +241,9 @@ describe('money invariant under random play', () => {
             if (rand() < 0.3) g.act(who, { type: 'REQUEST_LOAN', amount: 1000 });
             continue;
           }
-          if (phase === 'AWAITING_ROLL') g.roll(who, 1 + Math.floor(rand() * 6), 1 + Math.floor(rand() * 6));
+          if (phase === 'AWAITING_ROLL' && g.player(who).inJail) {
+            g.act(who, { type: g.balance(who) >= BUSINESS_MVP_RULES.jail.fine && rand() < 0.5 ? 'PAY_JAIL_FINE' : 'STAY_IN_JAIL' });
+          } else if (phase === 'AWAITING_ROLL') g.roll(who, 1 + Math.floor(rand() * 6), 1 + Math.floor(rand() * 6));
           else if (phase === 'AWAITING_DECISION') g.act(who, { type: rand() < 0.6 ? 'BUY_PROPERTY' : 'DECLINE_PROPERTY' });
           else if (phase === 'AUCTION') {
             const a = g.state.auction!;
@@ -250,8 +255,6 @@ describe('money invariant under random play', () => {
               g.advance(60);
               g.act(name, { type: 'CLOSE_AUCTION', auctionId: a.id });
             }
-          } else if (phase === 'AWAITING_PAYMENT' && pending?.kind === 'TAX_ENTRY') {
-            g.act(who, { type: 'PAY_TAX', amount: 500 + Math.floor(rand() * 4) * 500 });
           } else if (phase === 'AWAITING_PAYMENT' && pending?.kind === 'PAYMENT') {
             const pay = { RENT: 'PAY_RENT', TAX: 'PAY_TAX', CARD: 'PAY_CARD', LOAN_INTEREST: 'PAY_INTEREST', CLUB: 'PAY_CLUB' } as const;
             if (g.balance(who) >= pending.amount) g.act(who, { type: pay[pending.reason] });

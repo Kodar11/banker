@@ -30,9 +30,16 @@ export interface PlayerState {
   balance: number;
   position: number;
   status: PlayerStatus;
-  /** Turns this player will skip (Rest House / Jail). */
+  /** Turns this player will skip automatically (Rest House). */
   skipTurns: number;
+  /** Trapped in Jail. Always equals jailTurnsLeft > 0. */
   inJail: boolean;
+  /**
+   * Jail turns left (BUSINESS_MVP_RULES.jail.maxTurns when jailed). Each of the
+   * player's turns in Jail is either bought out (fine → 0) or missed (−1);
+   * reaching 0 releases them.
+   */
+  jailTurnsLeft: number;
   /** Completed circuits (times this player passed or landed on Start by a forward move). */
   circuits: number;
 }
@@ -117,9 +124,7 @@ export type Pending =
       /** Split equally between these players instead of toPlayerId (e.g. "pay each player"). */
       payeeIds?: string[];
     }
-  | { kind: 'CARD_MANUAL'; cardId: string; deck: Deck; rollTotal: number }
-  /** A tax square whose amount is not configured: the player enters the amount printed on the board. */
-  | { kind: 'TAX_ENTRY'; label: string };
+  | { kind: 'CARD_MANUAL'; cardId: string; deck: Deck; rollTotal: number };
 
 /** Work left after the current obligation is paid (e.g. resolve the square after paying loan interest). */
 export type FollowUp =
@@ -246,6 +251,8 @@ export type TransactionType =
   | 'CARD_REWARD'
   | 'CARD_COLLECTION'
   | 'CLUB_PAYMENT'
+  | 'REST_HOUSE_COLLECTION'
+  | 'JAIL_FINE'
   | 'TRADE_PAYMENT'
   | 'MORTGAGE'
   | 'UNMORTGAGE'

@@ -19,6 +19,7 @@ import { BUSINESS_MVP_RULES as RULES } from './rules.ts';
 import {
   buildingCount,
   computeRent,
+  incomeTaxDue,
   loansWithInterestDue,
   loanTerms,
   mortgageResolution,
@@ -30,6 +31,7 @@ import {
   tradeBlocker,
   undoBlocker,
   unmortgageCost,
+  wealthTaxDue,
   type PropertyActionKind,
 } from './selectors.ts';
 import type {
@@ -76,7 +78,7 @@ function freshTurn(): TurnState {
 }
 
 function newPlayer(id: string, name: string, seat: number, isHost: boolean): PlayerState {
-  return { id, name, seat, isHost, ready: isHost, balance: 0, position: 0, status: 'ACTIVE', skipTurns: 0, inJail: false, circuits: 0 };
+  return { id, name, seat, isHost, ready: isHost, balance: 0, position: 0, status: 'ACTIVE', skipTurns: 0, inJail: false, jailTurnsLeft: 0, circuits: 0 };
 }
 
 export function createGame(
@@ -160,6 +162,8 @@ const TURN_ACTIONS = new Set<GameAction['type']>([
   'PAY_CARD',
   'PAY_INTEREST',
   'PAY_CLUB',
+  'PAY_JAIL_FINE',
+  'STAY_IN_JAIL',
   'RESOLVE_CARD',
   'END_TURN',
   'DECLARE_BANKRUPTCY',
@@ -220,8 +224,7 @@ export function applyAction(state: GameState, actorId: string, rawAction: unknow
       payPending(d, actor, 'RENT');
       break;
     case 'PAY_TAX':
-      if (d.state.turn.pending?.kind === 'TAX_ENTRY') payEnteredTax(d, actor, action.amount);
-      else payPending(d, actor, 'TAX');
+      payPending(d, actor, 'TAX');
       break;
     case 'PAY_CARD':
       payPending(d, actor, 'CARD');
@@ -231,6 +234,12 @@ export function applyAction(state: GameState, actorId: string, rawAction: unknow
       break;
     case 'PAY_CLUB':
       payPending(d, actor, 'CLUB');
+      break;
+    case 'PAY_JAIL_FINE':
+      payJailFine(d, actor);
+      break;
+    case 'STAY_IN_JAIL':
+      stayInJail(d, actor);
       break;
     case 'RESOLVE_CARD':
       resolveManualCard(d, actor, action.resolution, action.amount ?? 0);
@@ -337,6 +346,7 @@ export function rollDiceValues(random: () => number): number[] {
 function rollDice(d: Draft, actor: PlayerState): void {
   const turn = d.state.turn;
   if (turn.phase !== 'AWAITING_ROLL') fail('INVALID_PHASE', 'You have already rolled.');
+  if (actor.inJail) fail('INVALID_PHASE', `You're in Jail — pay ${formatINR(RULES.jail.fine)} to leave, or stay this turn.`);
   const dice = rollDiceValues(d.ctx.random);
   const total = dice.reduce((a, b) => a + b, 0);
   const isDouble = dice.length > 1 && dice.every((v) => v === dice[0]);
@@ -465,9 +475,71 @@ function sendToJail(d: Draft, player: PlayerState): void {
     collectStart: !RULES.cards.jailAndRestHouseMovesAreDirect,
   });
   player.inJail = true;
-  player.skipTurns += RULES.jail.turnsSkipped;
+  player.jailTurnsLeft = RULES.jail.maxTurns;
   d.state.turn.toPosition = player.position;
-  d.event('SENT_TO_JAIL', player.id, `${player.name} goes to Jail`);
+  d.event('SENT_TO_JAIL', player.id, `${player.name} goes to Jail (up to ${RULES.jail.maxTurns} turns)`, {
+    turnsLeft: player.jailTurnsLeft,
+  });
+}
+
+/** In Jail, at the start of their turn: pay the fine to the bank and play this turn normally. */
+function payJailFine(d: Draft, actor: PlayerState): void {
+  const turn = d.state.turn;
+  if (!actor.inJail) fail('INVALID_PHASE', "You're not in Jail.");
+  if (turn.phase !== 'AWAITING_ROLL') fail('INVALID_PHASE', 'You can only leave Jail at the start of your turn.');
+  if (actor.balance < RULES.jail.fine) {
+    fail('INSUFFICIENT_FUNDS', `Not enough money — leaving Jail costs ${formatINR(RULES.jail.fine)}.`);
+  }
+  d.transfer({ type: 'JAIL_FINE', from: actor.id, to: null, amount: RULES.jail.fine, memo: 'Left Jail early' });
+  actor.inJail = false;
+  actor.jailTurnsLeft = 0;
+  d.event('JAIL_FINE_PAID', actor.id, `${actor.name} paid ${formatINR(RULES.jail.fine)} and left Jail`, { amount: RULES.jail.fine });
+}
+
+/** In Jail, at the start of their turn: miss this turn. The last missed turn releases them. */
+function stayInJail(d: Draft, actor: PlayerState): void {
+  if (!actor.inJail) fail('INVALID_PHASE', "You're not in Jail.");
+  if (d.state.turn.phase !== 'AWAITING_ROLL') fail('INVALID_PHASE', 'You can only choose at the start of your turn.');
+  actor.jailTurnsLeft -= 1;
+  if (actor.jailTurnsLeft <= 0) {
+    actor.jailTurnsLeft = 0;
+    actor.inJail = false;
+    d.event('JAIL_RELEASED', actor.id, `${actor.name} served ${RULES.jail.maxTurns} turns and is released from Jail`);
+  } else {
+    d.event('JAIL_STAYED', actor.id, `${actor.name} stays in Jail (${plural(actor.jailTurnsLeft, 'turn')} left)`, {
+      turnsLeft: actor.jailTurnsLeft,
+    });
+  }
+  advanceTurn(d, actor.id);
+}
+
+function plural(n: number, word: string, many = `${word}s`): string {
+  return `${n} ${n === 1 ? word : many}`;
+}
+
+/**
+ * `player` collects `amount` from every other active player in one step. A
+ * player who can't afford their share pays what they have (rules.cards
+ * .collectFromEachShortfall) — no debt is created.
+ */
+function collectFromEachPlayer(
+  d: Draft,
+  player: PlayerState,
+  amount: number,
+  type: 'CARD_COLLECTION' | 'REST_HOUSE_COLLECTION',
+  memo: string,
+): TransactionRecord[] {
+  const txs: TransactionRecord[] = [];
+  for (const other of d.activePlayers()) {
+    if (other.id === player.id) continue;
+    const paid = Math.min(amount, other.balance);
+    if (paid > 0) txs.push(d.transfer({ type, from: other.id, to: player.id, amount: paid, memo }));
+    if (paid < amount) {
+      const event = type === 'CARD_COLLECTION' ? 'CARD_SHORTFALL' : 'REST_HOUSE_SHORTFALL';
+      d.event(event, other.id, `${other.name} could only pay ${formatINR(paid)} of ${formatINR(amount)}`);
+    }
+  }
+  return txs;
 }
 
 function sendToRestHouse(d: Draft, player: PlayerState): void {
@@ -517,28 +589,46 @@ function resolveLanding(d: Draft, player: PlayerState, rollTotal: number, depth:
     case 'START':
       d.setPhase('TURN_COMPLETE');
       return;
-    case 'INCOME_TAX':
-      turn.pending = paymentPending('TAX', RULES.incomeTax.amount, 'Income Tax');
-      d.setPhase('AWAITING_PAYMENT');
+    case 'INCOME_TAX': {
+      const tax = incomeTaxDue(d.state, player.id);
+      requestTax(d, player, tax.amount, `${space.label} — ${plural(tax.properties, 'property', 'properties')} × ${formatINR(RULES.incomeTax.perProperty)}`);
       return;
-    case 'WEALTH_TAX':
-      turn.pending =
-        RULES.wealthTax.amount === null ? { kind: 'TAX_ENTRY', label: space.label } : paymentPending('TAX', RULES.wealthTax.amount, space.label);
-      d.setPhase('AWAITING_PAYMENT');
+    }
+    case 'WEALTH_TAX': {
+      const tax = wealthTaxDue(d.state, player.id);
+      const parts = [
+        ...(tax.houses ? [`${plural(tax.houses, 'house')} × ${formatINR(RULES.wealthTax.perHouse)}`] : []),
+        ...(tax.hotels ? [`${plural(tax.hotels, 'hotel')} × ${formatINR(RULES.wealthTax.perHotel)}`] : []),
+      ];
+      requestTax(d, player, tax.amount, `${space.label} — ${parts.length ? parts.join(' + ') : 'no buildings'}`);
       return;
+    }
     case 'CLUB':
       resolveClub(d, player);
       return;
     case 'JAIL':
-      if (RULES.jail.landingByRollSendsToJail) sendToJail(d, player);
-      else d.event('JUST_VISITING', player.id, `${player.name} is just visiting Jail`);
+      sendToJail(d, player);
       d.setPhase('TURN_COMPLETE');
       return;
-    case 'REST_HOUSE':
+    case 'REST_HOUSE': {
+      const amount = RULES.restHouse.collectFromEachPlayer;
+      const txs = collectFromEachPlayer(d, player, amount, 'REST_HOUSE_COLLECTION', 'Rest House');
+      const total = txs.reduce((s, t) => s + t.amount, 0);
       player.skipTurns += RULES.restHouse.turnsSkippedOnLanding;
-      d.event('REST_HOUSE', player.id, `${player.name} rests — skips next turn`);
+      d.event('REST_HOUSE', player.id, `${player.name} rests at the Rest House: collects ${formatINR(total)} and skips the next turn`, {
+        collected: total,
+      });
+      if (txs.length) {
+        recordUndoable(d, {
+          actionType: 'REST_HOUSE',
+          actorId: player.id,
+          description: `${player.name} collected ${formatINR(total)} at the Rest House`,
+          transactions: txs,
+        });
+      }
       d.setPhase('TURN_COMPLETE');
       return;
+    }
     case 'CHANCE':
     case 'COMMUNITY_CHEST':
       resolveCard(d, player, space.type, rollTotal, depth);
@@ -546,34 +636,29 @@ function resolveLanding(d: Draft, player: PlayerState, rollTotal: number, depth:
   }
 }
 
-/** Club — rule is configurable (BUSINESS_MVP_RULES.club); the default does nothing. */
-function resolveClub(d: Draft, player: PlayerState): void {
-  const rule = RULES.club.rule;
-  const others = d.activePlayers().filter((p) => p.id !== player.id);
-  switch (rule.type) {
-    case 'NONE':
-      d.event('CLUB', player.id, `${player.name} is at the Club`);
-      d.setPhase('TURN_COMPLETE');
-      return;
-    case 'RECEIVE_FROM_BANK':
-      d.transfer({ type: 'CLUB_PAYMENT', from: null, to: player.id, amount: rule.amount, memo: 'Club' });
-      d.setPhase('TURN_COMPLETE');
-      return;
-    case 'PAY_BANK':
-      d.state.turn.pending = paymentPending('CLUB', rule.amount, 'Club');
-      d.setPhase('AWAITING_PAYMENT');
-      return;
-    case 'PAY_EACH_PLAYER':
-      if (others.length === 0) {
-        d.setPhase('TURN_COMPLETE');
-        return;
-      }
-      d.state.turn.pending = paymentPending('CLUB', rule.amount * others.length, `Club — ${formatINR(rule.amount)} to each player`, {
-        payeeIds: others.map((p) => p.id),
-      });
-      d.setPhase('AWAITING_PAYMENT');
-      return;
+/** Income Tax / Wealth Taxes: the amount is computed from the authoritative state at landing; nothing to pay → nothing happens. */
+function requestTax(d: Draft, player: PlayerState, amount: number, label: string): void {
+  if (amount <= 0) {
+    d.event('TAX_NONE', player.id, `${label}: nothing to pay`);
+    d.setPhase('TURN_COMPLETE');
+    return;
   }
+  d.state.turn.pending = paymentPending('TAX', amount, label);
+  d.setPhase('AWAITING_PAYMENT');
+}
+
+/** Club: pay a fixed amount to every other active player (one PAY_CLUB, all transfers atomic). */
+function resolveClub(d: Draft, player: PlayerState): void {
+  const amount = RULES.club.payEachPlayer;
+  const others = d.activePlayers().filter((p) => p.id !== player.id);
+  if (others.length === 0) {
+    d.setPhase('TURN_COMPLETE');
+    return;
+  }
+  d.state.turn.pending = paymentPending('CLUB', amount * others.length, `Club — ${formatINR(amount)} to each player`, {
+    payeeIds: others.map((p) => p.id),
+  });
+  d.setPhase('AWAITING_PAYMENT');
 }
 
 /**
@@ -620,16 +705,7 @@ function resolveCard(d: Draft, player: PlayerState, deck: Deck, rollTotal: numbe
         track(d.transfer({ type: 'CARD_REWARD', from: null, to: player.id, amount: effect.amount, memo: card.text }));
         break;
       case 'COLLECT_FROM_EACH_PLAYER':
-        for (const other of d.activePlayers()) {
-          if (other.id === player.id) continue;
-          const amount = Math.min(effect.amount, other.balance);
-          if (amount > 0) {
-            track(d.transfer({ type: 'CARD_COLLECTION', from: other.id, to: player.id, amount, memo: card.text }));
-          }
-          if (amount < effect.amount) {
-            d.event('CARD_SHORTFALL', other.id, `${other.name} could only pay ${formatINR(amount)} of ${formatINR(effect.amount)}`);
-          }
-        }
+        collectFromEachPlayer(d, player, effect.amount, 'CARD_COLLECTION', card.text).forEach(track);
         break;
       case 'PAY_EACH_PLAYER':
         payEach += effect.amount;
@@ -752,13 +828,13 @@ function advanceTurn(d: Draft, fromPlayerId: string): void {
     if (!candidate || candidate.status !== 'ACTIVE') continue;
     if (candidate.skipTurns > 0) {
       candidate.skipTurns -= 1;
-      const where = candidate.inJail ? 'in Jail' : 'at the Rest House';
-      if (candidate.skipTurns === 0) candidate.inJail = false;
-      d.event('TURN_SKIPPED', candidate.id, `${candidate.name} skips a turn (${where})`);
+      d.event('TURN_SKIPPED', candidate.id, `${candidate.name} skips a turn (Rest House)`);
       continue;
     }
+    // A jailed player still gets their turn: they choose PAY_JAIL_FINE or STAY_IN_JAIL.
     d.state.turn = { ...freshTurn(), playerId: candidate.id, number: number + 1 };
-    d.event('TURN_STARTED', candidate.id, `${candidate.name}'s turn`, { turnNumber: number + 1 });
+    const jail = candidate.inJail ? ` — in Jail (${plural(candidate.jailTurnsLeft, 'turn')} left)` : '';
+    d.event('TURN_STARTED', candidate.id, `${candidate.name}'s turn${jail}`, { turnNumber: number + 1 });
     return;
   }
   fail('INVALID_PHASE', 'Could not find the next player.');
@@ -994,22 +1070,6 @@ function continueAfterPayment(d: Draft, actor: PlayerState): void {
   d.setPhase('TURN_COMPLETE');
 }
 
-/** Tax square with no configured amount (Wealth Taxes by default): the player enters the printed amount. */
-function payEnteredTax(d: Draft, actor: PlayerState, amount: number | undefined): void {
-  const turn = d.state.turn;
-  const pending = turn.pending;
-  if (turn.phase !== 'AWAITING_PAYMENT' || pending?.kind !== 'TAX_ENTRY') fail('INVALID_PHASE', 'There is nothing to pay right now.');
-  if (amount === undefined) fail('VALIDATION', `Enter the ${pending.label} amount shown on the board.`);
-  if (amount > RULES.cards.manualMaxAmount) fail('VALIDATION', `Entered amounts are limited to ${formatINR(RULES.cards.manualMaxAmount)}.`);
-  turn.pending = paymentPending('TAX', amount, pending.label);
-  if (actor.balance < amount) {
-    // Becomes a normal payment: raise money or declare bankruptcy.
-    d.event('TAX_ENTERED', actor.id, `${pending.label}: ${formatINR(amount)} due`);
-    return;
-  }
-  payPending(d, actor, 'TAX');
-}
-
 function resolveManualCard(d: Draft, actor: PlayerState, resolution: 'PAY' | 'RECEIVE' | 'NONE', amount: number): void {
   const turn = d.state.turn;
   const pending = turn.pending;
@@ -1087,6 +1147,7 @@ function declareBankruptcy(d: Draft, actor: PlayerState): void {
   actor.status = 'BANKRUPT';
   actor.skipTurns = 0;
   actor.inJail = false;
+  actor.jailTurnsLeft = 0;
   turn.pending = null;
   turn.followUp = null;
   d.event('PLAYER_BANKRUPT', actor.id, `${actor.name} is bankrupt`);

@@ -4,6 +4,7 @@ import {
   createGame,
   joinGame,
   ledgerViolations,
+  playerViolations,
   positionOfProperty,
   propertyViolations,
   type EngineContext,
@@ -147,7 +148,10 @@ export class TestGame {
   assertInvariants(): void {
     const money = ledgerViolations(this.state, this.ledger);
     const props = propertyViolations(this.state);
-    if (money.length || props.length) throw new Error(`Invariant violated:\n${[...money, ...props].join('\n')}`);
+    const players = playerViolations(this.state);
+    if (money.length || props.length || players.length) {
+      throw new Error(`Invariant violated:\n${[...money, ...props, ...players].join('\n')}`);
+    }
   }
 }
 

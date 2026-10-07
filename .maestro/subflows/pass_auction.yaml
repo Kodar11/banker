@@ -13,8 +13,14 @@ appId: com.boardgamebank.businessbanker
 - extendedWaitUntil:
     visible: '(?i)highest bid.*priya.*'
     timeout: 20000
-- tapOn:
-    id: pass-button
+# The countdown is 5 seconds: if it already ran out, the bot has won without our pass.
+- runFlow:
+    when:
+      visible:
+        id: pass-button
+    commands:
+      - tapOn:
+          id: pass-button
 - extendedWaitUntil:
     visible: '(?i)sold to priya'
     timeout: 15000

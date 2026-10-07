@@ -8,12 +8,12 @@ const RATE = BUSINESS_MVP_RULES.loans.interestRatePercent;
 const startRewards = (g: TestGame) => g.ledger.filter((t) => t.type === 'START_REWARD');
 const interest = (g: TestGame) => g.ledger.filter((t) => t.type === 'LOAN_INTEREST');
 
-/** Ends the current turn and lets the other two players take a harmless turn (Jail, just visiting). */
+/** Ends the current turn and lets the other two players take a harmless turn (Wealth Taxes with no buildings: nothing to pay). */
 function cycleBackTo(g: TestGame, name: string) {
   g.act(g.current, { type: 'END_TURN' });
   while (g.current !== name) {
     const who = g.current;
-    g.landOn(who, positionOfSpecial('JAIL'), 4);
+    g.landOn(who, positionOfSpecial('WEALTH_TAX'), 4);
     g.act(who, { type: 'END_TURN' });
   }
 }
@@ -126,7 +126,7 @@ describe('loans — interest is charged at the NEXT Start, not when borrowing', 
     for (const n of ['Asha', 'Bilal', 'Chitra']) g.act(n, { type: 'PASS_AUCTION', auctionId: g.state.auction!.id });
     for (let lap = 2; lap <= 3; lap += 1) {
       cycleBackTo(g, 'Asha');
-      g.landOn('Asha', positionOfSpecial('JAIL'), 4); // turns without passing Start
+      g.landOn('Asha', positionOfSpecial('WEALTH_TAX'), 4); // turns without passing Start
       expect(interest(g)).toHaveLength(1);
       cycleBackTo(g, 'Asha');
       g.placeAt('Asha', 32);

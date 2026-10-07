@@ -164,6 +164,6 @@ describe('movement uses the exact board order', () => {
     g.placeAt('Bilal', 14);
     g.roll('Bilal', 2, 2);
     expect(spaceName(g.player('Bilal').position)).toBe('Club');
-    expect(g.state.turn.phase).toBe('TURN_COMPLETE'); // Club rule NONE (unconfirmed → no effect)
+    expect(g.state.turn.pending).toMatchObject({ kind: 'PAYMENT', reason: 'CLUB' });
   });
 });

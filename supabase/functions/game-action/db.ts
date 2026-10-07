@@ -50,6 +50,7 @@ function mapPlayer(r: Row): PlayerState {
     status: r.status as PlayerState['status'],
     skipTurns: r.skip_turns as number,
     inJail: r.in_jail as boolean,
+    jailTurnsLeft: Number(r.jail_turns_left ?? 0),
     circuits: Number(r.circuits ?? 0),
   };
 }
@@ -220,9 +221,9 @@ export async function insertNewGame(tx: Tx, result: EngineResult, hostTokenHash:
 export async function insertPlayer(tx: Tx, gameId: string, p: PlayerState, tokenHash: string): Promise<void> {
   await tx`
     insert into public.players (id, game_id, name, seat, is_host, ready, balance, position, status, skip_turns, in_jail,
-      circuits, token_hash)
+      jail_turns_left, circuits, token_hash)
     values (${p.id}, ${gameId}, ${p.name}, ${p.seat}, ${p.isHost}, ${p.ready}, ${p.balance}, ${p.position},
-      ${p.status}, ${p.skipTurns}, ${p.inJail}, ${p.circuits}, ${tokenHash})`;
+      ${p.status}, ${p.skipTurns}, ${p.inJail}, ${p.jailTurnsLeft}, ${p.circuits}, ${tokenHash})`;
 }
 
 async function insertLedger(tx: Tx, gameId: string, result: EngineResult): Promise<void> {
@@ -306,14 +307,16 @@ export async function persistResult(tx: Tx, prevVersion: number, result: EngineR
     status: p.status,
     skip_turns: p.skipTurns,
     in_jail: p.inJail,
+    jail_turns_left: p.jailTurnsLeft,
     circuits: p.circuits,
   }));
   await tx`
     update public.players p set
       ready = x.ready, balance = x.balance, position = x.position, status = x.status,
-      skip_turns = x.skip_turns, in_jail = x.in_jail, circuits = x.circuits
+      skip_turns = x.skip_turns, in_jail = x.in_jail, jail_turns_left = x.jail_turns_left, circuits = x.circuits
     from jsonb_to_recordset(${json(playerRows)}) as x(
-      id uuid, ready boolean, balance bigint, position int, status text, skip_turns int, in_jail boolean, circuits int)
+      id uuid, ready boolean, balance bigint, position int, status text, skip_turns int, in_jail boolean,
+      jail_turns_left int, circuits int)
     where p.id = x.id and p.game_id = ${s.id}`;
 
   const propRows = PROPERTY_KEYS.map((k) => {

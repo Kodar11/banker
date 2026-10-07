@@ -194,7 +194,17 @@ describe.skipIf(!DATABASE_URL)('game-action handler (Postgres)', () => {
     it('duplicate payment, loan and transfer apply once', async () => {
       const g = await setupGame();
       ok(await g.act('Asha', { type: 'START_GAME' }));
-      queuedDice = [2, 3]; // Income Tax (square 5)
+      // Asha buys Railway (3), then on her next turn rolls 2 → Income Tax (5): 1 property × ₹50.
+      queuedDice = [1, 2];
+      ok(await g.act('Asha', { type: 'ROLL_DICE' }));
+      ok(await g.act('Asha', { type: 'BUY_PROPERTY' }));
+      ok(await g.act('Asha', { type: 'END_TURN' }));
+      for (const n of ['Bilal', 'Chitra']) {
+        queuedDice = [2, 3]; // Income Tax with no properties: nothing to pay
+        ok(await g.act(n, { type: 'ROLL_DICE' }));
+        ok(await g.act(n, { type: 'END_TURN' }));
+      }
+      queuedDice = [1, 1];
       ok(await g.act('Asha', { type: 'ROLL_DICE' }));
       const pay = randomUUID();
       ok(await g.act('Asha', { type: 'PAY_TAX' }, { actionId: pay }));
@@ -206,7 +216,7 @@ describe.skipIf(!DATABASE_URL)('game-action handler (Postgres)', () => {
       ok(await g.act('Chitra', { type: 'TRANSFER_MONEY', toPlayerId: g.seats.Asha!.playerId, amount: 700 }, { actionId: transfer }));
       ok(await g.act('Chitra', { type: 'TRANSFER_MONEY', toPlayerId: g.seats.Asha!.playerId, amount: 700 }, { actionId: transfer }));
       const snap = await state(g.gameId, g.seats.Asha!);
-      expect(snap.transactions.filter((t) => t.type === 'TAX_PAYMENT')).toHaveLength(1);
+      expect(snap.transactions.filter((t) => t.type === 'TAX_PAYMENT').map((t) => t.amount)).toEqual([50]);
       expect(snap.state.loans).toHaveLength(1);
       expect(snap.transactions.filter((t) => t.type === 'PLAYER_TRANSFER')).toHaveLength(1);
       await ledgerOk(g.gameId);
@@ -341,6 +351,143 @@ describe.skipIf(!DATABASE_URL)('game-action handler (Postgres)', () => {
     expect(row).toMatchObject({ status: 'FINISHED', paused_at: null });
   });
 
+  describe('Classic rules: Jail, Rest House, Club, taxes', () => {
+    const playerRow = async (gameId: string, playerId: string) => {
+      const [row] = await sql`select balance, position, in_jail, jail_turns_left, skip_turns from public.players
+        where game_id = ${gameId} and id = ${playerId}`;
+      return row!;
+    };
+    /** Test setup only: put a player on a board index (the handler loads state from the tables). */
+    const place = (gameId: string, playerId: string, position: number) =>
+      sql`update public.players set position = ${position} where game_id = ${gameId} and id = ${playerId}`;
+    /** A turn that moves no money: Income Tax while owning nothing. */
+    const quietTurn = async (g: Awaited<ReturnType<typeof setupGame>>, name: string) => {
+      await place(g.gameId, g.seats[name]!.playerId, 0);
+      queuedDice = [2, 3];
+      ok(await g.act(name, { type: 'ROLL_DICE' }));
+      ok(await g.act(name, { type: 'END_TURN' }));
+    };
+    const jailedAsha = async () => {
+      const g = await setupGame();
+      ok(await g.act('Asha', { type: 'START_GAME' }));
+      queuedDice = [4, 5]; // Start + 9 = Jail
+      ok(await g.act('Asha', { type: 'ROLL_DICE' }));
+      ok(await g.act('Asha', { type: 'END_TURN' }));
+      await quietTurn(g, 'Bilal');
+      await quietTurn(g, 'Chitra');
+      return g;
+    };
+
+    it('Jail: entering is persisted; rolling is refused; paying ₹500 is atomic and idempotent', async () => {
+      const g = await jailedAsha();
+      expect(await playerRow(g.gameId, g.seats.Asha!.playerId)).toMatchObject({ position: 9, in_jail: true, jail_turns_left: 3 });
+      queuedDice = [6, 6];
+      expect(await g.act('Asha', { type: 'ROLL_DICE' })).toMatchObject({ ok: false, error: { code: 'INVALID_PHASE' } });
+      const actionId = randomUUID();
+      const v = g.version;
+      const results = await Promise.all([
+        g.act('Asha', { type: 'PAY_JAIL_FINE' }, { actionId, expectedVersion: v }),
+        g.act('Asha', { type: 'PAY_JAIL_FINE' }, { actionId, expectedVersion: v }),
+      ]);
+      expect(results.every((r) => r.ok)).toBe(true);
+      // A second, different attempt is refused: not in Jail any more.
+      expect(await g.act('Asha', { type: 'PAY_JAIL_FINE' })).toMatchObject({ ok: false, error: { code: 'INVALID_PHASE' } });
+      const snap = await state(g.gameId, g.seats.Bilal!);
+      expect(snap.transactions.filter((t) => t.type === 'JAIL_FINE').map((t) => [t.amount, t.toPlayerId])).toEqual([[500, null]]);
+      expect(await playerRow(g.gameId, g.seats.Asha!.playerId)).toMatchObject({ balance: 24500, in_jail: false, jail_turns_left: 0 });
+      // Every client reads the same Jail state; the freed player rolls normally.
+      expect(snap.state.players.find((p) => p.name === 'Asha')).toMatchObject({ inJail: false, jailTurnsLeft: 0 });
+      queuedDice = [1, 2];
+      ok(await g.act('Asha', { type: 'ROLL_DICE' }));
+      expect((await playerRow(g.gameId, g.seats.Asha!.playerId)).position).toBe(12);
+      await ledgerOk(g.gameId);
+    });
+
+    it('Jail: three missed turns, then released exactly once (duplicate STAY applies once)', async () => {
+      const g = await jailedAsha();
+      for (const left of [2, 1, 0]) {
+        const actionId = randomUUID();
+        const v = g.version;
+        ok(await g.act('Asha', { type: 'STAY_IN_JAIL' }, { actionId, expectedVersion: v }));
+        const dup = ok(await g.act('Asha', { type: 'STAY_IN_JAIL' }, { actionId, expectedVersion: v }));
+        expect(dup.duplicate).toBe(true);
+        expect(await playerRow(g.gameId, g.seats.Asha!.playerId)).toMatchObject({ in_jail: left > 0, jail_turns_left: left, balance: 25000 });
+        await quietTurn(g, 'Bilal');
+        await quietTurn(g, 'Chitra');
+      }
+      const snap = await state(g.gameId, g.seats.Chitra!);
+      expect(snap.events.filter((e) => e.type === 'JAIL_RELEASED')).toHaveLength(1);
+      expect(snap.events.filter((e) => e.type === 'JAIL_STAYED')).toHaveLength(2);
+      queuedDice = [1, 2];
+      ok(await g.act('Asha', { type: 'ROLL_DICE' }));
+    });
+
+    it('Jail: the database refuses an inconsistent Jail state', async () => {
+      const g = await setupGame(['Asha', 'Bilal']);
+      await expect(sql`update public.players set in_jail = true, jail_turns_left = 0 where id = ${g.seats.Asha!.playerId}`).rejects.toThrow(
+        /players_jail_state_check/,
+      );
+      await expect(sql`update public.players set in_jail = true, jail_turns_left = 4 where id = ${g.seats.Asha!.playerId}`).rejects.toThrow(
+        /check/,
+      );
+    });
+
+    it('Rest House: ₹100 from each other player in the same action, then the next turn is skipped', async () => {
+      const g = await setupGame();
+      ok(await g.act('Asha', { type: 'START_GAME' }));
+      await place(g.gameId, g.seats.Asha!.playerId, 21);
+      queuedDice = [3, 3]; // 21 + 6 = Rest House
+      const res = ok(await g.act('Asha', { type: 'ROLL_DICE' }));
+      const collected = res.snapshot.transactions.filter((t) => t.type === 'REST_HOUSE_COLLECTION');
+      expect(collected).toHaveLength(2);
+      expect(new Set(collected.map((t) => t.actionId)).size).toBe(1);
+      expect(await playerRow(g.gameId, g.seats.Asha!.playerId)).toMatchObject({ balance: 25200, skip_turns: 1 });
+      ok(await g.act('Asha', { type: 'END_TURN' }));
+      await quietTurn(g, 'Bilal');
+      await quietTurn(g, 'Chitra');
+      const snap = await state(g.gameId, g.seats.Asha!);
+      expect(snap.state.turn.playerId).toBe(g.seats.Bilal!.playerId); // Asha skipped
+      expect(await playerRow(g.gameId, g.seats.Asha!.playerId)).toMatchObject({ skip_turns: 0 });
+      await ledgerOk(g.gameId);
+    });
+
+    it('Club: ₹100 to each other player; Income Tax and Wealth Taxes are computed by the server', async () => {
+      const g = await setupGame();
+      ok(await g.act('Asha', { type: 'START_GAME' }));
+      await place(g.gameId, g.seats.Asha!.playerId, 13);
+      queuedDice = [2, 3]; // 13 + 5 = Club
+      ok(await g.act('Asha', { type: 'ROLL_DICE' }));
+      ok(await g.act('Asha', { type: 'PAY_CLUB' }));
+      let snap = await state(g.gameId, g.seats.Asha!);
+      expect(snap.transactions.filter((t) => t.type === 'CLUB_PAYMENT').map((t) => t.amount)).toEqual([100, 100]);
+      expect(snap.state.players.map((p) => p.balance)).toEqual([24800, 25100, 25100]);
+      ok(await g.act('Asha', { type: 'END_TURN' }));
+
+      // Bilal owns 3 sites (one with 2 houses, one with a hotel) — test setup.
+      const bilal = g.seats.Bilal!.playerId;
+      await sql`update public.properties set owner_player_id = ${bilal} where game_id = ${g.gameId} and property_key in ('DELHI', 'MUMBAI', 'RAILWAY')`;
+      await sql`update public.properties set houses = 2 where game_id = ${g.gameId} and property_key = 'DELHI'`;
+      await sql`update public.properties set hotel = true where game_id = ${g.gameId} and property_key = 'MUMBAI'`;
+      queuedDice = [2, 3]; // Start + 5 = Income Tax
+      ok(await g.act('Bilal', { type: 'ROLL_DICE' }));
+      snap = await state(g.gameId, g.seats.Bilal!);
+      expect(snap.state.turn.pending).toMatchObject({ reason: 'TAX', amount: 150 });
+      ok(await g.act('Bilal', { type: 'PAY_TAX' }));
+      ok(await g.act('Bilal', { type: 'END_TURN' }));
+      await quietTurn(g, 'Chitra');
+      await quietTurn(g, 'Asha');
+      await place(g.gameId, bilal, 27);
+      queuedDice = [2, 2]; // 27 + 4 = Wealth Taxes
+      ok(await g.act('Bilal', { type: 'ROLL_DICE' }));
+      snap = await state(g.gameId, g.seats.Bilal!);
+      expect(snap.state.turn.pending).toMatchObject({ reason: 'TAX', amount: 400 });
+      ok(await g.act('Bilal', { type: 'PAY_TAX' }));
+      snap = await state(g.gameId, g.seats.Bilal!);
+      expect(snap.transactions.filter((t) => t.type === 'TAX_PAYMENT').map((t) => t.amount)).toEqual([400, 150]);
+      await ledgerOk(g.gameId);
+    });
+  });
+
   it('expired games reject actions', async () => {
     const g = await setupGame(['Asha', 'Bilal']);
     ok(await g.act('Asha', { type: 'START_GAME' }));
@@ -391,7 +538,9 @@ describe.skipIf(!DATABASE_URL)('game-action handler (Postgres)', () => {
           } else res = await g.act(who, { type: 'END_TURN' });
         }
         else if (r < 0.2 && s.undoRequest) res = await g.act(nameOf(s.undoRequest.approverIds[0]!), { type: 'APPROVE_UNDO', requestId: s.undoRequest.id });
-        else if (s.turn.phase === 'AWAITING_ROLL') res = await g.act(who, { type: 'ROLL_DICE' });
+        else if (s.turn.phase === 'AWAITING_ROLL' && s.players.find((x) => x.id === s.turn.playerId)?.inJail) {
+          res = await g.act(who, { type: rand() < 0.5 ? 'PAY_JAIL_FINE' : 'STAY_IN_JAIL' });
+        } else if (s.turn.phase === 'AWAITING_ROLL') res = await g.act(who, { type: 'ROLL_DICE' });
         else if (s.turn.phase === 'AWAITING_DECISION') res = await g.act(who, { type: rand() < 0.6 ? 'BUY_PROPERTY' : 'DECLINE_PROPERTY' });
         else if (s.turn.phase === 'AUCTION' && s.auction) {
           const a = s.auction;
@@ -399,8 +548,6 @@ describe.skipIf(!DATABASE_URL)('game-action handler (Postgres)', () => {
           res = bidder
             ? await g.act(nameOf(bidder), rand() < 0.5 ? { type: 'PLACE_BID', auctionId: a.id, amount: (a.highBid ?? 0) + 100 } : { type: 'PASS_AUCTION', auctionId: a.id })
             : await g.act(who, { type: 'CLOSE_AUCTION', auctionId: a.id });
-        } else if (s.turn.phase === 'AWAITING_PAYMENT' && p?.kind === 'TAX_ENTRY') {
-          res = await g.act(who, { type: 'PAY_TAX', amount: 1000 });
         } else if (s.turn.phase === 'AWAITING_PAYMENT' && p?.kind === 'PAYMENT') {
           const me = s.players.find((x) => x.id === s.turn.playerId)!;
           const pay = { RENT: 'PAY_RENT', TAX: 'PAY_TAX', CARD: 'PAY_CARD', LOAN_INTEREST: 'PAY_INTEREST', CLUB: 'PAY_CLUB' } as const;

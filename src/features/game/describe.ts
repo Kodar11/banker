@@ -7,7 +7,7 @@ export function describeWaiting(state: GameState, name: string): string {
   const pending = turn.pending;
   switch (turn.phase) {
     case 'AWAITING_ROLL':
-      return `${name} is about to roll`;
+      return state.players.find((p) => p.id === turn.playerId)?.inJail ? `${name} is in Jail — pay or stay?` : `${name} is about to roll`;
     case 'AWAITING_DECISION':
       return pending?.kind === 'BUY' ? `${name} is deciding on ${getDeed(pending.propertyKey).name}` : `${name} is deciding`;
     case 'AWAITING_PAYMENT':

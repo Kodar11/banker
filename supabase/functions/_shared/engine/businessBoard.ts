@@ -249,8 +249,9 @@ export type SquareId = PropertyKey | SpecialSpaceType;
 
 /**
  * Domain-level square type. City sites are PROPERTY; transport/utility deeds are
- * split by their board category; Wealth Taxes is its own type (its rule is not
- * the Income Tax rule — see BUSINESS_MVP_RULES.wealthTax).
+ * split by their board category; Wealth Taxes is its own type (charged on
+ * buildings, unlike Income Tax which is charged on properties — see
+ * BUSINESS_MVP_RULES.incomeTax / wealthTax).
  */
 export type SpaceType =
   | 'PROPERTY'

@@ -17,11 +17,14 @@ export const GameActionSchema = z.discriminatedUnion('type', [
   bare('DECLINE_PROPERTY'),
   bare('START_AUCTION'),
   bare('PAY_RENT'),
-  /** amount: only for a tax square without a configured amount (player enters the printed amount). */
-  z.object({ type: z.literal('PAY_TAX'), amount: z.number().int().positive().max(10_000_000).optional() }).strict(),
+  bare('PAY_TAX'),
   bare('PAY_CARD'),
   bare('PAY_INTEREST'),
   bare('PAY_CLUB'),
+  /** In Jail, on your turn: pay the fine and play this turn normally. */
+  bare('PAY_JAIL_FINE'),
+  /** In Jail, on your turn: miss this turn (released after the last one). */
+  bare('STAY_IN_JAIL'),
   z
     .object({
       type: z.literal('RESOLVE_CARD'),
@@ -90,6 +93,8 @@ export const STALE_SENSITIVE_ACTIONS: ReadonlySet<GameActionType> = new Set<Game
   'PAY_CARD',
   'PAY_INTEREST',
   'PAY_CLUB',
+  'PAY_JAIL_FINE',
+  'STAY_IN_JAIL',
   'RESOLVE_CARD',
   'PLACE_BID',
   'END_TURN',

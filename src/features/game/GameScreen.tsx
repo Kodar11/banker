@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { Alert, View } from 'react-native';
 import { router } from 'expo-router';
-import { Button, ConnectionBanner, Screen } from '@/components/ui';
+import { Button, ConfirmDialog, ConnectionBanner, Screen } from '@/components/ui';
 import { topUndoable } from '@/engine/index.ts';
 import { LoanSheet } from '@/features/loan/LoanSheet';
 import { TradeOffers } from '@/features/trade/TradeOffers';
 import { TradeSheet } from '@/features/trade/TradeSheet';
+import { useGameStore } from '@/store/gameStore';
 import { PayPlayerSheet } from '@/features/transactions/PayPlayerSheet';
 import { haptics } from '@/utils/haptics';
 import { ActionPanel } from './ActionPanel';
@@ -24,6 +25,8 @@ import type { GameView } from './useGameView';
 export function GameScreen({ view }: { view: GameView }) {
   const send = useGameAction();
   const [sheet, setSheet] = useState<'pay' | 'loan' | 'trade' | null>(null);
+  const [confirmEnd, setConfirmEnd] = useState(false);
+  const ending = useGameStore((s) => s.pendingAction === 'END_GAME');
   const { state, events } = view.snapshot;
   const me = view.me;
 
@@ -89,7 +92,7 @@ export function GameScreen({ view }: { view: GameView }) {
     >
       <ConnectionBanner />
       <TurnHeader view={view} />
-      {state.status === 'PAUSED' ? <PausedView view={view} send={send} /> : null}
+      {state.status === 'PAUSED' ? <PausedView view={view} send={send} onEndGame={() => setConfirmEnd(true)} /> : null}
       {state.status === 'FINISHED' ? <FinishedView view={view} /> : null}
       {state.status === 'ACTIVE' ? (
         <>
@@ -107,14 +110,25 @@ export function GameScreen({ view }: { view: GameView }) {
           variant="ghost"
           title="End game (host)"
           testID="end-game-button"
-          onPress={() =>
-            Alert.alert('End the game?', 'Highest net worth wins.', [
-              { text: 'Cancel', style: 'cancel' },
-              { text: 'End game', style: 'destructive', onPress: () => void send({ type: 'END_GAME' }) },
-            ])
-          }
+          onPress={() => setConfirmEnd(true)}
         />
       ) : null}
+      <ConfirmDialog
+        visible={confirmEnd && view.isHost && state.status !== 'FINISHED'}
+        icon="🏆"
+        title="End Game?"
+        message="Are you sure you want to finish this game?"
+        detail="Highest net worth wins."
+        confirmTitle="End Game"
+        destructive
+        loading={ending}
+        testID="end-game-dialog"
+        onCancel={() => setConfirmEnd(false)}
+        onConfirm={async () => {
+          await send({ type: 'END_GAME' });
+          setConfirmEnd(false);
+        }}
+      />
       <PayPlayerSheet visible={sheet === 'pay'} onClose={() => setSheet(null)} view={view} send={send} />
       <LoanSheet visible={sheet === 'loan'} onClose={() => setSheet(null)} view={view} send={send} />
       <TradeSheet visible={sheet === 'trade'} onClose={() => setSheet(null)} view={view} send={send} />

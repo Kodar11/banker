@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BUSINESS_MVP_RULES, minimumNextBid } from '@/engine/index.ts';
+import { BUSINESS_MVP_RULES, minimumNextBid, positionOfSpecial } from '@/engine/index.ts';
 import { TestGame } from './harness.ts';
 
 const START = BUSINESS_MVP_RULES.startingCash;
@@ -100,7 +100,7 @@ describe('bankruptcy and game end', () => {
 
   it('cannot declare bankruptcy when you can afford the payment', () => {
     const g = new TestGame();
-    g.roll('Asha', 2, 3); // Income Tax
+    g.landOn('Asha', positionOfSpecial('CLUB'), 5); // Club: ₹100 to each of 2 players
     expect(() => g.act('Asha', { type: 'DECLARE_BANKRUPTCY' })).toThrow('You can afford this payment.');
   });
 

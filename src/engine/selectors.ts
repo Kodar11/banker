@@ -98,6 +98,19 @@ export function buildingCount(state: StateLike, playerId: string): { houses: num
   return { houses, hotels };
 }
 
+/** Income Tax: ₹50 per property/site owned (mortgaged ones are still owned), capped. */
+export function incomeTaxDue(state: StateLike, playerId: string): { properties: number; amount: number } {
+  const properties = ownedBy(state, playerId).length;
+  return { properties, amount: Math.min(properties * RULES.incomeTax.perProperty, RULES.incomeTax.max) };
+}
+
+/** Wealth Taxes: ₹100 per house + ₹200 per hotel owned (a hotel is not also counted as houses), capped. */
+export function wealthTaxDue(state: StateLike, playerId: string): { houses: number; hotels: number; amount: number } {
+  const { houses, hotels } = buildingCount(state, playerId);
+  const amount = Math.min(houses * RULES.wealthTax.perHouse + hotels * RULES.wealthTax.perHotel, RULES.wealthTax.max);
+  return { houses, hotels, amount };
+}
+
 export function outstandingDebt(loans: LoanState[], playerId: string): number {
   return loans.filter((l) => l.playerId === playerId && l.status === 'ACTIVE').reduce((sum, l) => sum + l.outstanding, 0);
 }

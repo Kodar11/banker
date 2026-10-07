@@ -5,7 +5,8 @@
  *
  *  ✅ CONFIRMED — stated by the owner of the physical board (board order, card
  *     tables, ₹1,500 at Start, 3+ same colour doubles rent, loan interest at the
- *     next Start, trading, multi-undo, ₹25,000 starting cash).
+ *     next Start, trading, multi-undo, ₹25,000 starting cash, Income Tax,
+ *     Wealth Taxes, Club, Jail, Rest House, 5-second auction countdown).
  *  ⚠️ ASSUMPTION — not established by the physical board/cards/deeds. A default
  *     chosen to keep the MVP playable. Verify against the physical rules and
  *     change it here; nothing else in the code hard-codes these values.
@@ -14,16 +15,9 @@
  */
 import { formatINR } from './format.ts';
 
-/** Effect of landing on Club. Unknown for the physical board → configurable. */
-export type ClubRule =
-  | { type: 'NONE' }
-  | { type: 'PAY_BANK'; amount: number }
-  | { type: 'RECEIVE_FROM_BANK'; amount: number }
-  | { type: 'PAY_EACH_PLAYER'; amount: number };
-
 export const BUSINESS_MVP_RULES = {
   /** Bump when any value below changes so old sessions are identifiable. */
-  assumptionsVersion: 'MVP-2',
+  assumptionsVersion: 'MVP-3',
 
   /** ⚠️ ASSUMPTION */
   players: {
@@ -49,39 +43,38 @@ export const BUSINESS_MVP_RULES = {
     passReward: 1500,
   },
 
-  /** ⚠️ ASSUMPTION — the Income Tax amount is not printed in the supplied data. */
+  /** ✅ CONFIRMED — ₹50 for every property/site the player owns, at most ₹500. */
   incomeTax: {
-    amount: 1000,
+    perProperty: 50,
+    max: 500,
   },
 
-  /**
-   * ⚠️ ASSUMPTION — Wealth Taxes is its own square, but its amount is not in the
-   * supplied data. null = the player reads the amount on the physical board and
-   * enters it (capped at cards.manualMaxAmount); set a number to make it fixed.
-   */
+  /** ✅ CONFIRMED — ₹100 per house + ₹200 per hotel the player owns, at most ₹500. */
   wealthTax: {
-    amount: null as number | null,
+    perHouse: 100,
+    perHotel: 200,
+    max: 500,
+  },
+
+  /** ✅ CONFIRMED — landing on Club: pay this much to every other player. */
+  club: {
+    payEachPlayer: 100,
   },
 
   /**
-   * ⚠️ ASSUMPTION — the Club rule is not in the supplied data. NONE = landing on
-   * Club does nothing. Change to PAY_BANK / RECEIVE_FROM_BANK / PAY_EACH_PLAYER.
+   * ✅ CONFIRMED — landing on Jail (or a "Go to Jail" card) traps the player.
+   * On each of their turns in Jail they either pay the fine and play normally,
+   * or stay and miss the turn. After `maxTurns` missed turns they are released.
+   * There is no doubles escape.
    */
-  club: {
-    rule: { type: 'NONE' } as ClubRule,
-  },
-
-  /** ⚠️ ASSUMPTION */
   jail: {
-    /** Landing on the Jail square by a normal roll is "just visiting". */
-    landingByRollSendsToJail: false,
-    /** Turns skipped after being sent to jail (by a card). */
-    turnsSkipped: 1,
+    maxTurns: 3,
+    fine: 500,
   },
 
-  /** ⚠️ ASSUMPTION (the cards confirm "Go to Rest House — you cannot play next turn") */
+  /** ✅ CONFIRMED — landing on Rest House: collect from every other player, then miss the next turn. */
   restHouse: {
-    /** Turns skipped after landing on Rest House by a normal roll. */
+    collectFromEachPlayer: 100,
     turnsSkippedOnLanding: 1,
   },
 
@@ -110,7 +103,7 @@ export const BUSINESS_MVP_RULES = {
      * player" (Birthday), they pay what they have. No debt is created.
      */
     collectFromEachShortfall: 'PAY_WHAT_THEY_CAN' as const,
-    /** Cap for amounts entered manually (card entries not in the data, Wealth Taxes). */
+    /** Cap for amounts entered manually (card entries not in the data). */
     manualMaxAmount: 10000,
   },
 
@@ -162,17 +155,17 @@ export const BUSINESS_MVP_RULES = {
     buildingsOnMortgage: 'RETURN_TO_BANK_AT_SELL_BACK_VALUE' as const,
   },
 
-  /** ⚠️ ASSUMPTION */
+  /** ✅ CONFIRMED (5-second countdown) / ⚠️ ASSUMPTION (the rest) */
   auction: {
     enabled: true,
     /** The player who declined may also bid. */
     declinerMayBid: true,
     minimumOpeningBid: 100,
     minimumIncrement: 100,
-    /** Time to place the first bid. */
-    openingTimerSeconds: 30,
-    /** Each bid resets the countdown to this many seconds. */
-    bidTimerSeconds: 20,
+    /** ✅ Time to place the first bid. */
+    openingTimerSeconds: 5,
+    /** ✅ Each bid resets the countdown to this many seconds. */
+    bidTimerSeconds: 5,
   },
 
   loans: {
@@ -235,19 +228,6 @@ export type BusinessMvpRules = typeof BUSINESS_MVP_RULES;
 
 const R = BUSINESS_MVP_RULES;
 
-function clubText(rule: ClubRule): string {
-  switch (rule.type) {
-    case 'NONE':
-      return 'Landing on Club has no effect (rule not in the supplied data).';
-    case 'PAY_BANK':
-      return `Landing on Club: pay the bank ${formatINR(rule.amount)}.`;
-    case 'RECEIVE_FROM_BANK':
-      return `Landing on Club: receive ${formatINR(rule.amount)} from the bank.`;
-    case 'PAY_EACH_PLAYER':
-      return `Landing on Club: pay every other player ${formatINR(rule.amount)}.`;
-  }
-}
-
 /** Rules confirmed by the owner of the physical board. Shown in Settings. */
 export const CONFIRMED_RULES: readonly { title: string; detail: string }[] = [
   { title: 'Board order', detail: 'Exact order of the physical board: Start → Mumbai → … → Margao → Start (36 squares).' },
@@ -258,25 +238,35 @@ export const CONFIRMED_RULES: readonly { title: string; detail: string }[] = [
   { title: 'Loans', detail: `Interest (${R.loans.interestRatePercent}%) is payable when you next reach or pass Start — not when you borrow.` },
   { title: 'Trading', detail: 'Players can trade properties and money. The other player must accept.' },
   { title: 'Undo', detail: 'Several recent actions can be undone, newest first, with another player’s approval.' },
+  {
+    title: 'Income Tax',
+    detail: `${formatINR(R.incomeTax.perProperty)} for every property you own, at most ${formatINR(R.incomeTax.max)}.`,
+  },
+  {
+    title: 'Wealth Taxes',
+    detail: `${formatINR(R.wealthTax.perHouse)} per house + ${formatINR(R.wealthTax.perHotel)} per hotel you own, at most ${formatINR(R.wealthTax.max)}.`,
+  },
+  { title: 'Club', detail: `Landing on Club: pay every other player ${formatINR(R.club.payEachPlayer)}.` },
+  {
+    title: 'Jail',
+    detail: `Landing on Jail (or a Go to Jail card) traps you for up to ${R.jail.maxTurns} turns. On your turn, pay ${formatINR(R.jail.fine)} to leave and play, or stay and miss the turn. Released automatically after ${R.jail.maxTurns} missed turns. No doubles escape.`,
+  },
+  {
+    title: 'Rest House',
+    detail: `Landing on Rest House: collect ${formatINR(R.restHouse.collectFromEachPlayer)} from every other player, then miss your next turn.`,
+  },
+  { title: 'Auction timer', detail: `${R.auction.bidTimerSeconds}-second countdown, restarted by every bid.` },
 ];
 
 /** Human-readable list of the ASSUMPTIONS, shown in Settings so players can compare with their rulebook. */
 export const MVP_ASSUMPTIONS: readonly { title: string; detail: string }[] = [
   { title: 'Players', detail: `${R.players.min}–${R.players.max} players.` },
   { title: 'Dice', detail: 'Two six-sided dice. Doubles do not give an extra roll.' },
-  { title: 'Income Tax', detail: `Flat ${formatINR(R.incomeTax.amount)}.` },
-  {
-    title: 'Wealth Taxes',
-    detail: R.wealthTax.amount === null ? 'Enter the amount printed on your board when you land there.' : `Flat ${formatINR(R.wealthTax.amount)}.`,
-  },
-  { title: 'Club', detail: clubText(R.club.rule) },
-  { title: 'Jail', detail: 'Landing on Jail by a roll is just visiting. Sent to jail by a card = skip 1 turn.' },
-  { title: 'Rest House', detail: 'Landing on Rest House = skip your next turn.' },
   {
     title: 'Card moves',
-    detail: `"Go back to Bombay" moves ${R.cards.goBackToMumbaiDirection === 'FORWARD' ? 'forward (collect at Start if passed)' : 'backward'}. Go to Jail / Rest House move directly (no Start reward).`,
+    detail: `"Go back to Bombay" moves ${R.cards.goBackToMumbaiDirection === 'FORWARD' ? 'forward (collect at Start if passed)' : 'backward'}. Go to Jail / Rest House move directly (no Start reward). The Rest House card only skips your next turn — collecting from players happens when you land there by a roll.`,
   },
-  { title: 'Birthday', detail: 'A player who cannot pay the full ₹500 pays what they have.' },
+  { title: 'Birthday / Rest House', detail: 'A player who cannot pay their full share pays what they have.' },
   { title: 'Unreadable cards', detail: 'Card numbers with no entry in the supplied data are entered by hand.' },
   { title: 'Rent', detail: 'No rent on mortgaged properties. Mortgaged properties still count towards a colour set.' },
   { title: 'Building', detail: 'Build on any site you own during your turn: up to 3 houses, then a hotel. Sell back for 50%.' },
@@ -285,7 +275,10 @@ export const MVP_ASSUMPTIONS: readonly { title: string; detail: string }[] = [
     detail: 'Mortgage pays the deed value plus the sell-back value of any buildings, which return to the bank. Unmortgage = value + 10%.',
   },
   { title: 'Trades', detail: 'Only properties without buildings can be traded. Mortgaged properties keep their mortgage.' },
-  { title: 'Auctions', detail: 'Declined properties go to auction. Minimum bid ₹100, +₹100 steps, 20s timer per bid.' },
+  {
+    title: 'Auctions',
+    detail: `Declined properties go to auction. Minimum bid ${formatINR(R.auction.minimumOpeningBid)}, +${formatINR(R.auction.minimumIncrement)} steps.`,
+  },
   {
     title: 'Loans',
     detail: `Bank loans of ${formatINR(R.loans.minAmount)}–${formatINR(R.loans.maxOutstandingPrincipal)} at ${R.loans.interestRatePercent}%, charged ${R.loans.interestEveryCircuit ? 'at every Start' : 'once'}. Repaying before Start avoids interest.`,

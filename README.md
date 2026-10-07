@@ -60,7 +60,7 @@ tests/
   * **title deeds** (prices, rents, house/hotel costs, mortgage values, paired transport/utility rules), from the photographed cards;
   * **`BOARD_ROWS`** — the four sides of the physical board exactly as dictated (corner → corner). The 36-square cycle `BOARD_LAYOUT` is *derived* from the rows by `deriveBoardCycle`, which validates shared corners, closure back to Start and duplicates at module load. The DB catalog is generated from this file (`scripts/print-catalog-sql.ts`) and a test keeps them in sync.
 * `src/engine/cards.ts` — the confirmed Chance / Community Chest **EVEN and ODD tables** (dice total picks the table and the entry). The only total with no entry (Chance odd 11) is resolved by hand.
-* `src/engine/rules.ts` — **`BUSINESS_MVP_RULES`**, each value marked ✅ confirmed (₹25,000 start, ₹1,500 at Start, 3+ same colour ×2 rent, loan interest at next Start, trading, multi-undo) or ⚠️ assumption (Income Tax amount, Wealth Taxes amount, Club rule, jail, auctions, building sell-back rate, how buildings are valued on mortgage, …). Players see both lists in-app under **House rules**.
+* `src/engine/rules.ts` — **`BUSINESS_MVP_RULES`**, each value marked ✅ confirmed (₹25,000 start, ₹1,500 at Start, 3+ same colour ×2 rent, loan interest at next Start, trading, multi-undo, and the finalized Classic rules: Income Tax ₹50/property max ₹500, Wealth Taxes ₹100/house + ₹200/hotel max ₹500, Club pays ₹100 to each player, Rest House collects ₹100 from each player then skips a turn, Jail up to 3 turns or ₹500 to leave, 5-second auction countdown) or ⚠️ assumption (other auction details, building sell-back rate, how buildings are valued on mortgage, …). Players see both lists in-app under **House rules**.
 
 ## Setup
 

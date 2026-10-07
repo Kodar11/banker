@@ -59,7 +59,7 @@ describe('turn order', () => {
     for (let i = 0; i < 4; i += 1) {
       const who = g.current;
       order.push(who);
-      g.player(who).position = 7; // 7 + 2 = 9 → Jail (just visiting)
+      g.player(who).position = 34; // 34 + 2 = Start
       g.roll(who, 1, 1);
       g.act(who, { type: 'END_TURN' });
     }
@@ -158,18 +158,31 @@ describe('state machine', () => {
     const g = new TestGame();
     for (let i = 0; i < 30; i += 1) {
       const who = g.current;
+      if (g.player(who).inJail) {
+        g.act(who, { type: 'STAY_IN_JAIL' });
+        continue;
+      }
       const r = g.roll(who, (i % 6) + 1, ((i * 5) % 6) + 1);
       for (const t of r.transitions) expect(canTransition(t.from, t.to)).toBe(true);
       const phase = g.state.turn.phase;
       expect(RESTING_PHASES.has(phase)).toBe(true);
-      if (phase === 'AWAITING_DECISION') g.act(who, { type: 'BUY_PROPERTY' });
-      else if (phase === 'AWAITING_PAYMENT') {
-        const pending = g.state.turn.pending;
-        if (pending?.kind === 'TAX_ENTRY') g.act(who, { type: 'PAY_TAX', amount: 1000 });
-        else if (pending?.kind === 'PAYMENT') {
-          const pay = { RENT: 'PAY_RENT', TAX: 'PAY_TAX', CARD: 'PAY_CARD', LOAN_INTEREST: 'PAY_INTEREST', CLUB: 'PAY_CLUB' } as const;
-          g.act(who, { type: pay[pending.reason] });
+      const pending = g.state.turn.pending;
+      if (phase === 'AWAITING_DECISION' && pending?.kind === 'BUY') {
+        if (g.balance(who) >= pending.price) g.act(who, { type: 'BUY_PROPERTY' });
+        else {
+          g.act(who, { type: 'DECLINE_PROPERTY' });
+          for (const id of g.state.auction!.participantIds) {
+            g.act(g.state.players.find((p) => p.id === id)!.name, { type: 'PASS_AUCTION', auctionId: g.state.auction!.id });
+          }
         }
+      } else if (phase === 'AWAITING_PAYMENT' && pending?.kind === 'PAYMENT') {
+        const pay = { RENT: 'PAY_RENT', TAX: 'PAY_TAX', CARD: 'PAY_CARD', LOAN_INTEREST: 'PAY_INTEREST', CLUB: 'PAY_CLUB' } as const;
+        if (g.balance(who) < pending.amount) {
+          g.act(who, { type: 'DECLARE_BANKRUPTCY' });
+          if (g.state.status === 'FINISHED') break;
+          continue;
+        }
+        g.act(who, { type: pay[pending.reason] });
       } else if (phase === 'AWAITING_CARD') g.act(who, { type: 'RESOLVE_CARD', resolution: 'NONE' });
       g.act(who, { type: 'END_TURN' });
     }

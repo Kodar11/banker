@@ -48,7 +48,11 @@ export const PlayersStrip = memo(function PlayersStrip({ view }: { view: GameVie
               </Text>
             </View>
             <Text className="text-base font-extrabold text-cream">{p.status === 'BANKRUPT' ? 'Bankrupt' : formatINR(p.balance)}</Text>
-            {p.skipTurns > 0 ? <Text className="text-xs text-amber-300">{p.inJail ? 'In Jail' : 'Resting'}</Text> : null}
+            {p.inJail ? (
+              <Text className="text-xs text-amber-300">In Jail · {p.jailTurnsLeft} left</Text>
+            ) : p.skipTurns > 0 ? (
+              <Text className="text-xs text-amber-300">Resting</Text>
+            ) : null}
           </Pressable>
         );
       })}
@@ -85,7 +89,7 @@ export function UndoBanner({ view, send }: { view: GameView; send: (a: GameActio
   );
 }
 
-export function PausedView({ view, send }: { view: GameView; send: (a: GameAction) => Promise<unknown> }) {
+export function PausedView({ view, send, onEndGame }: { view: GameView; send: (a: GameAction) => Promise<unknown>; onEndGame: () => void }) {
   const pending = useGameStore((s) => s.pendingAction);
   return (
     <Card testID="paused-card" className="items-center">
@@ -100,7 +104,7 @@ export function PausedView({ view, send }: { view: GameView; send: (a: GameActio
         onPress={() => send({ type: 'RESUME_GAME' })}
       />
       {view.isHost ? (
-        <Button className="mt-3 self-stretch" size="sm" variant="secondary" title="End game now" testID="end-game-button" onPress={() => send({ type: 'END_GAME' })} />
+        <Button className="mt-3 self-stretch" size="sm" variant="secondary" title="End game now" testID="end-game-button" onPress={onEndGame} />
       ) : null}
     </Card>
   );
