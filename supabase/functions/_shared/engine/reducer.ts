@@ -815,6 +815,8 @@ function declareBankruptcy(d: Draft, actor: PlayerState): void {
 
 function finishGame(d: Draft, reason: 'HOST_ENDED' | 'LAST_PLAYER_STANDING'): void {
   d.setStatus('FINISHED');
+  d.state.pausedFrom = null;
+  d.state.pausedAt = null;
   const ranked = d
     .activePlayers()
     .map((p) => ({ p, worth: netWorth(d.state, p.id) }))

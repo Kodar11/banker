@@ -332,12 +332,65 @@ describe.skipIf(!DATABASE_URL)('game-action handler (Postgres)', () => {
     await ledgerOk(g.gameId);
   });
 
+  it('host can end a paused game (persists without violating constraints)', async () => {
+    const g = await setupGame(['Asha', 'Bilal']);
+    ok(await g.act('Asha', { type: 'START_GAME' }));
+    ok(await g.act('Bilal', { type: 'PAUSE_GAME' }));
+    ok(await g.act('Asha', { type: 'END_GAME' }));
+    const [row] = await sql`select status, paused_at from public.games where id = ${g.gameId}`;
+    expect(row).toMatchObject({ status: 'FINISHED', paused_at: null });
+  });
+
   it('expired games reject actions', async () => {
     const g = await setupGame(['Asha', 'Bilal']);
     ok(await g.act('Asha', { type: 'START_GAME' }));
     await sql`update public.games set expires_at = now() - interval '1 minute' where id = ${g.gameId}`;
     expect(await g.act('Asha', { type: 'ROLL_DICE' })).toMatchObject({ ok: false, error: { code: 'GAME_EXPIRED' } });
   });
+
+  it('fuzz: random play through the handler never hits a DB constraint the engine missed', async () => {
+    for (let game = 0; game < 3; game += 1) {
+      const names = ['Asha', 'Bilal', 'Chitra'];
+      const g = await setupGame(names);
+      ok(await g.act('Asha', { type: 'START_GAME' }));
+      let seed = 7 + game;
+      const rand = () => ((seed = (seed * 1103515245 + 12345) % 2 ** 31) / 2 ** 31);
+      const pick = <T,>(xs: T[]) => xs[Math.floor(rand() * xs.length)] as T;
+      const nameOf = (id: string) => names.find((n) => g.seats[n]!.playerId === id)!;
+      for (let step = 0; step < 120; step += 1) {
+        const snap = await state(g.gameId, g.seats.Asha!);
+        const s = snap.state;
+        if (s.status === 'FINISHED') break;
+        const who = nameOf(s.turn.playerId!);
+        const p = s.turn.pending;
+        let res: ApiResponse;
+        const r = rand();
+        if (r < 0.05) res = await g.act(pick(names), { type: 'PAUSE_GAME' });
+        else if (s.status === 'PAUSED') res = await g.act(pick(names), { type: 'RESUME_GAME' });
+        else if (r < 0.1) res = await g.act(pick(names), { type: 'REQUEST_LOAN', amount: 1000 });
+        else if (r < 0.15) {
+          const mine = Object.values(s.properties).filter((x) => x.ownerId === g.seats[who]!.playerId);
+          res = mine.length ? await g.act(who, { type: pick(['BUILD_HOUSE', 'MORTGAGE_PROPERTY', 'SELL_BUILDING', 'UNMORTGAGE_PROPERTY'] as const), propertyKey: pick(mine).key }) : await g.act(who, { type: 'END_TURN' });
+        } else if (r < 0.18 && s.lastUndoable) res = await g.act(nameOf(s.lastUndoable.actorId), { type: 'REQUEST_UNDO', targetActionId: s.lastUndoable.actionId });
+        else if (r < 0.2 && s.undoRequest) res = await g.act(nameOf(s.undoRequest.approverIds[0]!), { type: 'APPROVE_UNDO', requestId: s.undoRequest.id });
+        else if (s.turn.phase === 'AWAITING_ROLL') res = await g.act(who, { type: 'ROLL_DICE' });
+        else if (s.turn.phase === 'AWAITING_DECISION') res = await g.act(who, { type: rand() < 0.6 ? 'BUY_PROPERTY' : 'DECLINE_PROPERTY' });
+        else if (s.turn.phase === 'AUCTION' && s.auction) {
+          const a = s.auction;
+          const bidder = pick(a.participantIds.filter((id) => !a.passedIds.includes(id) && id !== a.highBidderId));
+          res = bidder
+            ? await g.act(nameOf(bidder), rand() < 0.5 ? { type: 'PLACE_BID', auctionId: a.id, amount: (a.highBid ?? 0) + 100 } : { type: 'PASS_AUCTION', auctionId: a.id })
+            : await g.act(who, { type: 'CLOSE_AUCTION', auctionId: a.id });
+        } else if (s.turn.phase === 'AWAITING_PAYMENT' && p?.kind === 'PAYMENT') {
+          const me = s.players.find((x) => x.id === s.turn.playerId)!;
+          res = await g.act(who, me.balance >= p.amount ? { type: `PAY_${p.reason}` as 'PAY_RENT' } : { type: 'DECLARE_BANKRUPTCY' });
+        } else if (s.turn.phase === 'AWAITING_CARD') res = await g.act(who, { type: 'RESOLVE_CARD', resolution: pick(['PAY', 'RECEIVE', 'NONE'] as const), amount: 300 });
+        else res = await g.act(who, { type: 'END_TURN' });
+        if (!res.ok) expect(res.error.code).not.toBe('SERVER_ERROR');
+      }
+      await ledgerOk(g.gameId);
+    }
+  }, 120_000);
 
   describe('database guards', () => {
     it('ledger tables are append-only', async () => {
