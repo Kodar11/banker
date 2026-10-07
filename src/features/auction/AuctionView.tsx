@@ -4,7 +4,7 @@ import { Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { getDeed, minimumNextBid } from '@/engine/index.ts';
 import { Button, Card, ConnectionBanner, Label, Pill, Screen } from '@/components/ui';
-import { GROUP_COLORS } from '@/constants/theme';
+import { PROPERTY_GROUP_THEME } from '@/constants/theme';
 import { useGameAction } from '@/features/game/useGameAction';
 import type { GameView } from '@/features/game/useGameView';
 import { useGameStore } from '@/store/gameStore';
@@ -83,16 +83,17 @@ export function AuctionView({ view, auctionId }: { view: GameView; auctionId: st
   const min = minimumNextBid(auction);
   const amIn = !!me && auction.participantIds.includes(me.id) && !auction.passedIds.includes(me.id);
   const leading = !!me && auction.highBidderId === me.id;
+  const groupTheme = PROPERTY_GROUP_THEME[deed.group];
   const bids = [min, min + 500, min + 1000].filter((b) => !!me && b <= me.balance);
 
   return (
     <Screen scroll testID="auction-screen">
       <ConnectionBanner />
       <Card className="overflow-hidden p-0">
-        <View style={{ backgroundColor: GROUP_COLORS[deed.group] }} className="items-center px-4 py-4">
-          <Text className="text-xs font-extrabold uppercase tracking-[4px] text-white/80">Auction</Text>
-          <Text className="text-3xl font-black text-white">{deed.name}</Text>
-          <Text className="text-sm font-semibold text-white/80">List price {formatINR(deed.price)}</Text>
+        <View style={{ backgroundColor: groupTheme.color }} className="items-center px-4 py-4" testID="auction-deed-header">
+          <Text style={{ color: groupTheme.onColor }} className="text-xs font-extrabold uppercase tracking-[4px] opacity-80">Auction</Text>
+          <Text style={{ color: groupTheme.onColor }} className="text-3xl font-black">{deed.name}</Text>
+          <Text style={{ color: groupTheme.onColor }} className="text-sm font-semibold opacity-80">List price {formatINR(deed.price)}</Text>
         </View>
         <View className="items-center gap-1 p-5">
           <Label>{auction.highBid === null ? 'No bids yet' : `Highest bid · ${view.playerName(auction.highBidderId)}`}</Label>

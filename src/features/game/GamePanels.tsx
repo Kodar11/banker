@@ -2,7 +2,7 @@ import { memo } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import type { GameAction, GameEventRecord } from '@/engine/index.ts';
-import { Button, Card, Label } from '@/components/ui';
+import { Button, Card, Label, PlayerBadge } from '@/components/ui';
 import { useGameStore } from '@/store/gameStore';
 import { formatINR } from '@/utils/currency';
 import type { GameView } from './useGameView';
@@ -40,7 +40,8 @@ export const PlayersStrip = memo(function PlayersStrip({ view }: { view: GameVie
             accessibilityLabel={`${p.name}, ${formatINR(p.balance)}${p.status === 'BANKRUPT' ? ', bankrupt' : ''}${isOnline ? '' : ', offline'}`}
             className={`min-w-[30%] flex-1 rounded-2xl px-3 py-2 ${isTurn ? 'border-2 border-saffron bg-felt-light' : 'bg-felt-dark'} ${p.status === 'BANKRUPT' ? 'opacity-40' : ''}`}
           >
-            <View className="flex-row items-center gap-1">
+            <View className="flex-row items-center gap-1.5">
+              <PlayerBadge player={p} size={18} testID={`player-badge-${p.name}`} />
               <View className={`h-2 w-2 rounded-full ${isOnline ? 'bg-green-400' : 'bg-stone-500'}`} />
               <Text numberOfLines={1} className="flex-1 text-sm font-bold text-cream">
                 {p.name}

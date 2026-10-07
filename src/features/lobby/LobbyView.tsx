@@ -1,7 +1,7 @@
 import { Share, Text, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { BUSINESS_MVP_RULES } from '@/engine/index.ts';
-import { Button, Card, ConnectionBanner, Label, Pill, Screen } from '@/components/ui';
+import { Button, Card, ConnectionBanner, Label, Pill, PlayerBadge, Screen } from '@/components/ui';
 import { joinLink } from '@/constants/app';
 import { COLORS } from '@/constants/theme';
 import type { GameView } from '@/features/game/useGameView';
@@ -70,6 +70,7 @@ export function LobbyView({ view }: { view: GameView }) {
           {state.players.map((p) => (
             <View key={p.id} className="flex-row items-center justify-between rounded-xl bg-white px-4 py-3">
               <View className="flex-row items-center gap-2">
+                <PlayerBadge player={p} size={24} testID={`player-badge-${p.name}`} />
                 <View className={`h-2.5 w-2.5 rounded-full ${online.includes(p.id) || p.id === me?.id ? 'bg-green-500' : 'bg-stone-300'}`} />
                 <Text className="text-lg font-bold text-ink">
                   {p.name}

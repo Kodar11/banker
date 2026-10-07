@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { getDeed, ownedBy, tradeBlocker, tradePropertyBlocker, type GameAction, type PropertyKey } from '@/engine/index.ts';
-import { Button, Label, Sheet, TextField } from '@/components/ui';
-import { GROUP_COLORS } from '@/constants/theme';
+import { Button, Label, PlayerBadge, Sheet, TextField } from '@/components/ui';
+import { PROPERTY_GROUP_THEME } from '@/constants/theme';
 import type { GameView } from '@/features/game/useGameView';
 import { useGameStore } from '@/store/gameStore';
 import { formatINR } from '@/utils/currency';
@@ -76,9 +76,12 @@ export function TradeSheet({ visible, onClose, view, send }: TradeSheetProps) {
             testID={`trade-with-${p.name}`}
             className={`min-h-[48px] min-w-[45%] flex-1 items-center justify-center rounded-2xl px-4 ${to === p.id ? 'bg-saffron' : 'bg-stone-200'}`}
           >
-            <Text className="text-lg font-bold text-ink" numberOfLines={1}>
-              {p.name}
-            </Text>
+            <View className="flex-row items-center gap-2">
+              <PlayerBadge player={p} size={20} />
+              <Text className="text-lg font-bold text-ink" numberOfLines={1}>
+                {p.name}
+              </Text>
+            </View>
           </Pressable>
         ))}
       </View>
@@ -165,7 +168,7 @@ function PropertyPicker({
               testID={`${testID}-${key}`}
               className={`min-h-[44px] flex-row items-center gap-2 rounded-xl px-3 ${on ? 'bg-saffron' : 'bg-white'} ${blocked ? 'opacity-40' : ''}`}
             >
-              <View style={{ backgroundColor: GROUP_COLORS[deed.group] }} className="h-3 w-3 rounded-full" />
+              <View style={{ backgroundColor: PROPERTY_GROUP_THEME[deed.group].mark }} className="h-3 w-3 rounded-full" />
               <Text className="text-base font-bold text-ink">
                 {deed.name}
                 {state.properties[key].mortgaged ? ' (M)' : ''}

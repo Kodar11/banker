@@ -5,3 +5,4 @@ export { ConnectionBanner, ErrorState, LoadingState, NoticeToast } from './Feedb
 export { Screen } from './Screen';
 export { Sheet } from './Sheet';
 export { TextField } from './TextField';
+export { PlayerBadge } from './PlayerBadge';

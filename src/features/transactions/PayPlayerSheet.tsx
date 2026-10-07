@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import type { GameAction } from '@/engine/index.ts';
-import { Button, Sheet, TextField } from '@/components/ui';
+import { Button, PlayerBadge, Sheet, TextField } from '@/components/ui';
 import type { GameView } from '@/features/game/useGameView';
 import { useGameStore } from '@/store/gameStore';
 import { formatINR } from '@/utils/currency';
@@ -38,7 +38,10 @@ export function PayPlayerSheet({ visible, onClose, view, send }: PayPlayerSheetP
             testID={`pay-to-${p.name}`}
             className={`min-h-[52px] min-w-[45%] flex-1 items-center justify-center rounded-2xl px-4 ${to === p.id ? 'bg-saffron' : 'bg-stone-200'}`}
           >
-            <Text className="text-lg font-bold text-ink">{p.name}</Text>
+            <View className="flex-row items-center gap-2">
+              <PlayerBadge player={p} size={20} />
+              <Text className="text-lg font-bold text-ink">{p.name}</Text>
+            </View>
           </Pressable>
         ))}
       </View>

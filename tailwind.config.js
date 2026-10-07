@@ -10,12 +10,13 @@ module.exports = {
         ink: '#1F1B16',
         saffron: { DEFAULT: '#F59E0B', dark: '#B45309' },
         brick: '#C2410C',
+        // Mirrors PROPERTY_* tokens in src/constants/theme.ts (property groups only).
         deed: {
-          blue: '#2563EB',
-          purple: '#7C3AED',
-          green: '#16A34A',
-          pink: '#DB2777',
-          transport: '#475569',
+          blue: '#315D8C',
+          purple: '#76579A',
+          green: '#4F8A5B',
+          pink: '#C86D8B',
+          transport: '#F4F0E6',
         },
       },
       fontSize: {

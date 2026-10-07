@@ -13,8 +13,8 @@ import {
   type PropertyActionKind,
   type PropertyKey,
 } from '@/engine/index.ts';
-import { Button, Card, Label, Pill, Screen } from '@/components/ui';
-import { GROUP_COLORS } from '@/constants/theme';
+import { Button, Card, Label, Pill, PlayerBadge, Screen } from '@/components/ui';
+import { PROPERTY_GROUP_THEME } from '@/constants/theme';
 import { useGameAction } from '@/features/game/useGameAction';
 import type { GameView } from '@/features/game/useGameView';
 import { useGameStore } from '@/store/gameStore';
@@ -30,6 +30,8 @@ export function PropertyView({ view, propertyKey }: { view: GameView; propertyKe
   const lastDice = state.turn.roll?.total ?? 7;
   const currentRent = prop.ownerId ? computeRent(state, propertyKey, lastDice) : 0;
   const level = prop.hotel ? 4 : prop.houses;
+  const groupTheme = PROPERTY_GROUP_THEME[deed.group];
+  const owner = prop.ownerId ? state.players.find((p) => p.id === prop.ownerId) : undefined;
 
   const actions: { kind: PropertyActionKind; title: string; variant: 'primary' | 'secondary' | 'success' | 'danger' }[] = [];
   if (me && deed.kind === 'CITY') {
@@ -52,15 +54,18 @@ export function PropertyView({ view, propertyKey }: { view: GameView; propertyKe
     <Screen scroll testID="property-screen">
       <Button size="sm" variant="ghost" title="‹ Back" onPress={() => goBack(`/game/${view.snapshot.state.id}`)} className="self-start" />
       <Card className="overflow-hidden p-0">
-        <View style={{ backgroundColor: GROUP_COLORS[deed.group] }} className="items-center px-4 py-5">
-          <Text className="text-xs font-extrabold uppercase tracking-[4px] text-white/80">{GROUP_LABELS[deed.group]}</Text>
-          <Text className="text-3xl font-black text-white">{deed.name}</Text>
+        <View style={{ backgroundColor: groupTheme.color }} className="items-center px-4 py-5" testID="property-deed-header">
+          <Text style={{ color: groupTheme.onColor }} className="text-xs font-extrabold uppercase tracking-[4px] opacity-80">{GROUP_LABELS[deed.group]}</Text>
+          <Text style={{ color: groupTheme.onColor }} className="text-3xl font-black">{deed.name}</Text>
         </View>
         <View className="gap-3 p-5">
           <View className="flex-row justify-between">
             <View>
               <Label>Owner</Label>
-              <Text className="text-lg font-bold text-ink">{prop.ownerId ? view.playerName(prop.ownerId) : 'Bank (unowned)'}</Text>
+              <View className="flex-row items-center gap-2">
+                {owner ? <PlayerBadge player={owner} size={20} testID="property-owner-badge" /> : null}
+                <Text className="text-lg font-bold text-ink">{prop.ownerId ? view.playerName(prop.ownerId) : 'Bank (unowned)'}</Text>
+              </View>
             </View>
             <View className="items-end">
               <Label>Price</Label>

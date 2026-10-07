@@ -9,6 +9,7 @@ import { TradeSheet } from '@/features/trade/TradeSheet';
 import { useGameStore } from '@/store/gameStore';
 import { PayPlayerSheet } from '@/features/transactions/PayPlayerSheet';
 import { haptics } from '@/utils/haptics';
+import { BoardViewOverlay } from '@/features/board/BoardView';
 import { ActionPanel } from './ActionPanel';
 import { DiceResult } from './DiceResult';
 import { EventFeed, FinishedView, PausedView, PlayersStrip, UndoBanner } from './GamePanels';
@@ -26,6 +27,7 @@ export function GameScreen({ view }: { view: GameView }) {
   const send = useGameAction();
   const [sheet, setSheet] = useState<'pay' | 'loan' | 'trade' | null>(null);
   const [confirmEnd, setConfirmEnd] = useState(false);
+  const [boardOpen, setBoardOpen] = useState(false);
   const ending = useGameStore((s) => s.pendingAction === 'END_GAME');
   const { state, events } = view.snapshot;
   const me = view.me;
@@ -43,6 +45,7 @@ export function GameScreen({ view }: { view: GameView }) {
   useEffect(() => {
     if (auctionId && shownAuction.current !== auctionId && me && state.auction?.participantIds.includes(me.id)) {
       shownAuction.current = auctionId;
+      setBoardOpen(false); // the board overlay would cover the auction screen
       haptics.warning();
       router.push(`/auction/${auctionId}`);
     }
@@ -92,6 +95,14 @@ export function GameScreen({ view }: { view: GameView }) {
     >
       <ConnectionBanner />
       <TurnHeader view={view} />
+      <Button
+        size="sm"
+        variant="ghost"
+        title="🗺️  View board"
+        testID="open-board"
+        accessibilityHint="Shows where every player is on the board"
+        onPress={() => setBoardOpen(true)}
+      />
       {state.status === 'PAUSED' ? <PausedView view={view} send={send} onEndGame={() => setConfirmEnd(true)} /> : null}
       {state.status === 'FINISHED' ? <FinishedView view={view} /> : null}
       {state.status === 'ACTIVE' ? (
@@ -129,6 +140,7 @@ export function GameScreen({ view }: { view: GameView }) {
           setConfirmEnd(false);
         }}
       />
+      <BoardViewOverlay visible={boardOpen} onClose={() => setBoardOpen(false)} view={view} />
       <PayPlayerSheet visible={sheet === 'pay'} onClose={() => setSheet(null)} view={view} send={send} />
       <LoanSheet visible={sheet === 'loan'} onClose={() => setSheet(null)} view={view} send={send} />
       <TradeSheet visible={sheet === 'trade'} onClose={() => setSheet(null)} view={view} send={send} />

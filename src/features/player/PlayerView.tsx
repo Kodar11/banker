@@ -2,7 +2,7 @@ import { goBack } from '@/utils/navigation';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
 import { buildingCount, netWorth, nextInterestCircuit, outstandingDebt, ownedBy } from '@/engine/index.ts';
-import { Button, Card, Label, Pill, Screen } from '@/components/ui';
+import { Button, Card, Label, Pill, PlayerBadge, Screen } from '@/components/ui';
 import type { GameView } from '@/features/game/useGameView';
 import { useGameAction } from '@/features/game/useGameAction';
 import { LoanSheet } from '@/features/loan/LoanSheet';
@@ -36,7 +36,10 @@ export function PlayerView({ view, playerId }: { view: GameView; playerId: strin
         {player.status === 'BANKRUPT' ? <Pill tone="bad">Bankrupt</Pill> : null}
       </View>
       <Card>
-        <Label>{isMe ? 'Your wallet' : `${player.name}'s wallet`}</Label>
+        <View className="flex-row items-center gap-2">
+          <PlayerBadge player={player} size={20} testID="wallet-player-badge" />
+          <Label>{isMe ? 'Your wallet' : `${player.name}'s wallet`}</Label>
+        </View>
         <Text className="text-hero text-ink" testID="wallet-balance">
           {formatINR(player.balance)}
         </Text>
