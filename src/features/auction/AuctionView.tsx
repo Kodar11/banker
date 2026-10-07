@@ -1,3 +1,4 @@
+import { goBack } from '@/utils/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import { router } from 'expo-router';
@@ -51,7 +52,7 @@ export function AuctionView({ view, auctionId }: { view: GameView; auctionId: st
 
   useEffect(() => {
     if (auction && auction.status === 'CLOSED') {
-      const t = setTimeout(() => (router.canGoBack() ? router.back() : router.replace(`/game/${state.id}`)), 2500);
+      const t = setTimeout(() => router.replace(`/game/${state.id}`), 2500);
       return () => clearTimeout(t);
     }
   }, [auction, state.id]);
@@ -137,7 +138,7 @@ export function AuctionView({ view, auctionId }: { view: GameView; auctionId: st
           <Text className="text-lg font-bold text-ink">You passed. Watching…</Text>
         </Card>
       ) : null}
-      <Button variant="ghost" size="sm" title="Back to game" onPress={() => (router.canGoBack() ? router.back() : router.replace(`/game/${state.id}`))} />
+      <Button variant="ghost" size="sm" title="Back to game" onPress={() => goBack(`/game/${state.id}`)} />
     </Screen>
   );
 }

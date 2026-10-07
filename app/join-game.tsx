@@ -1,6 +1,7 @@
+import { goBack } from '@/utils/navigation';
 import { useState } from 'react';
 import { Text } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { Button, Screen, TextField } from '@/components/ui';
 import { parseJoinCode } from '@/constants/app';
 import { QrScanner } from '@/features/lobby/QrScanner';
@@ -19,7 +20,7 @@ export default function JoinGame() {
       testID="join-game-screen"
       footer={<Button title="JOIN GAME" testID="join-confirm" loading={busy} onPress={() => submit({ kind: 'join', code }, name)} />}
     >
-      <Button size="sm" variant="ghost" title="‹ Back" className="self-start" onPress={() => router.back()} />
+      <Button size="sm" variant="ghost" title="‹ Back" className="self-start" onPress={() => goBack('/')} />
       <Text className="text-4xl font-black text-cream">Join a game</Text>
       <TextField
         label="6-digit code"

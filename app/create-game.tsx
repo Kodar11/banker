@@ -1,6 +1,6 @@
+import { goBack } from '@/utils/navigation';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
-import { router } from 'expo-router';
 import { BUSINESS_MVP_RULES, PROPERTY_KEYS } from '@/engine/index.ts';
 import { Button, Card, Label, Pill, Screen, TextField } from '@/components/ui';
 import { useEnterGame } from '@/features/lobby/useEnterGame';
@@ -16,7 +16,7 @@ export default function CreateGame() {
       testID="create-game-screen"
       footer={<Button title="CREATE GAME" testID="create-confirm" loading={busy} onPress={() => submit({ kind: 'create' }, name)} />}
     >
-      <Button size="sm" variant="ghost" title="‹ Back" className="self-start" onPress={() => router.back()} />
+      <Button size="sm" variant="ghost" title="‹ Back" className="self-start" onPress={() => goBack('/')} />
       <Text className="text-4xl font-black text-cream">New game</Text>
       <Label className="text-cream/70">Board</Label>
       <Card testID="game-option-business" className="border-2 border-saffron">

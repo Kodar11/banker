@@ -1,3 +1,4 @@
+import { goBack } from '@/utils/navigation';
 import { Alert, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { BUSINESS_MVP_RULES, MVP_ASSUMPTIONS, RULES_VERSION } from '@/engine/index.ts';
@@ -11,7 +12,7 @@ export default function Settings() {
 
   return (
     <Screen scroll testID="settings-screen">
-      <Button size="sm" variant="ghost" title="‹ Back" className="self-start" onPress={() => router.back()} />
+      <Button size="sm" variant="ghost" title="‹ Back" className="self-start" onPress={() => goBack('/')} />
       <Text className="text-4xl font-black text-cream">House rules</Text>
       <Card className="border-2 border-amber-400">
         <Text className="text-base font-bold text-ink">⚠️ These are configured MVP assumptions — verify against your physical rulebook.</Text>

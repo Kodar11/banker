@@ -1,6 +1,6 @@
+import { goBack } from '@/utils/navigation';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
-import { router } from 'expo-router';
 import { buildingCount, netWorth, outstandingDebt, ownedBy } from '@/engine/index.ts';
 import { Button, Card, Label, Pill, Screen } from '@/components/ui';
 import type { GameView } from '@/features/game/useGameView';
@@ -19,7 +19,7 @@ export function PlayerView({ view, playerId }: { view: GameView; playerId: strin
     return (
       <Screen>
         <Text className="mt-10 text-center text-xl font-bold text-cream">Player not found.</Text>
-        <Button title="Back" onPress={() => router.back()} />
+        <Button title="Back" onPress={() => goBack(`/game/${view.snapshot.state.id}`)} />
       </Screen>
     );
   }
@@ -32,7 +32,7 @@ export function PlayerView({ view, playerId }: { view: GameView; playerId: strin
   return (
     <Screen scroll testID="player-screen">
       <View className="flex-row items-center justify-between">
-        <Button size="sm" variant="ghost" title="‹ Back" onPress={() => router.back()} />
+        <Button size="sm" variant="ghost" title="‹ Back" onPress={() => goBack(`/game/${view.snapshot.state.id}`)} />
         {player.status === 'BANKRUPT' ? <Pill tone="bad">Bankrupt</Pill> : null}
       </View>
       <Card>

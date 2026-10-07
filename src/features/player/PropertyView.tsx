@@ -1,5 +1,5 @@
+import { goBack } from '@/utils/navigation';
 import { Text, View } from 'react-native';
-import { router } from 'expo-router';
 import {
   computeRent,
   getDeed,
@@ -43,7 +43,7 @@ export function PropertyView({ view, propertyKey }: { view: GameView; propertyKe
 
   return (
     <Screen scroll testID="property-screen">
-      <Button size="sm" variant="ghost" title="‹ Back" onPress={() => router.back()} className="self-start" />
+      <Button size="sm" variant="ghost" title="‹ Back" onPress={() => goBack(`/game/${view.snapshot.state.id}`)} className="self-start" />
       <Card className="overflow-hidden p-0">
         <View style={{ backgroundColor: GROUP_COLORS[deed.group] }} className="items-center px-4 py-5">
           <Text className="text-xs font-extrabold uppercase tracking-[4px] text-white/80">{GROUP_LABELS[deed.group]}</Text>
