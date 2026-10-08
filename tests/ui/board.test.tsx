@@ -61,8 +61,9 @@ const EXPECTED_GROUPS: Record<string, string[]> = {
 /** Current on-screen top-left of a token (its Animated translate values). */
 function tokenXY(id: string) {
   const style = StyleSheet.flatten(screen.getByTestId(`board-token-${id}`).props.style) as { transform: Record<string, number>[] };
-  const [tx, ty, lift] = style.transform;
-  return { x: tx!.translateX!, y: ty!.translateY! + lift!.translateY! };
+  const [tx, ty] = style.transform;
+  const lift = (StyleSheet.flatten(screen.getByTestId(`board-token-lift-${id}`).props.style) as { transform: Record<string, number>[] }).transform[0]!;
+  return { x: tx!.translateX!, y: ty!.translateY! + lift.translateY! };
 }
 
 function expectedXY(boardSize: number, position: number, offset = { x: 0, y: 0 }) {
@@ -159,7 +160,7 @@ describe('board squares', () => {
     expect(screen.getAllByTestId('board-house-DELHI')).toHaveLength(1);
     expect(screen.getByTestId('board-hotel-CALCUTTA')).toBeTruthy();
     expect(screen.queryByTestId('board-house-CALCUTTA')).toBeNull();
-    expect(screen.getByTestId('board-mortgage-SHIMLA')).toHaveTextContent('M');
+    expect(screen.getByTestId('board-mortgage-SHIMLA')).toBeTruthy();
     expect(screen.getByTestId(`board-square-${positionOfProperty('SHIMLA')}`).props.accessibilityLabel).toMatch(/mortgaged/);
     expect(screen.queryByTestId('board-mortgage-MUMBAI')).toBeNull();
     expect(screen.queryByTestId('board-hotel-MUMBAI')).toBeNull();

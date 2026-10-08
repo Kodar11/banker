@@ -6,6 +6,7 @@ import { Button, PlayerBadge } from '@/components/ui';
 import { useGameStore } from '@/store/gameStore';
 import { formatINR } from '@/utils/currency';
 import { turnStatus } from './gameFocus';
+import { FIXED_HEIGHT_FONT_SCALE } from './layout';
 import type { GameView } from './useGameView';
 
 interface TurnActionBarProps {
@@ -66,7 +67,7 @@ export const TurnActionBar = memo(function TurnActionBar({ view, send, onChoose,
       case 'waiting':
         action = (
           <View className="min-h-[44px] min-w-[96px] items-center justify-center rounded-2xl border border-white/15 px-3" testID="turn-waiting">
-            <Text className="text-sm font-bold text-cream/80" numberOfLines={1}>
+            <Text className="text-sm font-bold text-cream/80" numberOfLines={1} maxFontSizeMultiplier={FIXED_HEIGHT_FONT_SCALE}>
               {primary.label}
             </Text>
           </View>
@@ -79,14 +80,14 @@ export const TurnActionBar = memo(function TurnActionBar({ view, send, onChoose,
     <View
       testID="turn-bar"
       style={{ height }}
-      className={`flex-row items-center gap-2.5 rounded-2xl px-3 ${mine ? 'border-2 border-saffron bg-felt-light' : 'border-2 border-transparent bg-felt-dark'}`}
+      className={`flex-row items-center gap-2.5 overflow-hidden rounded-2xl px-3 ${mine ? 'border-2 border-saffron bg-felt-light' : 'border-2 border-transparent bg-felt-dark'}`}
     >
       {current ? <PlayerBadge player={current} size={28} /> : null}
       <View className="flex-1" accessible accessibilityRole="header" accessibilityLabel={`${title}. ${detail}`}>
-        <Text className={`text-base font-black tracking-[2px] ${mine ? 'text-saffron' : 'text-cream'}`} numberOfLines={1} testID="turn-title">
+        <Text className={`text-base font-black tracking-[2px] ${mine ? 'text-saffron' : 'text-cream'}`} numberOfLines={1} maxFontSizeMultiplier={FIXED_HEIGHT_FONT_SCALE} testID="turn-title">
           {title}
         </Text>
-        <Text className="text-xs font-semibold leading-4 text-cream/75" numberOfLines={dense ? 1 : 2} testID="turn-detail">
+        <Text className="text-xs font-semibold leading-4 text-cream/75" numberOfLines={dense ? 1 : 2} maxFontSizeMultiplier={FIXED_HEIGHT_FONT_SCALE} testID="turn-detail">
           {detail}
         </Text>
       </View>

@@ -57,13 +57,13 @@ export const PlayersStrip = memo(function PlayersStrip({ view, onSelect }: { vie
           >
             <View className="flex-row items-center gap-1.5">
               <PlayerBadge player={p} size={16} testID={`player-badge-${p.name}`} />
-              <Text numberOfLines={1} className="shrink text-xs font-bold text-cream">
+              <Text numberOfLines={1} maxFontSizeMultiplier={1.3} className="shrink text-xs font-bold text-cream">
                 {/* On my own phone my chip just says "You" — unmistakable, and it never truncates. */}
                 {isMe ? 'You' : p.name}
               </Text>
               {isOnline ? null : <View className="h-1.5 w-1.5 rounded-full bg-stone-500" />}
             </View>
-            <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} className="text-[13px] font-extrabold text-cream">
+            <Text numberOfLines={1} maxFontSizeMultiplier={1.3} className="text-[13px] font-extrabold text-cream">
               {p.status === 'BANKRUPT' ? 'Bankrupt' : formatINR(p.balance)}
               {tag ? <Text className="text-[10px] font-bold text-amber-300"> {tag}</Text> : null}
             </Text>

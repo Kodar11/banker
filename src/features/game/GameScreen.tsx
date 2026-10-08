@@ -39,6 +39,9 @@ type Panel =
 /** The existing money/trade sheets, optionally prefilled with a player. */
 type Tool = { kind: 'pay'; to: string | null } | { kind: 'trade'; to: string | null } | { kind: 'loan' };
 
+/** The auction this device was last taken to: one push per auction, however many screens are mounted. */
+let openedAuctionId: string | null = null;
+
 /** Estimate for header + player strip until the first layout pass reports the measured height. */
 const EST_TOP = 82;
 
@@ -50,7 +53,8 @@ const EST_TOP = 82;
  */
 export function GameScreen({ view }: { view: GameView }) {
   const send = useGameAction();
-  const [panel, setPanel] = useState<Panel | null>(null);
+  /** The open sheet, and the auction (if any) that was running when it was opened. */
+  const [panelState, setPanelState] = useState<{ panel: Panel; auctionId: string | null } | null>(null);
   const [tool, setTool] = useState<Tool | null>(null);
   /** Who the pay / trade sheet was last opened for; changing it remounts (resets) that sheet. */
   const [preselect, setPreselect] = useState<{ pay: string | null; trade: string | null }>({ pay: null, trade: null });
@@ -59,6 +63,10 @@ export function GameScreen({ view }: { view: GameView }) {
   const ending = useGameStore((s) => s.pendingAction === 'END_GAME');
   const { state, events } = view.snapshot;
   const me = view.me;
+  const auctionId = state.auction?.status === 'OPEN' ? state.auction.id : null;
+  // A sheet would cover the auction screen, so a sheet opened before an auction started is closed by it.
+  const panel = panelState && (!auctionId || panelState.auctionId === auctionId) ? panelState.panel : null;
+  const setPanel = useCallback((next: Panel | null) => setPanelState(next ? { panel: next, auctionId } : null), [auctionId]);
 
   // ---- Measured layout -----------------------------------------------------
   const screenSize = useWindowDimensions();
@@ -81,20 +89,17 @@ export function GameScreen({ view }: { view: GameView }) {
   }, [view.isMyTurn]);
 
   // Take everyone to the auction when one opens.
-  const auctionId = state.auction?.status === 'OPEN' ? state.auction.id : null;
-  const shownAuction = useRef<string | null>(null);
   useEffect(() => {
-    if (auctionId && shownAuction.current !== auctionId && me && state.auction?.participantIds.includes(me.id)) {
-      shownAuction.current = auctionId;
-      setPanel(null); // a sheet would cover the auction screen
+    if (auctionId && openedAuctionId !== auctionId && me && state.auction?.participantIds.includes(me.id)) {
+      openedAuctionId = auctionId;
       haptics.warning();
       router.push(`/auction/${auctionId}`);
     }
   }, [auctionId, me, state.auction?.participantIds]);
 
   // ---- Navigation between sheets (read-only until an existing flow is opened) ----
-  const openSquare = useCallback((index: number) => setPanel({ kind: 'square', index }), []);
-  const openPlayer = useCallback((id: string) => setPanel({ kind: 'player', id }), []);
+  const openSquare = useCallback((index: number) => setPanel({ kind: 'square', index }), [setPanel]);
+  const openPlayer = useCallback((id: string) => setPanel({ kind: 'player', id }), [setPanel]);
   const openTool = (next: Tool) => {
     setPanel(null);
     if (next.kind !== 'loan') setPreselect((p) => ({ ...p, [next.kind]: next.to }));
@@ -303,7 +308,13 @@ export function GameScreen({ view }: { view: GameView }) {
         </View>
         <TurnActionBar view={view} send={send} dense={plan.dense} height={plan.turnBarHeight} onChoose={() => setPanel({ kind: 'decision' })} />
 
-        <View testID="board-area" style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        {/*
+          The board has ONE size: the planned square. Its slot may grow to absorb spare height but can
+          never be shorter than the board. (`flex: 1` here meant flex-basis 0: unlike CSS, Yoga lets
+          such a box collapse below its content, so on a tight Android screen the slot shrank and the
+          board was painted over the turn bar and the contextual card. Web hid this.)
+        */}
+        <View testID="board-area" style={{ flexGrow: 1, flexShrink: 0, minHeight: plan.board, alignItems: 'center', justifyContent: 'center' }}>
           <ClassicBoard state={state} size={plan.board} onSquarePress={openSquare} onTokenPress={openPlayer} />
         </View>
 

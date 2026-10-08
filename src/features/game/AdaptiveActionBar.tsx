@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { ACTION_BUTTON_HEIGHT, ACTION_GAP, type ActionLayout } from './layout';
+import { ACTION_BUTTON_HEIGHT, ACTION_GAP, FIXED_HEIGHT_FONT_SCALE, type ActionLayout } from './layout';
 
 export type BarActionKey = 'properties' | 'trade' | 'pay' | 'loan' | 'auction' | 'more';
 
@@ -15,7 +15,7 @@ export interface BarAction {
 }
 
 /** Shown directly when space is tight; everything else lives in More. */
-export const COMPACT_ACTIONS: readonly BarActionKey[] = ['pay', 'loan', 'more'];
+export const COMPACT_ACTIONS: readonly BarActionKey[] = ['trade', 'loan', 'more'];
 
 /**
  * Secondary gameplay utilities — not app navigation. Six actions in one row on
@@ -55,14 +55,13 @@ function ActionButton({ action, layout }: { action: BarAction; layout: ActionLay
         style={{ height: ACTION_BUTTON_HEIGHT[layout], gap: twoLines ? 1 : 0 }}
         className={`items-center justify-center rounded-xl border border-white/20 bg-white/10 px-0.5 active:bg-white/20 ${action.disabled ? 'opacity-40' : ''}`}
       >
-        <Text className={twoLines ? 'text-lg leading-6' : 'text-base leading-5'} accessible={false}>
+        <Text className={twoLines ? 'text-lg leading-6' : 'text-base leading-5'} accessible={false} allowFontScaling={false}>
           {action.icon}
         </Text>
         <Text
           className={`text-center font-bold text-cream ${twoLines ? 'text-[10px] leading-[12px]' : 'text-xs leading-4'}`}
           numberOfLines={twoLines ? 2 : 1}
-          adjustsFontSizeToFit
-          minimumFontScale={0.8}
+          maxFontSizeMultiplier={FIXED_HEIGHT_FONT_SCALE}
         >
           {action.label}
         </Text>

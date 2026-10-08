@@ -50,6 +50,12 @@ const Token = memo(function Token({ player, position, offset, geo, size, isCurre
     const c = squareCenter(geo, index);
     return { x: c.x + off.x - size / 2, y: c.y + off.y - size / 2 };
   };
+  /** Presentation only: put the token exactly on the authoritative square, no animation. */
+  const snapTo = (index: number) => {
+    xy.setValue(at(index));
+    lift.setValue(0);
+    settled.current = index;
+  };
   const [xy] = useState(() => new Animated.ValueXY(at(position)));
   const [lift] = useState(() => new Animated.Value(0));
   /** Last authoritative square the token fully reached. */
@@ -73,16 +79,20 @@ const Token = memo(function Token({ player, position, offset, geo, size, isCurre
     const from = settled.current;
     const target = at(position);
     const steps = forwardSteps(from, position);
+    // Nothing sensible to animate (reduced motion, or a board that has no size yet): just be there.
+    if (reduceMotion || !Number.isFinite(target.x) || !Number.isFinite(target.y)) {
+      snapTo(position);
+      return;
+    }
     const finish = () => {
       if (running.current !== anim) return; // superseded; the newer animation owns the token
-      xy.setValue(target);
-      lift.setValue(0);
-      settled.current = position;
       running.current = null;
+      snapTo(position);
     };
     let anim: Animated.CompositeAnimation;
-    if (steps === 0 || reduceMotion) {
-      anim = Animated.timing(xy, { toValue: target, duration: steps === 0 ? 160 : 0, useNativeDriver: tokenAnimation.useNativeDriver });
+    if (steps === 0) {
+      // Same square, new spot in the cluster (someone arrived or left).
+      anim = Animated.timing(xy, { toValue: target, duration: 160, useNativeDriver: tokenAnimation.useNativeDriver });
     } else if (steps > MAX_HOP_STEPS) {
       anim = Animated.timing(xy, { toValue: target, duration: 450, easing: Easing.inOut(Easing.cubic), useNativeDriver: tokenAnimation.useNativeDriver });
     } else {
@@ -126,11 +136,14 @@ const Token = memo(function Token({ player, position, offset, geo, size, isCurre
         width: size,
         height: size,
         zIndex: isCurrent ? 2 : 1,
-        transform: [{ translateX: xy.x }, { translateY: xy.y }, { translateY: lift }],
+        transform: [{ translateX: xy.x }, { translateY: xy.y }],
       }}
     >
-      <View
+      {/* The hop's lift lives on its own view so no view ever carries the same transform key twice. */}
+      <Animated.View
+        testID={`board-token-lift-${player.id}`}
         style={{
+          transform: [{ translateY: lift }],
           width: size,
           height: size,
           borderRadius: size / 2,
@@ -146,8 +159,10 @@ const Token = memo(function Token({ player, position, offset, geo, size, isCurre
           elevation: 3,
         }}
       >
-        <Text style={{ color: c.onColor, fontSize: size * 0.48, fontWeight: '900', lineHeight: size * 0.6 }}>{playerInitial(player.name)}</Text>
-      </View>
+        <Text allowFontScaling={false} style={{ color: c.onColor, fontSize: size * 0.48, fontWeight: '900', lineHeight: size * 0.6, includeFontPadding: false }}>
+          {playerInitial(player.name)}
+        </Text>
+      </Animated.View>
       {isCurrent ? (
         <View
           testID={`board-token-current-${player.id}`}
@@ -180,7 +195,7 @@ const Token = memo(function Token({ player, position, offset, geo, size, isCurre
 });
 
 export function tokenSize(geo: BoardGeometry): number {
-  return Math.min(18, Math.max(10, geo.unit * 0.44));
+  return Math.min(18, Math.max(9, geo.cell * 0.4));
 }
 
 /** All tokens, positioned from authoritative player positions. Bankrupt players leave the board. */

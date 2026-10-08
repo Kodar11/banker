@@ -17,6 +17,12 @@ export const SECTION_GAP = { normal: 8, dense: 6 } as const;
 export const TURN_BAR_HEIGHT = { normal: 68, dense: 56 } as const;
 export const CONTEXT_CARD_HEIGHT = { normal: 76, dense: 62 } as const;
 export const SCREEN_PADDING = { top: 4, bottom: 8 } as const;
+/**
+ * The turn bar, contextual card and action buttons have fixed heights (so the
+ * board never jumps). Their text may follow the phone's font-size setting only
+ * this far — beyond it the text would be cut off or collide inside the fixed box.
+ */
+export const FIXED_HEIGHT_FONT_SCALE = 1.15;
 /** Gap between action buttons. */
 export const ACTION_GAP = 6;
 

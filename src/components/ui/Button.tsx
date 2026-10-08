@@ -53,8 +53,11 @@ export function Button({
       accessibilityLabel={subtitle ? `${title}, ${subtitle}` : title}
       accessibilityHint={accessibilityHint}
       accessibilityState={{ disabled: inactive, busy: loading }}
-      style={({ pressed }) => ({ transform: [{ scale: pressed && !inactive ? 0.97 : 1 }] })}
-      className={`items-center justify-center rounded-2xl ${pad} ${v.box} ${inactive ? 'opacity-50' : ''} ${className}`}
+      // Press feedback is a class that is ALWAYS present. Two NativeWind-on-native traps are avoided here:
+      // a function `style` is silently ignored, and a class that needs a runtime "upgrade" (transforms,
+      // shadows, animations) appearing after the first render makes NativeWind throw a
+      // "Couldn't find a navigation context" render error in development builds / Expo Go.
+      className={`items-center justify-center rounded-2xl active:opacity-80 ${pad} ${v.box} ${inactive ? 'opacity-50' : ''} ${className}`}
     >
       {loading ? (
         <ActivityIndicator color={v.spinner} />

@@ -27,13 +27,20 @@ export function GameGate({ gameId, area, children }: { gameId: string; area: Are
     if (area === 'game' && status === 'WAITING') router.replace(`/lobby/${gameId}`);
   }, [area, status, gameId]);
 
+  // A route left over from ANOTHER game (this phone played before, then joined a new table) must
+  // never strand the player on "Not in this game": send it to the game this phone is actually in.
+  const elsewhere = hydrated && !!session && session.gameId !== gameId ? session.gameId : null;
+  useEffect(() => {
+    if (elsewhere && area !== 'any') router.replace(area === 'lobby' ? `/lobby/${elsewhere}` : `/game/${elsewhere}`);
+  }, [elsewhere, area]);
+
   const leave = async () => {
     await clearSession();
     useGameStore.getState().reset(null);
     router.replace('/');
   };
 
-  if (!hydrated) return <LoadingState message="Loading…" />;
+  if (!hydrated || (elsewhere && area !== 'any')) return <LoadingState message="Loading…" />;
   if (!belongs) {
     return (
       <ErrorState

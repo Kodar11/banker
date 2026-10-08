@@ -54,6 +54,8 @@ export function useEnterGame() {
       const store = useGameStore.getState();
       store.reset(res.gameId);
       store.applySnapshot(res.snapshot);
+      // Screens of a previous game must not survive underneath the new one.
+      if (router.canDismiss()) router.dismissAll();
       router.replace(`/lobby/${res.gameId}`);
     },
     [setSession],

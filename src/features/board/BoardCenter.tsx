@@ -37,10 +37,10 @@ export const BoardCenter = memo(function BoardCenter({ x, size }: { x: number; s
         </Svg>
       </View>
       <View style={{ height: 1, width: size * 0.42, backgroundColor: COLORS.boardEdge, marginBottom: size * 0.035 }} />
-      <Text style={{ fontSize: size * 0.105, fontWeight: '900', color: COLORS.felt, letterSpacing: size * 0.012 }} numberOfLines={1}>
+      <Text style={{ fontSize: size * 0.105, fontWeight: '900', color: COLORS.felt, letterSpacing: size * 0.012, includeFontPadding: false }} numberOfLines={1} allowFontScaling={false}>
         BUSINESS
       </Text>
-      <Text style={{ fontSize: size * 0.034, fontWeight: '700', color: '#8A7A55', letterSpacing: size * 0.012, marginTop: 2 }}>CLASSIC · INDIA</Text>
+      <Text allowFontScaling={false} numberOfLines={1} style={{ includeFontPadding: false, fontSize: size * 0.034, fontWeight: '700', color: '#8A7A55', letterSpacing: size * 0.012, marginTop: 2 }}>CLASSIC · INDIA</Text>
       <View style={{ height: 1, width: size * 0.42, backgroundColor: COLORS.boardEdge, marginTop: size * 0.035 }} />
     </View>
   );

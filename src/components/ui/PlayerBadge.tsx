@@ -30,7 +30,7 @@ export const PlayerBadge = memo(function PlayerBadge({ player, size = 22, testID
         borderColor: 'rgba(255,255,255,0.85)',
       }}
     >
-      <Text style={{ color: c.onColor, fontSize: size * 0.5, fontWeight: '900', lineHeight: size * 0.62 }}>{playerInitial(player.name)}</Text>
+      <Text allowFontScaling={false} style={{ color: c.onColor, fontSize: size * 0.5, fontWeight: '900', lineHeight: size * 0.62, includeFontPadding: false }}>{playerInitial(player.name)}</Text>
     </View>
   );
 });

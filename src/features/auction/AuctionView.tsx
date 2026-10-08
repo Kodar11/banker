@@ -1,7 +1,6 @@
 import { goBack } from '@/utils/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
-import { router } from 'expo-router';
 import { getDeed, minimumNextBid } from '@/engine/index.ts';
 import { Button, Card, ConnectionBanner, Label, Pill, Screen } from '@/components/ui';
 import { PROPERTY_GROUP_THEME } from '@/constants/theme';
@@ -62,7 +61,10 @@ export function AuctionView({ view, auctionId }: { view: GameView; auctionId: st
 
   useEffect(() => {
     if (auction && auction.status === 'CLOSED') {
-      const t = setTimeout(() => router.replace(`/game/${state.id}`), 2500);
+      // Go BACK to the game screen that opened this auction. Replacing this route with a new
+      // /game screen left the old one mounted underneath: every auction added another live game
+      // screen (board, animations, and its own "open the auction" push).
+      const t = setTimeout(() => goBack(`/game/${state.id}`), 2500);
       return () => clearTimeout(t);
     }
   }, [auction, state.id]);
@@ -72,7 +74,7 @@ export function AuctionView({ view, auctionId }: { view: GameView; auctionId: st
       <Screen>
         <Card className="mt-10 items-center">
           <Text className="text-2xl font-bold text-ink">This auction is over.</Text>
-          <Button className="mt-4 self-stretch" title="Back to game" onPress={() => router.replace(`/game/${state.id}`)} />
+          <Button className="mt-4 self-stretch" title="Back to game" onPress={() => goBack(`/game/${state.id}`)} />
         </Card>
       </Screen>
     );

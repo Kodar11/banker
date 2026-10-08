@@ -335,14 +335,15 @@ describe('responsive layout (measured, not device presets)', () => {
     expect(style.height).toBe(board);
     if (mode === 'compact') {
       // Only the most used actions stay; the rest are in More.
-      expect(screen.getByTestId('open-pay')).toBeTruthy();
+      // Transfer + Bank / Loan + More stay; the rest (Pay Money included) are in More.
+      expect(screen.getByTestId('open-trade')).toBeTruthy();
       expect(screen.getByTestId('open-loan')).toBeTruthy();
-      expect(screen.queryByTestId('open-trade')).toBeNull();
+      expect(screen.queryByTestId('open-pay')).toBeNull();
       expect(screen.queryByTestId('open-properties')).toBeNull();
       await fireEvent.press(screen.getByTestId('open-more'));
-      for (const id of ['more-properties', 'more-trade', 'more-auction']) expect(screen.getByTestId(id)).toBeTruthy();
-      await fireEvent.press(screen.getByTestId('more-trade'));
-      expect(screen.getByTestId('trade-sheet')).toBeTruthy();
+      for (const id of ['more-properties', 'more-pay', 'more-auction']) expect(screen.getByTestId(id)).toBeTruthy();
+      await fireEvent.press(screen.getByTestId('more-pay'));
+      expect(screen.getByTestId('pay-sheet')).toBeTruthy();
     } else {
       for (const id of ['open-properties', 'open-trade', 'open-pay', 'open-loan', 'open-auction', 'open-more']) expect(screen.getByTestId(id)).toBeTruthy();
     }

@@ -14,6 +14,9 @@ import { useSessionStore } from '@/store/sessionStore';
  * so whenever the navigator had no URL-derived state (cold start, reload) its
  * first route was property/[key] with no key → "Unknown property".
  */
+/** A screen that throws while rendering shows a recoverable error screen; the game session is kept. */
+export { CrashScreen as ErrorBoundary } from '@/components/ui/CrashScreen';
+
 export const unstable_settings = {
   anchor: 'index',
 };

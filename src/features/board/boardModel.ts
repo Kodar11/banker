@@ -70,35 +70,20 @@ export function buildBoardSpaces(state: Pick<GameState, 'players' | 'properties'
 }
 
 // ---------------------------------------------------------------------------
-// Geometry — where each cyclic board index sits on the square board.
-// Row 1 runs along the bottom (Start at bottom-right), row 2 up the left side,
-// row 3 along the top, row 4 down the right side, like the physical board.
+// Geometry — a deterministic 10 × 10 grid.
+//
+// The board is GRID × GRID equal cells; the 36 squares are the cells on its
+// perimeter (10 along the top, 10 along the bottom, 8 on each side between
+// them). Every square is exactly cell × cell and its place comes ONLY from its
+// canonical index — never from flex, percentages or its content.
+//
+// Canonical order (the engine's BOARD_CYCLE, untouched) → visual place, as on
+// the physical board: Start in the bottom-right corner, row 1 runs left along
+// the bottom to Jail, row 2 up the left side to the Club, row 3 right along the
+// top to the Rest House, row 4 down the right side back to Start.
 // ---------------------------------------------------------------------------
 
 export type BoardSide = 'bottom' | 'left' | 'top' | 'right';
-const SIDES: readonly BoardSide[] = ['bottom', 'left', 'top', 'right'];
-
-/** Corner squares are this many times deeper than a side square is wide. */
-export const CORNER_RATIO = 2.1;
-
-export interface SquareSlot {
-  index: number;
-  side: BoardSide;
-  isCorner: boolean;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
-export interface BoardGeometry {
-  size: number;
-  /** Width of a side square along its edge. */
-  unit: number;
-  /** Corner size = depth of every side square. */
-  corner: number;
-  slots: SquareSlot[];
-}
 
 /** Squares between two corners on each side (derived from BOARD_ROWS; every side must match for a square board). */
 export const SQUARES_PER_SIDE = (() => {
@@ -107,57 +92,73 @@ export const SQUARES_PER_SIDE = (() => {
   return [...lengths][0]!;
 })();
 
-export function boardGeometry(size: number): BoardGeometry {
-  const n = SQUARES_PER_SIDE;
-  const unit = size / (n + 2 * CORNER_RATIO);
-  const c = unit * CORNER_RATIO;
-  const far = size - c;
-  const slots: SquareSlot[] = [];
-  BOARD_ROWS.forEach((row, r) => {
-    const side = SIDES[r]!;
-    const first = r * (n + 1);
-    // Corner that starts this row.
-    const corner = { bottom: [far, far], left: [0, far], top: [0, 0], right: [far, 0] }[side] as [number, number];
-    slots.push({ index: first, side, isCorner: true, x: corner[0], y: corner[1], width: c, height: c });
-    for (let j = 0; j < row.length - 2; j++) {
-      const index = first + 1 + j;
-      if (side === 'bottom') slots.push({ index, side, isCorner: false, x: far - (j + 1) * unit, y: far, width: unit, height: c });
-      if (side === 'left') slots.push({ index, side, isCorner: false, x: 0, y: far - (j + 1) * unit, width: c, height: unit });
-      if (side === 'top') slots.push({ index, side, isCorner: false, x: c + j * unit, y: 0, width: unit, height: c });
-      if (side === 'right') slots.push({ index, side, isCorner: false, x: far, y: c + j * unit, width: c, height: unit });
-    }
-  });
-  if (slots.length !== BOARD_SIZE) throw new Error(`Board geometry has ${slots.length} squares, board has ${BOARD_SIZE}`);
-  return { size, unit, corner: c, slots };
+/** Cells along one edge of the board, corners included. */
+export const GRID = SQUARES_PER_SIDE + 2;
+
+/** Grid cell (column, row; 0,0 = top-left) of a canonical board index. Pure renderer mapping. */
+export function gridCellOf(index: number): { col: number; row: number; side: BoardSide } {
+  const last = GRID - 1;
+  const i = ((index % BOARD_SIZE) + BOARD_SIZE) % BOARD_SIZE;
+  if (i <= last) return { col: last - i, row: last, side: 'bottom' }; // Start … Jail
+  if (i < 2 * last) return { col: 0, row: last - (i - last), side: 'left' };
+  if (i <= 3 * last) return { col: i - 2 * last, row: 0, side: 'top' }; // Club … Rest House
+  return { col: last, row: i - 3 * last, side: 'right' };
 }
+
+export interface SquareSlot {
+  index: number;
+  /** The board edge this cell lies on (corners belong to the bottom / top rows). */
+  side: BoardSide;
+  isCorner: boolean;
+  col: number;
+  row: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface BoardGeometry {
+  size: number;
+  /** Side of every cell: size / GRID. */
+  cell: number;
+  slots: SquareSlot[];
+}
+
+/**
+ * THE board layout: canonical index → an absolutely positioned cell × cell
+ * square inside a `size` × `size` board. Pure; everything on the board (squares,
+ * centre, tokens) is placed from this and nothing else.
+ */
+export function calculateBoardLayout(size: number): BoardGeometry {
+  if (BOARD_SIZE !== 4 * (GRID - 1)) throw new Error(`A ${GRID}×${GRID} grid has ${4 * (GRID - 1)} perimeter cells, the board has ${BOARD_SIZE}`);
+  const cell = size / GRID;
+  const last = GRID - 1;
+  const slots: SquareSlot[] = Array.from({ length: BOARD_SIZE }, (_, index) => {
+    const { col, row, side } = gridCellOf(index);
+    const isCorner = (col === 0 || col === last) && (row === 0 || row === last);
+    return { index, side, isCorner, col, row, x: col * cell, y: row * cell, width: cell, height: cell };
+  });
+  return { size, cell, slots };
+}
+
+/** @deprecated name kept for existing callers — same function. */
+export const boardGeometry = calculateBoardLayout;
 
 /** Thickness of the colour band on a property square's inner edge. */
 export function bandThickness(geo: BoardGeometry): number {
-  return Math.max(6, geo.corner * 0.18);
+  return Math.max(4, geo.cell * 0.16);
 }
 
-/** Where tokens stand on a square: the centre of its content area (the colour band excluded). */
+/** Where tokens stand: the centre of the square's cell. */
 export function squareCenter(geo: BoardGeometry, index: number): { x: number; y: number } {
   const s = geo.slots[((index % BOARD_SIZE) + BOARD_SIZE) % BOARD_SIZE]!;
-  const cx = s.x + s.width / 2;
-  const cy = s.y + s.height / 2;
-  if (s.isCorner) return { x: cx, y: cy };
-  const shift = bandThickness(geo) / 2;
-  switch (s.side) {
-    case 'bottom':
-      return { x: cx, y: cy + shift };
-    case 'top':
-      return { x: cx, y: cy - shift };
-    case 'left':
-      return { x: cx - shift, y: cy };
-    case 'right':
-      return { x: cx + shift, y: cy };
-  }
+  return { x: s.x + s.width / 2, y: s.y + s.height / 2 };
 }
 
 /** Offsets that keep up to 8 tokens on one square readable (never fully overlapping). */
 export function clusterOffsets(count: number, token: number): { x: number; y: number }[] {
-  const d = token * 0.55;
+  const d = token * 0.5;
   switch (count) {
     case 0:
       return [];
