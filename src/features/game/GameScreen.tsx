@@ -20,7 +20,7 @@ import { AdaptiveActionBar, type BarAction } from './AdaptiveActionBar';
 import { ContextualCard } from './ContextualCard';
 import { EventFeed, FinishedView, PlayersStrip, UndoBanner } from './GamePanels';
 import { needsDecision, pickContext, type ContextTarget } from './gameFocus';
-import { planScreenLayout, SCREEN_PADDING, screenGutter } from './layout';
+import { planScreenLayout, SCREEN_PADDING, screenGutter, SECTION_GAP } from './layout';
 import { MoreActions, type MoreItem } from './MoreActions';
 import { TurnActionBar } from './TurnActionBar';
 import { useGameAction } from './useGameAction';
@@ -119,20 +119,20 @@ export function GameScreen({ view }: { view: GameView }) {
       state.trades.some((t) => t.status === 'PENDING' && (t.toPlayerId === me.id || t.fromPlayerId === me.id)));
 
   const barActions: BarAction[] = [
-    { key: 'properties', icon: '🏘️', label: 'My Properties', testID: 'open-properties', onPress: () => me && openPlayer(me.id) },
-    { key: 'trade', icon: '🔄', label: 'Transfer', testID: 'open-trade', hint: 'Offer a trade of properties and money', onPress: () => openTool({ kind: 'trade', to: null }) },
-    { key: 'pay', icon: '💸', label: 'Pay Money', testID: 'open-pay', onPress: () => openTool({ kind: 'pay', to: null }) },
-    { key: 'loan', icon: '🏦', label: 'Bank / Loan', testID: 'open-loan', onPress: () => openTool({ kind: 'loan' }) },
+    { key: 'properties', icon: 'properties', label: 'My Properties', testID: 'open-properties', onPress: () => me && openPlayer(me.id) },
+    { key: 'trade', icon: 'transfer', label: 'Transfer', testID: 'open-trade', hint: 'Offer a trade of properties and money', onPress: () => openTool({ kind: 'trade', to: null }) },
+    { key: 'pay', icon: 'pay', label: 'Pay Money', testID: 'open-pay', onPress: () => openTool({ kind: 'pay', to: null }) },
+    { key: 'loan', icon: 'bank', label: 'Bank / Loan', testID: 'open-loan', onPress: () => openTool({ kind: 'loan' }) },
     {
       key: 'auction',
-      icon: '🔨',
+      icon: 'auction',
       label: 'Auction',
       testID: 'open-auction',
       disabled: !auctionId,
       hint: auctionId ? 'Open the live auction' : 'Starts when a player declines a property',
       onPress: () => auctionId && router.push(`/auction/${auctionId}`),
     },
-    { key: 'more', icon: '⋯', label: 'More', testID: 'open-more', hint: 'Mortgage, undo, pause, log and rules', onPress: () => setPanel({ kind: 'more' }) },
+    { key: 'more', icon: 'more', label: 'More', testID: 'open-more', hint: 'Mortgage, undo, pause, log and rules', onPress: () => setPanel({ kind: 'more' }) },
   ];
 
   const moreItems: MoreItem[] = [];
@@ -298,7 +298,8 @@ export function GameScreen({ view }: { view: GameView }) {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ flexGrow: 1, paddingHorizontal: gutter, paddingTop: SCREEN_PADDING.top, paddingBottom: SCREEN_PADDING.bottom, gap: plan.gap }}
       >
-        <View testID="game-top" onLayout={onTopLayout} style={{ gap: plan.gap }}>
+        {/* A fixed gap in here: this block's measured height feeds the plan, so it must not depend on the plan's spare height. */}
+        <View testID="game-top" onLayout={onTopLayout} style={{ gap: SECTION_GAP[plan.dense ? 'dense' : 'normal'] }}>
           <ConnectionBanner />
           <View className="flex-row items-baseline justify-between px-1" testID="game-header" accessibilityRole="header">
             <Text className="text-lg font-black tracking-[3px] text-cream">BUSINESS</Text>
@@ -309,18 +310,20 @@ export function GameScreen({ view }: { view: GameView }) {
         <TurnActionBar view={view} send={send} dense={plan.dense} height={plan.turnBarHeight} onChoose={() => setPanel({ kind: 'decision' })} />
 
         {/*
-          The board has ONE size: the planned square. Its slot may grow to absorb spare height but can
-          never be shorter than the board. (`flex: 1` here meant flex-basis 0: unlike CSS, Yoga lets
-          such a box collapse below its content, so on a tight Android screen the slot shrank and the
-          board was painted over the turn bar and the contextual card. Web hid this.)
+          The board has ONE size: the planned square, and its slot is exactly that tall — no slack
+          above or below it. (A growing slot put a tall phone's spare height around the board as two
+          empty bands; a `flex: 1` slot let Yoga collapse it below the board on a tight screen.)
         */}
-        <View testID="board-area" style={{ flexGrow: 1, flexShrink: 0, minHeight: plan.board, alignItems: 'center', justifyContent: 'center' }}>
+        <View testID="board-area" style={{ flexShrink: 0, height: plan.board, alignItems: 'center' }}>
           <ClassicBoard state={state} size={plan.board} onSquarePress={openSquare} onTokenPress={openPlayer} />
         </View>
 
         <ContextualCard item={context} height={plan.contextHeight} onAction={openContext} onDismiss={setDismissedEvent} />
 
-        <AdaptiveActionBar layout={plan.actions} actions={playing ? barActions : barActions.filter((a) => a.key === 'more')} />
+        {/* Any height the sections could not use sits here, so the actions stay at the bottom of the screen. */}
+        <View testID="action-area" style={{ flexGrow: 1, justifyContent: 'flex-end' }}>
+          <AdaptiveActionBar layout={plan.actions} buttonHeight={plan.actionButtonHeight} actions={playing ? barActions : barActions.filter((a) => a.key === 'more')} />
+        </View>
       </ScrollView>
 
       <Sheet visible={panelOpen} title={panelTitle} onClose={() => setPanel(null)} testID={panel ? `sheet-${panel.kind}` : undefined}>

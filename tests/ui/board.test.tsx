@@ -13,7 +13,7 @@ import {
   PROPERTY_PURPLE,
   playerColor,
 } from '@/constants/theme';
-import { boardGeometry, buildBoardSpaces, clusterOffsets, squareCenter } from '@/features/board/boardModel';
+import { boardGeometry, buildBoardSpaces, clusterOffsets, tokenAnchor } from '@/features/board/boardModel';
 import { BOARD_BORDER, BOARD_FRAME, ClassicBoard } from '@/features/board/ClassicBoard';
 import { tokenAnimation, tokenSize } from '@/features/board/BoardTokens';
 import { PlayersStrip } from '@/features/game/GamePanels';
@@ -69,7 +69,7 @@ function tokenXY(id: string) {
 function expectedXY(boardSize: number, position: number, offset = { x: 0, y: 0 }) {
   const geo = boardGeometry(boardSize - 2 * (BOARD_FRAME + BOARD_BORDER));
   const t = tokenSize(geo);
-  const c = squareCenter(geo, position);
+  const c = tokenAnchor(geo, position);
   return { x: c.x + offset.x - t / 2, y: c.y + offset.y - t / 2 };
 }
 
@@ -134,8 +134,14 @@ describe('board squares', () => {
     await render(<ClassicBoard state={f.state} size={360} />);
     const orange = playerColor(player(f, 'Tanmay')).color;
     expect(StyleSheet.flatten(screen.getByTestId('board-owner-strip-MUMBAI').props.style).backgroundColor).toBe(orange);
-    // No owner stamp; name and price stay visible.
+    // A thin line, not a block — and no owner stamp, initial or label anywhere on the card.
+    const strip = StyleSheet.flatten(screen.getByTestId('board-owner-strip-MUMBAI').props.style);
+    expect(Math.min(strip.width, strip.height)).toBeLessThan(4);
     expect(screen.queryByTestId('board-owner-MUMBAI')).toBeNull();
+    const card = within(screen.getByTestId(`board-square-${positionOfProperty('MUMBAI')}`));
+    expect(card.getAllByText(/\S/).map((t) => String(t.props.children))).toEqual(['Mumbai', '₹8,500']);
+    expect(card.queryByText('T')).toBeNull();
+    expect(card.queryByText(/Tanmay/)).toBeNull();
     expect(screen.getByTestId('board-price-MUMBAI')).toHaveTextContent('₹8,500');
     expect(screen.getByTestId(`board-square-${positionOfProperty('MUMBAI')}`)).toHaveTextContent(/Mumbai/);
     // Card keeps its group identity.
@@ -192,7 +198,7 @@ describe('player tokens', () => {
     await render(<ClassicBoard state={f.state} size={360} />);
     const geo = boardGeometry(360 - 2 * (BOARD_FRAME + BOARD_BORDER));
     expect(tokenXY(f.ids.Tanmay!)).toEqual(expectedXY(360, positionOfProperty('MUMBAI')));
-    const offsets = clusterOffsets(3, tokenSize(geo));
+    const offsets = clusterOffsets(3, tokenSize(geo), geo.slots[positionOfSpecial('JAIL')]!.parts.tokens.width);
     const jailed = ['Shamin', 'Rohit', 'Aman'].map((n) => tokenXY(f.ids[n]!));
     jailed.forEach((xy, i) => expect(xy).toEqual(expectedXY(360, positionOfSpecial('JAIL'), offsets[i])));
     // Pairwise distinct positions, at least ~a token apart on one axis.
@@ -206,9 +212,40 @@ describe('player tokens', () => {
     expect(screen.queryByTestId(`board-token-current-${f.ids.Aman}`)).toBeNull();
   });
 
+  it('are plain coloured pieces: the player colour, no initial, no name, no text at all', async () => {
+    const f = new Fixture(['Tanmay', 'Shamin']);
+    await render(<ClassicBoard state={f.state} size={360} onSquarePress={jest.fn()} onTokenPress={jest.fn()} />);
+    expect(within(screen.getByTestId('board-tokens')).queryAllByText(/[\s\S]/)).toHaveLength(0);
+    for (const name of ['Tanmay', 'Shamin']) {
+      const piece = StyleSheet.flatten(screen.getByTestId(`board-token-lift-${f.ids[name]}`).props.style);
+      expect(piece.backgroundColor).toBe(playerColor(player(f, name)).color);
+      expect(piece.borderRadius).toBe(piece.width / 2); // a circle
+      // Still identifiable without colour: the token's label names its player.
+      expect(screen.getByTestId(`board-token-press-${f.ids[name]}`).props.accessibilityLabel).toBe(`${name}'s token`);
+    }
+  });
+
+  it('stand inside their own square, in its token lane', async () => {
+    const f = new Fixture(['Tanmay', 'Shamin']);
+    player(f, 'Tanmay').position = positionOfProperty('SRINAGAR');
+    player(f, 'Shamin').position = positionOfProperty('DARJEELING');
+    await render(<ClassicBoard state={f.state} size={360} />);
+    const geo = boardGeometry(360 - 2 * (BOARD_FRAME + BOARD_BORDER));
+    const t = tokenSize(geo);
+    for (const name of ['Tanmay', 'Shamin']) {
+      const slot = geo.slots[player(f, name).position]!;
+      const lane = slot.parts.tokens;
+      const { x, y } = tokenXY(f.ids[name]!);
+      expect(x).toBeGreaterThanOrEqual(slot.x + lane.left);
+      expect(y).toBeGreaterThanOrEqual(slot.y + lane.top);
+      expect(x + t).toBeLessThanOrEqual(slot.x + lane.left + lane.width);
+      expect(y + t).toBeLessThanOrEqual(slot.y + lane.top + lane.height);
+    }
+  });
+
   it('cluster offsets keep up to 8 tokens apart', () => {
     for (let n = 1; n <= 8; n++) {
-      const pts = clusterOffsets(n, 14);
+      const pts = clusterOffsets(n, 14, 40);
       expect(pts).toHaveLength(n);
       expect(new Set(pts.map((p) => `${p.x},${p.y}`)).size).toBe(n);
     }

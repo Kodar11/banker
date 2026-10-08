@@ -295,7 +295,8 @@ describe('contextual card', () => {
 describe('responsive layout (measured, not device presets)', () => {
   const TOP = 80; // measured header + player strip
   const cases: [number, number, 'row' | 'grid' | 'compact'][] = [
-    [412, 840, 'row'],
+    [412, 840, 'grid'],
+    [412, 750, 'row'],
     [390, 763, 'grid'],
     [360, 730, 'grid'],
     [360, 640, 'compact'],
@@ -314,6 +315,32 @@ describe('responsive layout (measured, not device presets)', () => {
     if (mode !== 'compact') expect(plan.board).toBeGreaterThanOrEqual(width - 2 * gutter - 8); // full-width board with all six actions
   });
 
+  it('a tall screen spends its spare height on the sections — the board slot never gets slack above or below it', async () => {
+    const snug = planScreenLayout({ width: 412, height: 764, topHeight: TOP });
+    const tall = planScreenLayout({ width: 412, height: 915, topHeight: TOP });
+    expect(tall.board).toBe(snug.board); // already as wide as the screen
+    expect(tall.actions).toBe('grid');
+    expect(tall.contextHeight).toBeGreaterThan(snug.contextHeight);
+    expect(tall.actionButtonHeight).toBeGreaterThan(snug.actionButtonHeight);
+    expect(tall.gap).toBeGreaterThan(snug.gap);
+    expect(tall.gap).toBeLessThanOrEqual(16); // comfortable, never a blank band
+    const used = (p: typeof tall) => SCREEN_PADDING.top + SCREEN_PADDING.bottom + TOP + p.turnBarHeight + p.board + p.contextHeight + 2 * p.actionButtonHeight + 6 + 4 * p.gap;
+    expect(used(tall)).toBeLessThanOrEqual(915);
+    expect(used(snug)).toBeLessThanOrEqual(764);
+
+    const f = table().loadAs('Tanmay');
+    await render(<GameScreen view={viewFor(f, 'Tanmay')} />);
+    await fireEvent(screen.getByTestId('game-top'), 'layout', { nativeEvent: { layout: { width: 396, height: TOP } } });
+    await fireEvent(screen.getByTestId('game-scroll'), 'layout', { nativeEvent: { layout: { width: 412, height: 915 } } });
+    const area = StyleSheet.flatten(screen.getByTestId('board-area').props.style);
+    expect(area.height).toBe(tall.board);
+    expect(area.flexGrow).toBeUndefined();
+    expect(StyleSheet.flatten(screen.getByTestId('context-card').props.style).height).toBe(tall.contextHeight);
+    expect(StyleSheet.flatten(screen.getByTestId('open-pay').props.style).height).toBe(tall.actionButtonHeight);
+    // Whatever is still left sits above the actions, which stay at the bottom of the screen.
+    expect(StyleSheet.flatten(screen.getByTestId('action-area').props.style)).toMatchObject({ flexGrow: 1, justifyContent: 'flex-end' });
+  });
+
   it('short phones go dense before the board shrinks; only a 320×548 screen needs a little scrolling', () => {
     expect(planScreenLayout({ width: 360, height: 640, topHeight: TOP })).toMatchObject({ dense: false, fits: true });
     expect(planScreenLayout({ width: 360, height: 568, topHeight: TOP })).toMatchObject({ dense: true, fits: true });
@@ -321,8 +348,9 @@ describe('responsive layout (measured, not device presets)', () => {
   });
 
   it.each([
-    [412, 840, 'row', 388],
-    [390, 763, 'grid', 366],
+    [412, 840, 'grid', 396],
+    [412, 750, 'row', 396],
+    [390, 763, 'grid', 374],
     [360, 568, 'compact', 286],
   ] as const)('the screen uses its measured size: %ix%i shows the %s bar and a %ipx board', async (width, height, mode, board) => {
     const f = table().loadAs('Tanmay');

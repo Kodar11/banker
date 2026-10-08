@@ -1,8 +1,8 @@
 import { memo, useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Animated, Easing, Platform, Pressable, Text, View } from 'react-native';
+import { AccessibilityInfo, Animated, Easing, Platform, Pressable, View } from 'react-native';
 import type { PlayerState } from '@/engine/index.ts';
-import { COLORS, playerColor, playerInitial } from '@/constants/theme';
-import { clusterOffsets, forwardSteps, squareCenter, type BoardGeometry } from './boardModel';
+import { COLORS, playerColor } from '@/constants/theme';
+import { clusterOffsets, forwardSteps, tokenAnchor, type BoardGeometry } from './boardModel';
 
 /** Longest move animated square-by-square (a dice roll). Longer/backward jumps (cards, Jail) glide directly. */
 export const MAX_HOP_STEPS = 12;
@@ -47,7 +47,7 @@ interface TokenProps {
  */
 const Token = memo(function Token({ player, position, offset, geo, size, isCurrent, reduceMotion, onPress }: TokenProps) {
   const at = (index: number, off = offset) => {
-    const c = squareCenter(geo, index);
+    const c = tokenAnchor(geo, index);
     return { x: c.x + off.x - size / 2, y: c.y + off.y - size / 2 };
   };
   /** Presentation only: put the token exactly on the authoritative square, no animation. */
@@ -124,7 +124,7 @@ const Token = memo(function Token({ player, position, offset, geo, size, isCurre
   );
 
   const c = playerColor(player);
-  const ring = isCurrent ? Math.max(2, size * 0.16) : 0;
+  const ring = isCurrent ? Math.max(1.5, size * 0.13) : 0;
   return (
     <Animated.View
       testID={`board-token-${player.id}`}
@@ -148,30 +148,27 @@ const Token = memo(function Token({ player, position, offset, geo, size, isCurre
           height: size,
           borderRadius: size / 2,
           backgroundColor: c.color,
-          borderWidth: Math.max(1.5, size * 0.12),
+          borderWidth: Math.max(1, size * 0.1),
           borderColor: '#FFFFFF',
-          alignItems: 'center',
-          justifyContent: 'center',
           shadowColor: '#000',
-          shadowOpacity: 0.3,
+          shadowOpacity: 0.35,
           shadowRadius: 2,
           shadowOffset: { width: 0, height: 1 },
           elevation: 3,
         }}
       >
-        <Text allowFontScaling={false} style={{ color: c.onColor, fontSize: size * 0.48, fontWeight: '900', lineHeight: size * 0.6, includeFontPadding: false }}>
-          {playerInitial(player.name)}
-        </Text>
+        {/* A playing piece, not a badge: colour only — a soft highlight, never a letter. */}
+        <View style={{ position: 'absolute', left: '18%', top: '14%', width: '34%', height: '34%', borderRadius: size, backgroundColor: '#FFFFFF', opacity: 0.4 }} />
       </Animated.View>
       {isCurrent ? (
         <View
           testID={`board-token-current-${player.id}`}
           style={{
             position: 'absolute',
-            left: -ring - 1,
-            top: -ring - 1,
-            width: size + 2 * ring + 2,
-            height: size + 2 * ring + 2,
+            left: -ring,
+            top: -ring,
+            width: size + 2 * ring,
+            height: size + 2 * ring,
             borderRadius: size,
             borderWidth: ring,
             borderColor: COLORS.ink,
@@ -195,7 +192,7 @@ const Token = memo(function Token({ player, position, offset, geo, size, isCurre
 });
 
 export function tokenSize(geo: BoardGeometry): number {
-  return Math.min(18, Math.max(9, geo.cell * 0.4));
+  return geo.metrics.token;
 }
 
 /** All tokens, positioned from authoritative player positions. Bankrupt players leave the board. */
@@ -219,7 +216,8 @@ export const BoardTokens = memo(function BoardTokens({
     <View pointerEvents={onTokenPress ? 'box-none' : 'none'} style={{ position: 'absolute', left: 0, top: 0, width: geo.size, height: geo.size }} testID="board-tokens">
       {active.map((p) => {
         const here = bySquare.get(p.position)!;
-        const offset = clusterOffsets(here.length, size)[here.indexOf(p.id)]!;
+        const lane = geo.slots[p.position]?.parts.tokens.width ?? geo.cell;
+        const offset = clusterOffsets(here.length, size, lane)[here.indexOf(p.id)]!;
         return (
           <Token
             key={p.id}

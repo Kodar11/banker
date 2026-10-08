@@ -1,9 +1,10 @@
 import { memo, useState, type ReactNode } from 'react';
-import { Pressable, Text, View, type TextStyle, type ViewStyle } from 'react-native';
+import { Platform, Pressable, Text, View, type TextStyle, type ViewStyle } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 import type { SpecialSpaceType } from '@/engine/index.ts';
 import { COLORS, PROPERTY_GROUP_THEME, playerColor } from '@/constants/theme';
 import { formatINR } from '@/utils/currency';
-import type { BoardSide, BoardSpaceViewModel, SquareSlot } from './boardModel';
+import type { BoardMetrics, BoardSpaceViewModel, Rect, SquareSlot } from './boardModel';
 
 /** Small, restrained pictograms for squares that have no colour group. */
 export const SPECIAL_ICONS: Record<SpecialSpaceType, string> = {
@@ -17,28 +18,21 @@ export const SPECIAL_ICONS: Record<SpecialSpaceType, string> = {
   COMMUNITY_CHEST: '📦',
 };
 
-export interface SquareMetrics {
-  band: number;
-  nameFont: number;
-  priceFont: number;
-  ownerStrip: number;
-}
-
-/**
- * Where the colour band sits in a cell. Top and bottom rows carry it on the edge
- * facing the board centre. The side columns carry it along the top of the cell
- * instead: a band down the side would take its thickness out of the cell's WIDTH,
- * which is exactly what a name needs.
- */
-const BAND_EDGE: Record<BoardSide, 'top' | 'bottom'> = { bottom: 'top', top: 'bottom', left: 'top', right: 'top' };
-
 /** Smallest font a name is ever drawn at; decorations are dropped long before this. */
 const MIN_FONT = 4.5;
 /** Line height of board text, as a multiple of its font size. */
 const LINE = 1.15;
-/** Width of an average bold character, as a multiple of the font size (slightly generous, so lines never wrap). */
-const CHAR = 0.64;
 const PAD = 1;
+
+/**
+ * Board lettering is set in the platform's condensed face: a square is narrow,
+ * and a condensed bold fits a whole place name ("Chandigarh") on one line at a
+ * size a regular face could only reach by breaking the word.
+ */
+const BOARD_FONT = Platform.select<string | undefined>({ android: 'sans-serif-condensed', ios: 'HelveticaNeue-CondensedBold', default: undefined });
+/** Where there is no condensed face (web), letters are this much wider. */
+const FACE_WIDTH = BOARD_FONT ? 1 : 1.18;
+const SAFETY = 1.05;
 
 /**
  * Board text is part of a drawing, not of the app's reading text: it is sized
@@ -46,28 +40,45 @@ const PAD = 1;
  * extra font padding must not change it.
  */
 const BOARD_TEXT = { allowFontScaling: false, ellipsizeMode: 'clip', numberOfLines: 1 } as const;
-const NO_PAD: TextStyle = { includeFontPadding: false, textAlign: 'center', textAlignVertical: 'center' };
+const NO_PAD: TextStyle = { includeFontPadding: false, textAlign: 'center', textAlignVertical: 'center', fontFamily: BOARD_FONT };
 
-/** Font at which every one of `lines` fits a box `width` wide. */
-function fontForWidth(lines: string[], width: number): number {
-  return width / (Math.max(...lines.map((l) => l.length)) * CHAR);
+/** Advance width of one bold condensed character, in ems. */
+function charEms(ch: string): number {
+  if ("ijlI.,'-".includes(ch)) return 0.26;
+  if (ch === ' ') return 0.24;
+  if ('tfr'.includes(ch)) return 0.34;
+  if ('mwMW'.includes(ch)) return 0.8;
+  if (ch >= 'A' && ch <= 'Z') return 0.6;
+  return 0.5;
+}
+
+/** Estimated width of `text` in ems (slightly generous, so a line is never clipped). */
+export function textEms(text: string): number {
+  let ems = 0;
+  for (const ch of text) ems += charEms(ch);
+  return ems * FACE_WIDTH * SAFETY;
 }
 
 /**
- * The lines a square's name is drawn on — decided here, never by the platform's
- * text wrapping. Two-word names take a line per word. A long single word
- * ("Ootacamund") is hyphenated over two lines only when that is what keeps it
- * at a readable size in a `width`-wide cell.
+ * The lines a square's name is drawn on, and their font — decided here, never
+ * by the platform's text wrapping. A word is NEVER broken: a long name gets a
+ * smaller font instead. A two-word name goes on one line or two, whichever
+ * lets it be drawn larger in a `width` × `height` box. `below` is what must
+ * still fit under the name (the price), in lines of the name's own font.
  */
-export function nameLines(name: string, width: number, base: number): string[] {
+export function fitName(name: string, width: number, height: number, base: number, below = 0): { lines: string[]; font: number } {
   const words = name.trim().split(/\s+/);
+  const options = [[words.join(' ')]];
   if (words.length > 1) {
     const half = Math.ceil(words.length / 2);
-    return [words.slice(0, half).join(' '), words.slice(half).join(' ')];
+    options.push([words.slice(0, half).join(' '), words.slice(half).join(' ')]);
   }
-  if (name.length < 7 || fontForWidth(words, width) >= base * 0.9) return words;
-  const cut = Math.ceil(name.length / 2);
-  return [`${name.slice(0, cut)}-`, name.slice(cut)];
+  let best = { lines: options[0]!, font: 0 };
+  for (const lines of options) {
+    const font = Math.min(base, width / Math.max(...lines.map(textEms)), height / ((lines.length + below) * LINE));
+    if (font > best.font) best = { lines, font };
+  }
+  return best;
 }
 
 function describe(space: BoardSpaceViewModel): string {
@@ -149,7 +160,7 @@ function Cell({ space, style, onPress, children }: CellProps) {
 function Glyph({ children, box }: { children: string; box: number }) {
   return (
     <View style={{ width: box, height: box, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-      <Text {...BOARD_TEXT} style={[NO_PAD, { fontSize: box * 0.68 }]}>
+      <Text {...BOARD_TEXT} style={{ includeFontPadding: false, textAlign: 'center', textAlignVertical: 'center', fontSize: box * 0.68 }}>
         {children}
       </Text>
     </View>
@@ -167,31 +178,24 @@ function Line({ children, width, font, style, testID }: { children: string; widt
   );
 }
 
-interface ContentBox {
-  left: number;
-  top: number;
-  width: number;
-  height: number;
-}
-
 /**
  * What a square says, in a box of exactly `box` size: [icon] name [price], every
  * row a fixed height computed here. Priority when the box is small: name, then
  * price, then the decorative icon (dropped first).
  */
-function SquareContent({ space, box, metrics, icon }: { space: BoardSpaceViewModel; box: ContentBox; metrics: SquareMetrics; icon?: string }) {
+function SquareContent({ space, box, metrics, icon }: { space: BoardSpaceViewModel; box: Rect; metrics: BoardMetrics; icon?: string }) {
   const width = Math.max(1, box.width - 2 * PAD);
+  const height = Math.max(1, box.height - 2 * PAD);
   const base = space.isCorner ? metrics.nameFont * 1.1 : metrics.nameFont;
-  const lines = nameLines(space.name, width, base);
   const price = space.purchasePrice !== null ? formatINR(space.purchasePrice) : null;
-  const priceFont = price ? Math.max(MIN_FONT, Math.min(metrics.priceFont, width / (price.length * 0.6))) : 0;
-  const priceRow = priceFont * LINE;
-  const widthFont = Math.min(base, fontForWidth(lines, width));
-  const fontWith = (iconBox: number) => Math.min(widthFont, (box.height - 2 * PAD - priceRow - iconBox) / (lines.length * LINE));
-  let iconBox = icon ? Math.min(box.height * (space.isCorner ? 0.44 : 0.36), width) : 0;
+  const fit = (iconBox: number) => fitName(space.name, width, height - iconBox, base, price ? 1 : 0);
+  let iconBox = icon ? Math.min(box.height * (space.isCorner ? 0.46 : 0.4), width) : 0;
   // Readability first: the icon is decoration, and is dropped rather than squeezing the name.
-  if (iconBox && fontWith(iconBox) < widthFont * 0.85) iconBox = 0;
-  const font = Math.max(MIN_FONT, fontWith(iconBox));
+  if (iconBox && fit(iconBox).font < fit(0).font * 0.85) iconBox = 0;
+  const { lines, font: fitted } = fit(iconBox);
+  const font = Math.max(MIN_FONT, fitted);
+  // The price follows the name: never the louder of the two.
+  const priceFont = price ? Math.max(MIN_FONT, Math.min(metrics.priceFont, font, width / textEms(price))) : 0;
 
   return (
     <View
@@ -200,7 +204,7 @@ function SquareContent({ space, box, metrics, icon }: { space: BoardSpaceViewMod
     >
       {iconBox ? <Glyph box={iconBox}>{icon!}</Glyph> : null}
       {lines.map((line, i) => (
-        <Line key={i} width={width} font={font} style={{ fontWeight: '800', color: COLORS.ink }}>
+        <Line key={i} width={width} font={font} style={{ fontWeight: '700', color: COLORS.ink }}>
           {line}
         </Line>
       ))}
@@ -213,18 +217,45 @@ function SquareContent({ space, box, metrics, icon }: { space: BoardSpaceViewMod
   );
 }
 
+/** Buildings are neutral playing pieces: the same cream house whoever owns the property. */
+const PIECE = { fill: '#FFFDF7', stroke: COLORS.ink };
+
+function House({ size, testID }: { size: number; testID: string }) {
+  return (
+    <View testID={testID} style={{ width: size, height: size }}>
+      <Svg width={size} height={size} viewBox="0 0 10 10">
+        <Path d="M5 0.7 L9.5 4.9 H8.3 V9.3 H1.7 V4.9 H0.5 Z" fill={PIECE.fill} stroke={PIECE.stroke} strokeWidth={0.7} strokeLinejoin="round" />
+      </Svg>
+    </View>
+  );
+}
+
+/** A hotel: one larger block with windows, in place of the houses. */
+function Hotel({ size, testID }: { size: number; testID: string }) {
+  return (
+    <View testID={testID} style={{ width: size * 1.5, height: size }}>
+      <Svg width={size * 1.5} height={size} viewBox="0 0 15 10">
+        <Path d="M1 9.3 V2.6 H4.2 V0.8 H10.8 V2.6 H14 V9.3 Z" fill={PIECE.fill} stroke={PIECE.stroke} strokeWidth={0.7} strokeLinejoin="round" />
+        <Path d="M3.4 4.6 H5 M6.7 4.6 H8.3 M10 4.6 H11.6 M3.4 6.9 H5 M10 6.9 H11.6 M7.5 6.6 V9.3" stroke={PIECE.stroke} strokeWidth={0.9} />
+      </Svg>
+    </View>
+  );
+}
+
 /**
- * The colour band on a property's inner edge, with its markers. Buildings are
- * drawn as shapes (like the wooden pieces), sized so four houses plus the
- * mortgage mark always fit the band's length.
+ * The building strip: the property's group colour along the OUTER edge of its
+ * square, holding its houses / hotel (and the mortgage mark). It runs along the
+ * board's edge — across on the top and bottom rows, down on the side columns —
+ * and four houses always fit its length.
  */
-function ColourBand({ space, slot, band }: { space: BoardSpaceViewModel; slot: SquareSlot; band: number }) {
+function BuildingStrip({ space, slot }: { space: BoardSpaceViewModel; slot: SquareSlot }) {
   const theme = PROPERTY_GROUP_THEME[space.propertyGroup!];
-  const place: ViewStyle = { left: 0, top: BAND_EDGE[slot.side] === 'top' ? 0 : slot.height - band, width: slot.width, height: band };
+  const place = slot.parts.band!;
+  const vertical = slot.side === 'left' || slot.side === 'right';
   const gap = 1;
-  const length = slot.width;
-  const piece = Math.max(2, Math.min(band * 0.7, (length - 4 - 5 * gap) / 5));
-  const house: ViewStyle = { width: piece, height: piece, borderRadius: 1, backgroundColor: '#2E9E4F', borderWidth: 0.5, borderColor: '#FFFFFF' };
+  const thickness = vertical ? place.width : place.height;
+  const length = vertical ? place.height : place.width;
+  const piece = Math.max(2, Math.min(thickness * 0.86, (length - 2 - 3 * gap) / 4));
   return (
     <View
       testID={`board-band-${space.propertyKey}`}
@@ -235,47 +266,37 @@ function ColourBand({ space, slot, band }: { space: BoardSpaceViewModel; slot: S
         // The cream transport/utility band needs an outline to read as a band.
         borderColor: theme.mark,
         borderWidth: space.propertyGroup === 'TRANSPORT_UTILITY' ? 0.75 : 0,
-        flexDirection: 'row',
+        flexDirection: vertical ? 'column' : 'row',
         alignItems: 'center',
         justifyContent: 'center',
         gap,
         overflow: 'hidden',
       }}
     >
-      {space.hotel ? (
-        <View testID={`board-hotel-${space.propertyKey}`} style={[house, { width: piece * 1.8, backgroundColor: '#D03A2B' }]} />
-      ) : null}
+      {space.hotel ? <Hotel size={piece} testID={`board-hotel-${space.propertyKey}`} /> : null}
       {Array.from({ length: space.houses }, (_, i) => (
-        <View key={i} testID={`board-house-${space.propertyKey}`} style={house} />
+        <House key={i} size={piece} testID={`board-house-${space.propertyKey}`} />
       ))}
       {space.mortgaged ? (
         <View
           testID={`board-mortgage-${space.propertyKey}`}
-          style={{ width: piece, height: piece, borderRadius: piece / 2, backgroundColor: COLORS.ink, borderWidth: 0.5, borderColor: '#FFFFFF' }}
+          style={{ width: piece * 0.8, height: piece * 0.8, borderRadius: piece / 2, backgroundColor: COLORS.ink, borderWidth: 0.5, borderColor: '#FFFFFF' }}
         />
       ) : null}
     </View>
   );
 }
 
-/** Who owns it: a thin strip in the owner's player colour on the cell's outer edge. */
-function OwnerStrip({ space, slot, thickness }: { space: BoardSpaceViewModel; slot: SquareSlot; thickness: number }) {
+/** Who owns it: a thin line in the owner's player colour under the card (its inner edge) — never a letter or a badge. */
+function OwnerStrip({ space, slot }: { space: BoardSpaceViewModel; slot: SquareSlot }) {
   if (!space.owner) return null;
-  const place: ViewStyle =
-    slot.side === 'bottom'
-      ? { left: 0, top: slot.height - thickness, width: slot.width, height: thickness }
-      : slot.side === 'top'
-        ? { left: 0, top: 0, width: slot.width, height: thickness }
-        : slot.side === 'left'
-          ? { left: 0, top: 0, width: thickness, height: slot.height }
-          : { left: slot.width - thickness, top: 0, width: thickness, height: slot.height };
-  return <View testID={`board-owner-strip-${space.propertyKey}`} style={{ position: 'absolute', ...place, backgroundColor: playerColor(space.owner).color }} />;
+  return <View testID={`board-owner-strip-${space.propertyKey}`} style={{ position: 'absolute', ...slot.parts.owner!, backgroundColor: playerColor(space.owner).color }} />;
 }
 
 interface SquareProps {
   space: BoardSpaceViewModel;
   slot: SquareSlot;
-  metrics: SquareMetrics;
+  metrics: BoardMetrics;
   onPress?: (index: number) => void;
 }
 
@@ -283,29 +304,19 @@ interface SquareProps {
 function CornerBoardSquare({ space, slot, metrics, onPress }: SquareProps) {
   return (
     <Cell space={space} onPress={onPress} style={cellStyle(slot, COLORS.boardCorner)}>
-      <SquareContent space={space} metrics={metrics} icon={SPECIAL_ICONS[space.specialType!]} box={{ left: 0, top: 0, width: slot.width, height: slot.height }} />
+      <SquareContent space={space} metrics={metrics} icon={SPECIAL_ICONS[space.specialType!]} box={slot.parts.content} />
     </Cell>
   );
 }
 
-/** A property: colour band, owner strip on the board's outer edge, name + price in what is left. */
+/** A property: building strip on the board's outer edge, name + price, owner accent on the inner edge. */
 function PropertyBoardSquare({ space, slot, metrics, onPress }: SquareProps) {
   const theme = PROPERTY_GROUP_THEME[space.propertyGroup!];
-  const { band, ownerStrip } = metrics;
-  // The band and the (always reserved) owner strip take a fixed slice; the text gets exactly the rest.
-  const box: ContentBox =
-    slot.side === 'bottom'
-      ? { left: 0, top: band, width: slot.width, height: slot.height - band - ownerStrip }
-      : slot.side === 'top'
-        ? { left: 0, top: ownerStrip, width: slot.width, height: slot.height - band - ownerStrip }
-        : slot.side === 'left'
-          ? { left: ownerStrip, top: band, width: slot.width - ownerStrip, height: slot.height - band }
-          : { left: 0, top: band, width: slot.width - ownerStrip, height: slot.height - band };
   return (
     <Cell space={space} onPress={onPress} style={cellStyle(slot, theme.tint)}>
-      <ColourBand space={space} slot={slot} band={band} />
-      <SquareContent space={space} metrics={metrics} box={box} />
-      <OwnerStrip space={space} slot={slot} thickness={ownerStrip} />
+      <BuildingStrip space={space} slot={slot} />
+      <SquareContent space={space} metrics={metrics} box={slot.parts.content} />
+      <OwnerStrip space={space} slot={slot} />
     </Cell>
   );
 }
@@ -314,7 +325,7 @@ function PropertyBoardSquare({ space, slot, metrics, onPress }: SquareProps) {
 function SpecialBoardSquare({ space, slot, metrics, onPress }: SquareProps) {
   return (
     <Cell space={space} onPress={onPress} style={cellStyle(slot, COLORS.board)}>
-      <SquareContent space={space} metrics={metrics} icon={SPECIAL_ICONS[space.specialType!]} box={{ left: 0, top: 0, width: slot.width, height: slot.height }} />
+      <SquareContent space={space} metrics={metrics} icon={SPECIAL_ICONS[space.specialType!]} box={slot.parts.content} />
     </Cell>
   );
 }
@@ -323,9 +334,10 @@ function SpecialBoardSquare({ space, slot, metrics, onPress }: SquareProps) {
  * One square of the physical board: exactly one cell of the board layout.
  * Purely visual — no state beyond press feedback; an optional read-only
  * `onPress` for opening details. Nothing in here is rotated and nothing is
- * sized by its content.
- * Property group colour = what the property is (tint + inner colour band);
- * player colour = who owns it (thin outer strip).
+ * sized by its content; the token lane (see boardModel) is left empty for the
+ * tokens drawn above the squares.
+ * Property group colour = what the property is (tint + building strip);
+ * player colour = who owns it (thin accent line).
  */
 export const BoardSquare = memo(function BoardSquare(props: SquareProps) {
   if (props.space.isCorner) return <CornerBoardSquare {...props} />;

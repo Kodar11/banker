@@ -41,14 +41,15 @@ beforeEach(() => {
 });
 
 describe('board sizing', () => {
-  it('the board slot can grow but can never be shorter than the board (no flex-basis 0 collapse on native)', async () => {
+  it('the board slot is exactly as tall as the board: no slack around it, and no flex-basis 0 collapse on native', async () => {
     const f = new Fixture(['Tanmay', 'Guru']).loadAs('Guru');
     await render(<GameScreen view={viewFor(f, 'Guru')} />);
     await fireEvent(screen.getByTestId('game-scroll'), 'layout', { nativeEvent: { layout: { width: 360, height: 568 } } });
     const area = flat('board-area');
     const board = flat('classic-board');
     expect(board.width).toBe(board.height);
-    expect(area.minHeight).toBe(board.height);
+    expect(area.height).toBe(board.height);
+    expect(area.flexGrow).toBeUndefined();
     expect(area.flexShrink).toBe(0);
     expect(area.flex).toBeUndefined();
     expect(area.flexBasis).toBeUndefined();

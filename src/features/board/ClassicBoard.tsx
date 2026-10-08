@@ -3,11 +3,12 @@ import { View } from 'react-native';
 import type { GameState } from '@/engine/index.ts';
 import { COLORS } from '@/constants/theme';
 import { BoardCenter } from './BoardCenter';
-import { bandThickness, buildBoardSpaces, calculateBoardLayout } from './boardModel';
-import { BoardSquare, type SquareMetrics } from './BoardSquare';
+import { buildBoardSpaces, calculateBoardLayout } from './boardModel';
+import { BoardSquare } from './BoardSquare';
 import { BoardTokens } from './BoardTokens';
 
-export const BOARD_FRAME = 5;
+/** The board's rim is kept slim: every pixel of it is a pixel the squares don't get. */
+export const BOARD_FRAME = 3;
 export const BOARD_BORDER = 2;
 /** Below this there is no board to draw (e.g. a layout pass that has not measured the screen yet). */
 export const MIN_DRAWABLE_BOARD = 120;
@@ -33,10 +34,6 @@ export const ClassicBoard = memo(function ClassicBoard({
   const inner = drawable ? size - 2 * (BOARD_FRAME + BOARD_BORDER) : MIN_DRAWABLE_BOARD;
   const geo = useMemo(() => calculateBoardLayout(inner), [inner]);
   const spaces = useMemo(() => buildBoardSpaces(state), [state]);
-  const metrics: SquareMetrics = useMemo(() => {
-    const nameFont = Math.min(10, Math.max(5.5, geo.cell * 0.21));
-    return { band: bandThickness(geo), nameFont, priceFont: nameFont * 0.9, ownerStrip: Math.max(2, geo.cell * 0.07) };
-  }, [geo]);
 
   // Never hand the native side negative sizes or fonts: reserve the space and draw when there is some.
   if (!drawable) return <View testID="classic-board" style={{ width: Math.max(0, size || 0), height: Math.max(0, size || 0) }} />;
@@ -49,7 +46,7 @@ export const ClassicBoard = memo(function ClassicBoard({
         width: size,
         height: size,
         padding: BOARD_FRAME,
-        borderRadius: 18,
+        borderRadius: 14,
         borderWidth: BOARD_BORDER,
         borderColor: COLORS.boardEdge,
         backgroundColor: COLORS.board,
@@ -61,9 +58,9 @@ export const ClassicBoard = memo(function ClassicBoard({
       }}
     >
       <View style={{ width: inner, height: inner, borderRadius: 8, overflow: 'hidden', borderWidth: 0.5, borderColor: COLORS.boardLine }}>
-        <BoardCenter x={geo.cell} size={inner - 2 * geo.cell} />
+        <BoardCenter x={geo.depth} size={inner - 2 * geo.depth} />
         {spaces.map((space) => (
-          <BoardSquare key={space.index} space={space} slot={geo.slots[space.index]!} metrics={metrics} onPress={onSquarePress} />
+          <BoardSquare key={space.index} space={space} slot={geo.slots[space.index]!} metrics={geo.metrics} onPress={onSquarePress} />
         ))}
         <BoardTokens players={state.players} currentPlayerId={state.turn.playerId} geo={geo} onTokenPress={onTokenPress} />
       </View>

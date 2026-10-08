@@ -44,16 +44,21 @@ beforeEach(() => {
 });
 
 describe('Adaptive action bar + More', () => {
-  it('six actions in one row when there is room; labels short; every button a ≥44px target', async () => {
+  it('all six actions when there is room: vector icon + short label, no emoji; every button a ≥44px target', async () => {
     const f = new Fixture().loadAs('Asha');
     await render(<GameScreen view={viewFor(f, 'Asha')} />);
     await fireEvent(screen.getByTestId('game-scroll'), 'layout', { nativeEvent: { layout: { width: 412, height: 840 } } });
-    expect(screen.getByTestId('action-bar-row')).toBeTruthy();
+    expect(screen.getByTestId('action-bar-grid')).toBeTruthy();
     const ids = ['open-properties', 'open-trade', 'open-pay', 'open-loan', 'open-auction', 'open-more'];
-    for (const id of ids) {
+    const labels = ['My Properties', 'Transfer', 'Pay Money', 'Bank / Loan', 'Auction', 'More'];
+    const icons = ['properties', 'transfer', 'pay', 'bank', 'auction', 'more'];
+    ids.forEach((id, i) => {
       const button = screen.getByTestId(id);
       expect(StyleSheet.flatten(button.props.style).height).toBeGreaterThanOrEqual(44);
-    }
+      // The only text in a button is its label; the icon is drawn, not typed.
+      expect(within(button).getAllByText(/\S/).map((t) => String(t.props.children))).toEqual([labels[i]]);
+      expect(within(button).getByTestId(`action-icon-${icons[i]}`)).toBeTruthy();
+    });
     for (const label of ['My Properties', 'Transfer', 'Pay Money', 'Bank / Loan', 'Auction', 'More']) {
       expect(screen.getByText(label).props.numberOfLines).toBeLessThanOrEqual(2);
     }

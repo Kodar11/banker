@@ -72,10 +72,14 @@ export function buildBoardSpaces(state: Pick<GameState, 'players' | 'properties'
 // ---------------------------------------------------------------------------
 // Geometry — a deterministic 10 × 10 grid.
 //
-// The board is GRID × GRID equal cells; the 36 squares are the cells on its
+// The board is GRID × GRID tracks; the 36 squares are the cells on its
 // perimeter (10 along the top, 10 along the bottom, 8 on each side between
-// them). Every square is exactly cell × cell and its place comes ONLY from its
-// canonical index — never from flex, percentages or its content.
+// them). As on the physical board, the perimeter tracks are DEEPER than the
+// tracks between them: a square is `cell` long along its edge and `depth` deep
+// towards the centre, and a corner is depth × depth. That depth is what gives
+// a square room for a building strip, an unbroken name, a price and a token.
+// Every square's place and size come ONLY from its canonical index — never
+// from flex, percentages or its content.
 //
 // Canonical order (the engine's BOARD_CYCLE, untouched) → visual place, as on
 // the physical board: Start in the bottom-right corner, row 1 runs left along
@@ -95,6 +99,9 @@ export const SQUARES_PER_SIDE = (() => {
 /** Cells along one edge of the board, corners included. */
 export const GRID = SQUARES_PER_SIDE + 2;
 
+/** How much deeper (towards the centre) a square is than it is long along its edge. */
+export const DEPTH_RATIO = 1.4;
+
 /** Grid cell (column, row; 0,0 = top-left) of a canonical board index. Pure renderer mapping. */
 export function gridCellOf(index: number): { col: number; row: number; side: BoardSide } {
   const last = GRID - 1;
@@ -103,6 +110,43 @@ export function gridCellOf(index: number): { col: number; row: number; side: Boa
   if (i < 2 * last) return { col: 0, row: last - (i - last), side: 'left' };
   if (i <= 3 * last) return { col: i - 2 * last, row: 0, side: 'top' }; // Club … Rest House
   return { col: last, row: i - 3 * last, side: 'right' };
+}
+
+export interface Rect {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+/** Sizes shared by every square, all derived from the board's size. */
+export interface BoardMetrics {
+  /** Thickness of the building strip (the group-colour band) on a property's outer edge. */
+  band: number;
+  /** Thickness of the owner's accent line on a property's inner edge. */
+  ownerStrip: number;
+  /** Diameter of a player token. */
+  token: number;
+  /** Depth of the lane reserved for tokens in every square. */
+  tokenLane: number;
+  nameFont: number;
+  priceFont: number;
+}
+
+/**
+ * The fixed zones of one square, in the square's own coordinates. They never
+ * overlap, so buildings, text and tokens cannot collide:
+ *   outer edge of the board → [ building strip ] [ name + price ] … [ owner accent ] ← centre
+ * with a token lane beside the text (towards the centre on the top and bottom
+ * rows, along the bottom of the cell on the side columns and corners).
+ */
+export interface SquareParts {
+  /** Building strip — properties only. */
+  band: Rect | null;
+  /** Owner accent — properties only (drawn when owned, always reserved). */
+  owner: Rect | null;
+  content: Rect;
+  tokens: Rect;
 }
 
 export interface SquareSlot {
@@ -116,78 +160,110 @@ export interface SquareSlot {
   y: number;
   width: number;
   height: number;
+  parts: SquareParts;
 }
 
 export interface BoardGeometry {
   size: number;
-  /** Side of every cell: size / GRID. */
+  /** Length of a square along its edge. */
   cell: number;
+  /** Depth of a square towards the centre; corners are depth × depth. */
+  depth: number;
+  metrics: BoardMetrics;
   slots: SquareSlot[];
 }
 
+function boardMetrics(cell: number): BoardMetrics {
+  const token = Math.min(18, Math.max(8, cell * 0.3));
+  const nameFont = Math.min(11, Math.max(5.5, cell * 0.235));
+  return { band: Math.max(4, cell * 0.2), ownerStrip: Math.max(2, cell * 0.07), token, tokenLane: token + 1.5, nameFont, priceFont: nameFont * 0.9 };
+}
+
+/** Which board edge is "up" for a square decides where its zones go — its actual side, never a rotation. */
+function squareParts(side: BoardSide, isCorner: boolean, isProperty: boolean, w: number, h: number, m: BoardMetrics): SquareParts {
+  const b = isProperty ? m.band : 0;
+  const o = isProperty ? m.ownerStrip : 0;
+  const t = m.tokenLane;
+  const strips = (band: Rect, owner: Rect) => (isProperty ? { band, owner } : { band: null, owner: null });
+  if (isCorner) return { band: null, owner: null, content: { left: 0, top: 0, width: w, height: h - t }, tokens: { left: 0, top: h - t, width: w, height: t } };
+  switch (side) {
+    case 'top':
+      return {
+        ...strips({ left: 0, top: 0, width: w, height: b }, { left: 0, top: h - o, width: w, height: o }),
+        content: { left: 0, top: b, width: w, height: h - b - o - t },
+        tokens: { left: 0, top: h - o - t, width: w, height: t },
+      };
+    case 'bottom':
+      return {
+        ...strips({ left: 0, top: h - b, width: w, height: b }, { left: 0, top: 0, width: w, height: o }),
+        content: { left: 0, top: o + t, width: w, height: h - b - o - t },
+        tokens: { left: 0, top: o, width: w, height: t },
+      };
+    case 'left':
+      return {
+        ...strips({ left: 0, top: 0, width: b, height: h }, { left: w - o, top: 0, width: o, height: h }),
+        content: { left: b, top: 0, width: w - b - o, height: h - t },
+        tokens: { left: b, top: h - t, width: w - b - o, height: t },
+      };
+    case 'right':
+      return {
+        ...strips({ left: w - b, top: 0, width: b, height: h }, { left: 0, top: 0, width: o, height: h }),
+        content: { left: o, top: 0, width: w - b - o, height: h - t },
+        tokens: { left: o, top: h - t, width: w - b - o, height: t },
+      };
+  }
+}
+
 /**
- * THE board layout: canonical index → an absolutely positioned cell × cell
- * square inside a `size` × `size` board. Pure; everything on the board (squares,
- * centre, tokens) is placed from this and nothing else.
+ * THE board layout: canonical index → an absolutely positioned square inside a
+ * `size` × `size` board, with its zones. Pure; everything on the board
+ * (squares, centre, tokens) is placed from this and nothing else.
  */
 export function calculateBoardLayout(size: number): BoardGeometry {
   if (BOARD_SIZE !== 4 * (GRID - 1)) throw new Error(`A ${GRID}×${GRID} grid has ${4 * (GRID - 1)} perimeter cells, the board has ${BOARD_SIZE}`);
-  const cell = size / GRID;
+  const cell = size / (SQUARES_PER_SIDE + 2 * DEPTH_RATIO);
+  const depth = cell * DEPTH_RATIO;
   const last = GRID - 1;
+  const metrics = boardMetrics(cell);
+  const start = (track: number) => (track === 0 ? 0 : depth + (track - 1) * cell);
+  const span = (track: number) => (track === 0 || track === last ? depth : cell);
   const slots: SquareSlot[] = Array.from({ length: BOARD_SIZE }, (_, index) => {
     const { col, row, side } = gridCellOf(index);
     const isCorner = (col === 0 || col === last) && (row === 0 || row === last);
-    return { index, side, isCorner, col, row, x: col * cell, y: row * cell, width: cell, height: cell };
+    const width = span(col);
+    const height = span(row);
+    const parts = squareParts(side, isCorner, BOARD_LAYOUT[index]!.kind === 'PROPERTY', width, height, metrics);
+    return { index, side, isCorner, col, row, x: start(col), y: start(row), width, height, parts };
   });
-  return { size, cell, slots };
+  return { size, cell, depth, metrics, slots };
 }
 
 /** @deprecated name kept for existing callers — same function. */
 export const boardGeometry = calculateBoardLayout;
 
-/** Thickness of the colour band on a property square's inner edge. */
-export function bandThickness(geo: BoardGeometry): number {
-  return Math.max(4, geo.cell * 0.16);
-}
-
-/** Where tokens stand: the centre of the square's cell. */
-export function squareCenter(geo: BoardGeometry, index: number): { x: number; y: number } {
+/** Where a token stands on a square: the middle of the square's token lane (board coordinates). */
+export function tokenAnchor(geo: BoardGeometry, index: number): { x: number; y: number } {
   const s = geo.slots[((index % BOARD_SIZE) + BOARD_SIZE) % BOARD_SIZE]!;
-  return { x: s.x + s.width / 2, y: s.y + s.height / 2 };
+  const lane = s.parts.tokens;
+  return { x: s.x + lane.left + lane.width / 2, y: s.y + lane.top + lane.height / 2 };
 }
 
-/** Offsets that keep up to 8 tokens on one square readable (never fully overlapping). */
-export function clusterOffsets(count: number, token: number): { x: number; y: number }[] {
-  const d = token * 0.5;
-  switch (count) {
-    case 0:
-      return [];
-    case 1:
-      return [{ x: 0, y: 0 }];
-    case 2:
-      return [
-        { x: -d, y: 0 },
-        { x: d, y: 0 },
-      ];
-    case 3:
-      return [
-        { x: -d, y: d * 0.9 },
-        { x: d, y: d * 0.9 },
-        { x: 0, y: -d * 0.95 },
-      ];
-    case 4:
-      return [
-        { x: -d, y: -d },
-        { x: d, y: -d },
-        { x: -d, y: d },
-        { x: d, y: d },
-      ];
-    default: {
-      const step = token * 0.62;
-      const rows = Math.ceil(count / 3);
-      return Array.from({ length: count }, (_, i) => ({ x: ((i % 3) - 1) * step, y: (Math.floor(i / 3) - (rows - 1) / 2) * step }));
-    }
-  }
+/**
+ * Offsets (from the token anchor) for `count` tokens sharing a square whose
+ * token lane is `laneWidth` wide. Up to four stand in one row, spread as far as
+ * the lane allows; more form a second row above. Tokens may overlap when the
+ * lane is crowded, but never completely.
+ */
+export function clusterOffsets(count: number, token: number, laneWidth: number): { x: number; y: number }[] {
+  if (count <= 0) return [];
+  const perRow = count <= 4 ? count : Math.ceil(count / 2);
+  const stepX = perRow > 1 ? Math.min(token * 1.1, Math.max(token * 0.4, (laneWidth - token - 2) / (perRow - 1))) : 0;
+  const stepY = token * 0.6;
+  return Array.from({ length: count }, (_, i) => {
+    const row = Math.floor(i / perRow);
+    const inRow = Math.min(perRow, count - row * perRow);
+    return { x: ((i % perRow) - (inRow - 1) / 2) * stepX, y: row === 0 ? 0 : -row * stepY };
+  });
 }
 
 /** Forward squares from `from` to `to` (0 = same square). */

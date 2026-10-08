@@ -1,12 +1,13 @@
 import { memo } from 'react';
 import { Pressable, Text, View } from 'react-native';
+import { ActionIcon, type ActionIconName } from './ActionIcon';
 import { ACTION_BUTTON_HEIGHT, ACTION_GAP, FIXED_HEIGHT_FONT_SCALE, type ActionLayout } from './layout';
 
 export type BarActionKey = 'properties' | 'trade' | 'pay' | 'loan' | 'auction' | 'more';
 
 export interface BarAction {
   key: BarActionKey;
-  icon: string;
+  icon: ActionIconName;
   label: string;
   testID: string;
   onPress: () => void;
@@ -18,11 +19,20 @@ export interface BarAction {
 export const COMPACT_ACTIONS: readonly BarActionKey[] = ['trade', 'loan', 'more'];
 
 /**
- * Secondary gameplay utilities — not app navigation. Six actions in one row on
- * roomy screens, a 2×3 grid when the row would be too narrow, and just the most
- * used ones + More when vertical space is tight (see planGameLayout).
+ * Secondary gameplay utilities — not app navigation. A 2×3 grid when there is
+ * room, six in one row when there is a little less, and just the most used ones
+ * + More when vertical space is tight (see planGameLayout).
  */
-export const AdaptiveActionBar = memo(function AdaptiveActionBar({ layout, actions }: { layout: ActionLayout; actions: BarAction[] }) {
+export const AdaptiveActionBar = memo(function AdaptiveActionBar({
+  layout,
+  actions,
+  buttonHeight = ACTION_BUTTON_HEIGHT[layout],
+}: {
+  layout: ActionLayout;
+  actions: BarAction[];
+  /** From the screen layout plan: taller on screens with height to spare. */
+  buttonHeight?: number;
+}) {
   const shown = layout === 'compact' ? actions.filter((a) => COMPACT_ACTIONS.includes(a.key)) : actions;
   const rows = layout === 'grid' ? [shown.slice(0, 3), shown.slice(3)] : [shown];
   return (
@@ -31,7 +41,7 @@ export const AdaptiveActionBar = memo(function AdaptiveActionBar({ layout, actio
         {rows.map((row, i) => (
           <View key={i} style={{ flexDirection: 'row', gap: ACTION_GAP }}>
             {row.map((a) => (
-              <ActionButton key={a.key} action={a} layout={layout} />
+              <ActionButton key={a.key} action={a} layout={layout} height={buttonHeight} />
             ))}
           </View>
         ))}
@@ -40,7 +50,7 @@ export const AdaptiveActionBar = memo(function AdaptiveActionBar({ layout, actio
   );
 });
 
-function ActionButton({ action, layout }: { action: BarAction; layout: ActionLayout }) {
+function ActionButton({ action, layout, height }: { action: BarAction; layout: ActionLayout; height: number }) {
   const twoLines = layout === 'row';
   return (
     <View style={{ flex: 1 }}>
@@ -52,12 +62,10 @@ function ActionButton({ action, layout }: { action: BarAction; layout: ActionLay
         accessibilityLabel={action.label}
         accessibilityHint={action.hint}
         accessibilityState={{ disabled: !!action.disabled }}
-        style={{ height: ACTION_BUTTON_HEIGHT[layout], gap: twoLines ? 1 : 0 }}
+        style={{ height, gap: 2 }}
         className={`items-center justify-center rounded-xl border border-white/20 bg-white/10 px-0.5 active:bg-white/20 ${action.disabled ? 'opacity-40' : ''}`}
       >
-        <Text className={twoLines ? 'text-lg leading-6' : 'text-base leading-5'} accessible={false} allowFontScaling={false}>
-          {action.icon}
-        </Text>
+        <ActionIcon name={action.icon} size={twoLines ? 22 : 20} />
         <Text
           className={`text-center font-bold text-cream ${twoLines ? 'text-[10px] leading-[12px]' : 'text-xs leading-4'}`}
           numberOfLines={twoLines ? 2 : 1}
