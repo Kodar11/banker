@@ -6,6 +6,7 @@ import { Button, Card, Label, Pill, TextField } from '@/components/ui';
 import { useGameStore } from '@/store/gameStore';
 import { formatINR } from '@/utils/currency';
 import { describeWaiting } from './describe';
+import { PAY_ACTION } from './gameFocus';
 import type { GameView } from './useGameView';
 
 interface ActionPanelProps {
@@ -173,14 +174,6 @@ export function ActionPanel({ view, send, onOpenLoan }: ActionPanelProps) {
       return null;
   }
 }
-
-const PAY_ACTION = {
-  RENT: 'PAY_RENT',
-  TAX: 'PAY_TAX',
-  CARD: 'PAY_CARD',
-  LOAN_INTEREST: 'PAY_INTEREST',
-  CLUB: 'PAY_CLUB',
-} as const;
 
 const PAY_PILL = {
   RENT: 'Rent due',

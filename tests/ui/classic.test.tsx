@@ -54,6 +54,9 @@ describe('Jail', () => {
     expect(f.state.players.find((p) => p.name === 'Asha')!.position).toBe(positionOfSpecial('JAIL'));
     api.action.mockResolvedValue(ok(f.snapshot()));
     await render(<GameScreen view={viewFor(f, 'Asha')} />);
+    expect(screen.getByTestId('turn-detail')).toHaveTextContent(/In Jail — pay or stay/);
+    expect(screen.getByTestId('context-card')).toHaveTextContent(/Pay ₹500 to leave, or stay/);
+    await fireEvent.press(screen.getByTestId('turn-choose'));
     const card = screen.getByTestId('jail-card');
     expect(card).toHaveTextContent(/Jail · turn 1 of 3/);
     expect(screen.queryByTestId('roll-button')).toBeNull();
@@ -69,6 +72,7 @@ describe('Jail', () => {
     quietBilal(f.act('Asha', { type: 'STAY_IN_JAIL' })).loadAs('Asha');
     api.action.mockResolvedValue(ok(f.snapshot()));
     await render(<GameScreen view={viewFor(f, 'Asha')} />);
+    await fireEvent.press(screen.getByTestId('turn-choose'));
     expect(screen.getByTestId('jail-card')).toHaveTextContent(/turn 3 of 3/);
     expect(screen.getByTestId('jail-stay')).toHaveTextContent(/Released after this turn/);
     await fireEvent.press(screen.getByTestId('jail-stay'));
@@ -79,6 +83,7 @@ describe('Jail', () => {
     const f = jailedAsha();
     f.act('Asha', { type: 'TRANSFER_MONEY', toPlayerId: f.ids.Bilal!, amount: 24800 }).loadAs('Asha');
     await render(<GameScreen view={viewFor(f, 'Asha')} />);
+    await fireEvent.press(screen.getByTestId('turn-choose'));
     expect(screen.getByTestId('jail-pay').props.accessibilityState.disabled).toBe(true);
     expect(screen.getByText('You’re ₹300 short.')).toBeTruthy();
     expect(screen.getByTestId('jail-stay').props.accessibilityState.disabled).toBe(false);
@@ -87,8 +92,10 @@ describe('Jail', () => {
   it('other players see the Jail state', async () => {
     const f = jailedAsha().loadAs('Bilal');
     await render(<GameScreen view={viewFor(f, 'Bilal')} />);
-    expect(screen.getByTestId('waiting-card')).toHaveTextContent(/Asha is in Jail — pay or stay\?/);
-    expect(screen.getByTestId('players-strip')).toHaveTextContent(/In Jail · 3 left/);
+    expect(screen.getByTestId('turn-detail')).toHaveTextContent(/Asha is in Jail — pay or stay\?/);
+    expect(screen.getByTestId('turn-waiting')).toHaveTextContent('In Jail…');
+    expect(screen.getByTestId(`player-chip-${f.ids.Asha}`)).toHaveTextContent(/Jail/);
+    expect(screen.getByTestId(`player-chip-${f.ids.Asha}`).props.accessibilityLabel).toMatch(/In Jail · 3 left/);
   });
 });
 
@@ -98,6 +105,8 @@ describe('Club and Rest House', () => {
     f.state.players.find((p) => p.name === 'Asha')!.position = 13;
     f.roll('Asha', 2, 3).loadAs('Asha'); // 13 + 5 = Club
     await render(<GameScreen view={viewFor(f, 'Asha')} />);
+    expect(screen.getByTestId('turn-pay')).toHaveTextContent('Pay ₹200');
+    await fireEvent.press(screen.getByTestId('context-cta'));
     expect(screen.getByTestId('payment-card')).toHaveTextContent(/Club — ₹100 to each player/);
     expect(screen.getByText('PAY ₹200')).toBeTruthy();
   });
@@ -107,8 +116,9 @@ describe('Club and Rest House', () => {
     f.state.players.find((p) => p.name === 'Asha')!.position = 21;
     f.roll('Asha', 3, 3).loadAs('Bilal'); // 21 + 6 = Rest House
     await render(<GameScreen view={viewFor(f, 'Bilal')} />);
-    expect(screen.getByTestId('event-feed')).toHaveTextContent(/Asha rests at the Rest House: collects ₹200 and skips the next turn/);
-    expect(screen.getByTestId('players-strip')).toHaveTextContent(/Resting/);
+    expect(screen.getByTestId('context-event')).toBeTruthy();
+    expect(screen.getByTestId('context-card')).toHaveTextContent(/Asha rests at the Rest House: collects ₹200 and skips the next turn/);
+    expect(screen.getByTestId(`player-chip-${f.ids.Asha}`).props.accessibilityLabel).toMatch(/Resting/);
   });
 });
 
@@ -117,6 +127,7 @@ describe('End Game confirmation', () => {
     const f = new Fixture().loadAs('Asha');
     await render(<GameScreen view={viewFor(f, 'Asha')} />);
     expect(screen.queryByTestId('end-game-dialog')).toBeNull();
+    await fireEvent.press(screen.getByTestId('open-more'));
     await fireEvent.press(screen.getByTestId('end-game-button'));
     const dialog = screen.getByTestId('end-game-dialog');
     expect(within(dialog).getByText('🏆')).toBeTruthy();
@@ -131,12 +142,14 @@ describe('End Game confirmation', () => {
   it('Android back / backdrop tap cancels', async () => {
     const f = new Fixture().loadAs('Asha');
     await render(<GameScreen view={viewFor(f, 'Asha')} />);
+    await fireEvent.press(screen.getByTestId('open-more'));
     await fireEvent.press(screen.getByTestId('end-game-button'));
     // The hardware back button reaches a Modal as onRequestClose.
     let modal = screen.getByTestId('end-game-dialog').parent;
     while (modal && modal.type !== 'Modal') modal = modal.parent;
     await fireEvent(modal!, 'requestClose');
     expect(screen.queryByTestId('end-game-dialog')).toBeNull();
+    await fireEvent.press(screen.getByTestId('open-more'));
     await fireEvent.press(screen.getByTestId('end-game-button'));
     expect(screen.getByTestId('end-game-dialog')).toBeTruthy();
     // Hidden from screen readers (the card is accessibilityViewIsModal) but tappable.
@@ -150,6 +163,7 @@ describe('End Game confirmation', () => {
     const finished = new Fixture().act('Asha', { type: 'END_GAME' });
     api.action.mockResolvedValue(ok({ ...finished.snapshot(), state: { ...finished.state, id: f.state.id, version: f.state.version + 1 } }));
     await render(<GameScreen view={viewFor(f, 'Asha')} />);
+    await fireEvent.press(screen.getByTestId('open-more'));
     await fireEvent.press(screen.getByTestId('end-game-button'));
     const confirm = screen.getByTestId('end-game-dialog-confirm');
     expect(confirm).toHaveTextContent('End Game');
@@ -161,9 +175,12 @@ describe('End Game confirmation', () => {
   it('only the host sees End Game; the paused screen uses the same confirmation', async () => {
     const f = new Fixture().loadAs('Bilal');
     await render(<GameScreen view={viewFor(f, 'Bilal')} />);
+    await fireEvent.press(screen.getByTestId('open-more'));
+    expect(screen.getByTestId('more-actions')).toBeTruthy();
     expect(screen.queryByTestId('end-game-button')).toBeNull();
     const paused = new Fixture().act('Bilal', { type: 'PAUSE_GAME' }).loadAs('Asha');
     await render(<GameScreen view={viewFor(paused, 'Asha')} />);
+    await fireEvent.press(screen.getByTestId('open-more'));
     await fireEvent.press(screen.getByTestId('end-game-button'));
     expect(screen.getByTestId('end-game-dialog')).toBeTruthy();
     expect(api.action).not.toHaveBeenCalled();

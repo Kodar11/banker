@@ -3,10 +3,12 @@ appId: com.boardgamebank.businessbanker
 ---
 - runFlow: subflows/host_game_with_bot.yaml
 - tapOn:
+    id: open-more
+- tapOn:
     id: pause-button
 - extendedWaitUntil:
     visible:
-      id: paused-card
+      id: context-paused
     timeout: 15000
 - assertNotVisible:
     id: roll-button

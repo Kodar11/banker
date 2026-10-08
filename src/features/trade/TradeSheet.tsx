@@ -12,6 +12,8 @@ interface TradeSheetProps {
   onClose: () => void;
   view: GameView;
   send: (a: GameAction, opts?: { successMessage?: string }) => Promise<{ ok: boolean }>;
+  /** Preselects the other player (e.g. opened from that player's details). Remount (key) to change it. */
+  initialPlayerId?: string | null;
 }
 
 const toggle = (keys: PropertyKey[], key: PropertyKey) => (keys.includes(key) ? keys.filter((k) => k !== key) : [...keys, key]);
@@ -25,8 +27,8 @@ const rupees = (text: string) => {
  * Nothing changes until the other player accepts; the server re-checks
  * everything on accept and executes the whole exchange atomically.
  */
-export function TradeSheet({ visible, onClose, view, send }: TradeSheetProps) {
-  const [to, setTo] = useState<string | null>(null);
+export function TradeSheet({ visible, onClose, view, send, initialPlayerId = null }: TradeSheetProps) {
+  const [to, setTo] = useState<string | null>(initialPlayerId);
   const [give, setGive] = useState<PropertyKey[]>([]);
   const [want, setWant] = useState<PropertyKey[]>([]);
   const [giveMoney, setGiveMoney] = useState('');

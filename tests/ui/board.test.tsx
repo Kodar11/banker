@@ -1,5 +1,5 @@
 /// <reference types="jest" />
-/** Board View: a read-only, data-driven map of the physical board + the shared property/player colour system. */
+/** The board: a read-only, data-driven map of the physical board + the shared property/player colour system. */
 import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 import { BOARD_SIZE, netWorth, outstandingDebt, positionOfProperty, positionOfSpecial, PROPERTY_KEYS, getDeed } from '@/engine/index.ts';
@@ -16,17 +16,13 @@ import {
 import { boardGeometry, buildBoardSpaces, clusterOffsets, squareCenter } from '@/features/board/boardModel';
 import { BOARD_BORDER, BOARD_FRAME, ClassicBoard } from '@/features/board/ClassicBoard';
 import { tokenAnimation, tokenSize } from '@/features/board/BoardTokens';
-import { boardSizeFor, boardTurnStatus, BoardViewOverlay } from '@/features/board/BoardView';
 import { PlayersStrip } from '@/features/game/GamePanels';
 import { GameScreen } from '@/features/game/GameScreen';
 import { PropertyView } from '@/features/player/PropertyView';
 import type { GameView } from '@/features/game/useGameView';
-import { gameApi } from '@/lib/gameApi';
 import { useGameStore } from '@/store/gameStore';
 import { useSessionStore } from '@/store/sessionStore';
 import { Fixture } from './fixtures';
-
-const api = gameApi as jest.Mocked<typeof gameApi>;
 
 function viewFor(f: Fixture, name: string): GameView {
   const snapshot = f.snapshot();
@@ -85,31 +81,12 @@ beforeEach(() => {
   useGameStore.getState().reset(null);
 });
 
-describe('Board View overlay', () => {
-  it('opens from the game screen over it and closes with ✕ or Close', async () => {
-    const f = new Fixture().loadAs('Asha');
-    await render(<GameScreen view={viewFor(f, 'Asha')} />);
-    expect(screen.queryByTestId('board-view')).toBeNull();
-    await fireEvent.press(screen.getByTestId('open-board'));
-    expect(screen.getByTestId('board-view')).toBeTruthy();
-    expect(screen.getByTestId('game-screen')).toBeTruthy(); // gameplay stays mounted underneath
-    expect(screen.getByLabelText('Close board view')).toBeTruthy();
-    await fireEvent.press(screen.getByTestId('board-view-close'));
-    expect(screen.queryByTestId('board-view')).toBeNull();
-    await fireEvent.press(screen.getByTestId('open-board'));
-    await fireEvent.press(screen.getByTestId('board-view-close-x'));
-    expect(screen.queryByTestId('board-view')).toBeNull();
-  });
-
-  it('is observational: no control other than Close, and nothing is ever sent to the server', async () => {
-    const f = new Fixture().loadAs('Asha');
-    await render(<BoardViewOverlay visible onClose={jest.fn()} view={viewFor(f, 'Asha')} />);
-    const buttons = within(screen.getByTestId('board-view')).getAllByRole('button');
-    expect(buttons.map((b) => b.props.testID).sort()).toEqual(['board-view-close', 'board-view-close-x']);
+describe('board without handlers', () => {
+  it('is purely visual: squares and tokens have no press handlers', async () => {
+    const f = new Fixture();
+    await render(<ClassicBoard state={f.state} size={360} />);
     for (let i = 0; i < BOARD_SIZE; i++) expect(screen.getByTestId(`board-square-${i}`).props.onPress).toBeUndefined();
-    for (let i = 0; i < BOARD_SIZE; i++) fireEvent.press(screen.getByTestId(`board-square-${i}`));
-    expect(api.action).not.toHaveBeenCalled();
-    expect(api.state).not.toHaveBeenCalled();
+    expect(screen.queryByTestId(`board-token-press-${f.ids.Asha}`)).toBeNull();
   });
 });
 
@@ -236,12 +213,13 @@ describe('player tokens', () => {
     }
   });
 
-  it('bankrupt players leave the board but stay in Player Locations', async () => {
+  it('bankrupt players leave the board but stay in the player strip', async () => {
     const f = new Fixture(['Tanmay', 'Shamin', 'Rohit']);
     player(f, 'Rohit').status = 'BANKRUPT';
-    await render(<BoardViewOverlay visible onClose={jest.fn()} view={viewFor(f, 'Tanmay')} />);
+    f.loadAs('Tanmay');
+    await render(<GameScreen view={viewFor(f, 'Tanmay')} />);
     expect(screen.queryByTestId(`board-token-${f.ids.Rohit}`)).toBeNull();
-    expect(screen.getByTestId(`player-location-square-${f.ids.Rohit}`)).toHaveTextContent(/Bankrupt/);
+    expect(screen.getByTestId(`player-chip-${f.ids.Rohit}`)).toHaveTextContent(/Bankrupt/);
   });
 
   describe('movement animation', () => {
@@ -286,47 +264,12 @@ describe('player tokens', () => {
   });
 });
 
-describe('Player Locations + turn status', () => {
-  it('lists every player with colour badge, (You) and their current square', async () => {
-    const f = new Fixture(['Tanmay', 'Shamin']);
-    player(f, 'Tanmay').position = positionOfProperty('MUMBAI');
-    Object.assign(player(f, 'Shamin'), { position: positionOfSpecial('JAIL'), inJail: true, jailTurnsLeft: 2 });
-    await render(<BoardViewOverlay visible onClose={jest.fn()} view={viewFor(f, 'Tanmay')} />);
-    const me = screen.getByTestId(`player-location-${f.ids.Tanmay}`);
-    expect(me).toHaveTextContent(/Tanmay \(You\)/);
-    expect(screen.getByTestId(`player-location-square-${f.ids.Tanmay}`)).toHaveTextContent('Mumbai');
-    expect(screen.getByTestId(`player-location-square-${f.ids.Shamin}`)).toHaveTextContent('Jail · 2 turns left');
-    expect(screen.getByTestId(`player-location-${f.ids.Shamin}`)).not.toHaveTextContent(/\(You\)/);
-    expect(me.props.accessibilityLabel).toMatch(/Tanmay, you, Orange token, at Mumbai, current turn/);
-  });
-
-  it('says YOUR TURN above the board on my turn', async () => {
-    const f = new Fixture(['Tanmay', 'Shamin']);
-    await render(<BoardViewOverlay visible onClose={jest.fn()} view={viewFor(f, 'Tanmay')} />);
-    expect(screen.getByTestId('board-turn-title')).toHaveTextContent('YOUR TURN');
-    expect(screen.getByTestId('board-turn-detail')).toHaveTextContent(`Turn ${f.state.turn.number} · Roll the dice on the main screen`);
-  });
-
-  it("says SHAMIN'S TURN to everyone else", () => {
-    const f = new Fixture(['Shamin', 'Tanmay']);
-    expect(boardTurnStatus(viewFor(f, 'Tanmay'))).toEqual({ title: "SHAMIN'S TURN", detail: `Turn ${f.state.turn.number} · Shamin is about to roll` });
-  });
-});
-
-describe('responsive layout', () => {
-  it.each([
-    [320, 640],
-    [360, 780],
-    [412, 915],
-    [800, 1280],
-    [360, 560],
-  ])('board stays square and fully on screen at %ix%i', async (w, h) => {
-    const size = boardSizeFor(w, h);
-    expect(size).toBeLessThanOrEqual(w - 2 * 10);
-    expect(size).toBeGreaterThanOrEqual(Math.min(280, w - 20));
+describe('responsive board', () => {
+  it.each([280, 304, 336, 366, 388, 640])('stays square and fills exactly its size at %ipx', async (size) => {
     const f = new Fixture();
     await render(<ClassicBoard state={f.state} size={size} />);
     const style = StyleSheet.flatten(screen.getByTestId('classic-board').props.style);
+    expect(style.width).toBe(size);
     expect(style.width).toBe(style.height);
     const geo = boardGeometry(size);
     const right = Math.max(...geo.slots.map((s) => s.x + s.width));

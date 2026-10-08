@@ -1,5 +1,6 @@
 /// <reference types="jest" />
-import { Alert } from 'react-native';
+import { Alert, StyleSheet } from 'react-native';
+import { router } from 'expo-router';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { netWorth, outstandingDebt } from '@/engine/index.ts';
 import { GameScreen } from '@/features/game/GameScreen';
@@ -42,36 +43,59 @@ beforeEach(() => {
   useGameStore.getState().reset(null);
 });
 
-describe('Bottom action bar', () => {
-  it('two rows of three equal buttons; titles never wrap; touch targets ≥ 44px', async () => {
+describe('Adaptive action bar + More', () => {
+  it('six actions in one row when there is room; labels short; every button a ≥44px target', async () => {
     const f = new Fixture().loadAs('Asha');
     await render(<GameScreen view={viewFor(f, 'Asha')} />);
-    const rows = [screen.getByTestId('action-row-money'), screen.getByTestId('action-row-game')];
-    const ids = [
-      ['open-pay', 'open-loan', 'open-trade'],
-      ['request-undo', 'pause-button', 'open-more'],
-    ];
-    rows.forEach((row, i) => {
-      for (const id of ids[i]!) {
-        const button = within(row).getByTestId(id);
-        expect(button.props.className).toContain('flex-1');
-        expect(button.props.className).toContain('min-h-[44px]');
-      }
-    });
-    for (const label of ['Pay', 'Loan', 'Trade', 'Undo', 'Pause', 'More']) {
-      expect(screen.getByText(label).props.numberOfLines).toBe(1);
+    await fireEvent(screen.getByTestId('game-scroll'), 'layout', { nativeEvent: { layout: { width: 412, height: 840 } } });
+    expect(screen.getByTestId('action-bar-row')).toBeTruthy();
+    const ids = ['open-properties', 'open-trade', 'open-pay', 'open-loan', 'open-auction', 'open-more'];
+    for (const id of ids) {
+      const button = screen.getByTestId(id);
+      expect(StyleSheet.flatten(button.props.style).height).toBeGreaterThanOrEqual(44);
     }
+    for (const label of ['My Properties', 'Transfer', 'Pay Money', 'Bank / Loan', 'Auction', 'More']) {
+      expect(screen.getByText(label).props.numberOfLines).toBeLessThanOrEqual(2);
+    }
+    // Auction only works while one is running (auctions start when a property is declined).
+    expect(screen.getByTestId('open-auction').props.accessibilityState.disabled).toBe(true);
+    // No traditional tab bar: these are actions, not navigation.
+    expect(screen.queryByRole('tablist')).toBeNull();
   });
 
-  it('Undo is visible but disabled until there is something this player may undo', async () => {
+  it('each action opens its existing flow (no duplicate implementations)', async () => {
     const f = new Fixture().loadAs('Asha');
     await render(<GameScreen view={viewFor(f, 'Asha')} />);
+    await fireEvent.press(screen.getByTestId('open-pay'));
+    expect(screen.getByTestId('pay-sheet')).toBeTruthy();
+    await fireEvent.press(screen.getByTestId('open-loan'));
+    expect(screen.queryByTestId('pay-sheet')).toBeNull(); // one sheet at a time
+    expect(screen.getByTestId('loan-sheet')).toBeTruthy();
+    await fireEvent.press(screen.getByTestId('open-trade'));
+    expect(screen.getByTestId('trade-sheet')).toBeTruthy();
+    await fireEvent.press(screen.getByTestId('open-properties'));
+    expect(screen.getByTestId(`player-details-${f.ids.Asha}`)).toBeTruthy();
+    await fireEvent.press(screen.getByTestId('open-more'));
+    const more = screen.getByTestId('more-actions');
+    for (const id of ['more-properties', 'more-trade', 'more-pay', 'more-loan', 'more-auction', 'more-manage', 'request-undo', 'pause-button', 'open-log', 'open-rules', 'end-game-button']) {
+      expect(within(more).getByTestId(id)).toBeTruthy();
+    }
+    await fireEvent.press(screen.getByTestId('open-rules'));
+    expect(router.push).toHaveBeenCalledWith('/settings');
+    expect(api.action).not.toHaveBeenCalled();
+  });
+
+  it('Undo (in More) is visible but disabled until there is something this player may undo', async () => {
+    const f = new Fixture().loadAs('Asha');
+    await render(<GameScreen view={viewFor(f, 'Asha')} />);
+    await fireEvent.press(screen.getByTestId('open-more'));
     expect(screen.getByTestId('request-undo').props.accessibilityState.disabled).toBe(true);
 
     f.act('Asha', { type: 'TRANSFER_MONEY', toPlayerId: f.ids.Bilal!, amount: 500 }).loadAs('Asha');
     jest.spyOn(Alert, 'alert').mockImplementation((_t, _m, buttons) => buttons?.[1]?.onPress?.());
     api.action.mockResolvedValue(ok(f.snapshot()));
     await render(<GameScreen view={viewFor(f, 'Asha')} />);
+    await fireEvent.press(screen.getByTestId('open-more'));
     expect(screen.getByTestId('request-undo').props.accessibilityState.disabled).toBe(false);
     await fireEvent.press(screen.getByTestId('request-undo'));
     await waitFor(() => expect(api.action.mock.calls[0]![3]).toEqual({ type: 'REQUEST_UNDO', targetActionId: f.state.undoStack.at(-1)!.actionId }));
@@ -87,6 +111,7 @@ describe('Bottom action bar', () => {
     jest.spyOn(Alert, 'alert').mockImplementation((_t, _m, buttons) => buttons?.[1]?.onPress?.());
     api.action.mockResolvedValue(ok(f.snapshot()));
     await render(<GameScreen view={viewFor(f, 'Asha')} />);
+    await fireEvent.press(screen.getByTestId('open-more'));
     await fireEvent.press(screen.getByTestId('request-undo'));
     await waitFor(() => expect(api.action.mock.calls[0]![3]).toEqual({ type: 'REQUEST_UNDO', targetActionId: first }));
   });
@@ -146,6 +171,9 @@ describe('Trading UI', () => {
     jest.spyOn(Alert, 'alert').mockImplementation((_t, _m, buttons) => buttons?.[1]?.onPress?.());
     api.action.mockResolvedValue(ok(f.snapshot()));
     await render(<GameScreen view={viewFor(f, 'Bilal')} />);
+    expect(screen.getByTestId('context-offer')).toBeTruthy();
+    expect(screen.getByTestId('context-card')).toHaveTextContent(/Asha wants to trade/);
+    await fireEvent.press(screen.getByTestId('context-cta')); // Review Offer
     const card = screen.getByTestId('trade-incoming');
     expect(within(card).getByText(/Trade offer from Asha/)).toBeTruthy();
     expect(card).toHaveTextContent(/You get: Railway/);
@@ -168,6 +196,7 @@ describe('Trading UI', () => {
     f.loadAs('Bilal');
     api.action.mockResolvedValue(ok(f.snapshot()));
     await render(<GameScreen view={viewFor(f, 'Bilal')} />);
+    await fireEvent.press(screen.getByTestId('context-cta'));
     await fireEvent.press(screen.getByTestId('trade-reject'));
     await waitFor(() => expect(api.action.mock.calls[0]![3]).toEqual({ type: 'REJECT_TRADE', tradeId }));
 
@@ -175,6 +204,8 @@ describe('Trading UI', () => {
     f.loadAs('Asha');
     api.action.mockResolvedValue(ok(f.snapshot()));
     await render(<GameScreen view={viewFor(f, 'Asha')} />);
+    expect(screen.getByTestId('context-card')).toHaveTextContent(/Waiting for Bilal/);
+    await fireEvent.press(screen.getByTestId('context-cta'));
     expect(screen.getByTestId('trade-outgoing')).toBeTruthy();
     expect(screen.queryByTestId('trade-accept')).toBeNull();
     await fireEvent.press(screen.getByTestId('trade-cancel'));
@@ -193,6 +224,7 @@ describe('Trading UI', () => {
     });
     f.act('Asha', { type: 'SELL_PROPERTY', propertyKey: 'RAILWAY' }).loadAs('Bilal');
     await render(<GameScreen view={viewFor(f, 'Bilal')} />);
+    await fireEvent.press(screen.getByTestId('context-cta'));
     expect(screen.getByText('Railway no longer belongs to that player.')).toBeTruthy();
     expect(screen.getByTestId('trade-accept').props.accessibilityState.disabled).toBe(true);
   });
@@ -246,6 +278,8 @@ describe('Loans UI', () => {
     f.state.players.find((p) => p.name === 'Asha')!.position = 34;
     f.roll('Asha', 2, 3).loadAs('Asha');
     await render(<GameScreen view={viewFor(f, 'Asha')} />);
+    expect(screen.getByTestId('turn-choose')).toHaveTextContent('Raise cash');
+    await fireEvent.press(screen.getByTestId('turn-choose'));
     expect(screen.getByText('Interest due at Start')).toBeTruthy();
     expect(screen.getByText('PAY ₹2,000')).toBeTruthy();
     expect(screen.getByTestId('pay-button').props.accessibilityState.disabled).toBe(true);
@@ -262,6 +296,7 @@ describe('Special squares & cards', () => {
     f.roll('Asha', 2, 2).loadAs('Asha'); // 27 + 4 = 31 Wealth Taxes
     api.action.mockResolvedValue(ok(f.snapshot()));
     await render(<GameScreen view={viewFor(f, 'Asha')} />);
+    await fireEvent.press(screen.getByTestId('context-cta')); // View Payment
     expect(screen.getByTestId('payment-card')).toHaveTextContent(/Wealth Taxes — 2 houses × ₹100 \+ 1 hotel × ₹200/);
     expect(screen.getByText('PAY ₹400')).toBeTruthy();
     expect(screen.queryByTestId('tax-amount')).toBeNull(); // nothing to type in any more
@@ -274,6 +309,7 @@ describe('Special squares & cards', () => {
     f.state.players.find((p) => p.name === 'Asha')!.position = 12;
     f.roll('Asha', 4, 4).loadAs('Asha'); // 12 + 8 = 20 Chance
     await render(<GameScreen view={viewFor(f, 'Asha')} />);
+    await fireEvent.press(screen.getByTestId('context-cta'));
     expect(screen.getByText('PAY ₹3,000')).toBeTruthy();
     expect(screen.getAllByText(/Loss due to fire in godown/).length).toBeGreaterThan(0);
   });

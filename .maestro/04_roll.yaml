@@ -1,4 +1,4 @@
-# 4. Roll: server rolls, app shows dice total and destination.
+# 4. Roll: server rolls, the turn bar shows dice total and destination.
 appId: com.boardgamebank.businessbanker
 ---
 - runFlow: subflows/host_game_with_bot.yaml
@@ -6,8 +6,8 @@ appId: com.boardgamebank.businessbanker
     id: roll-button
 - extendedWaitUntil:
     visible:
-      id: dice-result
+      id: turn-detail
+      text: 'Turn \d+ · 🎲 \d+ → .*'
     timeout: 15000
-- assertVisible: '(?i)tanmay → move \d+ to .*'
 - assertNotVisible:
     id: roll-button

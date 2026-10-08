@@ -1,6 +1,23 @@
 # Resolves whatever the app player's roll produced, ends the turn, then the bot plays.
 appId: com.boardgamebank.businessbanker
 ---
+# Affordable payments are the turn bar's primary action.
+- runFlow:
+    when:
+      visible:
+        id: turn-pay
+        enabled: true
+    commands:
+      - tapOn:
+          id: turn-pay
+# Decisions (buy, card, payment I can't cover yet) open in the "Your move" sheet.
+- runFlow:
+    when:
+      visible:
+        id: turn-choose
+    commands:
+      - tapOn:
+          id: turn-choose
 - runFlow:
     when:
       visible:
@@ -73,8 +90,10 @@ appId: com.boardgamebank.businessbanker
 - runFlow:
     when:
       visible:
-        id: jail-card
+        id: turn-choose
     commands:
+      - tapOn:
+          id: turn-choose
       - tapOn:
           id: jail-pay
 - extendedWaitUntil:

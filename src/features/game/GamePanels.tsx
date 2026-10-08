@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import type { GameAction, GameEventRecord } from '@/engine/index.ts';
 import { Button, Card, Label, PlayerBadge } from '@/components/ui';
@@ -7,14 +7,14 @@ import { useGameStore } from '@/store/gameStore';
 import { formatINR } from '@/utils/currency';
 import type { GameView } from './useGameView';
 
-/** Latest few things that happened — one glance, then back to the board. */
+/** What happened lately, newest first (the "Game log" sheet). */
 export const EventFeed = memo(function EventFeed({ events, limit = 3 }: { events: GameEventRecord[]; limit?: number }) {
   const shown = events.slice(0, limit);
-  if (!shown.length) return null;
+  if (!shown.length) return <Text className="text-base text-stone-500">Nothing has happened yet.</Text>;
   return (
-    <View className="gap-1 px-1" testID="event-feed" accessibilityLiveRegion="polite">
+    <View className="gap-2" testID="event-feed" accessibilityLiveRegion="polite">
       {shown.map((e, i) => (
-        <Text key={e.id} numberOfLines={2} className={i === 0 ? 'text-base font-bold text-cream' : 'text-sm text-cream/60'}>
+        <Text key={e.id} className={i === 0 ? 'text-base font-bold text-ink' : 'text-sm text-stone-600'}>
           {i === 0 ? '• ' : ''}
           {e.message}
         </Text>
@@ -23,41 +23,54 @@ export const EventFeed = memo(function EventFeed({ events, limit = 3 }: { events
   );
 });
 
-/** Compact list of everyone: whose turn, balance, online. */
-export const PlayersStrip = memo(function PlayersStrip({ view }: { view: GameView }) {
+/**
+ * Everyone at the table, one compact chip each: colour + name, balance, whose
+ * turn. Scrolls sideways when there are many players; never wraps into rows.
+ */
+export const PlayersStrip = memo(function PlayersStrip({ view, onSelect }: { view: GameView; onSelect?: (playerId: string) => void }) {
   const online = useGameStore((s) => s.onlinePlayerIds);
   const { state } = view.snapshot;
+  const players = [...state.players].sort((a, b) => a.seat - b.seat);
+  // Up to four players share the width equally; more than that scroll sideways.
+  const fit = players.length <= 4;
+  const Strip = fit ? View : ScrollView;
+  const stripProps = fit
+    ? { style: { flexDirection: 'row' as const, gap: 6 } }
+    : { horizontal: true, showsHorizontalScrollIndicator: false, contentContainerStyle: { flexGrow: 1, gap: 6 }, style: { flexGrow: 0 } };
   return (
-    <View className="flex-row flex-wrap gap-2" testID="players-strip">
-      {state.players.map((p) => {
-        const isTurn = p.id === state.turn.playerId;
-        const isOnline = online.includes(p.id) || p.id === view.me?.id;
+    <Strip testID="players-strip" {...stripProps}>
+      {players.map((p) => {
+        const isTurn = p.id === state.turn.playerId && state.status === 'ACTIVE';
+        const isMe = p.id === view.me?.id;
+        const isOnline = online.includes(p.id) || isMe;
+        const status = p.status === 'BANKRUPT' ? null : p.inJail ? `In Jail · ${p.jailTurnsLeft} left` : p.skipTurns > 0 ? 'Resting' : null;
+        const tag = p.status === 'BANKRUPT' ? null : p.inJail ? '🔒 Jail' : p.skipTurns > 0 ? '🛏️ Rest' : null;
         return (
           <Pressable
             key={p.id}
-            onPress={() => router.push(`/player/${p.id}`)}
+            onPress={() => (onSelect ? onSelect(p.id) : router.push(`/player/${p.id}`))}
             accessibilityRole="button"
-            accessibilityLabel={`${p.name}, ${formatINR(p.balance)}${p.status === 'BANKRUPT' ? ', bankrupt' : ''}${isOnline ? '' : ', offline'}`}
-            className={`min-w-[30%] flex-1 rounded-2xl px-3 py-2 ${isTurn ? 'border-2 border-saffron bg-felt-light' : 'bg-felt-dark'} ${p.status === 'BANKRUPT' ? 'opacity-40' : ''}`}
+            accessibilityLabel={`${p.name}${isMe ? ' (you)' : ''}, ${p.status === 'BANKRUPT' ? 'bankrupt' : formatINR(p.balance)}${status ? `, ${status}` : ''}${isTurn ? ', current turn' : ''}${isOnline ? '' : ', offline'}`}
+            testID={`player-chip-${p.id}`}
+            style={fit ? { flex: 1, flexBasis: 0, minWidth: 0 } : { minWidth: 96, flexGrow: 1 }}
+            className={`min-h-[44px] justify-center rounded-xl px-2.5 py-1 ${isTurn ? 'border-2 border-saffron bg-felt-light' : 'border-2 border-transparent bg-felt-dark'} ${p.status === 'BANKRUPT' ? 'opacity-40' : ''}`}
           >
             <View className="flex-row items-center gap-1.5">
-              <PlayerBadge player={p} size={18} testID={`player-badge-${p.name}`} />
-              <View className={`h-2 w-2 rounded-full ${isOnline ? 'bg-green-400' : 'bg-stone-500'}`} />
-              <Text numberOfLines={1} className="flex-1 text-sm font-bold text-cream">
-                {p.name}
-                {p.isHost ? ' ★' : ''}
+              <PlayerBadge player={p} size={16} testID={`player-badge-${p.name}`} />
+              <Text numberOfLines={1} className="shrink text-xs font-bold text-cream">
+                {/* On my own phone my chip just says "You" — unmistakable, and it never truncates. */}
+                {isMe ? 'You' : p.name}
               </Text>
+              {isOnline ? null : <View className="h-1.5 w-1.5 rounded-full bg-stone-500" />}
             </View>
-            <Text className="text-base font-extrabold text-cream">{p.status === 'BANKRUPT' ? 'Bankrupt' : formatINR(p.balance)}</Text>
-            {p.inJail ? (
-              <Text className="text-xs text-amber-300">In Jail · {p.jailTurnsLeft} left</Text>
-            ) : p.skipTurns > 0 ? (
-              <Text className="text-xs text-amber-300">Resting</Text>
-            ) : null}
+            <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} className="text-[13px] font-extrabold text-cream">
+              {p.status === 'BANKRUPT' ? 'Bankrupt' : formatINR(p.balance)}
+              {tag ? <Text className="text-[10px] font-bold text-amber-300"> {tag}</Text> : null}
+            </Text>
           </Pressable>
         );
       })}
-    </View>
+    </Strip>
   );
 });
 
@@ -86,27 +99,6 @@ export function UndoBanner({ view, send }: { view: GameView; send: (a: GameActio
           <Button className="flex-1" size="md" variant="secondary" title="Cancel request" onPress={() => send({ type: 'REJECT_UNDO', requestId: req.id })} />
         )}
       </View>
-    </Card>
-  );
-}
-
-export function PausedView({ view, send, onEndGame }: { view: GameView; send: (a: GameAction) => Promise<unknown>; onEndGame: () => void }) {
-  const pending = useGameStore((s) => s.pendingAction);
-  return (
-    <Card testID="paused-card" className="items-center">
-      <Text className="text-6xl">⏸️</Text>
-      <Text className="mt-2 text-3xl font-black text-ink">Game paused</Text>
-      <Text className="mt-1 text-center text-base text-stone-600">No dice, purchases or payments until someone resumes.</Text>
-      <Button
-        className="mt-4 self-stretch"
-        title="RESUME GAME"
-        testID="resume-button"
-        loading={pending === 'RESUME_GAME'}
-        onPress={() => send({ type: 'RESUME_GAME' })}
-      />
-      {view.isHost ? (
-        <Button className="mt-3 self-stretch" size="sm" variant="secondary" title="End game now" testID="end-game-button" onPress={onEndGame} />
-      ) : null}
     </Card>
   );
 }

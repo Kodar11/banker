@@ -11,11 +11,13 @@ interface PayPlayerSheetProps {
   onClose: () => void;
   view: GameView;
   send: (a: GameAction, opts?: { successMessage?: string }) => Promise<{ ok: boolean }>;
+  /** Preselects the other player (e.g. opened from that player's details). Remount (key) to change it. */
+  initialPlayerId?: string | null;
 }
 
 /** Player-to-player payment (deals, side bets, settling up). */
-export function PayPlayerSheet({ visible, onClose, view, send }: PayPlayerSheetProps) {
-  const [to, setTo] = useState<string | null>(null);
+export function PayPlayerSheet({ visible, onClose, view, send, initialPlayerId = null }: PayPlayerSheetProps) {
+  const [to, setTo] = useState<string | null>(initialPlayerId);
   const [amount, setAmount] = useState('');
   const [memo, setMemo] = useState('');
   const pending = useGameStore((s) => s.pendingAction);

@@ -1,24 +1,20 @@
 import { goBack } from '@/utils/navigation';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 import {
-  computeRent,
   getDeed,
-  GROUP_LABELS,
   mortgageResolution,
   propertyActionBlocker,
-  rentMultiplier,
-  rentTable,
   sellBuildingRefund,
   unmortgageCost,
   type PropertyActionKind,
   type PropertyKey,
 } from '@/engine/index.ts';
-import { Button, Card, Label, Pill, PlayerBadge, Screen } from '@/components/ui';
-import { PROPERTY_GROUP_THEME } from '@/constants/theme';
+import { Button, Screen } from '@/components/ui';
 import { useGameAction } from '@/features/game/useGameAction';
 import type { GameView } from '@/features/game/useGameView';
 import { useGameStore } from '@/store/gameStore';
 import { formatINR } from '@/utils/currency';
+import { PropertyDeed } from './PropertyDeed';
 
 export function PropertyView({ view, propertyKey }: { view: GameView; propertyKey: PropertyKey }) {
   const send = useGameAction();
@@ -27,11 +23,6 @@ export function PropertyView({ view, propertyKey }: { view: GameView; propertyKe
   const deed = getDeed(propertyKey);
   const prop = state.properties[propertyKey];
   const me = view.me;
-  const lastDice = state.turn.roll?.total ?? 7;
-  const currentRent = prop.ownerId ? computeRent(state, propertyKey, lastDice) : 0;
-  const level = prop.hotel ? 4 : prop.houses;
-  const groupTheme = PROPERTY_GROUP_THEME[deed.group];
-  const owner = prop.ownerId ? state.players.find((p) => p.id === prop.ownerId) : undefined;
 
   const actions: { kind: PropertyActionKind; title: string; variant: 'primary' | 'secondary' | 'success' | 'danger' }[] = [];
   if (me && deed.kind === 'CITY') {
@@ -53,63 +44,7 @@ export function PropertyView({ view, propertyKey }: { view: GameView; propertyKe
   return (
     <Screen scroll testID="property-screen">
       <Button size="sm" variant="ghost" title="‹ Back" onPress={() => goBack(`/game/${view.snapshot.state.id}`)} className="self-start" />
-      <Card className="overflow-hidden p-0">
-        <View style={{ backgroundColor: groupTheme.color }} className="items-center px-4 py-5" testID="property-deed-header">
-          <Text style={{ color: groupTheme.onColor }} className="text-xs font-extrabold uppercase tracking-[4px] opacity-80">{GROUP_LABELS[deed.group]}</Text>
-          <Text style={{ color: groupTheme.onColor }} className="text-3xl font-black">{deed.name}</Text>
-        </View>
-        <View className="gap-3 p-5">
-          <View className="flex-row justify-between">
-            <View>
-              <Label>Owner</Label>
-              <View className="flex-row items-center gap-2">
-                {owner ? <PlayerBadge player={owner} size={20} testID="property-owner-badge" /> : null}
-                <Text className="text-lg font-bold text-ink">{prop.ownerId ? view.playerName(prop.ownerId) : 'Bank (unowned)'}</Text>
-              </View>
-            </View>
-            <View className="items-end">
-              <Label>Price</Label>
-              <Text className="text-lg font-bold text-ink">{formatINR(deed.price)}</Text>
-            </View>
-          </View>
-          {prop.mortgaged ? <Pill tone="bad">Mortgaged — no rent</Pill> : null}
-          {prop.ownerId ? (
-            <View>
-              <Label>Current rent</Label>
-              <Text className="text-2xl font-black text-ink" testID="current-rent">
-                {deed.kind === 'TRANSPORT_UTILITY' && deed.rent.type === 'DICE_MULTIPLIER' ? `${formatINR(currentRent)} on a ${lastDice}` : formatINR(currentRent)}
-              </Text>
-              {rentMultiplier(state, propertyKey) > 1 && currentRent > 0 ? (
-                <Text className="text-sm font-bold text-green-700" testID="rent-doubled">
-                  ×2 — owner has 3+ {GROUP_LABELS[deed.group]} properties
-                </Text>
-              ) : null}
-            </View>
-          ) : null}
-          <View className="gap-1 rounded-2xl bg-white p-3">
-            {rentTable(propertyKey).map((row, i) => {
-              const active = prop.ownerId && deed.kind === 'CITY' && i === level;
-              const amount = /^\d+$/.test(row.amount) ? formatINR(Number(row.amount)) : row.amount;
-              return (
-                <View key={row.label} className={`flex-row justify-between rounded-lg px-2 py-1 ${active ? 'bg-amber-100' : ''}`}>
-                  <Text className="text-base text-stone-700">{row.label}</Text>
-                  <Text className="text-base font-bold text-ink">{amount}</Text>
-                </View>
-              );
-            })}
-          </View>
-          <View className="flex-row flex-wrap gap-x-6 gap-y-2">
-            {deed.kind === 'CITY' ? (
-              <>
-                <Info label="House cost" value={formatINR(deed.houseCost)} />
-                <Info label="Hotel cost" value={formatINR(deed.hotelCost)} />
-                <Info label="Built" value={prop.hotel ? 'Hotel' : `${prop.houses} house${prop.houses === 1 ? '' : 's'}`} />
-              </>
-            ) : null}
-            <Info label="Mortgage value" value={formatINR(deed.mortgageValue)} />
-          </View>
-        </View>
-      </Card>
+      <PropertyDeed state={state} propertyKey={propertyKey} playerName={view.playerName} />
       {allowed.length ? (
         <View className="gap-3">
           {allowed.map((a) => (
@@ -130,11 +65,3 @@ export function PropertyView({ view, propertyKey }: { view: GameView; propertyKe
   );
 }
 
-function Info({ label, value }: { label: string; value: string }) {
-  return (
-    <View>
-      <Text className="text-xs font-bold uppercase tracking-wider text-stone-500">{label}</Text>
-      <Text className="text-base font-bold text-ink">{value}</Text>
-    </View>
-  );
-}

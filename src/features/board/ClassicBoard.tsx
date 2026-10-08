@@ -12,10 +12,21 @@ export const BOARD_BORDER = 2;
 
 /**
  * The physical Business board, digitised. READ-ONLY: renders authoritative
- * state (ownership, buildings, mortgages, positions) and has no handlers.
- * `size` is the outer side length; the board is always square.
+ * state (ownership, buildings, mortgages, positions). The optional handlers only
+ * open information (square / player details) — nothing on the board can change
+ * game state. `size` is the outer side length; the board is always square.
  */
-export const ClassicBoard = memo(function ClassicBoard({ state, size }: { state: Pick<GameState, 'players' | 'properties' | 'turn'>; size: number }) {
+export const ClassicBoard = memo(function ClassicBoard({
+  state,
+  size,
+  onSquarePress,
+  onTokenPress,
+}: {
+  state: Pick<GameState, 'players' | 'properties' | 'turn'>;
+  size: number;
+  onSquarePress?: (index: number) => void;
+  onTokenPress?: (playerId: string) => void;
+}) {
   const inner = size - 2 * (BOARD_FRAME + BOARD_BORDER);
   const geo = useMemo(() => boardGeometry(inner), [inner]);
   const spaces = useMemo(() => buildBoardSpaces(state), [state]);
@@ -47,9 +58,9 @@ export const ClassicBoard = memo(function ClassicBoard({ state, size }: { state:
       <View style={{ width: inner, height: inner, borderRadius: 8, overflow: 'hidden', borderWidth: 0.5, borderColor: COLORS.boardLine }}>
         <BoardCenter x={geo.corner} size={inner - 2 * geo.corner} />
         {spaces.map((space) => (
-          <BoardSquare key={space.index} space={space} slot={geo.slots[space.index]!} metrics={metrics} />
+          <BoardSquare key={space.index} space={space} slot={geo.slots[space.index]!} metrics={metrics} onPress={onSquarePress} />
         ))}
-        <BoardTokens players={state.players} currentPlayerId={state.turn.playerId} geo={geo} />
+        <BoardTokens players={state.players} currentPlayerId={state.turn.playerId} geo={geo} onTokenPress={onTokenPress} />
       </View>
     </View>
   );

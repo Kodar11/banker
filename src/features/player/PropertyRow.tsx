@@ -5,12 +5,13 @@ import { PROPERTY_GROUP_THEME } from '@/constants/theme';
 import { formatINR } from '@/utils/currency';
 import { openProperty } from '@/utils/navigation';
 
-export const PropertyRow = memo(function PropertyRow({ prop }: { prop: PropertyState }) {
+/** One owned property. Opens the property screen unless `onPress` says otherwise (e.g. the in-game details sheet). */
+export const PropertyRow = memo(function PropertyRow({ prop, onPress }: { prop: PropertyState; onPress?: () => void }) {
   const deed = getDeed(prop.key);
   const dev = prop.hotel ? '🏨 Hotel' : prop.houses > 0 ? '🏠'.repeat(prop.houses) : '';
   return (
     <Pressable
-      onPress={() => openProperty(prop.key)}
+      onPress={onPress ?? (() => openProperty(prop.key))}
       accessibilityRole="button"
       accessibilityLabel={`${deed.name}${prop.mortgaged ? ', mortgaged' : ''}`}
       testID={`property-${prop.key}`}

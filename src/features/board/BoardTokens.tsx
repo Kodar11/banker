@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Animated, Easing, Platform, Text, View } from 'react-native';
+import { AccessibilityInfo, Animated, Easing, Platform, Pressable, Text, View } from 'react-native';
 import type { PlayerState } from '@/engine/index.ts';
 import { COLORS, playerColor, playerInitial } from '@/constants/theme';
 import { clusterOffsets, forwardSteps, squareCenter, type BoardGeometry } from './boardModel';
@@ -35,6 +35,8 @@ interface TokenProps {
   size: number;
   isCurrent: boolean;
   reduceMotion: boolean;
+  /** Read-only: opens the player's details. */
+  onPress?: (playerId: string) => void;
 }
 
 /**
@@ -43,7 +45,7 @@ interface TokenProps {
  * running hop; the token first settles on the previous authoritative square,
  * then hops on, so it always ends exactly where the server says it is.
  */
-const Token = memo(function Token({ player, position, offset, geo, size, isCurrent, reduceMotion }: TokenProps) {
+const Token = memo(function Token({ player, position, offset, geo, size, isCurrent, reduceMotion, onPress }: TokenProps) {
   const at = (index: number, off = offset) => {
     const c = squareCenter(geo, index);
     return { x: c.x + off.x - size / 2, y: c.y + off.y - size / 2 };
@@ -116,7 +118,7 @@ const Token = memo(function Token({ player, position, offset, geo, size, isCurre
   return (
     <Animated.View
       testID={`board-token-${player.id}`}
-      pointerEvents="none"
+      pointerEvents={onPress ? 'box-none' : 'none'}
       style={{
         position: 'absolute',
         left: 0,
@@ -162,6 +164,17 @@ const Token = memo(function Token({ player, position, offset, geo, size, isCurre
           }}
         />
       ) : null}
+      {onPress ? (
+        <Pressable
+          testID={`board-token-press-${player.id}`}
+          onPress={() => onPress(player.id)}
+          hitSlop={Math.max(4, (28 - size) / 2)}
+          accessibilityRole="button"
+          accessibilityLabel={`${player.name}'s token`}
+          accessibilityHint="Shows player details"
+          style={{ position: 'absolute', left: 0, top: 0, width: size, height: size, borderRadius: size / 2 }}
+        />
+      ) : null}
     </Animated.View>
   );
 });
@@ -175,10 +188,12 @@ export const BoardTokens = memo(function BoardTokens({
   players,
   currentPlayerId,
   geo,
+  onTokenPress,
 }: {
   players: PlayerState[];
   currentPlayerId: string | null;
   geo: BoardGeometry;
+  onTokenPress?: (playerId: string) => void;
 }) {
   const reduceMotion = useReduceMotion();
   const size = tokenSize(geo);
@@ -186,7 +201,7 @@ export const BoardTokens = memo(function BoardTokens({
   const bySquare = new Map<number, string[]>();
   for (const p of active) bySquare.set(p.position, [...(bySquare.get(p.position) ?? []), p.id]);
   return (
-    <View pointerEvents="none" style={{ position: 'absolute', left: 0, top: 0, width: geo.size, height: geo.size }} testID="board-tokens">
+    <View pointerEvents={onTokenPress ? 'box-none' : 'none'} style={{ position: 'absolute', left: 0, top: 0, width: geo.size, height: geo.size }} testID="board-tokens">
       {active.map((p) => {
         const here = bySquare.get(p.position)!;
         const offset = clusterOffsets(here.length, size)[here.indexOf(p.id)]!;
@@ -200,6 +215,7 @@ export const BoardTokens = memo(function BoardTokens({
             size={size}
             isCurrent={p.id === currentPlayerId}
             reduceMotion={reduceMotion}
+            onPress={onTokenPress}
           />
         );
       })}

@@ -218,14 +218,19 @@ describe('Main game', () => {
     const f = new Fixture().loadAs('Bilal');
     await render(<GameScreen view={viewFor(f, 'Bilal')} />);
     expect(screen.queryByTestId('roll-button')).toBeNull();
-    expect(screen.getByText('Asha is about to roll')).toBeTruthy();
+    expect(screen.getByTestId('turn-title')).toHaveTextContent("ASHA'S TURN");
+    expect(screen.getByTestId('turn-detail')).toHaveTextContent(/Asha is about to roll/);
+    expect(screen.getByTestId('turn-waiting')).toHaveTextContent('Rolling…');
   });
 
-  it('after rolling: dice result, destination and BUY ₹9,500 / DECLINE', async () => {
+  it('after rolling: dice result, destination; Choose opens BUY ₹9,500 / DECLINE', async () => {
     const f = new Fixture().roll('Asha', 1, 2).loadAs('Asha');
     api.action.mockResolvedValue(ok(f.snapshot()));
     await render(<GameScreen view={viewFor(f, 'Asha')} />);
-    expect(screen.getByTestId('destination')).toHaveTextContent(/Railway/);
+    expect(screen.getByTestId('turn-detail')).toHaveTextContent('Turn 1 · 🎲 3 → Railway');
+    expect(screen.queryByTestId('roll-button')).toBeNull();
+    expect(screen.queryByTestId('buy-button')).toBeNull(); // nothing to buy from the board itself
+    await fireEvent.press(screen.getByTestId('turn-choose'));
     expect(screen.getByText('BUY ₹9,500')).toBeTruthy();
     await fireEvent.press(screen.getByTestId('buy-button'));
     await waitFor(() => expect(api.action.mock.calls[0]![3]).toEqual({ type: 'BUY_PROPERTY' }));
@@ -246,6 +251,7 @@ describe('Main game', () => {
     const f = new Fixture().roll('Asha', 1, 2).loadAs('Asha');
     useGameStore.getState().setPending('BUY_PROPERTY');
     await render(<GameScreen view={viewFor(f, 'Asha')} />);
+    await fireEvent.press(screen.getByTestId('turn-choose'));
     expect(screen.getByTestId('buy-button').props.accessibilityState).toMatchObject({ disabled: true, busy: true });
   });
 
@@ -254,6 +260,10 @@ describe('Main game', () => {
     f.roll('Asha', 1, 2).act('Asha', { type: 'BUY_PROPERTY' }).act('Asha', { type: 'END_TURN' });
     f.roll('Bilal', 1, 2).loadAs('Bilal');
     await render(<GameScreen view={viewFor(f, 'Bilal')} />);
+    // Affordable: the primary action pays in one tap; the card explains who and why.
+    expect(screen.getByTestId('turn-pay')).toHaveTextContent('Pay ₹1,000');
+    expect(screen.getByTestId('context-card')).toHaveTextContent(/You owe ₹1,000.*to Asha · Rent for Railway/);
+    await fireEvent.press(screen.getByTestId('context-cta'));
     expect(screen.getByText('Owned by Asha')).toBeTruthy();
     expect(screen.getByText('PAY RENT ₹1,000')).toBeTruthy();
     expect(screen.queryByTestId('bankrupt-button')).toBeNull();
@@ -264,6 +274,8 @@ describe('Main game', () => {
     broke.act('Bilal', { type: 'TRANSFER_MONEY', toPlayerId: broke.ids.Asha!, amount: 24500 });
     broke.roll('Bilal', 1, 2).loadAs('Bilal');
     await render(<GameScreen view={viewFor(broke, 'Bilal')} />);
+    expect(screen.queryByTestId('turn-pay')).toBeNull();
+    await fireEvent.press(screen.getByTestId('turn-choose')); // "Raise cash"
     expect(screen.getByText('You’re ₹500 short.')).toBeTruthy();
     expect(screen.getByTestId('raise-loan')).toBeTruthy();
     expect(screen.getByTestId('bankrupt-button')).toBeTruthy();
@@ -275,6 +287,8 @@ describe('Main game', () => {
     for (const key of ['DELHI', 'SHIMLA', 'RAILWAY'] as const) f.state.properties[key] = { ...f.state.properties[key], ownerId: f.ids.Asha! };
     f.roll('Asha', 2, 3).loadAs('Asha'); // Income Tax (square 5)
     await render(<GameScreen view={viewFor(f, 'Asha')} />);
+    expect(screen.getByTestId('turn-pay')).toHaveTextContent('Pay ₹150');
+    await fireEvent.press(screen.getByTestId('context-cta')); // View Payment
     expect(within(screen.getByTestId('payment-card')).getByText('Income Tax — 3 properties × ₹50')).toBeTruthy();
     expect(screen.getByText('PAY ₹150')).toBeTruthy();
     f.act('Asha', { type: 'PAY_TAX' });
@@ -285,14 +299,21 @@ describe('Main game', () => {
   it('paused game hides actions and offers resume', async () => {
     const f = new Fixture().act('Bilal', { type: 'PAUSE_GAME' }).loadAs('Asha');
     await render(<GameScreen view={viewFor(f, 'Asha')} />);
-    expect(screen.getByTestId('paused-card')).toBeTruthy();
+    expect(screen.getByTestId('context-paused')).toBeTruthy();
+    expect(screen.getByTestId('turn-title')).toHaveTextContent('GAME PAUSED');
     expect(screen.queryByTestId('roll-button')).toBeNull();
-    expect(screen.getByTestId('resume-button')).toBeTruthy();
+    expect(screen.queryByTestId('open-pay')).toBeNull(); // only "More" while paused
+    expect(screen.getByTestId('open-more')).toBeTruthy();
+    api.action.mockResolvedValue(ok(f.snapshot()));
+    await fireEvent.press(screen.getByTestId('resume-button'));
+    await waitFor(() => expect(api.action.mock.calls[0]![3]).toEqual({ type: 'RESUME_GAME' }));
   });
 
   it('finished game shows the winner', async () => {
     const f = new Fixture().act('Asha', { type: 'END_GAME' }).loadAs('Bilal');
     await render(<GameScreen view={viewFor(f, 'Bilal')} />);
+    expect(screen.getByTestId('context-card')).toHaveTextContent(/wins!/);
+    await fireEvent.press(screen.getByTestId('context-cta')); // Standings
     expect(screen.getByTestId('finished-card')).toBeTruthy();
     expect(within(screen.getByTestId('finished-card')).getByText(/wins!/)).toBeTruthy();
   });
@@ -303,6 +324,8 @@ describe('Main game', () => {
     f.act('Asha', { type: 'REQUEST_UNDO', targetActionId: f.state.undoStack.at(-1)!.actionId }).loadAs('Bilal');
     api.action.mockResolvedValue(ok(f.snapshot()));
     await render(<GameScreen view={viewFor(f, 'Bilal')} />);
+    expect(screen.getByTestId('context-undo')).toBeTruthy();
+    await fireEvent.press(screen.getByTestId('context-cta')); // Review
     expect(screen.getByTestId('undo-banner')).toBeTruthy();
     await fireEvent.press(screen.getByTestId('undo-approve'));
     await waitFor(() => expect(api.action.mock.calls[0]![3]).toEqual({ type: 'APPROVE_UNDO', requestId: f.state.undoRequest!.id }));
@@ -394,6 +417,7 @@ describe('Errors and reconnection', () => {
         <NoticeToast />
       </>,
     );
+    await fireEvent.press(screen.getByTestId('turn-choose'));
     await fireEvent.press(screen.getByTestId('buy-button'));
     expect(await screen.findByText('That property was already purchased.')).toBeTruthy();
   });
@@ -403,6 +427,7 @@ describe('Errors and reconnection', () => {
     api.action.mockResolvedValue({ ok: false, error: { code: 'STALE_STATE', message: 'The game just changed — check the screen and try again.' } });
     api.state.mockResolvedValue(ok(f.snapshot()));
     await render(<GameScreen view={viewFor(f, 'Asha')} />);
+    await fireEvent.press(screen.getByTestId('turn-choose'));
     await fireEvent.press(screen.getByTestId('buy-button'));
     await waitFor(() => expect(api.state).toHaveBeenCalled());
   });

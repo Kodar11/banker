@@ -11,9 +11,17 @@ appId: com.boardgamebank.businessbanker
       - tapOn:
           id: roll-button
       - extendedWaitUntil:
-          visible:
-            id: dice-result
+          notVisible:
+            id: roll-button
           timeout: 15000
+      # A decision (buy / card / payment I can't cover) opens from the turn bar's primary action.
+      - runFlow:
+          when:
+            visible:
+              id: turn-choose
+          commands:
+            - tapOn:
+                id: turn-choose
       - runFlow:
           when:
             notVisible:

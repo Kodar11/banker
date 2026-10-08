@@ -1,5 +1,5 @@
-import { memo } from 'react';
-import { Text, View, type ViewStyle } from 'react-native';
+import { memo, type ReactNode } from 'react';
+import { Pressable, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import type { PropertyKey, SpecialSpaceType } from '@/engine/index.ts';
 import { COLORS, PROPERTY_GROUP_THEME, playerColor } from '@/constants/theme';
 import { formatINR } from '@/utils/currency';
@@ -73,11 +73,50 @@ function describe(space: BoardSpaceViewModel): string {
 }
 
 /**
- * One square of the physical board. Purely visual: no handlers, no state.
+ * The square's frame. With `onPress` it becomes tappable — READ-ONLY: a tap only
+ * opens information, it never sends a game action — but it looks exactly the same
+ * (a board, not a grid of buttons); only a faint press feedback.
+ */
+function SquareFrame({ space, style, onPress, children }: { space: BoardSpaceViewModel; style: StyleProp<ViewStyle>; onPress?: (index: number) => void; children: ReactNode }) {
+  const label = describe(space);
+  if (!onPress) {
+    return (
+      <View style={style} testID={`board-square-${space.index}`} accessible accessibilityLabel={label}>
+        {children}
+      </View>
+    );
+  }
+  return (
+    <Pressable
+      style={({ pressed }) => [style, pressed ? { opacity: 0.7 } : null]}
+      testID={`board-square-${space.index}`}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityHint="Shows details"
+      onPress={() => onPress(space.index)}
+    >
+      {children}
+    </Pressable>
+  );
+}
+
+/**
+ * One square of the physical board. Purely visual: no state; an optional
+ * read-only `onPress` for opening details.
  * Property group colour = what the property is (tint + inner colour band);
  * player colour = who owns it (thin outer strip).
  */
-export const BoardSquare = memo(function BoardSquare({ space, slot, metrics }: { space: BoardSpaceViewModel; slot: SquareSlot; metrics: SquareMetrics }) {
+export const BoardSquare = memo(function BoardSquare({
+  space,
+  slot,
+  metrics,
+  onPress,
+}: {
+  space: BoardSpaceViewModel;
+  slot: SquareSlot;
+  metrics: SquareMetrics;
+  onPress?: (index: number) => void;
+}) {
   const frame: ViewStyle = {
     position: 'absolute',
     left: slot.x,
@@ -91,12 +130,7 @@ export const BoardSquare = memo(function BoardSquare({ space, slot, metrics }: {
 
   if (space.isCorner) {
     return (
-      <View
-        style={[frame, { backgroundColor: COLORS.boardCorner, alignItems: 'center', justifyContent: 'center', padding: 2 }]}
-        testID={`board-square-${space.index}`}
-        accessible
-        accessibilityLabel={describe(space)}
-      >
+      <SquareFrame space={space} onPress={onPress} style={[frame, { backgroundColor: COLORS.boardCorner, alignItems: 'center', justifyContent: 'center', padding: 2 }]}>
         <Text style={{ fontSize: metrics.nameFont * 2 }} accessible={false}>
           {SPECIAL_ICONS[space.specialType!]}
         </Text>
@@ -108,7 +142,7 @@ export const BoardSquare = memo(function BoardSquare({ space, slot, metrics }: {
         >
           {space.name}
         </Text>
-      </View>
+      </SquareFrame>
     );
   }
 
@@ -140,12 +174,7 @@ export const BoardSquare = memo(function BoardSquare({ space, slot, metrics }: {
   const nameFont = Math.min(fitFont(space.name, length - 2 * pad, metrics.nameFont), (thickness - 2 - below) / (lines * 1.25));
 
   return (
-    <View
-      style={[frame, { backgroundColor: theme?.tint ?? COLORS.board }]}
-      testID={`board-square-${space.index}`}
-      accessible
-      accessibilityLabel={describe(space)}
-    >
+    <SquareFrame space={space} onPress={onPress} style={[frame, { backgroundColor: theme?.tint ?? COLORS.board }]}>
       {theme ? (
         <View
           testID={`board-band-${space.propertyKey}`}
@@ -206,6 +235,6 @@ export const BoardSquare = memo(function BoardSquare({ space, slot, metrics }: {
       </View>
 
       {ownerColor ? <View testID={`board-owner-strip-${space.propertyKey}`} style={[edgeStyle(OUTER[slot.side], metrics.ownerStrip), { backgroundColor: ownerColor.color }]} /> : null}
-    </View>
+    </SquareFrame>
   );
 });
