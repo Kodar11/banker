@@ -21,7 +21,7 @@ interface GameStoreState {
   notice: Notice | null;
 
   reset: (gameId: string | null) => void;
-  /** Applies a server snapshot. Older (and equal) versions are ignored so stale responses never win. Returns true if applied. */
+  /** Applies a server snapshot of the attached game. Older (and equal) versions are ignored so stale responses never win. Returns true if applied. */
   applySnapshot: (snapshot: GameSnapshot) => boolean;
   setConnection: (c: ConnectionStatus) => void;
   setOnline: (ids: string[]) => void;
@@ -46,7 +46,8 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     set({ gameId, snapshot: null, connection: 'connecting', onlinePlayerIds: [], pendingAction: null, loadError: null, notice: null }),
   applySnapshot: (snapshot) => {
     const current = get().snapshot;
-    if (get().gameId && snapshot.state.id !== get().gameId) return false;
+    // Only the game this phone is attached to: a late response from a game it left must never land here.
+    if (snapshot.state.id !== get().gameId) return false;
     if (current && snapshot.state.version < current.state.version) return false;
     // Same version = same server state (every mutation bumps it). Keep the existing
     // object so selectors, memos and effects don't re-run on a no-op refetch.

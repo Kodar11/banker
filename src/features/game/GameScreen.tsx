@@ -3,7 +3,7 @@ import { Alert, ScrollView, Text, useWindowDimensions, View, type LayoutChangeEv
 import { SafeAreaInsetsContext, SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { isPropertyKey, positionOfProperty, spaceAt, spaceName, topUndoable } from '@/engine/index.ts';
-import { ConfirmDialog, ConnectionBanner, Sheet } from '@/components/ui';
+import { Button, ConfirmDialog, ConnectionBanner, Sheet } from '@/components/ui';
 import { ClassicBoard } from '@/features/board/ClassicBoard';
 import { SquareDetails } from '@/features/board/SquareDetails';
 import { LoanSheet } from '@/features/loan/LoanSheet';
@@ -19,6 +19,7 @@ import { AdaptiveActionBar, type BarAction } from './AdaptiveActionBar';
 import { ContextualCard } from './ContextualCard';
 import { EventFeed, FinishedView, PlayersStrip, UndoBanner } from './GamePanels';
 import { needsDecision, pickContext, type ContextTarget } from './gameFocus';
+import { leaveGame } from './leaveGame';
 import { planScreenLayout, SCREEN_PADDING, screenGutter, SECTION_GAP } from './layout';
 import { MoreActions, type MoreItem } from './MoreActions';
 import { TurnActionBar } from './TurnActionBar';
@@ -324,7 +325,16 @@ export function GameScreen({ view }: { view: GameView }) {
 
         {/* Any height the sections could not use sits here, so the actions stay at the bottom of the screen. */}
         <View testID="action-area" style={{ flexGrow: 1, justifyContent: 'flex-end' }}>
-          <AdaptiveActionBar layout={plan.actions} buttonHeight={plan.actionButtonHeight} actions={playing ? barActions : barActions.filter((a) => a.key === 'more')} />
+          {state.status === 'FINISHED' ? (
+            // The game is over: the way out is the normal Create / Join flow, with nothing of this game kept.
+            <View testID="game-over-actions" style={{ flexDirection: 'row', gap: 6, minHeight: plan.actionButtonHeight }}>
+              <Button className="flex-1 px-2" size="sm" title="Create New Game" testID="new-game-button" onPress={() => leaveGame('/create-game')} />
+              <Button className="flex-1 px-2" size="sm" variant="secondary" title="Join Game" testID="join-another-button" onPress={() => leaveGame('/join-game')} />
+              <Button className="px-3" size="sm" variant="ghost" title="More" testID="open-more" onPress={() => setPanel({ kind: 'more' })} />
+            </View>
+          ) : (
+            <AdaptiveActionBar layout={plan.actions} buttonHeight={plan.actionButtonHeight} actions={playing ? barActions : barActions.filter((a) => a.key === 'more')} />
+          )}
         </View>
       </ScrollView>
 

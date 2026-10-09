@@ -48,8 +48,9 @@ export const PROPERTY_GROUP_THEME: Record<PropertyGroup, GroupTheme> = {
 // ---------------------------------------------------------------------------
 // PLAYER colours — "who is this?"
 // Deliberately disjoint from the property-group palette. A player's colour is
-// fixed by their seat (assigned once at join, never changes), so it is stable
-// for the whole game on every device.
+// fixed by their seat (their place in the turn order, drawn by the server when
+// the game starts and never changed after), so it is stable for the whole game
+// on every device.
 // ---------------------------------------------------------------------------
 
 export const PLAYER_ORANGE = '#F59E0B';
@@ -80,7 +81,7 @@ export const PLAYER_COLORS: readonly PlayerColor[] = [
   { name: 'Charcoal', color: PLAYER_CHARCOAL, onColor: '#FFFFFF' },
 ];
 
-/** A player's identity colour, from their (immutable) seat. */
+/** A player's identity colour, from their seat. */
 export function playerColor(player: { seat: number }): PlayerColor {
   const n = PLAYER_COLORS.length;
   return PLAYER_COLORS[((player.seat % n) + n) % n]!;

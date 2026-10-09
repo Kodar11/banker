@@ -45,7 +45,7 @@ describe('dice', () => {
 });
 
 describe('turn order', () => {
-  it('starts with the host and gives everyone starting cash', () => {
+  it('starts with seat 0 (the harness pins the draw to joining order) and gives everyone starting cash', () => {
     const g = new TestGame();
     expect(g.state.status).toBe('ACTIVE');
     expect(g.current).toBe('Asha');

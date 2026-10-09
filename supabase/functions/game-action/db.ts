@@ -299,6 +299,17 @@ export async function persistResult(tx: Tx, prevVersion: number, result: EngineR
     where id = ${s.id} and state_version = ${prevVersion}`;
   if (updated.count !== 1) throw new Error('STALE_WRITE');
 
+  // START_GAME draws the turn order (seats), in this same transaction as status/turn. unique (game_id, seat)
+  // is checked row by row, so the old seats are moved out of the way before the drawn ones are written.
+  if (result.events.some((e) => e.type === 'GAME_STARTED')) {
+    const seatRows = s.players.map((p) => ({ id: p.id, seat: p.seat }));
+    await tx`update public.players set seat = seat + 1000 where game_id = ${s.id}`;
+    await tx`
+      update public.players p set seat = x.seat
+      from jsonb_to_recordset(${json(seatRows)}) as x(id uuid, seat int)
+      where p.id = x.id and p.game_id = ${s.id}`;
+  }
+
   const playerRows = s.players.map((p) => ({
     id: p.id,
     ready: p.ready,

@@ -1,4 +1,5 @@
-# App creates a game as "Tanmay", the bot joins, app starts it.
+# App creates a game as "Tanmay", the bot joins, app starts it. The server draws who goes first:
+# if that is the bot, it plays its turn, so the flow always continues on the app player's turn.
 appId: com.boardgamebank.businessbanker
 ---
 - launchApp:
@@ -33,3 +34,13 @@ appId: com.boardgamebank.businessbanker
     visible:
       id: game-screen
     timeout: 20000
+- runScript:
+    file: ../scripts/bot.js
+    env:
+      OP: play
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_KEY: ${SUPABASE_KEY}
+- extendedWaitUntil:
+    visible:
+      id: roll-button
+    timeout: 30000

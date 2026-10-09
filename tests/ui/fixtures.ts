@@ -23,6 +23,7 @@ export class Fixture {
   transactions: TransactionRecord[] = [];
   events: GameEventRecord[] = [];
   private faces: number[] = [];
+  private randoms: number[] = [];
 
   constructor(names = ['Asha', 'Bilal'], { start = true } = {}) {
     const [host, ...rest] = names;
@@ -32,7 +33,22 @@ export class Fixture {
       this.ids[name] = id();
       this.state = this.absorb(joinGame(this.state, { playerId: this.ids[name]!, name }, this.ctx()));
     }
-    if (start) this.act(host!, { type: 'START_GAME' });
+    if (start) this.start();
+  }
+
+  /**
+   * Host starts the game. The engine draws the turn order at random; fixtures pin the
+   * draw to `order` (default: joining order) so tests can script turns by name.
+   */
+  start(order: string[] = Object.keys(this.ids)): this {
+    const pool = Object.keys(this.ids);
+    // Replays the engine's Fisher–Yates backwards: pick, for each slot from the last, the RNG value that puts `order` there.
+    for (let i = pool.length - 1; i > 0; i -= 1) {
+      const j = pool.indexOf(order[i]!);
+      this.randoms.push((j + 0.5) / (i + 1));
+      [pool[i], pool[j]] = [pool[j]!, pool[i]!];
+    }
+    return this.act(Object.keys(this.ids)[0]!, { type: 'START_GAME' });
   }
 
   ctx(): EngineContext {
@@ -40,6 +56,8 @@ export class Fixture {
       actionId: id(),
       now: new Date().toISOString(),
       random: () => {
+        const raw = this.randoms.shift();
+        if (raw !== undefined) return raw;
         const f = this.faces.shift();
         return f === undefined ? 0.5 : (f - 1) / 6 + 0.01;
       },

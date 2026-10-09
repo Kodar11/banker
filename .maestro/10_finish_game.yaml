@@ -17,6 +17,11 @@ appId: com.boardgamebank.businessbanker
 - extendedWaitUntil:
     visible: '(?i).* wins!'
     timeout: 15000
+# Game Over is not a dead end: the way on to another game is on screen.
+- assertVisible:
+    id: new-game-button
+- assertVisible:
+    id: join-another-button
 - tapOn:
     id: context-cta
 - assertVisible:

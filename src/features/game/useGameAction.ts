@@ -44,6 +44,8 @@ export function useGameAction() {
         await sleep(700 * attempt);
         res = await gameApi.action(session, actionId, snapshot.state.version, action);
       }
+      // Left this game while the request was in flight: its outcome belongs to no screen any more.
+      if (useGameStore.getState().gameId !== session.gameId) return { ok: false, error: { code: 'NETWORK', message: 'You left that game.' } };
       useGameStore.getState().setPending(null);
 
       if (res.ok) {

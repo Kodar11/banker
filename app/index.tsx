@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Text, View } from 'react-native';
 import { router, usePathname } from 'expo-router';
 import { Button, Screen } from '@/components/ui';
+import { detachFromGame } from '@/features/game/leaveGame';
 import { activeGameRoute } from '@/utils/navigation';
 import { startupRouting } from '@/utils/startupRouting';
 import { isSupabaseConfigured } from '@/lib/supabase';
@@ -11,7 +12,6 @@ import { useSessionStore } from '@/store/sessionStore';
 export default function Home() {
   const session = useSessionStore((s) => s.session);
   const hydrated = useSessionStore((s) => s.hydrated);
-  const clearSession = useSessionStore((s) => s.clearSession);
   const status = useGameStore((s) => (s.snapshot && s.snapshot.state.id === session?.gameId ? s.snapshot.state.status : null));
   const loadError = useGameStore((s) => s.loadError);
   const gone = !!loadError && ['FORBIDDEN', 'NOT_FOUND', 'GAME_EXPIRED'].includes(loadError.code);
@@ -32,14 +32,20 @@ export default function Home() {
     }
     if (gone) {
       startupRouting.markDone();
-      useGameStore.getState().reset(null);
-      void clearSession();
+      detachFromGame();
       return;
     }
     if (!status) return; // wait for the server snapshot (fetched by GameSyncHost)
     startupRouting.markDone();
     if (target) router.replace(target);
-  }, [hydrated, session, status, gone, target, clearSession, pathname]);
+  }, [hydrated, session, status, gone, target, pathname]);
+
+  // A finished game has nothing to go back to. Once the player is on Home, let go of it (session,
+  // snapshot, realtime) so the next Create / Join starts from nothing. Only while Home is the screen
+  // in front: it also sits underneath the game screen, where the final standings are still shown.
+  useEffect(() => {
+    if (pathname === '/' && session && status === 'FINISHED') detachFromGame();
+  }, [pathname, session, status]);
 
   return (
     <Screen

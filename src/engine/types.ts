@@ -24,6 +24,10 @@ export type PlayerStatus = 'ACTIVE' | 'BANKRUPT';
 export interface PlayerState {
   id: string;
   name: string;
+  /**
+   * Turn-order position. Joining order while in the lobby; START_GAME replaces it
+   * with a random draw (0 = first to roll) and it never changes after that.
+   */
   seat: number;
   isHost: boolean;
   ready: boolean;

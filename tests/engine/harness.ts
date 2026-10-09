@@ -38,7 +38,13 @@ export class TestGame {
   ids: Record<string, string> = {};
   nowMs = Date.parse('2026-01-01T10:00:00.000Z');
   private queuedFaces: number[] = [];
+  private queuedRandoms: number[] = [];
 
+  /**
+   * START_GAME draws the turn order at random. Unless a test asks for the raw draw
+   * (`start: false`, then `queueRandom` + START_GAME), the harness pins it to the
+   * joining order so every other test can script turns by name.
+   */
   constructor(names: string[] = ['Asha', 'Bilal', 'Chitra'], { start = true } = {}) {
     const [host, ...others] = names;
     if (!host) throw new Error('need a host');
@@ -49,7 +55,10 @@ export class TestGame {
       this.ids[name] = testId();
       this.absorb(joinGame(this.state, { playerId: this.ids[name], name }, this.ctx()));
     }
-    if (start) this.act(host, { type: 'START_GAME' });
+    if (start) {
+      this.queueRandom(...keepOrder(names.length));
+      this.act(host, { type: 'START_GAME' });
+    }
   }
 
   ctx(actionId: string = testId()): EngineContext {
@@ -57,6 +66,8 @@ export class TestGame {
       actionId,
       now: new Date(this.nowMs).toISOString(),
       random: () => {
+        const raw = this.queuedRandoms.shift();
+        if (raw !== undefined) return raw;
         const face = this.queuedFaces.shift();
         return face === undefined ? 0.5 : faceToRandom(face);
       },
@@ -92,6 +103,18 @@ export class TestGame {
 
   queueDice(...faces: number[]): void {
     this.queuedFaces.push(...faces);
+  }
+
+  /** Host starts a `start: false` game with the turn-order draw coming out as `order` (names, first to roll first). */
+  startWith(order: string[]): EngineResult {
+    const names = Object.keys(this.ids);
+    this.queueRandom(...orderRandoms(names, order));
+    return this.act(names[0]!, { type: 'START_GAME' });
+  }
+
+  /** Raw RNG values in [0, 1), consumed before any queued dice. */
+  queueRandom(...values: number[]): void {
+    this.queuedRandoms.push(...values);
   }
 
   private absorb(result: EngineResult): EngineResult {
@@ -153,6 +176,23 @@ export class TestGame {
       throw new Error(`Invariant violated:\n${[...money, ...props, ...players].join('\n')}`);
     }
   }
+}
+
+/** RNG values that make START_GAME's shuffle of `players` players keep the joining order. */
+export function keepOrder(players: number): number[] {
+  return Array.from({ length: Math.max(0, players - 1) }, () => 0.999);
+}
+
+/** RNG values that make START_GAME's shuffle turn the joining order `names` into `order` (the engine's Fisher–Yates, replayed). */
+export function orderRandoms(names: string[], order: string[]): number[] {
+  const pool = [...names];
+  const out: number[] = [];
+  for (let i = pool.length - 1; i > 0; i -= 1) {
+    const j = pool.indexOf(order[i]!);
+    out.push((j + 0.5) / (i + 1));
+    [pool[i], pool[j]] = [pool[j]!, pool[i]!];
+  }
+  return out;
 }
 
 /** Dice faces that sum to `total` (2–12). */

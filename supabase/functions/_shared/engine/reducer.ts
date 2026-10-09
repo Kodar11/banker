@@ -324,14 +324,33 @@ function startGame(d: Draft, actor: PlayerState): void {
     fail('NOT_ENOUGH_PLAYERS', `Need at least ${RULES.players.min} players to start.`);
   }
   d.setStatus('ACTIVE');
-  const ordered = [...d.state.players].sort((a, b) => a.seat - b.seat);
+  // The turn order is drawn here, once, with the server's RNG, and stored as each player's seat:
+  // seat 0 rolls first and every later turn follows seat order. Joining order (the host) means nothing.
+  const ordered = shuffled([...d.state.players].sort((a, b) => a.seat - b.seat), d.ctx.random);
+  ordered.forEach((p, seat) => {
+    p.seat = seat;
+  });
+  d.state.players = ordered;
   for (const p of ordered) {
     d.transfer({ type: 'STARTING_FUNDS', from: null, to: p.id, amount: RULES.startingCash, memo: 'Starting cash' });
   }
   const first = ordered[0];
   if (!first) fail('NOT_ENOUGH_PLAYERS', 'No players.');
   d.state.turn = { ...freshTurn(), playerId: first.id, number: 1 };
-  d.event('GAME_STARTED', actor.id, `Game started! ${first.name} goes first`, { firstPlayerId: first.id });
+  d.event('GAME_STARTED', actor.id, `Game started! ${first.name} goes first`, {
+    firstPlayerId: first.id,
+    turnOrder: ordered.map((p) => p.id),
+  });
+}
+
+/** Fisher–Yates shuffle driven by the injected RNG (every ordering equally likely). */
+function shuffled<T>(items: readonly T[], random: () => number): T[] {
+  const out = [...items];
+  for (let i = out.length - 1; i > 0; i -= 1) {
+    const j = Math.min(Math.max(Math.floor(random() * (i + 1)), 0), i);
+    [out[i], out[j]] = [out[j]!, out[i]!];
+  }
+  return out;
 }
 
 export function rollDiceValues(random: () => number): number[] {

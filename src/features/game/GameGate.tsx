@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { Button, ErrorState, LoadingState } from '@/components/ui';
 import { useGameStore } from '@/store/gameStore';
 import { useSessionStore } from '@/store/sessionStore';
+import { leaveGame } from './leaveGame';
 import { useGameView, type GameView } from './useGameView';
 
 type Area = 'lobby' | 'game' | 'any';
@@ -15,7 +16,6 @@ type Area = 'lobby' | 'game' | 'any';
 export function GameGate({ gameId, area, children }: { gameId: string; area: Area; children: (view: GameView) => ReactNode }) {
   const session = useSessionStore((s) => s.session);
   const hydrated = useSessionStore((s) => s.hydrated);
-  const clearSession = useSessionStore((s) => s.clearSession);
   const loadError = useGameStore((s) => s.loadError);
   const belongs = !!session && session.gameId === gameId;
   const view = useGameView();
@@ -34,12 +34,6 @@ export function GameGate({ gameId, area, children }: { gameId: string; area: Are
     if (elsewhere && area !== 'any') router.replace(area === 'lobby' ? `/lobby/${elsewhere}` : `/game/${elsewhere}`);
   }, [elsewhere, area]);
 
-  const leave = async () => {
-    await clearSession();
-    useGameStore.getState().reset(null);
-    router.replace('/');
-  };
-
   if (!hydrated || (elsewhere && area !== 'any')) return <LoadingState message="Loading…" />;
   if (!belongs) {
     return (
@@ -56,7 +50,7 @@ export function GameGate({ gameId, area, children }: { gameId: string; area: Are
       <ErrorState
         title={gone ? 'Game unavailable' : "Couldn't load the game"}
         message={loadError.message}
-        action={gone ? <Button title="Leave game" onPress={leave} /> : <Button title="Try again" onPress={() => useGameStore.getState().setLoadError(null)} />}
+        action={gone ? <Button title="Leave game" onPress={() => leaveGame()} /> : <Button title="Try again" onPress={() => useGameStore.getState().setLoadError(null)} />}
       />
     );
   }

@@ -13,6 +13,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createSql, type Sql } from '../../supabase/functions/game-action/db.ts';
 import { handleRequest, type HandlerDeps } from '../../supabase/functions/game-action/handler.ts';
 import type { ApiResponse, GameAction, GameSnapshot, StateBroadcast } from '../../supabase/functions/_shared/engine/index.ts';
+import { orderRandoms } from '../engine/harness.ts';
 
 const DATABASE_URL = process.env.DATABASE_URL;
 
@@ -22,6 +23,8 @@ describe.skipIf(!DATABASE_URL)('game-action handler (Postgres)', () => {
   let sql: Sql;
   const broadcasts: { gameId: string; payload: StateBroadcast }[] = [];
   let queuedDice: number[] = [];
+  /** Raw RNG values, used before queued dice (pins START_GAME's turn-order draw). */
+  let queuedRandoms: number[] = [];
   let deps: HandlerDeps;
 
   beforeAll(() => {
@@ -32,6 +35,8 @@ describe.skipIf(!DATABASE_URL)('game-action handler (Postgres)', () => {
         broadcasts.push({ gameId, payload });
       },
       random: () => {
+        const raw = queuedRandoms.shift();
+        if (raw !== undefined) return raw;
         const face = queuedDice.shift();
         return face === undefined ? Math.random() : (face - 1) / 6 + 0.01;
       },
@@ -72,8 +77,14 @@ describe.skipIf(!DATABASE_URL)('game-action handler (Postgres)', () => {
       seats[name] = { playerId: joined.playerId, token: t };
     }
     let version = (await state(gameId, seats[host!]!)).state.version;
-    const act = async (name: string, action: GameAction, opts: { actionId?: string; expectedVersion?: number } = {}) => {
+    const act = async (
+      name: string,
+      action: GameAction,
+      /** START_GAME only — `order`: the turn order the draw produces (default: joining order, so tests can script turns by name); `randomOrder`: a real draw. */
+      opts: { actionId?: string; expectedVersion?: number; order?: string[]; randomOrder?: boolean } = {},
+    ) => {
       const seat = seats[name]!;
+      if (action.type === 'START_GAME' && !opts.randomOrder) queuedRandoms = orderRandoms(names, opts.order ?? names);
       const res = await call({
         op: 'action',
         gameId,
@@ -83,6 +94,7 @@ describe.skipIf(!DATABASE_URL)('game-action handler (Postgres)', () => {
         expectedVersion: opts.expectedVersion ?? version,
         action,
       });
+      queuedRandoms = [];
       if (res.ok) version = res.snapshot.state.version;
       return res;
     };
@@ -113,6 +125,98 @@ describe.skipIf(!DATABASE_URL)('game-action handler (Postgres)', () => {
     expect(snap.state.players.every((p) => p.balance === 25000)).toBe(true);
     expect(snap.transactions.filter((t) => t.type === 'STARTING_FUNDS')).toHaveLength(3);
     await ledgerOk(g.gameId);
+  });
+
+  describe('random starting player', () => {
+    const NAMES = ['Tanmay', 'Shamin', 'Ram', 'Priya']; // Tanmay hosts
+    const ORDER = ['Priya', 'Tanmay', 'Ram', 'Shamin'];
+    const seatRows = async (gameId: string) =>
+      (await sql`select name, seat from public.players where game_id = ${gameId} order by seat`).map((r) => `${r.seat}:${r.name}`);
+    const quietTurn = async (g: Awaited<ReturnType<typeof setupGame>>, name: string) => {
+      await sql`update public.players set position = 0 where game_id = ${g.gameId} and id = ${g.seats[name]!.playerId}`;
+      queuedDice = [2, 3]; // Income Tax while owning nothing
+      ok(await g.act(name, { type: 'ROLL_DICE' }));
+      ok(await g.act(name, { type: 'END_TURN' }));
+    };
+
+    it('START_GAME stores the drawn order as seats, in the same transaction that activates the game', async () => {
+      const g = await setupGame(NAMES);
+      expect(await seatRows(g.gameId)).toEqual(['0:Tanmay', '1:Shamin', '2:Ram', '3:Priya']);
+      const started = ok(await g.act('Tanmay', { type: 'START_GAME' }, { order: ORDER }));
+      expect(started.snapshot.state.status).toBe('ACTIVE');
+      expect(started.snapshot.state.players.map((p) => p.name)).toEqual(ORDER);
+      expect(started.snapshot.state.players.map((p) => p.seat)).toEqual([0, 1, 2, 3]);
+      expect(started.snapshot.state.turn).toMatchObject({ playerId: g.seats.Priya!.playerId, number: 1, phase: 'AWAITING_ROLL' });
+      expect(await seatRows(g.gameId)).toEqual(['0:Priya', '1:Tanmay', '2:Ram', '3:Shamin']);
+      const [game] = await sql`select status, current_player_id, turn_number, host_player_id from public.games where id = ${g.gameId}`;
+      expect(game).toMatchObject({ status: 'ACTIVE', current_player_id: g.seats.Priya!.playerId, turn_number: 1, host_player_id: g.seats.Tanmay!.playerId });
+      await ledgerOk(g.gameId);
+    });
+
+    it('every phone, and every reconnect, is served the same order and the same current player', async () => {
+      const g = await setupGame(NAMES);
+      ok(await g.act('Tanmay', { type: 'START_GAME' }, { order: ORDER }));
+      queuedRandoms = [0.1, 0.1, 0.1]; // would produce another order if anything drew again
+      for (let round = 0; round < 2; round += 1) {
+        for (const name of NAMES) {
+          const snap = await state(g.gameId, g.seats[name]!);
+          expect(snap.state.players.map((p) => p.name)).toEqual(ORDER);
+          expect(snap.state.turn.playerId).toBe(g.seats.Priya!.playerId);
+          expect(snap.state.turn.number).toBe(1);
+        }
+      }
+      queuedRandoms = [];
+    });
+
+    it('the draw happens once: a retried START_GAME and a second START_GAME both leave the order alone', async () => {
+      const g = await setupGame(NAMES);
+      const actionId = randomUUID();
+      const v = g.version;
+      ok(await g.act('Tanmay', { type: 'START_GAME' }, { actionId, expectedVersion: v, order: ORDER }));
+      const retry = ok(await g.act('Tanmay', { type: 'START_GAME' }, { actionId, expectedVersion: v, order: ['Ram', 'Shamin', 'Priya', 'Tanmay'] }));
+      expect(retry.duplicate).toBe(true);
+      const again = await g.act('Tanmay', { type: 'START_GAME' }, { order: ['Ram', 'Shamin', 'Priya', 'Tanmay'] });
+      expect(again).toMatchObject({ ok: false, error: { code: 'INVALID_PHASE' } });
+      expect(await seatRows(g.gameId)).toEqual(['0:Priya', '1:Tanmay', '2:Ram', '3:Shamin']);
+      const snap = await state(g.gameId, g.seats.Ram!);
+      expect(snap.events.filter((e) => e.type === 'GAME_STARTED')).toHaveLength(1);
+      expect(snap.transactions.filter((t) => t.type === 'STARTING_FUNDS')).toHaveLength(4);
+    });
+
+    it('two concurrent START_GAME requests: one draw', async () => {
+      const g = await setupGame(NAMES);
+      const v = g.version;
+      const results = await Promise.all([
+        g.act('Tanmay', { type: 'START_GAME' }, { expectedVersion: v, randomOrder: true }),
+        g.act('Tanmay', { type: 'START_GAME' }, { expectedVersion: v, randomOrder: true }),
+      ]);
+      expect(results.filter((r) => r.ok)).toHaveLength(1);
+      const snap = await state(g.gameId, g.seats.Tanmay!);
+      expect(snap.events.filter((e) => e.type === 'GAME_STARTED')).toHaveLength(1);
+      expect(snap.state.players.map((p) => p.seat)).toEqual([0, 1, 2, 3]);
+      expect(snap.state.turn.playerId).toBe(snap.state.players[0]!.id);
+    });
+
+    it('turns follow the stored order; nobody but the drawn player can take turn 1', async () => {
+      const g = await setupGame(NAMES);
+      ok(await g.act('Tanmay', { type: 'START_GAME' }, { order: ORDER }));
+      expect(await g.act('Tanmay', { type: 'ROLL_DICE' })).toMatchObject({ ok: false, error: { code: 'NOT_YOUR_TURN' } });
+      for (const name of [...ORDER, 'Priya']) {
+        expect((await state(g.gameId, g.seats.Ram!)).state.turn.playerId).toBe(g.seats[name]!.playerId);
+        await quietTurn(g, name);
+      }
+      expect(await seatRows(g.gameId)).toEqual(['0:Priya', '1:Tanmay', '2:Ram', '3:Shamin']);
+    });
+
+    it('with the real RNG the host does not always start', async () => {
+      const firsts = new Set<string>();
+      for (let i = 0; i < 24 && firsts.size < 2; i += 1) {
+        const g = await setupGame(['Tanmay', 'Shamin']);
+        const started = ok(await g.act('Tanmay', { type: 'START_GAME' }, { randomOrder: true }));
+        firsts.add(started.snapshot.state.players.find((p) => p.id === started.snapshot.state.turn.playerId)!.name);
+      }
+      expect([...firsts].sort()).toEqual(['Shamin', 'Tanmay']);
+    });
   });
 
   it('rejects bad tokens, unknown codes, and joining a started game', async () => {
