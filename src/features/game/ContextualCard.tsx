@@ -24,16 +24,19 @@ interface ContextualCardProps {
   /** Fixed height from the screen layout plan, so the board never jumps when content changes. */
   height: number;
   onAction: (target: ContextTarget) => void;
-  onDismiss: (eventId: string) => void;
 }
 
 /**
  * The game's attention surface: the single most relevant thing right now (an
  * offer, a payment, a big moment, the latest news, or where you stand). Fixed
- * height so the board above never jumps when the content changes.
+ * height so the board above never jumps when the content changes. Part of the
+ * table, not a popup: it has no close button — the next thing that matters
+ * replaces it.
  */
-export const ContextualCard = memo(function ContextualCard({ item, height, onAction, onDismiss }: ContextualCardProps) {
+export const ContextualCard = memo(function ContextualCard({ item, height, onAction }: ContextualCardProps) {
   const urgent = item.kind === 'offer' || item.kind === 'undo' || item.kind === 'decision' || item.kind === 'payment' || item.kind === 'auction';
+  // A message with no detail line may use that room: two lines, or three when the card is tall enough for them.
+  const titleLines = item.detail ? 1 : height >= CONTEXT_CARD_HEIGHT.normal + 8 ? 3 : 2;
   return (
     <View
       testID="context-card"
@@ -50,7 +53,7 @@ export const ContextualCard = memo(function ContextualCard({ item, height, onAct
         <Text className="text-[10px] font-extrabold uppercase tracking-[2px] text-stone-500" numberOfLines={1} maxFontSizeMultiplier={FIXED_HEIGHT_FONT_SCALE} testID="context-label">
           {item.label}
         </Text>
-        <Text className="text-[15px] font-extrabold leading-5 text-ink" numberOfLines={item.detail ? 1 : 2} maxFontSizeMultiplier={FIXED_HEIGHT_FONT_SCALE} testID="context-title">
+        <Text className="text-[15px] font-extrabold leading-5 text-ink" numberOfLines={titleLines} maxFontSizeMultiplier={FIXED_HEIGHT_FONT_SCALE} testID="context-title">
           {item.title}
         </Text>
         {item.detail ? (
@@ -70,18 +73,6 @@ export const ContextualCard = memo(function ContextualCard({ item, height, onAct
           <Text className={`text-center text-[13px] font-extrabold ${urgent ? 'text-ink' : 'text-cream'}`} numberOfLines={2} maxFontSizeMultiplier={FIXED_HEIGHT_FONT_SCALE}>
             {item.cta.label}
           </Text>
-        </Pressable>
-      ) : null}
-      {item.dismissKey ? (
-        <Pressable
-          onPress={() => onDismiss(item.dismissKey!)}
-          accessibilityRole="button"
-          accessibilityLabel="Dismiss"
-          testID="context-dismiss"
-          hitSlop={8}
-          className="-ml-1 h-8 w-6 items-center justify-center"
-        >
-          <Text className="text-base font-bold text-stone-400">✕</Text>
         </Pressable>
       ) : null}
     </View>

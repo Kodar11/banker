@@ -159,8 +159,6 @@ export interface ContextItem {
   title: string;
   detail?: string;
   cta?: { label: string; target: ContextTarget };
-  /** Set on event/news items: the event id the player may dismiss locally. */
-  dismissKey?: string;
 }
 
 /** Events that never deserve the card on their own (the turn bar / board already say it). */
@@ -244,12 +242,8 @@ function positionItem(view: Pick<GameView, 'snapshot' | 'me' | 'current' | 'isMy
 /**
  * Priority: 1) offers / decisions that need me, 2) payments, 3) important events,
  * 4) news, 5) where I (or the moving player) stand, 6) a neutral fallback.
- * `dismissedEventId` hides an event/news item the player swiped away locally.
  */
-export function pickContext(
-  view: Pick<GameView, 'snapshot' | 'me' | 'current' | 'isMyTurn' | 'playerName'>,
-  dismissedEventId: string | null = null,
-): ContextItem {
+export function pickContext(view: Pick<GameView, 'snapshot' | 'me' | 'current' | 'isMyTurn' | 'playerName'>): ContextItem {
   const { state, events } = view.snapshot;
   const { turn } = state;
   const me = view.me;
@@ -395,7 +389,7 @@ export function pickContext(
     }
   }
   const latest = events[0];
-  if (latest && latest.id !== dismissedEventId && !ROUTINE_EVENTS.has(latest.type)) {
+  if (latest && !ROUTINE_EVENTS.has(latest.type)) {
     const important = IMPORTANT_EVENTS[latest.type];
     const square = eventSquare(latest);
     return {
@@ -404,7 +398,6 @@ export function pickContext(
       label: important?.label ?? 'Latest',
       title: latest.message,
       cta: square !== null ? squareTarget(square, 'property') : { label: 'Game log', target: { kind: 'log' } },
-      dismissKey: latest.id,
     };
   }
 

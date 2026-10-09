@@ -26,7 +26,7 @@ export function ActionPanel({ view, send, onOpenLoan }: ActionPanelProps) {
 
   if (turn.phase === 'AUCTION' && state.auction?.status === 'OPEN') {
     return (
-      <Card testID="auction-callout">
+      <Card testID="auction-callout" bottomBorder={false}>
         <Pill tone="gold">Auction!</Pill>
         <Text className="mt-2 text-2xl font-extrabold text-ink">{getDeed(state.auction.propertyKey).name} is up for bids</Text>
         <Button
@@ -41,7 +41,7 @@ export function ActionPanel({ view, send, onOpenLoan }: ActionPanelProps) {
 
   if (!isMyTurn) {
     return (
-      <Card testID="waiting-card">
+      <Card testID="waiting-card" bottomBorder={false}>
         <Label>Waiting</Label>
         <Text className="mt-1 text-xl font-bold text-ink">{describeWaiting(state, current?.name ?? 'Someone')}</Text>
         <Text className="mt-2 text-sm text-stone-500">Look up — the board is where the fun is. We’ll buzz you when it’s your turn.</Text>
@@ -71,7 +71,7 @@ export function ActionPanel({ view, send, onOpenLoan }: ActionPanelProps) {
       const deed = getDeed(turn.pending.propertyKey);
       const canAfford = me.balance >= deed.price;
       return (
-        <Card testID="buy-card">
+        <Card testID="buy-card" bottomBorder={false}>
           <Pill tone="good">Property available</Pill>
           <Text className="mt-2 text-3xl font-black text-ink">{deed.name}</Text>
           <Text className="text-base text-stone-600">Price {formatINR(deed.price)}</Text>
@@ -109,7 +109,7 @@ export function ActionPanel({ view, send, onOpenLoan }: ActionPanelProps) {
       const heading =
         p.reason === 'RENT' ? `Owned by ${playerName(p.toPlayerId)}` : p.reason === 'TAX' ? p.label : p.reason === 'LOAN_INTEREST' ? 'Loan interest' : p.reason === 'CLUB' ? 'Club' : 'Card';
       return (
-        <Card testID="payment-card">
+        <Card testID="payment-card" bottomBorder={false}>
           <Pill tone="warn">{PAY_PILL[p.reason]}</Pill>
           <Text className="mt-2 text-2xl font-black text-ink">{heading}</Text>
           {p.label !== heading ? <Text className="text-base text-stone-600">{p.label}</Text> : null}
@@ -193,7 +193,7 @@ function JailChoice({ view, send, onOpenLoan }: ActionPanelProps) {
   const lastTurn = me.jailTurnsLeft <= 1;
   const short = fine - me.balance;
   return (
-    <Card testID="jail-card">
+    <Card testID="jail-card" bottomBorder={false}>
       <Pill tone="bad">In Jail</Pill>
       <Text className="mt-2 text-3xl font-black text-ink">Jail · turn {turnInJail} of {maxTurns}</Text>
       <Text className="mt-1 text-base text-stone-600">
@@ -238,7 +238,7 @@ function ManualCard({ view, send }: { view: GameView; send: ActionPanelProps['se
   const valid = Number.isInteger(value) && value > 0 && value <= BUSINESS_MVP_RULES.cards.manualMaxAmount;
   if (!card) return null;
   return (
-    <Card testID="manual-card">
+    <Card testID="manual-card" bottomBorder={false}>
       <Pill tone="gold">
         {DECK_LABELS[card.deck]} · {card.table.toLowerCase()} {card.rollTotal}
       </Pill>

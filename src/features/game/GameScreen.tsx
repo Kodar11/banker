@@ -58,7 +58,6 @@ export function GameScreen({ view }: { view: GameView }) {
   /** Who the pay / trade sheet was last opened for; changing it remounts (resets) that sheet. */
   const [preselect, setPreselect] = useState<{ pay: string | null; trade: string | null }>({ pay: null, trade: null });
   const [confirmEnd, setConfirmEnd] = useState(false);
-  const [dismissedEvent, setDismissedEvent] = useState<string | null>(null);
   const ending = useGameStore((s) => s.pendingAction === 'END_GAME');
   const { state, events } = view.snapshot;
   const me = view.me;
@@ -286,7 +285,7 @@ export function GameScreen({ view }: { view: GameView }) {
     }
   }
 
-  const context = pickContext(view, dismissedEvent);
+  const context = pickContext(view);
   const gutter = screenGutter(width);
 
   return (
@@ -321,7 +320,7 @@ export function GameScreen({ view }: { view: GameView }) {
           <ClassicBoard state={state} size={plan.board} onSquarePress={openSquare} onTokenPress={openPlayer} />
         </View>
 
-        <ContextualCard item={context} height={plan.contextHeight} onAction={openContext} onDismiss={setDismissedEvent} />
+        <ContextualCard item={context} height={plan.contextHeight} onAction={openContext} />
 
         {/* Any height the sections could not use sits here, so the actions stay at the bottom of the screen. */}
         <View testID="action-area" style={{ flexGrow: 1, justifyContent: 'flex-end' }}>

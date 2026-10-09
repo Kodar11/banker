@@ -489,18 +489,43 @@ describe('contextual card', () => {
     expect(pickContext(viewFor(f, 'Bilal'))).toMatchObject({ kind: 'position', label: 'Asha is on', title: 'Railway', detail: '₹9,500 · Not owned' });
   });
 
-  it('an incoming offer takes priority; resolving it reveals the next item, and dismissing that reveals the position', async () => {
+  it('an incoming offer takes priority; resolving it reveals the latest news, which has no close button and opens the game log', async () => {
     const f = new Fixture(['Asha', 'Bilal']).roll('Asha', 1, 2).act('Asha', { type: 'BUY_PROPERTY' }).act('Asha', { type: 'END_TURN' });
     f.act('Asha', { type: 'CREATE_TRADE', toPlayerId: f.ids.Bilal!, offeredPropertyKeys: ['RAILWAY'], requestedPropertyKeys: [], offeredMoney: 0, requestedMoney: 6000 });
     expect(pickContext(viewFor(f, 'Bilal'))).toMatchObject({ kind: 'offer', title: 'Asha wants to trade', detail: 'You get Railway ↔ you give ₹6,000' });
     f.act('Bilal', { type: 'REJECT_TRADE', tradeId: f.state.trades[0]!.id }).loadAs('Bilal');
-    const ui = await render(<GameScreen view={viewFor(f, 'Bilal')} />);
+    await render(<GameScreen view={viewFor(f, 'Bilal')} />);
     expect(screen.getByTestId('context-news')).toBeTruthy();
-    expect(screen.getByTestId('context-card')).toHaveTextContent(/Bilal rejected a trade offer/);
-    await fireEvent.press(screen.getByTestId('context-dismiss'));
-    expect(screen.getByTestId('context-position')).toBeTruthy();
-    await ui.rerender(<GameScreen view={viewFor(f, 'Bilal')} />);
-    expect(screen.getByTestId('context-position')).toBeTruthy(); // stays dismissed
+    const card = screen.getByTestId('context-card');
+    expect(card).toHaveTextContent(/Latest.*Bilal rejected a trade offer/);
+    // Not a popup: nothing to dismiss, and the only control is the card's one action.
+    expect(screen.queryByTestId('context-dismiss')).toBeNull();
+    expect(within(card).queryByLabelText('Dismiss')).toBeNull();
+    expect(within(card).queryByText('✕')).toBeNull();
+    expect(within(card).getAllByRole('button')).toHaveLength(1);
+    // The message gets the freed width and wraps instead of being cut after one line.
+    expect(screen.getByTestId('context-title').props.numberOfLines).toBeGreaterThanOrEqual(2);
+    await fireEvent.press(screen.getByTestId('context-cta'));
+    expect(screen.getByTestId('event-feed')).toBeTruthy();
+  });
+
+  it('news about a property keeps View Property, which opens that property; no close button for any kind of item', async () => {
+    const f = table();
+    f.state.properties.DELHI.ownerId = f.ids.Tanmay!;
+    f.act('Tanmay', { type: 'MORTGAGE_PROPERTY', propertyKey: 'DELHI' }).loadAs('Tanmay');
+    expect(pickContext(viewFor(f, 'Tanmay'))).toMatchObject({ kind: 'news', label: 'Latest', cta: { label: 'View Property', target: { kind: 'square', index: positionOfProperty('DELHI') } } });
+    const ui = await render(<GameScreen view={viewFor(f, 'Tanmay')} />);
+    expect(screen.getByTestId('context-title')).toHaveTextContent(/mortgaged Delhi/);
+    expect(screen.queryByTestId('context-dismiss')).toBeNull();
+    await fireEvent.press(screen.getByTestId('context-cta'));
+    expect(screen.getByTestId(`square-details-${positionOfProperty('DELHI')}`)).toBeTruthy();
+    expect(api.action).not.toHaveBeenCalled();
+    // Position and paused items never had one either.
+    f.state.status = 'PAUSED';
+    f.loadAs('Tanmay');
+    await ui.rerender(<GameScreen view={viewFor(f, 'Tanmay')} />);
+    expect(screen.getByTestId('context-paused')).toBeTruthy();
+    expect(screen.queryByTestId('context-dismiss')).toBeNull();
   });
 
   it('a payment I owe beats news; a payment owed to me is shown too', () => {

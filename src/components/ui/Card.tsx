@@ -1,9 +1,19 @@
 import type { ReactNode } from 'react';
 import { Text, View } from 'react-native';
 
-export function Card({ children, className = '', testID }: { children: ReactNode; className?: string; testID?: string }) {
+export function Card({
+  children,
+  className = '',
+  testID,
+  bottomBorder = true,
+}: {
+  children: ReactNode;
+  className?: string;
+  testID?: string;
+  bottomBorder?: boolean;
+}) {
   return (
-    <View testID={testID} className={`rounded-3xl border-b-4 border-stone-300 bg-cream p-5 ${className}`}>
+    <View testID={testID} className={`rounded-3xl ${bottomBorder ? 'border-b-4 border-stone-300' : ''} bg-cream p-5 ${className}`}>
       {children}
     </View>
   );
