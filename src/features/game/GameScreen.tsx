@@ -142,9 +142,9 @@ export function GameScreen({ view }: { view: GameView }) {
   const moreItems: MoreItem[] = [];
   if (playing && me) {
     moreItems.push(
-      { key: 'properties', icon: '🏘️', label: 'My Properties', testID: 'more-properties', hint: 'Cash, properties, loans and history', onPress: () => openWallet(me.id) },
-      { key: 'trade', icon: '🔄', label: 'Transfer', hint: 'Trade properties and money with a player', testID: 'more-trade', onPress: () => openTool({ kind: 'trade', to: null }) },
-      { key: 'pay', icon: '💸', label: 'Pay Money', hint: 'Pay another player', testID: 'more-pay', onPress: () => openTool({ kind: 'pay', to: null }) },
+      { key: 'properties', icon: '🏠', label: 'My Properties', testID: 'more-properties', hint: 'Cash, properties, loans and history', onPress: () => openWallet(me.id) },
+      { key: 'trade', icon: '🤝', label: 'Transfer', hint: 'Trade properties and money with a player', testID: 'more-trade', onPress: () => openTool({ kind: 'trade', to: null }) },
+      { key: 'pay', icon: '💰', label: 'Pay Money', hint: 'Pay another player', testID: 'more-pay', onPress: () => openTool({ kind: 'pay', to: null }) },
       { key: 'loan', icon: '🏦', label: 'Bank / Loan', hint: 'Borrow or repay', testID: 'more-loan', onPress: () => openTool({ kind: 'loan' }) },
       {
         key: 'auction',

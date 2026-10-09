@@ -5,7 +5,7 @@ import { StyleSheet } from 'react-native';
 import { BOARD_CYCLE, BOARD_LAYOUT, BOARD_SIZE, positionOfProperty, positionOfSpecial, spaceName } from '@/engine/index.ts';
 import { PROPERTY_GROUP_THEME } from '@/constants/theme';
 import { BOARD_BORDER, BOARD_FRAME, ClassicBoard } from '@/features/board/ClassicBoard';
-import { fitName, SPECIAL_ICONS, textEms } from '@/features/board/BoardSquare';
+import { fitName, HOUSE_ICON, SPECIAL_ICONS, textEms } from '@/features/board/BoardSquare';
 import { tokenSize } from '@/features/board/BoardTokens';
 import { calculateBoardLayout, clusterOffsets, DEPTH_RATIO, GRID, gridCellOf, tokenAnchor, type BoardSide, type Rect } from '@/features/board/boardModel';
 import { screenGutter } from '@/features/game/layout';
@@ -207,7 +207,11 @@ describe('rendered board', () => {
         const content = flat(`board-content-${i}`);
         expect(content.overflow).toBe('hidden');
         expect(content).toMatchObject(slot.parts.content);
+        // An icon is a row above the name, or (wide shallow squares) a column beside it.
+        const beside = content.flexDirection === 'row';
         let rows = 0;
+        let iconBox = 0;
+        let lineWidth = 0;
         for (const { text, props, style } of contentTexts(i)) {
           expect(props.numberOfLines).toBe(1);
           expect(props.allowFontScaling).toBe(false);
@@ -217,11 +221,14 @@ describe('rendered board', () => {
             expect(style.width).toBeLessThanOrEqual(content.width);
             expect(textEms(text) * style.fontSize).toBeLessThanOrEqual(style.width + 1e-6);
             rows += style.lineHeight!;
+            lineWidth = style.width;
           } else {
-            rows += style.fontSize / 0.68; // an icon box
+            iconBox = style.fontSize / 0.68;
           }
         }
-        expect(rows).toBeLessThanOrEqual(content.height + 1e-6);
+        expect(beside ? Math.max(rows, iconBox) : rows + iconBox).toBeLessThanOrEqual(content.height + 1e-6);
+        // Beside the name, icon + gap + name never exceed the square, so they cannot overlap.
+        if (beside) expect(iconBox + (content.gap as number) + lineWidth).toBeLessThanOrEqual(content.width + 1e-6);
       }
       expect(seen.size).toBe(36);
       // The centre is exactly the hole the squares leave.
@@ -311,9 +318,30 @@ describe('rendered board', () => {
         used += s[along] + 1;
       }
       expect(used).toBeLessThanOrEqual(strip[along] + 1e-6);
-      // Neutral pieces: no text, and nothing of the owner's colour.
-      expect(band.queryAllByText(/\S/)).toHaveLength(0);
+      // Neutral pieces: the only text in the strip is the house emoji, one per house; nothing of the owner's colour.
+      expect(band.queryAllByText(/\S/).map((t) => String(t.props.children))).toEqual(band.queryAllByTestId(`board-house-${key}`).map(() => HOUSE_ICON));
     }
+  });
+
+  it.each(PHONE_BOARDS)('at %ipx: every Community Chest square shows its icon, the same way, without shrinking the name much', async (size) => {
+    const f = new Fixture();
+    await render(<ClassicBoard state={f.state} size={size} />);
+    const chests = BOARD_LAYOUT.flatMap((s, i) => (s.kind === 'SPECIAL' && s.type === 'COMMUNITY_CHEST' ? [i] : []));
+    expect(chests).toHaveLength(2);
+    const drawn = chests.map((i) => {
+      const texts = contentTexts(i);
+      const icons = texts.filter((t) => t.style.width === undefined);
+      const name = texts.filter((t) => t.style.width !== undefined);
+      expect(icons.map((t) => t.text)).toEqual([SPECIAL_ICONS.COMMUNITY_CHEST]);
+      expect(name.map((t) => t.text)).toEqual(['Community', 'Chest']); // the text is unchanged
+      // The icon supports the name: never larger than it, and the name stays close to the board's lettering size.
+      expect(icons[0]!.style.fontSize).toBeLessThanOrEqual(name[0]!.style.fontSize);
+      expect(icons[0]!.style.fontSize).toBeGreaterThanOrEqual(4.5);
+      expect(name[0]!.style.fontSize).toBeGreaterThanOrEqual(calculateBoardLayout(inner(size)).metrics.nameFont * 0.8);
+      return { icon: icons[0]!.style.fontSize, name: name[0]!.style.fontSize, direction: flat(`board-content-${i}`).flexDirection };
+    });
+    expect(drawn[1]).toEqual(drawn[0]);
+    expect(SPECIAL_ICONS.COMMUNITY_CHEST).toBe('📦');
   });
 
   it('neutral cards stay plain (name and price only); only true special squares carry a pictogram', async () => {

@@ -178,10 +178,17 @@ function Line({ children, width, font, style, testID }: { children: string; widt
   );
 }
 
+/** Gap between an icon and a name drawn beside it. */
+const SIDE_GAP = 1;
+
 /**
  * What a square says, in a box of exactly `box` size: [icon] name [price], every
  * row a fixed height computed here. Priority when the box is small: name, then
  * price, then the decorative icon (dropped first).
+ *
+ * The icon goes above the name. On a wide, shallow square (the side columns)
+ * a two-line name leaves no row for it ("Community Chest"), so there it sits
+ * beside the name instead, at a size that keeps the name readable.
  */
 function SquareContent({ space, box, metrics, icon }: { space: BoardSpaceViewModel; box: Rect; metrics: BoardMetrics; icon?: string }) {
   const width = Math.max(1, box.width - 2 * PAD);
@@ -192,40 +199,63 @@ function SquareContent({ space, box, metrics, icon }: { space: BoardSpaceViewMod
   let iconBox = icon ? Math.min(box.height * (space.isCorner ? 0.46 : 0.4), width) : 0;
   // Readability first: the icon is decoration, and is dropped rather than squeezing the name.
   if (iconBox && fit(iconBox).font < fit(0).font * 0.85) iconBox = 0;
-  const { lines, font: fitted } = fit(iconBox);
+  let sideBox = 0;
+  if (icon && !iconBox) {
+    const candidate = Math.min(height * 0.6, width * 0.2);
+    if (fitName(space.name, width - candidate - SIDE_GAP, height, base, price ? 1 : 0).font >= fit(0).font * 0.8) sideBox = candidate;
+  }
+  const textWidth = sideBox ? width - sideBox - SIDE_GAP : width;
+  const { lines, font: fitted } = sideBox ? fitName(space.name, textWidth, height, base, price ? 1 : 0) : fit(iconBox);
   const font = Math.max(MIN_FONT, fitted);
   // The price follows the name: never the louder of the two.
-  const priceFont = price ? Math.max(MIN_FONT, Math.min(metrics.priceFont, font, width / textEms(price))) : 0;
-
-  return (
-    <View
-      testID={`board-content-${space.index}`}
-      style={{ position: 'absolute', ...box, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', opacity: space.mortgaged ? 0.45 : 1 }}
-    >
-      {iconBox ? <Glyph box={iconBox}>{icon!}</Glyph> : null}
+  const priceFont = price ? Math.max(MIN_FONT, Math.min(metrics.priceFont, font, textWidth / textEms(price))) : 0;
+  const text = (
+    <>
       {lines.map((line, i) => (
-        <Line key={i} width={width} font={font} style={{ fontWeight: '700', color: COLORS.ink }}>
+        <Line key={i} width={textWidth} font={font} style={{ fontWeight: '700', color: COLORS.ink }}>
           {line}
         </Line>
       ))}
       {price ? (
-        <Line width={width} font={priceFont} testID={`board-price-${space.propertyKey}`} style={{ fontWeight: '600', color: '#5B5347' }}>
+        <Line width={textWidth} font={priceFont} testID={`board-price-${space.propertyKey}`} style={{ fontWeight: '600', color: '#5B5347' }}>
           {price}
         </Line>
       ) : null}
+    </>
+  );
+
+  return (
+    <View
+      testID={`board-content-${space.index}`}
+      style={{
+        position: 'absolute',
+        ...box,
+        flexDirection: sideBox ? 'row' : 'column',
+        gap: sideBox ? SIDE_GAP : 0,
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
+        opacity: space.mortgaged ? 0.45 : 1,
+      }}
+    >
+      {iconBox ? <Glyph box={iconBox}>{icon!}</Glyph> : null}
+      {sideBox ? <Glyph box={sideBox}>{icon!}</Glyph> : null}
+      {sideBox ? <View style={{ width: textWidth }}>{text}</View> : text}
     </View>
   );
 }
 
-/** Buildings are neutral playing pieces: the same cream house whoever owns the property. */
+/** Buildings are neutral playing pieces: the same house and hotel whoever owns the property. */
 const PIECE = { fill: '#FFFDF7', stroke: COLORS.ink };
+export const HOUSE_ICON = '🏠';
 
+/** A house: the 🏠 emoji, boxed to exactly `size` so it can never spill out of the strip. */
 function House({ size, testID }: { size: number; testID: string }) {
   return (
-    <View testID={testID} style={{ width: size, height: size }}>
-      <Svg width={size} height={size} viewBox="0 0 10 10">
-        <Path d="M5 0.7 L9.5 4.9 H8.3 V9.3 H1.7 V4.9 H0.5 Z" fill={PIECE.fill} stroke={PIECE.stroke} strokeWidth={0.7} strokeLinejoin="round" />
-      </Svg>
+    <View testID={testID} style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+      <Text {...BOARD_TEXT} style={{ includeFontPadding: false, textAlign: 'center', textAlignVertical: 'center', fontSize: size * 0.78, lineHeight: size }}>
+        {HOUSE_ICON}
+      </Text>
     </View>
   );
 }
