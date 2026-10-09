@@ -20,6 +20,7 @@ import { gameApi } from '@/lib/gameApi';
 import { useGameStore } from '@/store/gameStore';
 import { useSessionStore } from '@/store/sessionStore';
 import { netWorth, outstandingDebt } from '@/engine/index.ts';
+import { formatINR } from '@/utils/currency';
 import { openProperty } from '@/utils/navigation';
 import { startupRouting } from '@/utils/startupRouting';
 import { Fixture, ok } from './fixtures';
@@ -404,6 +405,36 @@ describe('Wallet', () => {
     expect(screen.getByText('Borrowed ₹2,000')).toBeTruthy();
     expect(screen.getByText('Starting cash')).toBeTruthy();
     expect(screen.getByText('−₹9,500')).toBeTruthy();
+  });
+
+  it('the full page: summary from the game state, every property with its state, and a row opens the property screen; Back returns to the board', async () => {
+    const f = new Fixture();
+    Object.assign(f.state.properties.DELHI, { ownerId: f.ids.Asha!, hotel: true });
+    Object.assign(f.state.properties.RAILWAY, { ownerId: f.ids.Asha!, mortgaged: true });
+    f.state.properties.MUMBAI.ownerId = f.ids.Bilal!;
+    f.act('Asha', { type: 'REQUEST_LOAN', amount: 2000 }).loadAs('Asha');
+    await render(<PlayerView view={viewFor(f, 'Asha')} playerId={f.ids.Asha!} />);
+    const page = screen.getByTestId('player-screen');
+    expect(screen.getByTestId('wallet-balance')).toHaveTextContent(formatINR(f.state.players.find((p) => p.id === f.ids.Asha)!.balance));
+    expect(page).toHaveTextContent(new RegExp(`Net worth${formatINR(netWorth(f.state, f.ids.Asha!))}.*Loans owed${formatINR(outstandingDebt(f.state.loans, f.ids.Asha!))}.*Houses0.*Hotels1`));
+    expect(screen.getByTestId('property-count')).toHaveTextContent('2');
+    expect(screen.getByTestId('property-status-DELHI')).toHaveTextContent(/Hotel/);
+    expect(screen.getByTestId('property-status-RAILWAY')).toHaveTextContent('Mortgaged');
+    expect(screen.queryByTestId('property-MUMBAI')).toBeNull();
+    expect(screen.getByText('Borrowed ₹2,000')).toBeTruthy();
+    expect(screen.getByTestId('wallet-loan')).toBeTruthy();
+    await fireEvent.press(screen.getByTestId('property-DELHI'));
+    expect(router.push).toHaveBeenCalledWith('/property/DELHI');
+    (router.canGoBack as jest.Mock).mockReturnValueOnce(true);
+    await fireEvent.press(screen.getByText('‹ Back'));
+    expect(router.back).toHaveBeenCalled();
+  });
+
+  it('the full page with nothing owned: compact empty states', async () => {
+    const f = new Fixture().loadAs('Asha');
+    await render(<PlayerView view={viewFor(f, 'Asha')} playerId={f.ids.Asha!} />);
+    expect(screen.getByTestId('property-list-empty')).toHaveTextContent('No properties yet');
+    expect(screen.getByText('No loans.')).toBeTruthy();
   });
 });
 

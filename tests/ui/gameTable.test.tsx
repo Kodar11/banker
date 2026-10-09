@@ -159,8 +159,8 @@ describe('interactive, read-only board', () => {
     f.state.properties.DELHI.ownerId = f.ids.Tanmay!;
     f.loadAs('Tanmay');
     const ui = await render(<GameScreen view={viewFor(f, 'Tanmay')} />);
-    // My Properties → the property.
-    await fireEvent.press(screen.getByTestId('open-properties'));
+    // My own sheet → the property.
+    await fireEvent.press(screen.getByTestId(`player-chip-${f.ids.Tanmay}`));
     await fireEvent.press(screen.getByTestId('property-DELHI'));
     const sheet = screen.getByTestId(`square-details-${positionOfProperty('DELHI')}`);
     expect(within(sheet).getByTestId('property-deed-header')).toHaveTextContent(/Delhi/);
@@ -282,6 +282,32 @@ describe('interactive, read-only board', () => {
     expect(screen.queryByTestId(/^action-note-/)).toBeNull();
   });
 
+  it('My Properties opens the full wallet page directly — no sheet in between; another player still opens Player Details', async () => {
+    const f = table();
+    f.state.properties.DELHI.ownerId = f.ids.Tanmay!;
+    f.loadAs('Tanmay');
+    await render(<GameScreen view={viewFor(f, 'Tanmay')} />);
+    await fireEvent.press(screen.getByTestId('open-properties'));
+    expect(router.push).toHaveBeenCalledTimes(1);
+    expect(router.push).toHaveBeenCalledWith(`/player/${f.ids.Tanmay}`);
+    expect(screen.queryByTestId('sheet-player')).toBeNull();
+    expect(screen.queryByTestId(`player-details-${f.ids.Tanmay}`)).toBeNull();
+    // The same from the More sheet, which closes behind the page.
+    for (const id of ['more-properties', 'more-manage']) {
+      await fireEvent.press(screen.getByTestId('open-more'));
+      await fireEvent.press(screen.getByTestId(id));
+      expect(router.push).toHaveBeenLastCalledWith(`/player/${f.ids.Tanmay}`);
+      expect(screen.queryByTestId('more-actions')).toBeNull();
+      expect(screen.queryByTestId('sheet-player')).toBeNull();
+    }
+    expect(router.push).toHaveBeenCalledTimes(3);
+    // Someone else: Player Details, as before.
+    await fireEvent.press(screen.getByTestId(`player-chip-${f.ids.Shamin}`));
+    expect(screen.getByTestId(`player-details-${f.ids.Shamin}`)).toBeTruthy();
+    expect(screen.getByTestId('player-make-offer')).toBeTruthy();
+    expect(api.action).not.toHaveBeenCalled();
+  });
+
   it('tapping a token opens that player; my own details offer no deal with myself', async () => {
     const f = table().loadAs('Tanmay');
     await render(<GameScreen view={viewFor(f, 'Tanmay')} />);
@@ -305,7 +331,7 @@ describe('interactive, read-only board', () => {
     const parts = ['player-details-header', 'player-details-balance', 'player-details-location', 'player-details-net-worth', 'player-details-loans', 'player-details-properties', 'player-open-wallet'];
 
     // Mine: my cash, net worth and loan; my two properties with their states; no deal with myself.
-    await fireEvent.press(screen.getByTestId('open-properties'));
+    await fireEvent.press(screen.getByTestId(`player-chip-${f.ids.Tanmay}`));
     for (const id of parts) expect(screen.getByTestId(id)).toBeTruthy();
     expect(screen.getByTestId('player-details-badge', { includeHiddenElements: true })).toBeTruthy();
     expect(screen.getByTestId('player-details-header')).toHaveTextContent(/Tanmay.*\(You\).*Active.*Your turn/);
@@ -353,7 +379,7 @@ describe('interactive, read-only board', () => {
     Object.assign(player(f, 'Bilal'), { inJail: true, jailTurnsLeft: 2, position: positionOfSpecial('JAIL') });
     f.loadAs(long);
     await render(<GameScreen view={viewFor(f, long)} />);
-    await fireEvent.press(screen.getByTestId('open-properties'));
+    await fireEvent.press(screen.getByTestId(`player-chip-${f.ids[long]}`));
     expect(screen.getByText(long).props.numberOfLines).toBe(1);
     expect(screen.getByTestId('player-details-header')).toHaveTextContent(/\(You\)/);
     expect(within(screen.getByTestId('sheet-player')).getByLabelText('Close')).toBeTruthy();

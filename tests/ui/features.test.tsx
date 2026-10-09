@@ -78,8 +78,10 @@ describe('Adaptive action bar + More', () => {
     expect(screen.getByTestId('loan-sheet')).toBeTruthy();
     await fireEvent.press(screen.getByTestId('open-trade'));
     expect(screen.getByTestId('trade-sheet')).toBeTruthy();
+    // My Properties goes straight to the full wallet page: no sheet in between.
     await fireEvent.press(screen.getByTestId('open-properties'));
-    expect(screen.getByTestId(`player-details-${f.ids.Asha}`)).toBeTruthy();
+    expect(router.push).toHaveBeenCalledWith(`/player/${f.ids.Asha}`);
+    expect(screen.queryByTestId(`player-details-${f.ids.Asha}`)).toBeNull();
     await fireEvent.press(screen.getByTestId('open-more'));
     const more = screen.getByTestId('more-actions');
     for (const id of ['more-properties', 'more-trade', 'more-pay', 'more-loan', 'more-auction', 'more-manage', 'request-undo', 'pause-button', 'open-log', 'open-rules', 'end-game-button']) {

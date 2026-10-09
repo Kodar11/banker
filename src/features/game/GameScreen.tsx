@@ -99,6 +99,11 @@ export function GameScreen({ view }: { view: GameView }) {
   // ---- Navigation between sheets (read-only until an existing flow is opened) ----
   const openSquare = useCallback((index: number) => setPanel({ kind: 'square', index }), [setPanel]);
   const openPlayer = useCallback((id: string) => setPanel({ kind: 'player', id }), [setPanel]);
+  /** The full wallet page (cash, properties, loans, history). "My Properties" goes straight here, with no sheet in between. */
+  const openWallet = (id: string) => {
+    setPanel(null);
+    router.push(`/player/${id}`);
+  };
   const openTool = (next: Tool) => {
     setPanel(null);
     if (next.kind !== 'loan') setPreselect((p) => ({ ...p, [next.kind]: next.to }));
@@ -118,7 +123,7 @@ export function GameScreen({ view }: { view: GameView }) {
       state.trades.some((t) => t.status === 'PENDING' && (t.toPlayerId === me.id || t.fromPlayerId === me.id)));
 
   const barActions: BarAction[] = [
-    { key: 'properties', icon: 'properties', label: 'My Properties', testID: 'open-properties', onPress: () => me && openPlayer(me.id) },
+    { key: 'properties', icon: 'properties', label: 'My Properties', testID: 'open-properties', hint: 'Your cash, properties, loans and history', onPress: () => me && openWallet(me.id) },
     { key: 'trade', icon: 'transfer', label: 'Transfer', testID: 'open-trade', hint: 'Offer a trade of properties and money', onPress: () => openTool({ kind: 'trade', to: null }) },
     { key: 'pay', icon: 'pay', label: 'Pay Money', testID: 'open-pay', onPress: () => openTool({ kind: 'pay', to: null }) },
     { key: 'loan', icon: 'bank', label: 'Bank / Loan', testID: 'open-loan', onPress: () => openTool({ kind: 'loan' }) },
@@ -137,7 +142,7 @@ export function GameScreen({ view }: { view: GameView }) {
   const moreItems: MoreItem[] = [];
   if (playing && me) {
     moreItems.push(
-      { key: 'properties', icon: '🏘️', label: 'My Properties', testID: 'more-properties', onPress: () => openPlayer(me.id) },
+      { key: 'properties', icon: '🏘️', label: 'My Properties', testID: 'more-properties', hint: 'Cash, properties, loans and history', onPress: () => openWallet(me.id) },
       { key: 'trade', icon: '🔄', label: 'Transfer', hint: 'Trade properties and money with a player', testID: 'more-trade', onPress: () => openTool({ kind: 'trade', to: null }) },
       { key: 'pay', icon: '💸', label: 'Pay Money', hint: 'Pay another player', testID: 'more-pay', onPress: () => openTool({ kind: 'pay', to: null }) },
       { key: 'loan', icon: '🏦', label: 'Bank / Loan', hint: 'Borrow or repay', testID: 'more-loan', onPress: () => openTool({ kind: 'loan' }) },
@@ -150,7 +155,7 @@ export function GameScreen({ view }: { view: GameView }) {
         disabled: !auctionId,
         onPress: () => auctionId && router.push(`/auction/${auctionId}`),
       },
-      { key: 'manage', icon: '🏗️', label: 'Mortgage, build or sell', hint: 'Pick one of your properties', testID: 'more-manage', onPress: () => openPlayer(me.id) },
+      { key: 'manage', icon: '🏗️', label: 'Mortgage, build or sell', hint: 'Pick one of your properties', testID: 'more-manage', onPress: () => openWallet(me.id) },
       {
         key: 'undo',
         icon: '↩️',
@@ -231,10 +236,7 @@ export function GameScreen({ view }: { view: GameView }) {
             view={view}
             playerId={panel.id}
             onPropertyPress={(key) => isPropertyKey(key) && openSquare(positionOfProperty(key))}
-            onOpenWallet={(id) => {
-              setPanel(null);
-              router.push(`/player/${id}`);
-            }}
+            onOpenWallet={openWallet}
           />
         );
         // Dealing is with someone else; my own sheet (and a spectator's view) has no pinned actions.
