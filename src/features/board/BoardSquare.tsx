@@ -246,10 +246,10 @@ function Hotel({ size, testID }: { size: number; testID: string }) {
  * The building strip: the property's group colour along the INNER edge of its
  * square (the edge facing the board centre), holding its houses / hotel (and
  * the mortgage mark). It runs along that edge — across on the top and bottom
- * rows, down on the side columns — and four houses always fit its length. The
- * sliver the owner accent is drawn over is kept clear of buildings.
+ * rows, down on the side columns — and four houses always fit its length. A
+ * sliver along its inner edge is kept clear of buildings.
  */
-/** The edge of the strip the owner accent lies on: the square's inner edge. */
+/** The edge of the strip kept clear of buildings: the square's inner edge. */
 const ACCENT_PADDING = { top: 'paddingBottom', bottom: 'paddingTop', left: 'paddingRight', right: 'paddingLeft' } as const;
 
 function BuildingStrip({ space, slot }: { space: BoardSpaceViewModel; slot: SquareSlot }) {
@@ -293,7 +293,7 @@ function BuildingStrip({ space, slot }: { space: BoardSpaceViewModel; slot: Squa
   );
 }
 
-/** Who owns it: a thin line in the owner's player colour on the card's inner edge, over the strip — never a letter or a badge. */
+/** Who owns it: a thin line in the owner's player colour on the card's outer edge, opposite the strip — never a letter or a badge. */
 function OwnerStrip({ space, slot }: { space: BoardSpaceViewModel; slot: SquareSlot }) {
   if (!space.owner) return null;
   return <View testID={`board-owner-strip-${space.propertyKey}`} style={{ position: 'absolute', ...slot.parts.owner!, backgroundColor: playerColor(space.owner).color }} />;
@@ -315,7 +315,7 @@ function CornerBoardSquare({ space, slot, metrics, onPress }: SquareProps) {
   );
 }
 
-/** A property: name + price, then the building strip on the inner edge with the owner accent along it. */
+/** A property: name + price, the building strip on the inner edge and the owner accent on the outer one. */
 function PropertyBoardSquare({ space, slot, metrics, onPress }: SquareProps) {
   const theme = PROPERTY_GROUP_THEME[space.propertyGroup!];
   return (

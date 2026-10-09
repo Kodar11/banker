@@ -99,7 +99,7 @@ describe('calculateBoardLayout (pure)', () => {
     expect(gridCellOf(-1)).toEqual(gridCellOf(35));
   });
 
-  it.each(SIZES)('at %ipx: every square has its zones — building strip on the INNER edge of its side (top row → bottom, right column → left, bottom row → top, left column → right), owner accent along it', (size) => {
+  it.each(SIZES)('at %ipx: every square has its zones — building strip on the INNER edge of its side (top row → bottom, right column → left, bottom row → top, left column → right), owner accent on the OPPOSITE (outer) edge', (size) => {
     const { slots, metrics } = calculateBoardLayout(size);
     for (const s of slots) {
       const { band, owner, content, tokens } = s.parts;
@@ -109,8 +109,9 @@ describe('calculateBoardLayout (pure)', () => {
         expect(z.width).toBeGreaterThan(0);
         expect(z.height).toBeGreaterThan(0);
       }
-      // Only the owner accent overlaps anything: it is drawn over the strip's inner edge.
-      for (const a of zones) for (const b of zones) if (a !== b && !(a === band && b === owner) && !(a === owner && b === band)) expect(overlap(a, b)).toBe(false);
+      // Only the owner accent overlaps anything: a line along the whole outer edge, over the margin of the text (and the end of the token lane on the side columns) — never over the strip.
+      for (const a of zones) for (const b of zones) if (a !== b && a !== owner && b !== owner) expect(overlap(a, b)).toBe(false);
+      if (band && owner) expect(overlap(band, owner)).toBe(false);
       // A token fits its lane.
       expect(tokens.height).toBeGreaterThanOrEqual(metrics.token);
       expect(tokens.width).toBeGreaterThanOrEqual(2 * metrics.token);
@@ -124,19 +125,19 @@ describe('calculateBoardLayout (pure)', () => {
       const expected: Record<BoardSide, [Rect, Rect]> = {
         top: [
           { left: 0, top: s.height - strip, width: s.width, height: strip },
-          { left: 0, top: s.height - metrics.ownerStrip, width: s.width, height: metrics.ownerStrip },
+          { left: 0, top: 0, width: s.width, height: metrics.ownerStrip },
         ],
         bottom: [
           { left: 0, top: 0, width: s.width, height: strip },
-          { left: 0, top: 0, width: s.width, height: metrics.ownerStrip },
+          { left: 0, top: s.height - metrics.ownerStrip, width: s.width, height: metrics.ownerStrip },
         ],
         left: [
           { left: s.width - strip, top: 0, width: strip, height: s.height },
-          { left: s.width - metrics.ownerStrip, top: 0, width: metrics.ownerStrip, height: s.height },
+          { left: 0, top: 0, width: metrics.ownerStrip, height: s.height },
         ],
         right: [
           { left: 0, top: 0, width: strip, height: s.height },
-          { left: 0, top: 0, width: metrics.ownerStrip, height: s.height },
+          { left: s.width - metrics.ownerStrip, top: 0, width: metrics.ownerStrip, height: s.height },
         ],
       };
       expect(band).toEqual(expected[s.side][0]);
@@ -284,9 +285,14 @@ describe('rendered board', () => {
       if (side === 'right') expect(strip.left).toBe(0);
       if (side === 'bottom') expect(strip.top).toBe(0);
       if (side === 'left') expect(strip.left + strip.width).toBeCloseTo(slot.width, 6);
-      // The owner accent keeps its place on that same edge, over the strip; buildings stay off it.
+      // The owner accent is on the opposite (outer) edge: NORTH → top, EAST → right, SOUTH → bottom, WEST → left. It never touches the strip.
       const accent = flat(`board-owner-strip-${key}`);
       expect(accent).toMatchObject(slot.parts.owner!);
+      if (side === 'top') expect(accent.top).toBe(0);
+      if (side === 'right') expect(accent.left + accent.width).toBeCloseTo(slot.width, 6);
+      if (side === 'bottom') expect(accent.top + accent.height).toBeCloseTo(slot.height, 6);
+      if (side === 'left') expect(accent.left).toBe(0);
+      expect(overlap(strip, accent)).toBe(false);
       const pad = { top: 'paddingBottom', right: 'paddingLeft', bottom: 'paddingTop', left: 'paddingRight' }[side];
       expect(strip[pad]).toBe(geo.metrics.ownerStrip);
       // Clear of the text and of the token lane.
