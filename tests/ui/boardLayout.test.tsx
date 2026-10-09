@@ -99,7 +99,7 @@ describe('calculateBoardLayout (pure)', () => {
     expect(gridCellOf(-1)).toEqual(gridCellOf(35));
   });
 
-  it.each(SIZES)('at %ipx: every square has separate zones — building strip on the OUTER edge of its side, owner accent on the inner edge, text and tokens between', (size) => {
+  it.each(SIZES)('at %ipx: every square has its zones — building strip on the INNER edge of its side (top row → bottom, right column → left, bottom row → top, left column → right), owner accent along it', (size) => {
     const { slots, metrics } = calculateBoardLayout(size);
     for (const s of slots) {
       const { band, owner, content, tokens } = s.parts;
@@ -109,7 +109,8 @@ describe('calculateBoardLayout (pure)', () => {
         expect(z.width).toBeGreaterThan(0);
         expect(z.height).toBeGreaterThan(0);
       }
-      for (const a of zones) for (const b of zones) if (a !== b) expect(overlap(a, b)).toBe(false);
+      // Only the owner accent overlaps anything: it is drawn over the strip's inner edge.
+      for (const a of zones) for (const b of zones) if (a !== b && !(a === band && b === owner) && !(a === owner && b === band)) expect(overlap(a, b)).toBe(false);
       // A token fits its lane.
       expect(tokens.height).toBeGreaterThanOrEqual(metrics.token);
       expect(tokens.width).toBeGreaterThanOrEqual(2 * metrics.token);
@@ -118,22 +119,23 @@ describe('calculateBoardLayout (pure)', () => {
         expect(owner).toBeNull();
         continue;
       }
-      // Orientation comes from the square's board side: the strip hugs the board's outer edge and runs along it.
+      // Orientation comes from the square's board side: the strip lies on the edge facing the board centre and runs along it.
+      const strip = metrics.band + metrics.ownerStrip;
       const expected: Record<BoardSide, [Rect, Rect]> = {
         top: [
-          { left: 0, top: 0, width: s.width, height: metrics.band },
+          { left: 0, top: s.height - strip, width: s.width, height: strip },
           { left: 0, top: s.height - metrics.ownerStrip, width: s.width, height: metrics.ownerStrip },
         ],
         bottom: [
-          { left: 0, top: s.height - metrics.band, width: s.width, height: metrics.band },
+          { left: 0, top: 0, width: s.width, height: strip },
           { left: 0, top: 0, width: s.width, height: metrics.ownerStrip },
         ],
         left: [
-          { left: 0, top: 0, width: metrics.band, height: s.height },
+          { left: s.width - strip, top: 0, width: strip, height: s.height },
           { left: s.width - metrics.ownerStrip, top: 0, width: metrics.ownerStrip, height: s.height },
         ],
         right: [
-          { left: s.width - metrics.band, top: 0, width: metrics.band, height: s.height },
+          { left: 0, top: 0, width: strip, height: s.height },
           { left: 0, top: 0, width: metrics.ownerStrip, height: s.height },
         ],
       };
@@ -259,7 +261,7 @@ describe('rendered board', () => {
     }
   });
 
-  it.each(PHONE_BOARDS)('at %ipx: houses and hotels sit in the outer-edge building strip, clear of the name, the price and the tokens', async (size) => {
+  it.each(PHONE_BOARDS)('at %ipx: houses and hotels sit in the inner-edge building strip, clear of the owner accent, the name, the price and the tokens', async (size) => {
     const f = new Fixture(['Tanmay', 'Guru']);
     // One built property on every side of the board.
     const built = { MUMBAI: 'bottom', DELHI: 'left', CALCUTTA: 'top', MADRAS: 'right' } as const;
@@ -277,11 +279,16 @@ describe('rendered board', () => {
       expect(strip).toMatchObject(slot.parts.band!);
       expect(strip.overflow).toBe('hidden');
       expect(strip.flexDirection).toBe(side === 'left' || side === 'right' ? 'column' : 'row');
-      // On the board's outer edge.
-      if (side === 'top') expect(strip.top).toBe(0);
-      if (side === 'left') expect(strip.left).toBe(0);
-      if (side === 'bottom') expect(strip.top + strip.height).toBeCloseTo(slot.height, 6);
-      if (side === 'right') expect(strip.left + strip.width).toBeCloseTo(slot.width, 6);
+      // On the square's inner edge: NORTH → bottom, EAST → left, SOUTH → top, WEST → right.
+      if (side === 'top') expect(strip.top + strip.height).toBeCloseTo(slot.height, 6);
+      if (side === 'right') expect(strip.left).toBe(0);
+      if (side === 'bottom') expect(strip.top).toBe(0);
+      if (side === 'left') expect(strip.left + strip.width).toBeCloseTo(slot.width, 6);
+      // The owner accent keeps its place on that same edge, over the strip; buildings stay off it.
+      const accent = flat(`board-owner-strip-${key}`);
+      expect(accent).toMatchObject(slot.parts.owner!);
+      const pad = { top: 'paddingBottom', right: 'paddingLeft', bottom: 'paddingTop', left: 'paddingRight' }[side];
+      expect(strip[pad]).toBe(geo.metrics.ownerStrip);
       // Clear of the text and of the token lane.
       expect(overlap(strip, flat(`board-content-${index}`))).toBe(false);
       expect(overlap(strip, slot.parts.tokens)).toBe(false);
@@ -294,7 +301,7 @@ describe('rendered board', () => {
       let used = 0;
       for (const p of pieces) {
         const s = StyleSheet.flatten(p.props.style) as Rect;
-        expect(s[across]).toBeLessThanOrEqual(strip[across] + 1e-6);
+        expect(s[across]).toBeLessThanOrEqual(strip[across] - geo.metrics.ownerStrip + 1e-6);
         used += s[along] + 1;
       }
       expect(used).toBeLessThanOrEqual(strip[along] + 1e-6);

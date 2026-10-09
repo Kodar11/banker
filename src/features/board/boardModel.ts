@@ -121,9 +121,9 @@ export interface Rect {
 
 /** Sizes shared by every square, all derived from the board's size. */
 export interface BoardMetrics {
-  /** Thickness of the building strip (the group-colour band) on a property's outer edge. */
+  /** Thickness of the group-colour band that holds a property's buildings. */
   band: number;
-  /** Thickness of the owner's accent line on a property's inner edge. */
+  /** Thickness of the owner's accent line along the band's inner edge. */
   ownerStrip: number;
   /** Diameter of a player token. */
   token: number;
@@ -134,16 +134,18 @@ export interface BoardMetrics {
 }
 
 /**
- * The fixed zones of one square, in the square's own coordinates. They never
- * overlap, so buildings, text and tokens cannot collide:
- *   outer edge of the board → [ building strip ] [ name + price ] … [ owner accent ] ← centre
+ * The fixed zones of one square, in the square's own coordinates. Buildings,
+ * text and tokens never overlap:
+ *   outer edge of the board → [ name + price ] … [ building strip ] ← centre
  * with a token lane beside the text (towards the centre on the top and bottom
- * rows, along the bottom of the cell on the side columns and corners).
+ * rows, along the bottom of the cell on the side columns and corners). The
+ * owner accent is a thin line along the strip's own inner edge — the one
+ * deliberate overlap; the strip keeps that sliver clear of buildings.
  */
 export interface SquareParts {
-  /** Building strip — properties only. */
+  /** Building strip, on the square's INNER edge (facing the board centre) — properties only. */
   band: Rect | null;
-  /** Owner accent — properties only (drawn when owned, always reserved). */
+  /** Owner accent, drawn over the strip's inner edge — properties only (drawn when owned, always reserved). */
   owner: Rect | null;
   content: Rect;
   tokens: Rect;
@@ -181,35 +183,36 @@ function boardMetrics(cell: number): BoardMetrics {
 
 /** Which board edge is "up" for a square decides where its zones go — its actual side, never a rotation. */
 function squareParts(side: BoardSide, isCorner: boolean, isProperty: boolean, w: number, h: number, m: BoardMetrics): SquareParts {
-  const b = isProperty ? m.band : 0;
   const o = isProperty ? m.ownerStrip : 0;
+  // The strip is the colour band plus the sliver the owner accent is drawn over.
+  const b = isProperty ? m.band + o : 0;
   const t = m.tokenLane;
   const strips = (band: Rect, owner: Rect) => (isProperty ? { band, owner } : { band: null, owner: null });
   if (isCorner) return { band: null, owner: null, content: { left: 0, top: 0, width: w, height: h - t }, tokens: { left: 0, top: h - t, width: w, height: t } };
   switch (side) {
     case 'top':
       return {
-        ...strips({ left: 0, top: 0, width: w, height: b }, { left: 0, top: h - o, width: w, height: o }),
-        content: { left: 0, top: b, width: w, height: h - b - o - t },
-        tokens: { left: 0, top: h - o - t, width: w, height: t },
+        ...strips({ left: 0, top: h - b, width: w, height: b }, { left: 0, top: h - o, width: w, height: o }),
+        content: { left: 0, top: 0, width: w, height: h - b - t },
+        tokens: { left: 0, top: h - b - t, width: w, height: t },
       };
     case 'bottom':
       return {
-        ...strips({ left: 0, top: h - b, width: w, height: b }, { left: 0, top: 0, width: w, height: o }),
-        content: { left: 0, top: o + t, width: w, height: h - b - o - t },
-        tokens: { left: 0, top: o, width: w, height: t },
+        ...strips({ left: 0, top: 0, width: w, height: b }, { left: 0, top: 0, width: w, height: o }),
+        content: { left: 0, top: b + t, width: w, height: h - b - t },
+        tokens: { left: 0, top: b, width: w, height: t },
       };
     case 'left':
       return {
-        ...strips({ left: 0, top: 0, width: b, height: h }, { left: w - o, top: 0, width: o, height: h }),
-        content: { left: b, top: 0, width: w - b - o, height: h - t },
-        tokens: { left: b, top: h - t, width: w - b - o, height: t },
+        ...strips({ left: w - b, top: 0, width: b, height: h }, { left: w - o, top: 0, width: o, height: h }),
+        content: { left: 0, top: 0, width: w - b, height: h - t },
+        tokens: { left: 0, top: h - t, width: w - b, height: t },
       };
     case 'right':
       return {
-        ...strips({ left: w - b, top: 0, width: b, height: h }, { left: 0, top: 0, width: o, height: h }),
-        content: { left: o, top: 0, width: w - b - o, height: h - t },
-        tokens: { left: o, top: h - t, width: w - b - o, height: t },
+        ...strips({ left: 0, top: 0, width: b, height: h }, { left: 0, top: 0, width: o, height: h }),
+        content: { left: b, top: 0, width: w - b, height: h - t },
+        tokens: { left: b, top: h - t, width: w - b, height: t },
       };
   }
 }
