@@ -17,6 +17,7 @@ import type { GameView } from '@/features/game/useGameView';
 import { gameApi } from '@/lib/gameApi';
 import { useGameStore } from '@/store/gameStore';
 import { useSessionStore } from '@/store/sessionStore';
+import { formatINR } from '@/utils/currency';
 import { Fixture, ok } from './fixtures';
 
 const api = gameApi as jest.Mocked<typeof gameApi>;
@@ -122,7 +123,7 @@ describe('interactive, read-only board', () => {
     expect(screen.getByTestId('current-rent')).toHaveTextContent('₹5,500');
     await fireEvent.press(screen.getByTestId('property-view-owner'));
     const details = screen.getByTestId(`player-details-${f.ids.Shamin}`);
-    expect(details).toHaveTextContent(/Shamin/);
+    expect(screen.getByTestId('player-details-header')).toHaveTextContent(/Shamin/);
     expect(screen.getByTestId('player-details-balance')).toHaveTextContent('₹25,000');
     expect(screen.getByTestId('player-details-location')).toHaveTextContent(/Jail/);
     expect(screen.getByTestId('player-details-loans')).toHaveTextContent(/₹0/);
@@ -159,9 +160,93 @@ describe('interactive, read-only board', () => {
     expect(screen.getByTestId(`player-details-${f.ids.Shamin}`)).toBeTruthy();
     expect(screen.getByTestId('player-make-offer')).toBeTruthy();
     await fireEvent.press(screen.getByTestId(`board-token-press-${f.ids.Tanmay}`));
-    expect(screen.getByTestId(`player-details-${f.ids.Tanmay}`)).toHaveTextContent(/\(You\)/);
+    expect(screen.getByTestId(`player-details-${f.ids.Tanmay}`)).toBeTruthy();
+    expect(screen.getByTestId('player-details-header')).toHaveTextContent(/Tanmay.*\(You\)/);
     expect(screen.queryByTestId('player-make-offer')).toBeNull();
     expect(api.action).not.toHaveBeenCalled();
+  });
+
+  it('My Properties and Player Details are one sheet: same structure, each with its own player’s data', async () => {
+    const f = table();
+    Object.assign(f.state.properties.DELHI, { ownerId: f.ids.Tanmay!, hotel: true });
+    Object.assign(f.state.properties.RAILWAY, { ownerId: f.ids.Tanmay!, mortgaged: true });
+    f.act('Tanmay', { type: 'REQUEST_LOAN', amount: 2000 }).loadAs('Tanmay');
+    const view = viewFor(f, 'Tanmay');
+    await render(<GameScreen view={view} />);
+    const parts = ['player-details-header', 'player-details-balance', 'player-details-location', 'player-details-net-worth', 'player-details-loans', 'player-details-properties', 'player-open-wallet'];
+
+    // Mine: my cash, net worth and loan; my two properties with their states; no deal with myself.
+    await fireEvent.press(screen.getByTestId('open-properties'));
+    for (const id of parts) expect(screen.getByTestId(id)).toBeTruthy();
+    expect(screen.getByTestId('player-details-badge', { includeHiddenElements: true })).toBeTruthy();
+    expect(screen.getByTestId('player-details-header')).toHaveTextContent(/Tanmay.*\(You\).*Active.*Your turn/);
+    // A plain colour token, as on the board: no initial inside.
+    expect(within(screen.getByTestId('player-details-badge', { includeHiddenElements: true })).queryByText(/./)).toBeNull();
+    expect(screen.getByTestId('player-details-balance')).toHaveTextContent(formatINR(player(f, 'Tanmay').balance));
+    expect(screen.getByTestId('player-details-net-worth')).toHaveTextContent(formatINR(netWorth(f.state, f.ids.Tanmay!)), { exact: false });
+    expect(screen.getByTestId('player-details-loans')).toHaveTextContent(formatINR(outstandingDebt(f.state.loans, f.ids.Tanmay!)), { exact: false });
+    const mine = screen.getByTestId('player-details-properties');
+    expect(within(mine).getByTestId('property-count')).toHaveTextContent('2');
+    expect(within(mine).getByTestId('property-status-DELHI')).toHaveTextContent(/Hotel/);
+    expect(within(mine).getByTestId('property-status-RAILWAY')).toHaveTextContent('Mortgaged');
+    expect(within(mine).queryByTestId('property-MUMBAI')).toBeNull();
+    expect(mine).toHaveTextContent(/Tap a property to build, mortgage or sell/);
+    expect(screen.queryByTestId('player-details-actions')).toBeNull();
+    expect(screen.getByTestId('player-open-wallet')).toHaveTextContent(/Wallet & History.*Transactions, loans and financial history/);
+
+    // Theirs: the same parts, their numbers, their property; in Jail and not their turn.
+    await fireEvent.press(screen.getByTestId(`player-chip-${f.ids.Shamin}`));
+    for (const id of parts) expect(screen.getByTestId(id)).toBeTruthy();
+    expect(screen.getByTestId('player-details-badge', { includeHiddenElements: true })).toBeTruthy();
+    expect(screen.getByTestId('player-details-header')).toHaveTextContent(/Shamin/);
+    expect(screen.getByTestId('player-details-header')).not.toHaveTextContent(/You|turn/);
+    expect(screen.getByTestId('player-details-balance')).toHaveTextContent('₹25,000');
+    expect(screen.getByTestId('player-details-loans')).toHaveTextContent(/₹0$/);
+    const theirs = screen.getByTestId('player-details-properties');
+    expect(within(theirs).getByTestId('property-count')).toHaveTextContent('1');
+    expect(within(theirs).getByTestId('property-status-MUMBAI')).toHaveTextContent(/× 2/);
+    expect(within(theirs).queryByTestId('property-DELHI')).toBeNull();
+    expect(theirs).not.toHaveTextContent(/Tap a property/);
+    expect(screen.getByTestId('player-make-offer').props.accessibilityState.disabled).toBe(false);
+
+    // A row opens the existing property details; the wallet row keeps its destination.
+    await fireEvent.press(within(theirs).getByTestId('property-MUMBAI'));
+    expect(screen.getByTestId(`square-details-${positionOfProperty('MUMBAI')}`)).toBeTruthy();
+    await fireEvent.press(screen.getByTestId('property-view-owner'));
+    await fireEvent.press(screen.getByTestId('player-open-wallet'));
+    expect(router.push).toHaveBeenCalledWith(`/player/${f.ids.Shamin}`);
+    expect(api.action).not.toHaveBeenCalled();
+  });
+
+  it('player sheet: compact empty state, jail badge, a long name keeps (You) and the close button', async () => {
+    const long = 'Maharaja Krishnadeva'; // the longest name the game accepts (20 characters)
+    const f = new Fixture([long, 'Bilal']);
+    Object.assign(player(f, 'Bilal'), { inJail: true, jailTurnsLeft: 2, position: positionOfSpecial('JAIL') });
+    f.loadAs(long);
+    await render(<GameScreen view={viewFor(f, long)} />);
+    await fireEvent.press(screen.getByTestId('open-properties'));
+    expect(screen.getByText(long).props.numberOfLines).toBe(1);
+    expect(screen.getByTestId('player-details-header')).toHaveTextContent(/\(You\)/);
+    expect(within(screen.getByTestId('sheet-player')).getByLabelText('Close')).toBeTruthy();
+    expect(screen.getByTestId('property-list-empty')).toHaveTextContent('No properties yet');
+    expect(screen.getByTestId('player-details-properties')).not.toHaveTextContent(/Tap a property/);
+
+    await fireEvent.press(screen.getByTestId(`player-chip-${f.ids.Bilal}`));
+    expect(screen.getByTestId('player-details-header')).toHaveTextContent(/Bilal.*In Jail · 2 left/);
+    expect(screen.getByTestId('player-details-location')).toHaveTextContent(/Jail/);
+  });
+
+  it('Make Offer / Pay Money stay visible but disabled, with the reason, when a deal is not allowed', async () => {
+    const f = table();
+    player(f, 'Shamin').status = 'BANKRUPT';
+    f.loadAs('Tanmay');
+    await render(<GameScreen view={viewFor(f, 'Tanmay')} />);
+    await fireEvent.press(screen.getByTestId(`player-chip-${f.ids.Shamin}`));
+    expect(screen.getByTestId('player-make-offer').props.accessibilityState.disabled).toBe(true);
+    expect(screen.getByTestId('player-pay-money').props.accessibilityState.disabled).toBe(true);
+    expect(screen.getByTestId('player-actions-blocked')).toHaveTextContent('This player is out of the game.');
+    await fireEvent.press(screen.getByTestId('player-make-offer'));
+    expect(screen.queryByTestId('trade-sheet')).toBeNull();
   });
 
   it.each([

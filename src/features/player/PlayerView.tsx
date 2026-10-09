@@ -8,7 +8,7 @@ import { useGameAction } from '@/features/game/useGameAction';
 import { LoanSheet } from '@/features/loan/LoanSheet';
 import { TransactionList } from '@/features/transactions/TransactionList';
 import { formatINR } from '@/utils/currency';
-import { PropertyRow } from './PropertyRow';
+import { PropertyList } from './PropertyList';
 
 export function PlayerView({ view, playerId }: { view: GameView; playerId: string }) {
   const send = useGameAction();
@@ -52,14 +52,7 @@ export function PlayerView({ view, playerId }: { view: GameView; playerId: strin
       </Card>
 
       <Card>
-        <Label>Properties ({keys.length})</Label>
-        <View className="mt-3 gap-2">
-          {keys.length ? (
-            keys.map((k) => <PropertyRow key={k} prop={state.properties[k]} />)
-          ) : (
-            <Text className="text-base text-stone-500">No properties yet.</Text>
-          )}
-        </View>
+        <PropertyList properties={keys.map((k) => state.properties[k])} />
       </Card>
 
       <Card>

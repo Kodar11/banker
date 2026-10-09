@@ -7,7 +7,7 @@ import { ConfirmDialog, ConnectionBanner, Sheet } from '@/components/ui';
 import { ClassicBoard } from '@/features/board/ClassicBoard';
 import { SquareDetails } from '@/features/board/SquareDetails';
 import { LoanSheet } from '@/features/loan/LoanSheet';
-import { PlayerDetails } from '@/features/player/PlayerDetails';
+import { PlayerDetails, PlayerDetailsActions, PlayerDetailsHeader } from '@/features/player/PlayerDetails';
 import { PropertyDeed } from '@/features/player/PropertyDeed';
 import { TradeOffers } from '@/features/trade/TradeOffers';
 import { TradeSheet } from '@/features/trade/TradeSheet';
@@ -214,6 +214,8 @@ export function GameScreen({ view }: { view: GameView }) {
     (panel.kind !== 'standings' || state.status === 'FINISHED');
   let panelTitle = '';
   let panelBody: ReactNode = null;
+  let panelHeader: ReactNode = null;
+  let panelFooter: ReactNode = null;
   if (panel && panelOpen) {
     switch (panel.kind) {
       case 'square': {
@@ -234,19 +236,29 @@ export function GameScreen({ view }: { view: GameView }) {
       }
       case 'player':
         panelTitle = panel.id === me?.id ? 'You' : 'Player';
+        panelHeader = <PlayerDetailsHeader view={view} playerId={panel.id} />;
         panelBody = (
           <PlayerDetails
             view={view}
             playerId={panel.id}
             onPropertyPress={(key) => isPropertyKey(key) && openSquare(positionOfProperty(key))}
-            onMakeOffer={(id) => openTool({ kind: 'trade', to: id })}
-            onPayMoney={(id) => openTool({ kind: 'pay', to: id })}
             onOpenWallet={(id) => {
               setPanel(null);
               router.push(`/player/${id}`);
             }}
           />
         );
+        // Dealing is with someone else; my own sheet (and a spectator's view) has no pinned actions.
+        if (me && panel.id !== me.id) {
+          panelFooter = (
+            <PlayerDetailsActions
+              view={view}
+              playerId={panel.id}
+              onMakeOffer={(id) => openTool({ kind: 'trade', to: id })}
+              onPayMoney={(id) => openTool({ kind: 'pay', to: id })}
+            />
+          );
+        }
         break;
       case 'decision': {
         const pending = state.turn.pending;
@@ -326,7 +338,7 @@ export function GameScreen({ view }: { view: GameView }) {
         </View>
       </ScrollView>
 
-      <Sheet visible={panelOpen} title={panelTitle} onClose={() => setPanel(null)} testID={panel ? `sheet-${panel.kind}` : undefined}>
+      <Sheet visible={panelOpen} title={panelTitle} header={panelHeader} footer={panelFooter} onClose={() => setPanel(null)} testID={panel ? `sheet-${panel.kind}` : undefined}>
         {panelBody}
       </Sheet>
       <PayPlayerSheet
