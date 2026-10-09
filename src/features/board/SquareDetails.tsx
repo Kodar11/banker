@@ -1,9 +1,10 @@
 import { Pressable, Text, View } from 'react-native';
 import { DECK_LABELS, spaceAt, spaceName, type PlayerState } from '@/engine/index.ts';
-import { Button, Card, Label, PlayerBadge } from '@/components/ui';
+import { Card, Label, PlayerBadge } from '@/components/ui';
 import { COLORS } from '@/constants/theme';
 import type { GameView } from '@/features/game/useGameView';
 import { PropertyDeed } from '@/features/player/PropertyDeed';
+import { PropertyManage } from '@/features/player/PropertyManage';
 import { SPECIAL_ICONS } from './BoardSquare';
 import { specialSquareInfo } from './squareInfo';
 
@@ -50,30 +51,22 @@ interface SquareDetailsProps {
   view: GameView;
   index: number;
   onPlayerPress: (playerId: string) => void;
-  /** Opens the full property screen (build / mortgage / sell) for a property I own. */
-  onManageProperty: (key: string) => void;
 }
 
-/** Read-only details for any board square. Nothing here changes game state. */
-export function SquareDetails({ view, index, onPlayerPress, onManageProperty }: SquareDetailsProps) {
+/**
+ * Details for any board square. Read-only, except that a property I own carries its
+ * manage section (build / mortgage / sell) in the same card.
+ */
+export function SquareDetails({ view, index, onPlayerPress }: SquareDetailsProps) {
   const { state } = view.snapshot;
   const space = spaceAt(index);
 
   if (space.kind === 'PROPERTY') {
-    const mine = !!view.me && state.properties[space.propertyKey].ownerId === view.me.id;
     return (
       <View className="gap-4" testID={`square-details-${index}`}>
-        <PropertyDeed state={state} propertyKey={space.propertyKey} playerName={view.playerName} onOwnerPress={onPlayerPress} />
-        {mine && state.status === 'ACTIVE' ? (
-          <Button
-            size="sm"
-            variant="secondary"
-            title="Build, mortgage or sell ›"
-            testID="square-manage-property"
-            accessibilityHint="Opens the property screen"
-            onPress={() => onManageProperty(space.propertyKey)}
-          />
-        ) : null}
+        <PropertyDeed state={state} propertyKey={space.propertyKey} playerName={view.playerName} onOwnerPress={onPlayerPress}>
+          <PropertyManage view={view} propertyKey={space.propertyKey} />
+        </PropertyDeed>
         <PlayersHere view={view} index={index} onPlayerPress={onPlayerPress} />
       </View>
     );

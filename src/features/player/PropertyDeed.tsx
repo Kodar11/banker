@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Text, View } from 'react-native';
 import { computeRent, getDeed, GROUP_LABELS, rentMultiplier, rentTable, type GameState, type PropertyKey } from '@/engine/index.ts';
 import { Button, Card, Label, Pill, PlayerBadge } from '@/components/ui';
@@ -10,13 +11,16 @@ interface PropertyDeedProps {
   playerName: (id: string | null) => string;
   /** When set, the owner gets a "View <name>" button (read-only navigation). */
   onOwnerPress?: (playerId: string) => void;
+  /** Continues the same card under the deed (the owner's manage section). */
+  children?: ReactNode;
 }
 
 /**
  * The title deed: price, owner, rent table, buildings and mortgage state.
- * Purely informational — shared by the property screen and the board's details sheet.
+ * Informational itself — shared by the property screen and the board's details sheet;
+ * anything the owner can do is passed in as children.
  */
-export function PropertyDeed({ state, propertyKey, playerName, onOwnerPress }: PropertyDeedProps) {
+export function PropertyDeed({ state, propertyKey, playerName, onOwnerPress, children }: PropertyDeedProps) {
   const deed = getDeed(propertyKey);
   const prop = state.properties[propertyKey];
   const lastDice = state.turn.roll?.total ?? 7;
@@ -40,7 +44,7 @@ export function PropertyDeed({ state, propertyKey, playerName, onOwnerPress }: P
           <View className="flex-1">
             <Label>Owner</Label>
             <View className="flex-row items-center gap-2">
-              {owner ? <PlayerBadge player={owner} size={20} testID="property-owner-badge" /> : null}
+              {owner ? <PlayerBadge player={owner} size={20} plain testID="property-owner-badge" /> : null}
               <Text className="text-lg font-bold text-ink" testID="property-owner">
                 {prop.ownerId ? `Owned by ${playerName(prop.ownerId)}` : 'Available · Bank'}
               </Text>
@@ -90,6 +94,7 @@ export function PropertyDeed({ state, propertyKey, playerName, onOwnerPress }: P
           ) : null}
           <Info label="Mortgage value" value={formatINR(deed.mortgageValue)} />
         </View>
+        {children}
       </View>
     </Card>
   );

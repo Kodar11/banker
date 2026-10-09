@@ -1,12 +1,14 @@
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
-type Variant = 'primary' | 'secondary' | 'danger' | 'ghost' | 'success';
+type Variant = 'primary' | 'secondary' | 'danger' | 'ghost' | 'success' | 'outline';
 
 const VARIANTS: Record<Variant, { box: string; text: string; spinner: string }> = {
   primary: { box: 'bg-saffron border-b-4 border-saffron-dark', text: 'text-ink', spinner: '#1F1B16' },
   success: { box: 'bg-green-500 border-b-4 border-green-700', text: 'text-white', spinner: '#fff' },
   secondary: { box: 'bg-cream border-b-4 border-stone-300', text: 'text-ink', spinner: '#1F1B16' },
   danger: { box: 'bg-brick border-b-4 border-red-900', text: 'text-white', spinner: '#fff' },
+  // A consequential action on a light surface that should not shout (e.g. sell to bank).
+  outline: { box: 'border-2 border-brick/60', text: 'text-brick', spinner: '#C2410C' },
   ghost: { box: 'bg-white/10 border border-white/30', text: 'text-cream', spinner: '#FFF8E7' },
 };
 

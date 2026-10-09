@@ -242,7 +242,8 @@ describe('Mortgage UI', () => {
     api.action.mockResolvedValue(ok(f.snapshot()));
     await render(<PropertyView view={viewFor(f, 'Asha')} propertyKey="INDORE" />);
     // Indore: mortgage 750 + 2 houses × 1,000 sell-back.
-    expect(screen.getByText('Mortgage +₹2,750 (buildings returned)')).toBeTruthy();
+    expect(screen.getByText('Mortgage · +₹2,750')).toBeTruthy();
+    expect(screen.getByTestId('action-note-MORTGAGE_PROPERTY')).toHaveTextContent(/buildings.*go back to the bank/);
     await fireEvent.press(screen.getByTestId('action-MORTGAGE_PROPERTY'));
     await waitFor(() => expect(api.action.mock.calls[0]![3]).toEqual({ type: 'MORTGAGE_PROPERTY', propertyKey: 'INDORE' }));
   });

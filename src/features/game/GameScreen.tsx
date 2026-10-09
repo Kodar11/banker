@@ -14,7 +14,6 @@ import { TradeSheet } from '@/features/trade/TradeSheet';
 import { PayPlayerSheet } from '@/features/transactions/PayPlayerSheet';
 import { useGameStore } from '@/store/gameStore';
 import { haptics } from '@/utils/haptics';
-import { openProperty } from '@/utils/navigation';
 import { ActionPanel } from './ActionPanel';
 import { AdaptiveActionBar, type BarAction } from './AdaptiveActionBar';
 import { ContextualCard } from './ContextualCard';
@@ -26,7 +25,7 @@ import { TurnActionBar } from './TurnActionBar';
 import { useGameAction } from './useGameAction';
 import type { GameView } from './useGameView';
 
-/** Information sheets (one at a time, content swapped in place): opening one never changes game state. */
+/** Information sheets (one at a time, content swapped in place): opening one never changes game state. A property I own is also managed from its sheet. */
 type Panel =
   | { kind: 'square'; index: number }
   | { kind: 'player'; id: string }
@@ -221,17 +220,7 @@ export function GameScreen({ view }: { view: GameView }) {
       case 'square': {
         const space = spaceAt(panel.index);
         panelTitle = space.kind === 'PROPERTY' ? 'Property' : spaceName(panel.index);
-        panelBody = (
-          <SquareDetails
-            view={view}
-            index={panel.index}
-            onPlayerPress={openPlayer}
-            onManageProperty={(key) => {
-              setPanel(null);
-              openProperty(key);
-            }}
-          />
-        );
+        panelBody = <SquareDetails view={view} index={panel.index} onPlayerPress={openPlayer} />;
         break;
       }
       case 'player':

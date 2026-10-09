@@ -3,7 +3,19 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 import { router } from 'expo-router';
-import { BOARD_SIZE, netWorth, outstandingDebt, positionOfProperty, positionOfSpecial, positionsOfSpecial } from '@/engine/index.ts';
+import {
+  BOARD_SIZE,
+  computeRent,
+  getDeed,
+  mortgageResolution,
+  netWorth,
+  outstandingDebt,
+  positionOfProperty,
+  positionOfSpecial,
+  positionsOfSpecial,
+  sellBuildingRefund,
+  unmortgageCost,
+} from '@/engine/index.ts';
 import { GameScreen } from '@/features/game/GameScreen';
 import { pickContext, turnStatus } from '@/features/game/gameFocus';
 import {
@@ -142,15 +154,132 @@ describe('interactive, read-only board', () => {
     expect(api.action).not.toHaveBeenCalled();
   });
 
-  it('my own property links to the existing property screen to build / mortgage / sell', async () => {
+  it('my own property: details and Manage property share one sheet; building updates it in place, no navigation', async () => {
     const f = table();
     f.state.properties.DELHI.ownerId = f.ids.Tanmay!;
     f.loadAs('Tanmay');
-    await render(<GameScreen view={viewFor(f, 'Tanmay')} />);
+    const ui = await render(<GameScreen view={viewFor(f, 'Tanmay')} />);
+    // My Properties → the property.
+    await fireEvent.press(screen.getByTestId('open-properties'));
+    await fireEvent.press(screen.getByTestId('property-DELHI'));
+    const sheet = screen.getByTestId(`square-details-${positionOfProperty('DELHI')}`);
+    expect(within(sheet).getByTestId('property-deed-header')).toHaveTextContent(/Delhi/);
+    expect(within(sheet).getByTestId('rent-table')).toBeTruthy();
+    expect(within(sheet).getByTestId('property-built')).toHaveTextContent(/0 houses/);
+    // The same card carries the actions, with the engine's amounts; the old hop to another screen is gone.
+    const manage = within(within(sheet).getByTestId('property-deed')).getByTestId('property-manage');
+    expect(screen.queryByTestId('square-manage-property')).toBeNull();
+    const deed = getDeed('DELHI');
+    if (deed.kind !== 'CITY') throw new Error('Delhi is a city site');
+    expect(within(manage).getByTestId('action-BUILD_HOUSE')).toHaveTextContent(`Build House · ${formatINR(deed.houseCost)}`);
+    expect(within(manage).getByTestId('action-MORTGAGE_PROPERTY')).toHaveTextContent(`Mortgage · +${formatINR(mortgageResolution(f.state.properties.DELHI).payout)}`);
+    expect(within(manage).getByTestId('action-SELL_PROPERTY')).toHaveTextContent(`Sell to Bank · +${formatINR(deed.mortgageValue)}`);
+    for (const kind of ['BUILD_HOUSE', 'MORTGAGE_PROPERTY', 'SELL_PROPERTY']) expect(screen.getByTestId(`action-${kind}`).props.accessibilityState.disabled).toBe(false);
+    expect(screen.queryByTestId('action-SELL_BUILDING')).toBeNull();
+    expect(screen.queryByTestId('action-UNMORTGAGE_PROPERTY')).toBeNull();
+
+    // Build: one request to the referee, then the same sheet shows the new authoritative state.
+    f.act('Tanmay', { type: 'BUILD_HOUSE', propertyKey: 'DELHI' }).loadAs('Tanmay');
+    api.action.mockResolvedValue(ok(f.snapshot()));
+    await fireEvent.press(screen.getByTestId('action-BUILD_HOUSE'));
+    await waitFor(() => expect(api.action).toHaveBeenCalledTimes(1));
+    expect(api.action.mock.calls[0]![3]).toEqual({ type: 'BUILD_HOUSE', propertyKey: 'DELHI' });
+    await ui.rerender(<GameScreen view={viewFor(f, 'Tanmay')} />);
+    expect(screen.getByTestId(`square-details-${positionOfProperty('DELHI')}`)).toBeTruthy();
+    expect(screen.getByTestId('property-built')).toHaveTextContent(/1 house$/);
+    expect(screen.getByTestId('current-rent')).toHaveTextContent(formatINR(computeRent(f.state, 'DELHI', 7)));
+    expect(screen.getByTestId('action-SELL_BUILDING')).toHaveTextContent(/Sell House · \+₹/);
+    expect(screen.getByTestId('action-SELL_PROPERTY').props.accessibilityState.disabled).toBe(true);
+    expect(screen.getByTestId('action-note-SELL_PROPERTY')).toHaveTextContent('Sell the buildings first.');
+    expect(router.push).not.toHaveBeenCalled();
+  });
+
+  it('mortgage and sell keep the sheet on the property and show its new state', async () => {
+    const f = table();
+    f.state.properties.DELHI.ownerId = f.ids.Tanmay!;
+    f.loadAs('Tanmay');
+    const ui = await render(<GameScreen view={viewFor(f, 'Tanmay')} />);
     await fireEvent.press(screen.getByTestId(`board-square-${positionOfProperty('DELHI')}`));
-    await fireEvent.press(screen.getByTestId('square-manage-property'));
-    expect(router.push).toHaveBeenCalledWith('/property/DELHI');
+
+    const before = player(f, 'Tanmay').balance;
+    const payout = mortgageResolution(f.state.properties.DELHI).payout;
+    f.act('Tanmay', { type: 'MORTGAGE_PROPERTY', propertyKey: 'DELHI' }).loadAs('Tanmay');
+    api.action.mockResolvedValue(ok(f.snapshot()));
+    await fireEvent.press(screen.getByTestId('action-MORTGAGE_PROPERTY'));
+    await waitFor(() => expect(api.action).toHaveBeenCalledTimes(1));
+    await ui.rerender(<GameScreen view={viewFor(f, 'Tanmay')} />);
+    expect(player(f, 'Tanmay').balance).toBe(before + payout);
+    expect(screen.getByText('Mortgaged — no rent')).toBeTruthy();
+    expect(screen.getByTestId('current-rent')).toHaveTextContent('₹0');
+    // No second mortgage, nothing to build on or sell until it is unmortgaged.
+    expect(screen.queryByTestId('action-MORTGAGE_PROPERTY')).toBeNull();
+    expect(screen.getByTestId('action-UNMORTGAGE_PROPERTY')).toHaveTextContent(`Unmortgage · ${formatINR(unmortgageCost('DELHI'))}`);
+    expect(screen.getByTestId('action-BUILD_HOUSE').props.accessibilityState.disabled).toBe(true);
+    expect(screen.getByTestId('action-note-BUILD_HOUSE')).toHaveTextContent('Unmortgage this property first.');
+    expect(screen.getByTestId('action-SELL_PROPERTY').props.accessibilityState.disabled).toBe(true);
+
+    f.act('Tanmay', { type: 'UNMORTGAGE_PROPERTY', propertyKey: 'DELHI' }).act('Tanmay', { type: 'SELL_PROPERTY', propertyKey: 'DELHI' }).loadAs('Tanmay');
+    await ui.rerender(<GameScreen view={viewFor(f, 'Tanmay')} />);
+    // Sold: still on the property, now the bank's, with nothing left to manage.
+    expect(screen.getByTestId(`square-details-${positionOfProperty('DELHI')}`)).toBeTruthy();
+    expect(screen.getByTestId('property-owner')).toHaveTextContent('Available · Bank');
+    expect(screen.queryByTestId('property-manage')).toBeNull();
+    expect(router.push).not.toHaveBeenCalled();
+  });
+
+  it('someone else’s property and an unowned one are read-only: no manage section', async () => {
+    const f = table().loadAs('Tanmay');
+    await render(<GameScreen view={viewFor(f, 'Tanmay')} />);
+    await fireEvent.press(screen.getByTestId(`board-square-${positionOfProperty('MUMBAI')}`));
+    expect(screen.getByTestId('property-owner')).toHaveTextContent('Owned by Shamin');
+    expect(within(screen.getByTestId('property-owner-badge', { includeHiddenElements: true })).queryByText(/./)).toBeNull();
+    expect(screen.getByTestId('property-view-owner')).toBeTruthy();
+    expect(screen.queryByTestId('property-manage')).toBeNull();
+    await fireEvent.press(screen.getByTestId(`board-square-${positionOfProperty('AHMEDABAD')}`));
+    expect(screen.getByTestId('property-owner')).toHaveTextContent('Available · Bank');
+    expect(screen.queryByTestId('property-manage')).toBeNull();
+    expect(screen.queryByTestId(/^action-[A-Z_]+$/)).toBeNull();
+  });
+
+  it('manage actions follow the engine: no cash, a hotel, a paused game, and a refusal from the server', async () => {
+    const f = table();
+    Object.assign(f.state.properties.DELHI, { ownerId: f.ids.Tanmay! });
+    Object.assign(f.state.properties.MADRAS, { ownerId: f.ids.Tanmay!, houses: 0, hotel: true });
+    player(f, 'Tanmay').balance = 100;
+    f.loadAs('Tanmay');
+    const ui = await render(<GameScreen view={viewFor(f, 'Tanmay')} />);
+
+    // Not enough cash: Build House is shown, disabled, with the engine's reason; mortgaging still works.
+    await fireEvent.press(screen.getByTestId(`board-square-${positionOfProperty('DELHI')}`));
+    expect(screen.getByTestId('action-BUILD_HOUSE').props.accessibilityState.disabled).toBe(true);
+    expect(screen.getByTestId('action-note-BUILD_HOUSE')).toHaveTextContent('Not enough money for a house.');
+    expect(screen.getByTestId('action-MORTGAGE_PROPERTY').props.accessibilityState.disabled).toBe(false);
+    await fireEvent.press(screen.getByTestId('action-BUILD_HOUSE'));
     expect(api.action).not.toHaveBeenCalled();
+
+    // A refusal is shown next to the buttons, and the sheet stays.
+    api.action.mockResolvedValue({ ok: false, error: { code: 'INVALID_PHASE', message: 'Wait for the auction to finish.' } });
+    await fireEvent.press(screen.getByTestId('action-MORTGAGE_PROPERTY'));
+    await waitFor(() => expect(screen.getByTestId('property-manage-error')).toHaveTextContent('Wait for the auction to finish.'));
+    expect(screen.getByTestId(`square-details-${positionOfProperty('DELHI')}`)).toBeTruthy();
+
+    // A hotel: nothing more to build; sell the hotel before the site; mortgaging returns the buildings.
+    await fireEvent.press(screen.getByTestId(`board-square-${positionOfProperty('MADRAS')}`));
+    expect(screen.queryByTestId('property-manage-error')).toBeNull();
+    expect(screen.getByTestId('property-built')).toHaveTextContent(/Hotel/);
+    expect(screen.queryByTestId('action-BUILD_HOUSE')).toBeNull();
+    expect(screen.queryByTestId('action-BUILD_HOTEL')).toBeNull();
+    expect(screen.getByTestId('action-SELL_BUILDING')).toHaveTextContent(`Sell Hotel · +${formatINR(sellBuildingRefund('MADRAS', f.state.properties.MADRAS))}`);
+    expect(screen.getByTestId('action-note-MORTGAGE_PROPERTY')).toHaveTextContent(/buildings.*go back to the bank/);
+    expect(screen.getByTestId('action-note-SELL_PROPERTY')).toHaveTextContent('Sell the buildings first.');
+
+    // Paused: every action disabled, the reason said once.
+    f.state.status = 'PAUSED';
+    f.loadAs('Tanmay');
+    await ui.rerender(<GameScreen view={viewFor(f, 'Tanmay')} />);
+    expect(screen.getByTestId('property-manage-blocked')).toHaveTextContent('Game is paused.');
+    for (const kind of ['SELL_BUILDING', 'MORTGAGE_PROPERTY', 'SELL_PROPERTY']) expect(screen.getByTestId(`action-${kind}`).props.accessibilityState.disabled).toBe(true);
+    expect(screen.queryByTestId(/^action-note-/)).toBeNull();
   });
 
   it('tapping a token opens that player; my own details offer no deal with myself', async () => {
