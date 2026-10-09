@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 interface SheetProps {
@@ -18,7 +18,8 @@ interface SheetProps {
 export function Sheet({ visible, title, onClose, children, testID, header, footer }: SheetProps) {
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View className="flex-1 justify-end bg-black/50">
+      {/* Same keyboard handling as Screen: the sheet (and its pinned footer) stays above the keyboard. */}
+      <KeyboardAvoidingView className="flex-1 justify-end bg-black/50" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <Pressable className="flex-1" onPress={onClose} accessibilityLabel="Close" accessibilityRole="button" />
         <SafeAreaView edges={['bottom']} className="max-h-[85%] rounded-t-3xl bg-cream" testID={testID}>
           <View className={`flex-row justify-between gap-3 px-5 pt-4 ${header ? 'items-start pb-3' : 'items-center pb-2'}`}>
@@ -32,7 +33,7 @@ export function Sheet({ visible, title, onClose, children, testID, header, foote
           </ScrollView>
           {footer ? <View className="border-t border-stone-200 px-5 pb-4 pt-3">{footer}</View> : null}
         </SafeAreaView>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

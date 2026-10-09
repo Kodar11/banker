@@ -8,6 +8,7 @@ import type { GameView } from '@/features/game/useGameView';
 import { LoanSheet } from '@/features/loan/LoanSheet';
 import { PropertyView } from '@/features/player/PropertyView';
 import { TradeSheet } from '@/features/trade/TradeSheet';
+import { PayPlayerSheet } from '@/features/transactions/PayPlayerSheet';
 import { gameApi } from '@/lib/gameApi';
 import { useGameStore } from '@/store/gameStore';
 import { useSessionStore } from '@/store/sessionStore';
@@ -124,7 +125,73 @@ describe('Adaptive action bar + More', () => {
   });
 });
 
+describe('Pay a player sheet', () => {
+  it('the button says what is missing, then exactly what it will do; the amount is grouped as typed', async () => {
+    const f = new Fixture().loadAs('Asha');
+    const send = jest.fn(async () => ({ ok: true }));
+    const onClose = jest.fn();
+    await render(<PayPlayerSheet visible onClose={onClose} view={viewFor(f, 'Asha')} send={send} />);
+    const button = () => screen.getByTestId('pay-confirm');
+    expect(button()).toHaveTextContent('Choose a player');
+    expect(button().props.accessibilityState.disabled).toBe(true);
+    expect(screen.getByText('Pay to')).toBeTruthy();
+    await fireEvent.press(screen.getByTestId('pay-to-Bilal'));
+    expect(screen.getByTestId('pay-to-Bilal').props.accessibilityState.selected).toBe(true);
+    expect(button()).toHaveTextContent('Enter amount');
+    await fireEvent.changeText(screen.getByTestId('pay-amount'), '0');
+    expect(button()).toHaveTextContent('Enter a valid amount');
+    // More than I have: said in plain words, with what is available.
+    await fireEvent.changeText(screen.getByTestId('pay-amount'), '9999999');
+    expect(button()).toHaveTextContent('Insufficient funds');
+    expect(button().props.accessibilityState.disabled).toBe(true);
+    expect(screen.getByText('Insufficient funds. You have ₹25,000 available.')).toBeTruthy();
+    // Only digits count, and they are shown grouped.
+    await fireEvent.changeText(screen.getByTestId('pay-amount'), '5,0a00');
+    expect(screen.getByTestId('pay-amount').props.value).toBe('5,000');
+    expect(screen.queryByText(/Insufficient funds/)).toBeNull();
+    expect(button()).toHaveTextContent('Pay ₹5,000 to Bilal');
+    expect(button().props.accessibilityState.disabled).toBe(false);
+    await fireEvent.changeText(screen.getByTestId('pay-note'), ' deal for Delhi ');
+    await fireEvent.press(button());
+    expect(send).toHaveBeenCalledWith({ type: 'TRANSFER_MONEY', toPlayerId: f.ids.Bilal, amount: 5000, memo: 'deal for Delhi' }, expect.anything());
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+  });
+});
+
 describe('Trading UI', () => {
+  it('guides instead of scolding: the helper and the button follow what is still missing', async () => {
+    const f = withRailway().loadAs('Asha');
+    await render(<TradeSheet visible onClose={jest.fn()} view={viewFor(f, 'Asha')} send={jest.fn(async () => ({ ok: true }))} />);
+    const button = () => screen.getByTestId('trade-send');
+    expect(button()).toHaveTextContent('Choose a player');
+    expect(screen.queryByTestId('trade-problem')).toBeNull();
+    expect(screen.queryByTestId('trade-want')).toBeNull();
+    await fireEvent.press(screen.getByTestId('trade-with-Bilal'));
+    expect(screen.getByTestId('trade-with-Bilal').props.accessibilityState.selected).toBe(true);
+    // Two sides, each with its own properties and money.
+    expect(screen.getByTestId('trade-give')).toHaveTextContent(/You give.*Railway.*Plus money you give/);
+    expect(screen.getByTestId('trade-want')).toHaveTextContent(/You get from Bilal.*No properties available.*Plus money you get/);
+    expect(button()).toHaveTextContent('Add something to trade');
+    expect(screen.getByTestId('trade-problem')).toHaveTextContent('Add at least one property to the trade.');
+    await fireEvent.changeText(screen.getByTestId('trade-give-money'), '2000');
+    expect(screen.getByTestId('trade-give-money').props.value).toBe('2,000');
+    expect(button()).toHaveTextContent('Complete the trade');
+    expect(screen.getByTestId('trade-problem')).toHaveTextContent('Add at least one property to the trade.');
+    await fireEvent.press(screen.getByTestId('trade-give-RAILWAY'));
+    expect(screen.getByTestId('trade-give-RAILWAY').props.accessibilityState.checked).toBe(true);
+    expect(screen.getByTestId('trade-give-RAILWAY')).toHaveTextContent(/Railway.*✓/);
+    expect(button()).toHaveTextContent('Complete the trade');
+    expect(button().props.accessibilityState.disabled).toBe(true);
+    await fireEvent.changeText(screen.getByTestId('trade-want-money'), '5000');
+    expect(screen.queryByTestId('trade-problem')).toBeNull();
+    expect(button()).toHaveTextContent('Send offer to Bilal');
+    expect(button().props.accessibilityState.disabled).toBe(false);
+    // A real obstacle is still the engine's own message.
+    await fireEvent.changeText(screen.getByTestId('trade-want-money'), '999999');
+    expect(screen.getByTestId('trade-problem')).toHaveTextContent(/Bilal doesn.t have the requested money/);
+    expect(button().props.accessibilityState.disabled).toBe(true);
+  });
+
   it('builds an offer: my property ⇄ custom money, sends CREATE_TRADE', async () => {
     const f = withRailway().loadAs('Asha');
     const send = jest.fn(async () => ({ ok: true }));

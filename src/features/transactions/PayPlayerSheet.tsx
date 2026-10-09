@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { View } from 'react-native';
 import type { GameAction } from '@/engine/index.ts';
-import { Button, PlayerBadge, Sheet, TextField } from '@/components/ui';
+import { Button, MoneyField, PlayerPicker, Sheet, TextField } from '@/components/ui';
 import type { GameView } from '@/features/game/useGameView';
 import { useGameStore } from '@/store/gameStore';
 import { formatINR } from '@/utils/currency';
@@ -15,7 +15,7 @@ interface PayPlayerSheetProps {
   initialPlayerId?: string | null;
 }
 
-/** Player-to-player payment (deals, side bets, settling up). */
+/** Player-to-player payment (deals, side bets, settling up): who → how much → why (optional) → pay. */
 export function PayPlayerSheet({ visible, onClose, view, send, initialPlayerId = null }: PayPlayerSheetProps) {
   const [to, setTo] = useState<string | null>(initialPlayerId);
   const [amount, setAmount] = useState('');
@@ -25,50 +25,59 @@ export function PayPlayerSheet({ visible, onClose, view, send, initialPlayerId =
   if (!me) return null;
   const others = view.snapshot.state.players.filter((p) => p.id !== me.id && p.status === 'ACTIVE');
   const value = Number.parseInt(amount, 10) || 0;
-  const error = value > me.balance ? 'Not enough money for this payment.' : null;
-  const valid = !!to && value > 0 && !error;
+  const short = value > me.balance;
+  const valid = !!to && value > 0 && !short;
+  // The button always says what is still missing, or exactly what it will do.
+  const next = !to
+    ? 'Choose a player'
+    : amount === ''
+      ? 'Enter amount'
+      : value <= 0
+        ? 'Enter a valid amount'
+        : short
+          ? 'Insufficient funds'
+          : `Pay ${formatINR(value)} to ${view.playerName(to)}`;
 
   return (
-    <Sheet visible={visible} onClose={onClose} title="Pay a player" testID="pay-sheet">
-      <View className="flex-row flex-wrap gap-2">
-        {others.map((p) => (
-          <Pressable
-            key={p.id}
-            onPress={() => setTo(p.id)}
-            accessibilityRole="radio"
-            accessibilityState={{ selected: to === p.id }}
-            testID={`pay-to-${p.name}`}
-            className={`min-h-[52px] min-w-[45%] flex-1 items-center justify-center rounded-2xl px-4 ${to === p.id ? 'bg-saffron' : 'bg-stone-200'}`}
-          >
-            <View className="flex-row items-center gap-2">
-              <PlayerBadge player={p} size={20} />
-              <Text className="text-lg font-bold text-ink">{p.name}</Text>
-            </View>
-          </Pressable>
-        ))}
-      </View>
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      title="Pay a player"
+      testID="pay-sheet"
+      footer={
+        <Button
+          title={next}
+          testID="pay-confirm"
+          disabled={!valid || !!pending}
+          loading={pending === 'TRANSFER_MONEY'}
+          onPress={async () => {
+            if (!to) return;
+            const res = await send(
+              { type: 'TRANSFER_MONEY', toPlayerId: to, amount: value, ...(memo.trim() ? { memo: memo.trim() } : {}) },
+              { successMessage: `Paid ${view.playerName(to)} ${formatINR(value)}` },
+            );
+            if (res.ok) {
+              setAmount('');
+              setMemo('');
+              onClose();
+            }
+          }}
+        />
+      }
+    >
+      <PlayerPicker label="Pay to" players={others} selectedId={to} onSelect={setTo} testIDPrefix="pay-to" />
       <View className="gap-3 rounded-2xl bg-felt p-3">
-        <TextField label="Amount (₹)" keyboardType="number-pad" value={amount} onChangeText={setAmount} error={error} testID="pay-amount" />
-        <TextField label="Note (optional)" value={memo} onChangeText={setMemo} maxLength={80} placeholder="e.g. deal for Delhi" />
+        <MoneyField
+          label="Amount"
+          emphasis="strong"
+          value={amount}
+          onChangeValue={setAmount}
+          placeholder="0"
+          error={short ? `Insufficient funds. You have ${formatINR(me.balance)} available.` : null}
+          testID="pay-amount"
+        />
+        <TextField label="Note · optional" emphasis="quiet" value={memo} onChangeText={setMemo} maxLength={80} placeholder="e.g. deal for Delhi" testID="pay-note" />
       </View>
-      <Button
-        title={to ? `PAY ${view.playerName(to)} ${formatINR(value)}` : 'Choose a player'}
-        testID="pay-confirm"
-        disabled={!valid || !!pending}
-        loading={pending === 'TRANSFER_MONEY'}
-        onPress={async () => {
-          if (!to) return;
-          const res = await send(
-            { type: 'TRANSFER_MONEY', toPlayerId: to, amount: value, ...(memo.trim() ? { memo: memo.trim() } : {}) },
-            { successMessage: `Paid ${view.playerName(to)} ${formatINR(value)}` },
-          );
-          if (res.ok) {
-            setAmount('');
-            setMemo('');
-            onClose();
-          }
-        }}
-      />
     </Sheet>
   );
 }

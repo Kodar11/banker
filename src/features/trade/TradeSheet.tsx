@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { getDeed, ownedBy, tradeBlocker, tradePropertyBlocker, type GameAction, type PropertyKey } from '@/engine/index.ts';
-import { Button, Label, PlayerBadge, Sheet, TextField } from '@/components/ui';
+import { Button, MoneyField, PlayerPicker, Sheet } from '@/components/ui';
 import { PROPERTY_GROUP_THEME } from '@/constants/theme';
 import type { GameView } from '@/features/game/useGameView';
 import { useGameStore } from '@/store/gameStore';
@@ -53,7 +53,14 @@ export function TradeSheet({ visible, onClose, view, send, initialPlayerId = nul
   );
   if (!me) return null;
   const others = state.players.filter((p) => p.id !== me.id && p.status === 'ACTIVE');
+  // The engine decides whether the offer can be sent; the sheet only chooses how to say what is still missing.
   const problem = draft ? tradeBlocker(state, draft) : 'Choose a player to trade with.';
+  const untouched = !!draft && give.length + want.length === 0 && draft.offeredMoney === 0 && draft.requestedMoney === 0;
+  /** A form that is simply not filled in yet gets guidance; a real obstacle (e.g. not enough money) reads as one. */
+  const unfinished =
+    !!draft && (give.length + want.length === 0 || (give.length === 0 && draft.offeredMoney === 0) || (want.length === 0 && draft.requestedMoney === 0));
+  const helper = !problem || !to ? null : give.length + want.length === 0 ? 'Add at least one property to the trade.' : problem;
+  const next = !to ? 'Choose a player' : !problem ? `Send offer to ${view.playerName(to)}` : untouched ? 'Add something to trade' : 'Complete the trade';
 
   const reset = () => {
     setGive([]);
@@ -63,122 +70,137 @@ export function TradeSheet({ visible, onClose, view, send, initialPlayerId = nul
   };
 
   return (
-    <Sheet visible={visible} onClose={onClose} title="Propose a trade" testID="trade-sheet">
-      <Label className="text-stone-600">Trade with</Label>
-      <View className="flex-row flex-wrap gap-2">
-        {others.map((p) => (
-          <Pressable
-            key={p.id}
-            onPress={() => {
-              setTo(p.id);
-              setWant([]);
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      title="Propose a trade"
+      testID="trade-sheet"
+      footer={
+        <View className="gap-2">
+          {helper ? (
+            <Text className={`text-center text-sm font-semibold ${unfinished ? 'text-stone-600' : 'text-brick'}`} testID="trade-problem">
+              {helper}
+            </Text>
+          ) : null}
+          <Button
+            title={next}
+            testID="trade-send"
+            disabled={!!problem || !!pending}
+            loading={pending === 'CREATE_TRADE'}
+            onPress={async () => {
+              if (!draft) return;
+              const { fromPlayerId: _from, ...rest } = draft;
+              const res = await send({ type: 'CREATE_TRADE', ...rest }, { successMessage: `Offer sent to ${view.playerName(draft.toPlayerId)}` });
+              if (res.ok) {
+                reset();
+                onClose();
+              }
             }}
-            accessibilityRole="radio"
-            accessibilityState={{ selected: to === p.id }}
-            testID={`trade-with-${p.name}`}
-            className={`min-h-[48px] min-w-[45%] flex-1 items-center justify-center rounded-2xl px-4 ${to === p.id ? 'bg-saffron' : 'bg-stone-200'}`}
-          >
-            <View className="flex-row items-center gap-2">
-              <PlayerBadge player={p} size={20} />
-              <Text className="text-lg font-bold text-ink" numberOfLines={1}>
-                {p.name}
-              </Text>
-            </View>
-          </Pressable>
-        ))}
-      </View>
-
-      <PropertyPicker title="You give" ownerId={me.id} view={view} selected={give} onToggle={(k) => setGive((g) => toggle(g, k))} testID="trade-give" />
-      <View className="rounded-2xl bg-felt p-3">
-        <TextField label="Plus money you give (₹)" keyboardType="number-pad" value={giveMoney} onChangeText={setGiveMoney} testID="trade-give-money" />
-      </View>
-
-      {to ? (
-        <>
-          <PropertyPicker
-            title={`You get from ${view.playerName(to)}`}
-            ownerId={to}
-            view={view}
-            selected={want}
-            onToggle={(k) => setWant((w) => toggle(w, k))}
-            testID="trade-want"
           />
-          <View className="rounded-2xl bg-felt p-3">
-            <TextField label="Plus money you get (₹)" keyboardType="number-pad" value={wantMoney} onChangeText={setWantMoney} testID="trade-want-money" />
-          </View>
-        </>
-      ) : null}
-
-      {problem && to ? (
-        <Text className="text-center text-sm font-semibold text-brick" testID="trade-problem">
-          {problem}
-        </Text>
-      ) : null}
-      <Button
-        title={to ? `SEND OFFER TO ${view.playerName(to).toUpperCase()}` : 'Choose a player'}
-        testID="trade-send"
-        disabled={!!problem || !!pending}
-        loading={pending === 'CREATE_TRADE'}
-        onPress={async () => {
-          if (!draft) return;
-          const { fromPlayerId: _from, ...rest } = draft;
-          const res = await send({ type: 'CREATE_TRADE', ...rest }, { successMessage: `Offer sent to ${view.playerName(draft.toPlayerId)}` });
-          if (res.ok) {
-            reset();
-            onClose();
-          }
+        </View>
+      }
+    >
+      <PlayerPicker
+        label="Trade with"
+        players={others}
+        selectedId={to}
+        onSelect={(id) => {
+          setTo(id);
+          setWant([]);
         }}
+        testIDPrefix="trade-with"
       />
+
+      {/* The exchange: what leaves me, then what comes back. Each side keeps its own properties and money together. */}
+      <View className="gap-1">
+        <TradeSide
+          title="You give"
+          moneyLabel="Plus money you give"
+          ownerId={me.id}
+          view={view}
+          selected={give}
+          onToggle={(k) => setGive((g) => toggle(g, k))}
+          money={giveMoney}
+          onMoney={setGiveMoney}
+          testID="trade-give"
+        />
+        {to ? (
+          <>
+            <Text className="text-center text-xl font-black text-stone-400" accessibilityElementsHidden importantForAccessibility="no">
+              ⇅
+            </Text>
+            <TradeSide
+              title={`You get from ${view.playerName(to)}`}
+              moneyLabel="Plus money you get"
+              ownerId={to}
+              view={view}
+              selected={want}
+              onToggle={(k) => setWant((w) => toggle(w, k))}
+              money={wantMoney}
+              onMoney={setWantMoney}
+              testID="trade-want"
+            />
+          </>
+        ) : null}
+      </View>
     </Sheet>
   );
 }
 
-function PropertyPicker({
-  title,
-  ownerId,
-  view,
-  selected,
-  onToggle,
-  testID,
-}: {
+interface TradeSideProps {
   title: string;
+  moneyLabel: string;
   ownerId: string;
   view: GameView;
   selected: PropertyKey[];
   onToggle: (key: PropertyKey) => void;
+  money: string;
+  onMoney: (digits: string) => void;
   testID: string;
-}) {
+}
+
+/** One side of the exchange: that player's properties to pick from, and the money that goes with them. */
+function TradeSide({ title, moneyLabel, ownerId, view, selected, onToggle, money, onMoney, testID }: TradeSideProps) {
   const { state } = view.snapshot;
   const keys = ownedBy(state, ownerId);
   return (
-    <View className="gap-2" testID={testID}>
-      <Label className="text-stone-600">{title}</Label>
-      {keys.length === 0 ? <Text className="text-sm text-stone-500">No properties.</Text> : null}
-      <View className="flex-row flex-wrap gap-2">
-        {keys.map((key) => {
-          const deed = getDeed(key);
-          const blocked = tradePropertyBlocker(state, ownerId, key);
-          const on = selected.includes(key);
-          return (
-            <Pressable
-              key={key}
-              disabled={!!blocked}
-              onPress={() => onToggle(key)}
-              accessibilityRole="checkbox"
-              accessibilityState={{ checked: on, disabled: !!blocked }}
-              accessibilityLabel={`${deed.name}${blocked ? `, ${blocked}` : ''}`}
-              testID={`${testID}-${key}`}
-              className={`min-h-[44px] flex-row items-center gap-2 rounded-xl px-3 ${on ? 'bg-saffron' : 'bg-white'} ${blocked ? 'opacity-40' : ''}`}
-            >
-              <View style={{ backgroundColor: PROPERTY_GROUP_THEME[deed.group].mark }} className="h-3 w-3 rounded-full" />
-              <Text className="text-base font-bold text-ink">
-                {deed.name}
-                {state.properties[key].mortgaged ? ' (M)' : ''}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
+    <View className="gap-3 rounded-2xl bg-felt p-3" testID={testID}>
+      <Text className="text-sm font-extrabold uppercase tracking-widest text-cream" numberOfLines={1}>
+        {title}
+      </Text>
+      {keys.length ? (
+        <View className="flex-row flex-wrap gap-2">
+          {keys.map((key) => {
+            const deed = getDeed(key);
+            const blocked = tradePropertyBlocker(state, ownerId, key);
+            const on = selected.includes(key);
+            return (
+              <Pressable
+                key={key}
+                disabled={!!blocked}
+                onPress={() => onToggle(key)}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: on, disabled: !!blocked }}
+                accessibilityLabel={`${deed.name}${state.properties[key].mortgaged ? ', mortgaged' : ''}${blocked ? `, ${blocked}` : ''}`}
+                testID={`${testID}-${key}`}
+                className={`min-h-[44px] flex-row items-center gap-2 rounded-xl border-2 px-3 ${on ? 'border-saffron-dark bg-saffron' : 'border-transparent bg-cream'} ${blocked ? 'opacity-40' : ''}`}
+              >
+                <View style={{ backgroundColor: PROPERTY_GROUP_THEME[deed.group].mark }} className="h-3.5 w-3.5 rounded-full border border-white" />
+                <Text className="text-base font-bold text-ink">
+                  {deed.name}
+                  {state.properties[key].mortgaged ? <Text className="font-semibold text-stone-600"> (M)</Text> : null}
+                </Text>
+                {on ? <Text className="text-base font-black text-ink">✓</Text> : null}
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : (
+        <View className="rounded-xl border border-dashed border-cream/40 px-3 py-2.5" testID={`${testID}-empty`}>
+          <Text className="text-center text-sm font-semibold text-cream/70">No properties available</Text>
+        </View>
+      )}
+      <MoneyField label={moneyLabel} placeholder="0" value={money} onChangeValue={onMoney} testID={`${testID}-money`} />
     </View>
   );
 }
