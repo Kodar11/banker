@@ -1,3 +1,6 @@
+/** The app's display name (app.json `name`), for text the player sends to other people. */
+export const APP_NAME = 'Business Banker';
+
 /** Deep link scheme from app.json — QR codes encode businessbanker://join-game?code=123456 */
 export const APP_SCHEME = 'businessbanker';
 

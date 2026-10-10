@@ -240,6 +240,11 @@ export interface GameState {
   /** Intermediate Mode's economy (financial year, market, loans, credit). Null in Classic games and before the game starts. */
   intermediate: IntermediateState | null;
   status: GameStatus;
+  /**
+   * The host closed admission: nobody new can join while this is set. Only meaningful while WAITING
+   * (a started game never takes new players). Missing on a snapshot from an older server means open.
+   */
+  lobbyLocked?: boolean;
   /** Status to restore when resuming from PAUSED. */
   pausedFrom: GameStatus | null;
   pausedAt: string | null;

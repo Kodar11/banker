@@ -4,6 +4,7 @@ import { Button, Pill, PlayerBadge } from '@/components/ui';
 import { COLORS } from '@/constants/theme';
 import { ActionIcon } from '@/features/game/ActionIcon';
 import type { GameView } from '@/features/game/useGameView';
+import { PlayerFriendAction } from '@/features/social/PlayerFriendAction';
 import { formatINR } from '@/utils/currency';
 import { PropertyList } from './PropertyList';
 
@@ -130,6 +131,7 @@ interface PlayerDetailsActionsProps {
  * What I can do with another player. Shown disabled, with the reason, when the
  * server would refuse (game not running, either of us bankrupt). Nothing for
  * my own sheet or for a spectator.
+ * Below them: Add Friend. It is not a game action — it works whatever the state of the game or the turn.
  */
 export function PlayerDetailsActions({ view, playerId, onMakeOffer, onPayMoney }: PlayerDetailsActionsProps) {
   const found = findPlayer(view, playerId);
@@ -156,6 +158,7 @@ export function PlayerDetailsActions({ view, playerId, onMakeOffer, onPayMoney }
           {blocked}
         </Text>
       ) : null}
+      <PlayerFriendAction gameId={state.id} seatId={player.id} />
     </View>
   );
 }

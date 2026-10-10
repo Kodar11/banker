@@ -166,6 +166,28 @@ No Android OAuth client or SHA-1 fingerprint is needed: sign-in runs in the brow
 
 `expo-web-browser` and `expo-clipboard` are included in Expo Go; a development or release build needs to be rebuilt once because they are native modules.
 
+## Friends, private invitations, presence and notifications
+
+Players find each other by Player ID, become friends, and invite friends into a lobby. Nothing here is matchmaking, chat or push: it is in-app only.
+
+* **Where it lives** — `supabase/migrations/20261015000000_social.sql` (tables, RLS, functions), `src/lib/socialApi.ts` (one call per function), `src/lib/socialRealtime.ts` (change counter + presence), `src/store/socialStore.ts`, `src/features/social/` (`SocialHost` lifecycle, Friends screen, lobby sheets, `logic.ts` for the rules that need no server). Route: `app/friends.tsx`.
+* **Security model** — the same as profiles. RLS is on for every new table and nothing is granted to the app, except `SELECT` on its **own** `social_sync` row (a version number). Every read and write is a `SECURITY DEFINER` function (fixed empty `search_path`, `authenticated` only) that acts on `auth.uid()`; other players are named only by public Player ID. No account id, email or token of another player leaves the server.
+* **Friend requests** — `send_friend_request(player_id)`: under a per-pair advisory lock it returns the existing state (already friends / already sent), or — if the other player's request is open — creates the friendship at once (**reciprocal match**, both get a `friends_matched` notification), or inserts a pending request (30 days). `respond_friend_request(id, accept)` is recipient-only, `cancel_friend_request(id)` sender-only; both are idempotent. A declined request keeps looking pending to its sender until it expires or is cancelled.
+* **Friendships** — one row per pair, `(user_low, user_high)` with `user_low < user_high` as primary key: a second friendship of the same two players cannot exist. `remove_friend(player_id)` by either side. At most 200 friends (`social_max_friends()`).
+* **Blocking** — `block_player` / `unblock_player`. A block ends the friendship, withdraws open requests and invitations between the two, and refuses new ones in both directions. The blocked player is never told (they get the neutral `UNAVAILABLE`). It does not remove anyone from a game they are both in.
+* **Seats and accounts** — a seat is still a device token. `players.user_id` (nullable, `ON DELETE SET NULL`) records which account sits there once the app calls `claim_seat(game, seat, token)`, which proves the seat with the token's SHA-256 exactly as the referee does. Only the social functions read it: `game_player_profiles(game)` (for *Add Friend* in a lobby or a running game) and the invitation checks.
+* **Invitations** — `send_game_invite(game, player_id)`: the caller must sit in that game, the invitee must be a friend, and the lobby must be able to take them (waiting, not locked, not full). 15 minutes, one live invitation per (game, inviter, recipient), so a retry creates nothing. `open_game_invite(id)` re-checks everything and returns the game code; joining is then the **normal join** through `game-action`, which checks status, lock and capacity again under the game row lock. An invitation is never a way in by itself. `decline_game_invite`, `revoke_game_invite` (inviter or host).
+* **Friends of friends** — the game code is independent of friendship. Anyone in the lobby can copy it or share it (system share sheet: mode, code and the app's own `businessbanker://join-game?code=…` link), and whoever has it joins through *Join game* — no friendship with the host, no friend request sent.
+* **Host controls** (engine actions, lobby only, host only) — `SET_LOBBY_LOCK` (stored in `games.lobby_locked`; a locked lobby refuses every join with `LOBBY_LOCKED`) and `REMOVE_PLAYER`.
+* **Realtime** — `social_sync` holds one change counter per player, bumped by triggers whenever anything they can see changes (including when another account is deleted). The app listens to Postgres changes of its own row and refetches `social_state()` when the announced version is ahead; older answers never replace newer ones. It also refetches on sign-in, reconnect and return to the foreground, and polls every 30 s only while Realtime is down.
+* **Presence** — Supabase Realtime Presence on `presence:<presence_key>`. The key is a random value on the profile, given only to the player and their current friends and replaced when a friendship ends or a block is made. A player is tracked on their own topic while the app is in front (keyed by a per-run session id); the Friends screen listens to its friends' topics (at most 50) while it is open. Shown as Online / Offline / Unknown: my own connection dropping reads Unknown, and a friend's drop reads Offline only after 12 s. Presence authorises nothing.
+* **Notifications** — `public.notifications`, written only by the functions, unique on `(recipient, deduplication_key)`. Events: friend request received, request accepted, reciprocal match, game invitation. The Friends button shows requests to answer + usable invitations + unseen news. A toast announces a notification once when it arrives; it is marked read (`mark_notifications_read`) when the player leaves the Friends screen, never by merely receiving it.
+* **Limits** — `public.social_limits` (data; change a row without a deploy): 30 lookups/min, 20 friend requests/hour, 3 requests to the same player/7 days, 30 invitations/10 min, 5 to the same player/10 min. Refusals carry `retry_after_seconds`.
+* **Account deletion** — unchanged (`delete-account`). Every social table references `profiles` `ON DELETE CASCADE`, so friendships, requests, blocks, invitations and notifications of the deleted account go in the same transaction, and the other players' counters are bumped so their phones drop them. Games are not touched.
+* **Housekeeping** — optional: `select public.social_cleanup();` (e.g. daily with pg_cron). Nothing depends on it; expiry is decided by the clock wherever a request or an invitation is read.
+
+Deploying this: `npm run deploy:db` **first** (migration `20261015000000_social.sql`, additive; it also adds `social_sync` to the `supabase_realtime` publication), then `npm run deploy:functions` (the referee now reads and writes `games.lobby_locked`), then ship the app. No new Edge Function, secret or dashboard setting is needed; Realtime must be enabled for the project (it already is for the game channels).
+
 ## Checks & tests
 
 ```bash
@@ -173,6 +195,7 @@ npx tsc --noEmit          # typecheck
 npx expo lint             # lint
 npm run test:engine       # Vitest: engine + exact Business data + drift checks
 npm run test:account      # Vitest: nickname rules, secure session storage, deletion handler
+npm run test:social       # Vitest: Player ID input, relationship/expiry/presence/notification rules
 npm run test:ui           # Jest + RNTL
 npm run db:local          # throwaway local Postgres (no Docker) with the migrations
 DATABASE_URL=postgres://postgres@127.0.0.1:54329/banker npm run test:server

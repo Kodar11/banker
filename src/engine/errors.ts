@@ -10,6 +10,7 @@ export type GameErrorCode =
   | 'GAME_FINISHED'
   | 'GAME_EXPIRED'
   | 'GAME_FULL'
+  | 'LOBBY_LOCKED'
   | 'NAME_TAKEN'
   | 'NOT_ENOUGH_PLAYERS'
   | 'INSUFFICIENT_FUNDS'

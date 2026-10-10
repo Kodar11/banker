@@ -188,6 +188,7 @@ export async function loadState(tx: Tx, game: Row): Promise<GameState> {
     objectives: mapObjectives(objectiveRows, game.objective_trades),
     intermediate: (game.intermediate as GameState['intermediate']) ?? null,
     status: game.status as GameState['status'],
+    lobbyLocked: game.lobby_locked === true,
     pausedFrom: (game.paused_from as GameState['pausedFrom']) ?? null,
     pausedAt: isoOrNull(game.paused_at),
     version: game.state_version as number,
@@ -331,6 +332,7 @@ export async function persistResult(tx: Tx, prevVersion: number, result: EngineR
   const updated = await tx`
     update public.games set
       status = ${s.status},
+      lobby_locked = ${s.lobbyLocked === true},
       state_version = ${s.version},
       host_player_id = ${s.hostPlayerId},
       winner_player_id = ${s.winnerId},

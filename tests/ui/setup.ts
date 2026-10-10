@@ -81,3 +81,36 @@ jest.mock('@/lib/accountApi', () => {
     },
   };
 });
+
+// The social layer never reaches Supabase in UI tests either. Defaults describe a phone with no network;
+// tests/ui/friends.test.tsx sets what each scenario needs.
+jest.mock('@/lib/socialApi', () => {
+  const offline = { ok: false, error: { code: 'NETWORK', message: 'No connection. Check your internet and try again.' } };
+  const call = () => jest.fn(async () => offline);
+  return {
+    socialError: (code: string) => ({ code, message: code === 'NOT_READY' ? 'Your profile isn’t loaded yet. Check your connection and try again.' : code }),
+    socialApi: {
+      state: call(),
+      lookup: call(),
+      sendRequest: call(),
+      respondRequest: call(),
+      cancelRequest: call(),
+      removeFriend: call(),
+      block: call(),
+      unblock: call(),
+      claimSeat: call(),
+      seatProfiles: call(),
+      sendInvite: call(),
+      openInvite: call(),
+      declineInvite: call(),
+      revokeInvite: call(),
+      markRead: call(),
+    },
+  };
+});
+
+jest.mock('@/lib/socialRealtime', () => ({
+  subscribeToSocialSync: jest.fn(() => () => undefined),
+  trackOwnPresence: jest.fn(() => () => undefined),
+  watchPresence: jest.fn(() => () => undefined),
+}));

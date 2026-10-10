@@ -109,6 +109,7 @@ export function createGame(
     objectives: null,
     intermediate: null,
     status: 'WAITING',
+    lobbyLocked: false,
     pausedFrom: null,
     pausedAt: null,
     version: 1,
@@ -134,6 +135,8 @@ export function createGame(
 export function joinGame(state: GameState, input: { playerId: string; name: string }, ctx: EngineContext): EngineResult {
   assertLoadable(state, ctx);
   if (state.status !== 'WAITING') fail('GAME_NOT_ACTIVE', 'This game has already started.');
+  // The host closed admission. A code, a link or an invitation is never a way around it.
+  if (state.lobbyLocked) fail('LOBBY_LOCKED', 'The host has locked this lobby. Ask them to unlock it.');
   const name = PlayerNameSchema.safeParse(input.name);
   if (!name.success) fail('VALIDATION', name.error.issues[0]?.message ?? 'Invalid name.');
   // People who left the lobby don't take a place. (Their name stays theirs: it still labels their events.)
@@ -185,6 +188,9 @@ const TURN_ACTIONS = new Set<GameAction['type']>([
   'DECLARE_BANKRUPTCY',
 ]);
 
+/** Everything a player can do before the game starts. */
+const LOBBY_ACTIONS = new Set<GameAction['type']>(['SET_READY', 'START_GAME', 'LEAVE_GAME', 'UPDATE_CONFIG', 'SET_LOBBY_LOCK', 'REMOVE_PLAYER']);
+
 /**
  * Apply one player action to the authoritative state.
  * Pure: returns a new state plus the transactions/events it produced. Throws GameError when invalid,
@@ -204,12 +210,12 @@ export function applyAction(state: GameState, actorId: string, rawAction: unknow
     fail('INVALID_PHASE', 'The game has started — its settings are locked.');
   }
   if (state.status === 'WAITING') {
-    if (action.type !== 'SET_READY' && action.type !== 'START_GAME' && action.type !== 'LEAVE_GAME' && action.type !== 'UPDATE_CONFIG') {
+    if (!LOBBY_ACTIONS.has(action.type)) {
       fail('GAME_NOT_STARTED', 'The game has not started yet.');
     }
   } else if (state.status === 'PAUSED') {
     if (action.type !== 'RESUME_GAME' && action.type !== 'END_GAME' && action.type !== 'LEAVE_GAME') fail('GAME_PAUSED', 'Game is paused.');
-  } else if (action.type === 'SET_READY' || action.type === 'START_GAME') {
+  } else if (action.type === 'SET_READY' || action.type === 'START_GAME' || action.type === 'SET_LOBBY_LOCK' || action.type === 'REMOVE_PLAYER') {
     fail('INVALID_PHASE', 'The game has already started.');
   }
 
@@ -238,6 +244,25 @@ export function applyAction(state: GameState, actorId: string, rawAction: unknow
       d.state.config = parseGameConfig(d.state.mode, action.config);
       d.event('GAME_CONFIG_UPDATED', actorId, `${actor.name} changed the game settings`, { config: d.state.config });
       break;
+    case 'SET_LOBBY_LOCK':
+      if (!actor.isHost) fail('FORBIDDEN', 'Only the host can lock the lobby.');
+      if ((d.state.lobbyLocked === true) !== action.locked) {
+        d.state.lobbyLocked = action.locked;
+        d.event('LOBBY_LOCK_CHANGED', actorId, `${actor.name} ${action.locked ? 'locked' : 'unlocked'} the lobby`, { locked: action.locked });
+      }
+      break;
+    case 'REMOVE_PLAYER': {
+      if (!actor.isHost) fail('FORBIDDEN', 'Only the host can remove a player.');
+      if (action.playerId === actorId) fail('VALIDATION', 'Use Leave game to leave your own lobby.');
+      const target = d.state.players.find((p) => p.id === action.playerId);
+      if (!target) fail('NOT_FOUND', 'That player is not in this game.');
+      // Already gone (they left, or a repeated tap): nothing to do.
+      if (target.status !== 'LEFT') {
+        d.event('PLAYER_REMOVED', actorId, `${actor.name} removed ${target.name} from the lobby`, { playerId: target.id });
+        leaveTable(d, target);
+      }
+      break;
+    }
     case 'START_GAME':
       startGame(d, actor);
       break;

@@ -17,6 +17,10 @@ export const GameActionSchema = z.discriminatedUnion('type', [
    * wrong value gets a message that names it. Refused once the game has started.
    */
   z.object({ type: z.literal('UPDATE_CONFIG'), config: z.record(z.string(), z.unknown()) }).strict(),
+  /** Lobby only, host only: close (or reopen) admission. While locked, nobody new can join — code, link or invitation. */
+  z.object({ type: z.literal('SET_LOBBY_LOCK'), locked: z.boolean() }).strict(),
+  /** Lobby only, host only: take another player out of the lobby. Their seat is treated exactly as if they had left. */
+  z.object({ type: z.literal('REMOVE_PLAYER'), playerId: id }).strict(),
   bare('START_GAME'),
   bare('ROLL_DICE'),
   /**

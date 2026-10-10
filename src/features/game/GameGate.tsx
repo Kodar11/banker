@@ -56,7 +56,15 @@ export function GameGate({ gameId, area, children }: { gameId: string; area: Are
   }
   if (!view) return <LoadingState />;
   if (view.me?.status === 'LEFT') {
-    return <ErrorState title="You left this game" message="This phone is no longer playing in it." action={<Button title="Home" onPress={() => leaveGame()} />} />;
+    // Taken out of the lobby by the host, as opposed to walking away.
+    const removed = view.snapshot.events.some((e) => e.type === 'PLAYER_REMOVED' && e.payload.playerId === view.me?.id);
+    return (
+      <ErrorState
+        title={removed ? 'You were removed from this game' : 'You left this game'}
+        message={removed ? 'The host removed you from the lobby.' : 'This phone is no longer playing in it.'}
+        action={<Button title="Home" onPress={() => leaveGame()} />}
+      />
+    );
   }
   return <>{children(view)}</>;
 }

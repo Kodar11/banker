@@ -7,6 +7,7 @@ import { NoticeToast } from '@/components/ui';
 import { COLORS } from '@/constants/theme';
 import { AccountHost } from '@/features/account/AccountHost';
 import { GameSyncHost } from '@/features/game/sync';
+import { SocialHost } from '@/features/social/SocialHost';
 import { useLearningStore } from '@/store/learningStore';
 import { useSessionStore } from '@/store/sessionStore';
 
@@ -35,6 +36,7 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <AccountHost />
       <GameSyncHost />
+      <SocialHost />
       <StatusBar style="light" />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: COLORS.felt }, animation: 'fade_from_bottom' }}>
         <Stack.Screen name="index" />
