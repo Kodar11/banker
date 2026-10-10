@@ -4,6 +4,9 @@
 //   stale-version check → load authoritative state → run engine → persist all
 //   changes + ledger + events + action record in ONE transaction → broadcast.
 //
+// Every snapshot returned is the requesting player's view (loadSnapshot): other players' secret
+// objectives never leave the server while a game is running. Broadcasts carry only public events.
+//
 // Runtime-agnostic so it can be integration-tested in Node against real Postgres.
 import {
   ApiRequestSchema,
@@ -138,12 +141,12 @@ async function createOp(
     try {
       const snapshot = await deps.sql.begin(async (tx) => {
         const ctx: EngineContext = { actionId: req.actionId, now: now(), random, newId };
-        const result = createGame({ gameId, code, hostPlayerId: playerId, hostName: req.name, mode: req.mode }, ctx);
+        const result = createGame({ gameId, code, hostPlayerId: playerId, hostName: req.name, mode: req.mode, config: req.config }, ctx);
         await insertNewGame(tx, result, tokenHash);
         await tx`insert into public.game_actions (action_id, game_id, player_id, type, payload, state_version_after)
           values (${req.actionId}, ${gameId}, ${playerId}, 'CREATE_GAME', '{}'::jsonb, ${result.state.version})`;
         const [game] = await tx`select * from public.games where id = ${gameId}`;
-        return loadSnapshot(tx, game!);
+        return loadSnapshot(tx, game!, playerId);
       });
       return { status: 200, body: { ok: true, gameId, playerId, snapshot } };
     } catch (error) {
@@ -163,7 +166,7 @@ async function duplicateOf(deps: HandlerDeps, prior: { game_id: string; player_i
     await authenticate(tx, prior.game_id, prior.player_id, token);
     const [game] = await tx`select * from public.games where id = ${prior.game_id}`;
     if (!game) throw new GameError('NOT_FOUND', 'Game not found.');
-    return loadSnapshot(tx, game);
+    return loadSnapshot(tx, game, prior.player_id);
   });
   return { status: 200, body: { ok: true, gameId: prior.game_id, playerId: prior.player_id, snapshot, duplicate: true } };
 }
@@ -196,7 +199,7 @@ async function joinOp(
     await tx`insert into public.game_actions (action_id, game_id, player_id, type, payload, state_version_after)
       values (${req.actionId}, ${gameId}, ${playerId}, 'JOIN_GAME', '{}'::jsonb, ${result.state.version})`;
     const [fresh] = await tx`select * from public.games where id = ${gameId}`;
-    return { playerId, snapshot: await loadSnapshot(tx, fresh!), result };
+    return { playerId, snapshot: await loadSnapshot(tx, fresh!, playerId), result };
   });
 
   if ('duplicate' in outcome && outcome.duplicate) return duplicateOf(deps, outcome.duplicate, req.token);
@@ -213,7 +216,7 @@ async function stateOp(req: Extract<ApiRequest, { op: 'state' }>, deps: HandlerD
     const [game] = await tx`select * from public.games where id = ${req.gameId}`;
     if (!game) throw new GameError('NOT_FOUND', 'Game not found.');
     assertCurrentRules(game);
-    return loadSnapshot(tx, game);
+    return loadSnapshot(tx, game, req.playerId);
   });
   return { status: 200, body: { ok: true, gameId: req.gameId, playerId: req.playerId, snapshot } };
 }
@@ -239,7 +242,7 @@ async function actionOp(
       if (prior.game_id !== req.gameId || prior.player_id !== req.playerId) {
         throw new GameError('VALIDATION', 'Duplicate action id.');
       }
-      return { duplicate: true as const, snapshot: await loadSnapshot(tx, game) };
+      return { duplicate: true as const, snapshot: await loadSnapshot(tx, game, req.playerId) };
     }
 
     assertCurrentRules(game);
@@ -261,7 +264,7 @@ async function actionOp(
         ${tx.json({ transactions: result.transactions.map((t) => t.id), events: result.events.map((e) => e.type) })})`;
     const [fresh] = await tx`select * from public.games where id = ${req.gameId}`;
     const deadlineSet = result.state.auction?.id !== state.auction?.id || result.state.auction?.endsAt !== state.auction?.endsAt;
-    return { duplicate: false as const, snapshot: await loadSnapshot(tx, fresh!), result, deadlineSet };
+    return { duplicate: false as const, snapshot: await loadSnapshot(tx, fresh!, req.playerId), result, deadlineSet };
   });
 
   if (!outcome.duplicate) {

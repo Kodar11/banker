@@ -1,4 +1,4 @@
-import { INTERMEDIATE_RULES as IR, type LoanProductKey } from './intermediateConfig.ts';
+import { INTERMEDIATE_RULES as IR, type LoanProductKey, type MarketVolatility } from './intermediateConfig.ts';
 
 /**
  * Intermediate Mode's financial maths. Pure functions of their arguments: no game state, no
@@ -59,15 +59,16 @@ export function applyMarketChange(value: number, changePercent: number): number 
   return Math.max(IR.market.minValue, roundToNearest(moved, IR.market.roundTo));
 }
 
-/** Draws one annual change from the configured distribution. `random` is uniform in [0, 1). */
-export function pickMarketChange(random: () => number): number {
+/** Draws one annual change from the game's volatility profile. `random` is uniform in [0, 1). */
+export function pickMarketChange(random: () => number, profile: MarketVolatility = IR.market.defaultProfile): number {
+  const changes = IR.market.profiles[profile];
   const roll = clamp(random(), 0, 0.999999) * 100;
   let cumulative = 0;
-  for (const change of IR.market.changes) {
+  for (const change of changes) {
     cumulative += change.weight;
     if (roll < cumulative) return change.percent;
   }
-  return IR.market.changes[IR.market.changes.length - 1]!.percent;
+  return changes[changes.length - 1]!.percent;
 }
 
 /** Uniform pick from a list. */

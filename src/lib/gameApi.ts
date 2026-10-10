@@ -1,5 +1,5 @@
 import { FunctionsHttpError } from '@supabase/supabase-js';
-import type { ApiRequest, ApiResponse, GameAction, GameMode } from '@/engine/index.ts';
+import type { ApiRequest, ApiResponse, GameAction, GameConfig, GameMode } from '@/engine/index.ts';
 import { recordServerTime } from './serverClock';
 import { getSupabase } from './supabase';
 
@@ -50,9 +50,12 @@ export interface Credentials {
 }
 
 export const gameApi = {
-  /** `mode` is the host's choice of ruleset for the whole game. Leaving it out creates a Classic game, with the request Classic has always sent. */
-  create: (actionId: string, token: string, name: string, mode?: GameMode) =>
-    callGameApi({ op: 'create', actionId, token, name, ...(mode && mode !== 'classic' ? { mode } : {}) }),
+  /**
+   * `mode` is the host's choice of ruleset for the whole game. Leaving it out creates a Classic game, with the request Classic has always sent.
+   * `config` is the host's settings; leaving it out means the mode's defaults. The server validates it and has the last word.
+   */
+  create: (actionId: string, token: string, name: string, mode?: GameMode, config?: GameConfig) =>
+    callGameApi({ op: 'create', actionId, token, name, ...(mode && mode !== 'classic' ? { mode } : {}), ...(config ? { config } : {}) }),
   join: (actionId: string, token: string, code: string, name: string) => callGameApi({ op: 'join', actionId, token, code, name }),
   state: (c: Credentials) => callGameApi({ op: 'state', gameId: c.gameId, playerId: c.playerId, token: c.token }),
   action: (c: Credentials, actionId: string, expectedVersion: number, action: GameAction) =>

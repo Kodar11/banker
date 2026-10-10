@@ -2,7 +2,7 @@
 import { goBack } from '@/utils/navigation';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
-import { INTERMEDIATE_RULE_ENTRIES, RULE_SECTIONS, TOP_RULES, type RuleEntry } from '@/engine/index.ts';
+import { configOf, intermediateRuleEntries, ruleSections, topRules, type RuleEntry } from '@/engine/index.ts';
 import { Button, Card, Screen } from '@/components/ui';
 import { LeaveGameDialog } from '@/features/game/LeaveGameDialog';
 import { useGameStore } from '@/store/gameStore';
@@ -71,6 +71,9 @@ export default function Settings() {
   const [confirmLeave, setConfirmLeave] = useState(false);
   // Only a game played in Intermediate Mode shows its extra rules; Classic games read exactly as before.
   const intermediate = useGameStore((state) => state.snapshot?.state.mode === 'intermediate');
+  // In a game the rules quote that game's own settings (starting cash, loan limit, market); outside one, the standard values.
+  const game = useGameStore((state) => state.snapshot?.state);
+  const config = game ? configOf(game) : undefined;
 
   return (
     <Screen scroll testID="settings-screen">
@@ -90,10 +93,10 @@ export default function Settings() {
         testID="top-rules"
         title="The 5 rules to know"
         intro="Read these and you can play. Everything after them is detail for when a question comes up."
-        rules={TOP_RULES}
+        rules={topRules(config)}
       />
 
-      {RULE_SECTIONS.map((section) => (
+      {ruleSections(config).map((section) => (
         <RuleSection key={section.id} testID={`rules-${section.id}`} title={section.title} rules={section.rules} />
       ))}
 
@@ -102,7 +105,7 @@ export default function Settings() {
           testID="rules-intermediate"
           title="Intermediate Mode"
           intro="This game adds a financial layer. Every Classic rule above still applies."
-          rules={INTERMEDIATE_RULE_ENTRIES}
+          rules={intermediateRuleEntries(config)}
         />
       ) : null}
 

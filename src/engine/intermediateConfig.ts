@@ -14,7 +14,15 @@ export type LoanProductKey = (typeof LOAN_PRODUCT_KEYS)[number];
 export const CREDIT_EVENT_TYPES = ['ON_TIME_PAYMENT', 'INSTALLMENT_OVERDUE', 'CAUGHT_UP', 'LOAN_DEFAULT', 'LOAN_REPAID', 'CLEAN_YEAR'] as const;
 export type CreditEventType = (typeof CREDIT_EVENT_TYPES)[number];
 
+/**
+ * How far property values swing each year. Chosen by the host before the game starts (GameConfig.marketVolatility);
+ * each profile is one distribution of annual changes in `market.profiles`.
+ */
+export const MARKET_VOLATILITIES = ['stable', 'balanced', 'volatile'] as const;
+export type MarketVolatility = (typeof MARKET_VOLATILITIES)[number];
+
 const percent = z.number().int().min(-100).max(100);
+const MarketChangesSchema = z.array(z.object({ percent, weight: z.number().int().positive() }).strict()).min(1);
 const rupees = z.number().int().positive();
 
 const LoanProductSchema = z
@@ -38,8 +46,13 @@ const IntermediateRulesSchema = z
     inflation: z.object({ ratePercent: z.number().int().min(0).max(100) }).strict(),
     market: z
       .object({
-        /** Annual change of one property's value, drawn independently per property per year. Weights sum to 100. */
-        changes: z.array(z.object({ percent, weight: z.number().int().positive() }).strict()).min(1),
+        /**
+         * Annual change of one property's value, drawn independently per property per year, for each volatility
+         * profile. Weights sum to 100; a change a profile never produces is simply left out of it.
+         */
+        profiles: z.object(Object.fromEntries(MARKET_VOLATILITIES.map((v) => [v, MarketChangesSchema])) as Record<MarketVolatility, typeof MarketChangesSchema>).strict(),
+        /** The profile of a game whose host did not choose one (and of every game stored before profiles existed). */
+        defaultProfile: z.enum(MARKET_VOLATILITIES),
         /** Market values are rounded to the nearest multiple of this, and never drop below `minValue`. */
         roundTo: rupees,
         minValue: rupees,
@@ -90,7 +103,9 @@ const IntermediateRulesSchema = z
   .strict()
   .superRefine((cfg, ctx) => {
     const issue = (message: string) => ctx.addIssue({ code: 'custom', message });
-    if (cfg.market.changes.reduce((s, c) => s + c.weight, 0) !== 100) issue('market.changes weights must sum to 100');
+    for (const v of MARKET_VOLATILITIES) {
+      if (cfg.market.profiles[v].reduce((s, c) => s + c.weight, 0) !== 100) issue(`market.profiles.${v} weights must sum to 100`);
+    }
     if (cfg.credit.min > cfg.credit.start || cfg.credit.start > cfg.credit.max) issue('credit.start must lie within min..max');
     const sorted = [...cfg.credit.bands].sort((a, b) => a.min - b.min);
     if (sorted[0]?.min !== cfg.credit.min || sorted[sorted.length - 1]?.max !== cfg.credit.max) issue('credit bands must cover min..max');
@@ -127,13 +142,30 @@ export const INTERMEDIATE_RULES: IntermediateRules = validateIntermediateRules({
   },
 
   market: {
-    changes: [
-      { percent: -20, weight: 10 },
-      { percent: -10, weight: 20 },
-      { percent: 0, weight: 20 },
-      { percent: 10, weight: 30 },
-      { percent: 20, weight: 20 },
-    ],
+    /** Initial balancing values — tune here after playtesting. Balanced is the distribution Intermediate Mode has always used. */
+    profiles: {
+      stable: [
+        { percent: -10, weight: 20 },
+        { percent: 0, weight: 40 },
+        { percent: 10, weight: 30 },
+        { percent: 20, weight: 10 },
+      ],
+      balanced: [
+        { percent: -20, weight: 10 },
+        { percent: -10, weight: 20 },
+        { percent: 0, weight: 20 },
+        { percent: 10, weight: 30 },
+        { percent: 20, weight: 20 },
+      ],
+      volatile: [
+        { percent: -20, weight: 20 },
+        { percent: -10, weight: 20 },
+        { percent: 0, weight: 10 },
+        { percent: 10, weight: 25 },
+        { percent: 20, weight: 25 },
+      ],
+    },
+    defaultProfile: 'balanced',
     roundTo: 100,
     minValue: 100,
     trendOptions: [-5, 0, 5, 10],

@@ -3,6 +3,7 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import type { GameAction } from '@/engine/index.ts';
 import { Button, Card, Label, PlayerBadge } from '@/components/ui';
+import { ObjectiveResults } from '@/features/objectives/ObjectiveCard';
 import { useGameStore } from '@/store/gameStore';
 import { formatINR } from '@/utils/currency';
 import type { GameView } from './useGameView';
@@ -94,24 +95,28 @@ export function FinishedView({ view }: { view: GameView }) {
   const standings = (finished?.payload.standings as { playerId: string; netWorth: number }[] | undefined) ?? [];
   const winner = view.playerName(state.winnerId);
   return (
-    <Card testID="finished-card" className="items-center">
-      <Text className="text-6xl">🏆</Text>
-      <Text className="mt-2 text-center text-3xl font-black text-ink">{state.winnerId ? `${winner} wins!` : 'Game over'}</Text>
-      <View className="mt-4 gap-2 self-stretch">
-        {standings.map((s, i) => (
-          <View key={s.playerId} className="flex-row justify-between rounded-xl bg-white px-4 py-3">
-            <Text className="text-lg font-bold text-ink">
-              {i + 1}. {view.playerName(s.playerId)}
-            </Text>
-            <Text className="text-lg font-bold text-ink">{formatINR(s.netWorth)}</Text>
-          </View>
-        ))}
-      </View>
-      <Text className="mt-3 text-center text-xs text-stone-500">
-        {state.mode === 'intermediate'
-          ? 'Net worth = cash + property at market value + buildings at cost − mortgages to redeem − loans owed'
-          : 'Net worth = cash + property at cost + buildings − loans owed'}
-      </Text>
-    </Card>
+    <>
+      <Card testID="finished-card" className="items-center">
+        <Text className="text-6xl">🏆</Text>
+        <Text className="mt-2 text-center text-3xl font-black text-ink">{state.winnerId ? `${winner} wins!` : 'Game over'}</Text>
+        <View className="mt-4 gap-2 self-stretch">
+          {standings.map((s, i) => (
+            <View key={s.playerId} className="flex-row justify-between rounded-xl bg-white px-4 py-3">
+              <Text className="text-lg font-bold text-ink">
+                {i + 1}. {view.playerName(s.playerId)}
+              </Text>
+              <Text className="text-lg font-bold text-ink">{formatINR(s.netWorth)}</Text>
+            </View>
+          ))}
+        </View>
+        <Text className="mt-3 text-center text-xs text-stone-500">
+          {state.mode === 'intermediate'
+            ? 'Net worth = cash + property at market value + buildings at cost − mortgages to redeem − loans owed'
+            : 'Net worth = cash + property at cost + buildings − loans owed'}
+        </Text>
+      </Card>
+      {/* Intermediate with secret objectives only: nothing is drawn when the game had none. */}
+      <ObjectiveResults view={view} />
+    </>
   );
 }

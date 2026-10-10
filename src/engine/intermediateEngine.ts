@@ -2,6 +2,7 @@ import { getDeed, PROPERTY_KEYS, type PropertyKey } from './businessBoard.ts';
 import type { Draft } from './draft.ts';
 import { fail } from './errors.ts';
 import { formatINR } from './format.ts';
+import { configOf } from './gameConfig.ts';
 import { INTERMEDIATE_RULES as IR, type CreditEventType, type LoanProductKey } from './intermediateConfig.ts';
 import {
   accruedInterest,
@@ -151,9 +152,11 @@ export function recordDiceMovement(d: Draft, player: PlayerState, spaces: number
 function startNextYear(d: Draft, eco: IntermediateState): YearReport {
   eco.year += 1;
   const report: YearReport = { year: eco.year, changes: {} };
+  // The host's volatility setting picks the distribution; everything else about a market year is unchanged.
+  const profile = configOf(d.state).marketVolatility;
   for (const key of PROPERTY_KEYS) {
     const entry = eco.market[key];
-    const percent = pickMarketChange(d.ctx.random);
+    const percent = pickMarketChange(d.ctx.random, profile);
     const from = entry.value;
     entry.value = applyMarketChange(from, percent);
     entry.lastChangePercent = percent;

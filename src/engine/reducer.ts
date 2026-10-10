@@ -15,8 +15,10 @@ import { DECK_LABELS, findCard, type CardDefinition, type Deck, type MoveDirecti
 import { Draft } from './draft.ts';
 import { fail, GameError } from './errors.ts';
 import { formatINR } from './format.ts';
+import { configOf, parseGameConfig } from './gameConfig.ts';
 import { initEconomy, payDefaultedLoan, payInstallment, prepayLoan, recordDiceMovement, takeLoan, writeOffLoans } from './intermediateEngine.ts';
 import { isIntermediate, normalizeGameMode, type GameMode } from './intermediateState.ts';
+import { assignObjectives, finalizeObjectives, forgetObjectiveTrade, recordObjectiveTrade } from './objectives.ts';
 import { BUSINESS_MVP_RULES as RULES } from './rules.ts';
 import {
   buildingCount,
@@ -86,7 +88,7 @@ function newPlayer(id: string, name: string, seat: number, isHost: boolean): Pla
 }
 
 export function createGame(
-  input: { gameId: string; code: string; hostPlayerId: string; hostName: string; mode?: GameMode },
+  input: { gameId: string; code: string; hostPlayerId: string; hostName: string; mode?: GameMode; config?: unknown },
   ctx: EngineContext,
 ): EngineResult {
   const name = PlayerNameSchema.safeParse(input.hostName);
@@ -94,12 +96,16 @@ export function createGame(
   const properties = Object.fromEntries(
     PROPERTY_KEYS.map((key): [PropertyKey, PropertyState] => [key, { key, ownerId: null, houses: 0, hotel: false, mortgaged: false }]),
   ) as Record<PropertyKey, PropertyState>;
+  // No mode given (an older client) means Classic. Joining players never choose: they get the host's.
+  const mode = normalizeGameMode(input.mode);
   const state: GameState = {
     id: input.gameId,
     code: input.code,
     rulesVersion: RULES_VERSION,
-    // No mode given (an older client) means Classic. Joining players never choose: they get the host's.
-    mode: normalizeGameMode(input.mode),
+    mode,
+    // No settings given means the mode's defaults. A wrong value fails here, before anything is stored.
+    config: parseGameConfig(mode, input.config),
+    objectives: null,
     intermediate: null,
     status: 'WAITING',
     pausedFrom: null,
@@ -192,8 +198,12 @@ export function applyAction(state: GameState, actorId: string, rawAction: unknow
   if (state.status === 'FINISHED') fail('GAME_FINISHED', 'This game has finished.');
   assertLoadable(state, ctx);
 
+  // The settings are locked from the moment the game starts — paused or running, host or not.
+  if (action.type === 'UPDATE_CONFIG' && state.status !== 'WAITING') {
+    fail('INVALID_PHASE', 'The game has started — its settings are locked.');
+  }
   if (state.status === 'WAITING') {
-    if (action.type !== 'SET_READY' && action.type !== 'START_GAME' && action.type !== 'LEAVE_GAME') {
+    if (action.type !== 'SET_READY' && action.type !== 'START_GAME' && action.type !== 'LEAVE_GAME' && action.type !== 'UPDATE_CONFIG') {
       fail('GAME_NOT_STARTED', 'The game has not started yet.');
     }
   } else if (state.status === 'PAUSED') {
@@ -216,6 +226,11 @@ export function applyAction(state: GameState, actorId: string, rawAction: unknow
     case 'SET_READY':
       actor.ready = action.ready;
       d.event('PLAYER_READY', actorId, `${actor.name} is ${action.ready ? 'ready' : 'not ready'}`, { ready: action.ready });
+      break;
+    case 'UPDATE_CONFIG':
+      if (!actor.isHost) fail('FORBIDDEN', 'Only the host can change the game settings.');
+      d.state.config = parseGameConfig(d.state.mode, action.config);
+      d.event('GAME_CONFIG_UPDATED', actorId, `${actor.name} changed the game settings`, { config: d.state.config });
       break;
     case 'START_GAME':
       startGame(d, actor);
@@ -362,11 +377,17 @@ function startGame(d: Draft, actor: PlayerState): void {
   d.state.players.forEach((p, seat) => {
     p.seat = seat;
   });
+  // From here on the settings are locked (UPDATE_CONFIG is refused): this game is played by this config.
+  const config = configOf(d.state);
   for (const p of ordered) {
-    d.transfer({ type: 'STARTING_FUNDS', from: null, to: p.id, amount: RULES.startingCash, memo: 'Starting cash' });
+    d.transfer({ type: 'STARTING_FUNDS', from: null, to: p.id, amount: config.startingCash, memo: 'Starting cash' });
   }
   // Intermediate Mode only: the game's economy is generated here, once, after the turn-order draw.
-  if (isIntermediate(d.state)) initEconomy(d, ordered);
+  if (isIntermediate(d.state)) {
+    initEconomy(d, ordered);
+    // Dealt last, so the draws above are exactly what they were before objectives existed.
+    if (config.secretObjectives) assignObjectives(d, ordered);
+  }
   const first = ordered[0];
   if (!first) fail('NOT_ENOUGH_PLAYERS', 'No players.');
   d.state.turn = { ...freshTurn(), playerId: first.id, number: 1 };
@@ -1310,6 +1331,9 @@ function finishGame(d: Draft, reason: 'HOST_ENDED' | 'LAST_PLAYER_STANDING' | 'P
   expireTrades(d, () => true);
   d.state.undoStack = [];
   d.state.undoRequest = null;
+  // Secret-objective bonuses are checked and paid here, before the ranking: the winner below is decided
+  // on the final balances, so the declared result and the money always agree. (Nothing to do in Classic.)
+  finalizeObjectives(d);
   const ranked = d
     .activePlayers()
     .map((p) => ({ p, worth: netWorth(d.state, p.id) }))
@@ -1457,8 +1481,10 @@ function requestLoan(d: Draft, actor: PlayerState, amount: number): void {
   if (amount < rules.minAmount) fail('LOAN_NOT_ALLOWED', `Minimum loan is ${formatINR(rules.minAmount)}.`);
   if (amount % rules.step !== 0) fail('LOAN_NOT_ALLOWED', `Loans come in steps of ${formatINR(rules.step)}.`);
   const current = outstandingPrincipal(d.state.loans, actor.id);
-  if (current + amount > rules.maxOutstandingPrincipal) {
-    fail('LOAN_NOT_ALLOWED', `Loan limit is ${formatINR(rules.maxOutstandingPrincipal)}. You can borrow ${formatINR(Math.max(0, rules.maxOutstandingPrincipal - current))} more.`);
+  // The game's own limit: the host's setting, which is the standard limit unless they changed it.
+  const limit = configOf(d.state).loanLimit;
+  if (current + amount > limit) {
+    fail('LOAN_NOT_ALLOWED', `Loan limit is ${formatINR(limit)}. You can borrow ${formatINR(Math.max(0, limit - current))} more.`);
   }
   const terms = loanTerms(amount);
   const loan = {
@@ -1591,6 +1617,7 @@ function acceptTrade(d: Draft, actor: PlayerState, tradeId: string): void {
     requestedMoney: trade.requestedMoney,
   });
   recordUndoable(d, { actionType: 'ACCEPT_TRADE', actorId: actor.id, description: `Trade: ${summary}`, before });
+  recordObjectiveTrade(d, trade);
   pruneTrades(d);
 }
 
@@ -1753,6 +1780,7 @@ function approveUndo(d: Draft, actor: PlayerState, requestId: string): void {
       throw error;
     }
   }
+  if (top.actionType === 'ACCEPT_TRADE') forgetObjectiveTrade(d, top.actionId);
   d.state.undoStack.pop();
   d.state.undoRequest = null;
   d.event('UNDO_APPLIED', actor.id, `Undone: ${top.description} (approved by ${actor.name})`, { targetActionId: top.actionId });

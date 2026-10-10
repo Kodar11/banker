@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Text, View } from 'react-native';
-import { BUSINESS_MVP_RULES, loanTerms, nextInterestCircuit, outstandingPrincipal, type GameAction } from '@/engine/index.ts';
+import { BUSINESS_MVP_RULES, configOf, loanTerms, nextInterestCircuit, outstandingPrincipal, type GameAction } from '@/engine/index.ts';
 import { Button, Card, Label, Pill, Sheet, TextField } from '@/components/ui';
 import type { GameView } from '@/features/game/useGameView';
 import { useGameStore } from '@/store/gameStore';
@@ -23,7 +23,8 @@ export function LoanSheet({ visible, onClose, view, send }: LoanSheetProps) {
   if (!me) return null;
   const loans = view.snapshot.state.loans.filter((l) => l.playerId === me.id);
   const active = loans.filter((l) => l.status === 'ACTIVE');
-  const room = Math.max(0, RULES.maxOutstandingPrincipal - outstandingPrincipal(view.snapshot.state.loans, me.id));
+  // The game's own loan limit (the host's setting).
+  const room = Math.max(0, configOf(view.snapshot.state).loanLimit - outstandingPrincipal(view.snapshot.state.loans, me.id));
   const value = Number.parseInt(amount, 10) || 0;
   const terms = loanTerms(value);
   const error =

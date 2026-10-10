@@ -19,6 +19,11 @@ export const ApiRequestSchema = z.discriminatedUnion('op', [
       name: z.string(),
       /** The ruleset for the whole game. Omitted (an older app) means Classic. Only `create` takes it: joiners inherit the host's. */
       mode: z.enum(GAME_MODES as [GameMode, ...GameMode[]]).optional(),
+      /**
+       * The host's settings (GameConfigInput). Omitted means the defaults of the mode. Checked by the engine,
+       * which answers a wrong value with a message naming it. Only `create` takes it: joiners inherit the host's.
+       */
+      config: z.unknown().optional(),
     })
     .strict(),
   z.object({ op: z.literal('join'), actionId: uuid, token: PlayerTokenSchema, code: GameCodeSchema, name: z.string() }).strict(),

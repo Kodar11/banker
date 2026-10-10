@@ -12,6 +12,11 @@ const onProperty = <T extends string>(type: T) => z.object({ type: z.literal(typ
 
 export const GameActionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('SET_READY'), ready: z.boolean() }).strict(),
+  /**
+   * Lobby only, host only: replace the game's settings. Validated in the engine (parseGameConfig) so a
+   * wrong value gets a message that names it. Refused once the game has started.
+   */
+  z.object({ type: z.literal('UPDATE_CONFIG'), config: z.record(z.string(), z.unknown()) }).strict(),
   bare('START_GAME'),
   bare('ROLL_DICE'),
   bare('BUY_PROPERTY'),

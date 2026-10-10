@@ -3,14 +3,20 @@
 import postgres from 'postgres';
 import {
   BUSINESS_MVP_RULES,
+  normalizeGameConfig,
   normalizeGameMode,
   PROPERTY_KEYS,
+  redactObjectives,
   type AuctionState,
   type EngineResult,
   type GameEventRecord,
   type GameSnapshot,
   type GameState,
   type LoanState,
+  type ObjectiveId,
+  type ObjectiveResult,
+  type ObjectivesState,
+  type ObjectiveTrade,
   type PlayerState,
   type PropertyKey,
   type PropertyState,
@@ -145,7 +151,7 @@ export async function lockGame(tx: Tx, gameId: string): Promise<Row | undefined>
 /** Assembles the authoritative engine state from the normalized tables. */
 export async function loadState(tx: Tx, game: Row): Promise<GameState> {
   const id = game.id as string;
-  const [players, props, loans, auctions, pendingTrades, resolvedTrades] = await Promise.all([
+  const [players, props, loans, auctions, pendingTrades, resolvedTrades, objectiveRows] = await Promise.all([
     tx`select * from public.players where game_id = ${id} order by seat`,
     tx`select * from public.properties where game_id = ${id}`,
     tx`select * from public.loans where game_id = ${id} order by created_at, id`,
@@ -153,6 +159,7 @@ export async function loadState(tx: Tx, game: Row): Promise<GameState> {
     tx`select * from public.trade_offers where game_id = ${id} and status = 'PENDING' order by created_at, id`,
     tx`select * from public.trade_offers where game_id = ${id} and status <> 'PENDING'
        order by resolved_at desc, id limit ${RESOLVED_TRADES_LOADED}`,
+    tx`select * from public.player_objectives where game_id = ${id}`,
   ]);
   const trades = [...resolvedTrades.reverse(), ...pendingTrades].map(mapTrade);
   const properties = Object.fromEntries(
@@ -169,12 +176,16 @@ export async function loadState(tx: Tx, game: Row): Promise<GameState> {
     };
   }
   const auctionRow = auctions[0];
+  // A row without a mode (written before modes existed) is a Classic game.
+  const mode = normalizeGameMode(game.game_mode);
   return {
     id,
     code: game.code as string,
     rulesVersion: game.rules_version as string,
-    // A row without a mode (written before modes existed) is a Classic game.
-    mode: normalizeGameMode(game.game_mode),
+    mode,
+    // A row without a config (written before settings existed) plays by the rules as they were then.
+    config: normalizeGameConfig(mode, game.config),
+    objectives: mapObjectives(objectiveRows, game.objective_trades),
     intermediate: (game.intermediate as GameState['intermediate']) ?? null,
     status: game.status as GameState['status'],
     pausedFrom: (game.paused_from as GameState['pausedFrom']) ?? null,
@@ -195,14 +206,48 @@ export async function loadState(tx: Tx, game: Row): Promise<GameState> {
   };
 }
 
-export async function loadSnapshot(tx: Tx, game: Row): Promise<GameSnapshot> {
+/**
+ * The secret objectives of a game: one row per player who was dealt one (none in a Classic game, or
+ * when the host disabled them), plus the public list of trades that count towards Deal Maker.
+ * This is the full, unredacted state — the engine needs every assignment. Only loadSnapshot may send
+ * it to a device, and it removes the other players' objectives first.
+ */
+function mapObjectives(rows: readonly Row[], trades: unknown): ObjectivesState | null {
+  if (rows.length === 0) return null;
+  const assignments = Object.fromEntries(rows.map((r) => [r.player_id as string, r.objective_id as ObjectiveId]));
+  const evaluated = rows.every((r) => r.evaluated_at !== null);
+  const results: ObjectiveResult[] | null = evaluated
+    ? [...rows]
+        .sort((a, b) => Number(a.result_order) - Number(b.result_order))
+        .map((r) => ({
+          playerId: r.player_id as string,
+          objectiveId: r.objective_id as ObjectiveId,
+          completed: r.completed as boolean,
+          reward: Number(r.reward),
+          detail: r.detail as string,
+        }))
+    : null;
+  return { assignments, trades: (trades as ObjectiveTrade[] | null) ?? [], results };
+}
+
+/**
+ * What one player's device receives. `viewerId` is required on purpose: every snapshot that leaves the
+ * server is cut down to what that player may see (redactObjectives), so no code path can send another
+ * player's secret objective by forgetting to ask who is looking.
+ */
+export async function loadSnapshot(tx: Tx, game: Row, viewerId: string): Promise<GameSnapshot> {
   const id = game.id as string;
   const [state, events, transactions] = await Promise.all([
     loadState(tx, game),
     tx`select * from public.game_events where game_id = ${id} order by seq desc limit 60`,
     tx`select * from public.transactions where game_id = ${id} order by seq desc limit 400`,
   ]);
-  return { state, events: events.map(mapEvent), transactions: transactions.map(mapTransaction), serverTime: new Date().toISOString() };
+  return {
+    state: redactObjectives(state, viewerId),
+    events: events.map(mapEvent),
+    transactions: transactions.map(mapTransaction),
+    serverTime: new Date().toISOString(),
+  };
 }
 
 /** Inserts the rows for a brand-new game (after engine.createGame). */
@@ -211,9 +256,9 @@ export async function insertNewGame(tx: Tx, result: EngineResult, hostTokenHash:
   const host = s.players[0];
   if (!host) throw new Error('createGame produced no host');
   await tx`
-    insert into public.games (id, code, rules_version, game_mode, status, state_version, host_player_id, current_player_id,
+    insert into public.games (id, code, rules_version, game_mode, config, status, state_version, host_player_id, current_player_id,
       turn_phase, turn_number, turn, assumptions_version, created_at, expires_at)
-    values (${s.id}, ${s.code}, ${s.rulesVersion}, ${s.mode}, ${s.status}, ${s.version}, ${host.id}, null,
+    values (${s.id}, ${s.code}, ${s.rulesVersion}, ${s.mode}, ${tx.json(s.config as unknown as postgres.JSONValue)}, ${s.status}, ${s.version}, ${host.id}, null,
       ${s.turn.phase}, ${s.turn.number}, ${tx.json(s.turn as unknown as postgres.JSONValue)},
       ${BUSINESS_MVP_RULES.rulesetVersion}, ${s.createdAt}, ${s.expiresAt})`;
   await insertPlayer(tx, s.id, host, hostTokenHash);
@@ -298,11 +343,41 @@ export async function persistResult(tx: Tx, prevVersion: number, result: EngineR
       undo_stack = ${tx.json(s.undoStack as unknown as postgres.JSONValue)},
       undo_request = ${json(s.undoRequest)},
       intermediate = ${json(s.intermediate)},
+      objective_trades = ${tx.json((s.objectives?.trades ?? []) as unknown as postgres.JSONValue)},
       current_auction_id = ${s.auction?.id ?? null},
       expires_at = ${s.expiresAt},
       updated_at = now()
     where id = ${s.id} and state_version = ${prevVersion}`;
   if (updated.count !== 1) throw new Error('STALE_WRITE');
+
+  // The settings are written only by the action that changes them (the host, in the lobby). Every other
+  // action leaves the stored config alone, and the database refuses a change once the game has started.
+  if (result.events.some((e) => e.type === 'GAME_CONFIG_UPDATED')) {
+    await tx`update public.games set config = ${tx.json(s.config as unknown as postgres.JSONValue)} where id = ${s.id}`;
+  }
+
+  // Secret objectives. Dealt once, by START_GAME: the primary key (game, player) makes a second deal impossible.
+  if (s.objectives && result.events.some((e) => e.type === 'GAME_STARTED')) {
+    const rows = Object.entries(s.objectives.assignments).map(([playerId, objectiveId]) => ({
+      game_id: s.id,
+      player_id: playerId,
+      objective_id: objectiveId,
+    }));
+    if (rows.length) await tx`insert into public.player_objectives ${tx(rows, 'game_id', 'player_id', 'objective_id')}`;
+  }
+  // Results are written once, by the action that finishes the game, in the same transaction as the bonus
+  // payments: both happen or neither does. A row that already holds a result can't be written again.
+  if (s.objectives?.results && result.events.some((e) => e.type === 'GAME_FINISHED')) {
+    let order = 0;
+    for (const r of s.objectives.results) {
+      order += 1;
+      const written = await tx`
+        update public.player_objectives set completed = ${r.completed}, reward = ${r.reward}, detail = ${r.detail},
+          result_order = ${order}, evaluated_at = now()
+        where game_id = ${s.id} and player_id = ${r.playerId} and evaluated_at is null`;
+      if (written.count !== 1) throw new Error('STALE_WRITE');
+    }
+  }
 
   // START_GAME draws the turn order (seats), in this same transaction as status/turn. unique (game_id, seat)
   // is checked row by row, so the old seats are moved out of the way before the drawn ones are written.

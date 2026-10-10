@@ -1,8 +1,9 @@
 import { goBack } from '@/utils/navigation';
 import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { BUSINESS_MVP_RULES, PROPERTY_KEYS, type GameMode } from '@/engine/index.ts';
+import { BUSINESS_MVP_RULES, defaultGameConfig, PROPERTY_KEYS, type GameConfig, type GameMode } from '@/engine/index.ts';
 import { Button, Card, Label, Pill, Screen, TextField } from '@/components/ui';
+import { GameConfigEditor, GameConfigSummary } from '@/features/lobby/GameConfigEditor';
 import { useEnterGame } from '@/features/lobby/useEnterGame';
 import { formatINR } from '@/utils/currency';
 
@@ -18,8 +19,14 @@ const MODES: { mode: GameMode; title: string; points: string[] }[] = [
 export default function CreateGame() {
   const [name, setName] = useState('');
   const [gameMode, setGameMode] = useState<GameMode>('classic');
+  const [config, setConfig] = useState<GameConfig>(() => defaultGameConfig('classic'));
   const { submit, busy, error } = useEnterGame();
-  const create = () => submit({ kind: 'create', gameMode }, name);
+  const create = () => submit({ kind: 'create', gameMode, config }, name);
+  // The money settings are the host's own choices, so they follow them to the other mode; everything else takes that mode's default.
+  const chooseMode = (mode: GameMode) => {
+    setGameMode(mode);
+    setConfig((c) => ({ ...defaultGameConfig(mode), startingCash: c.startingCash, loanLimit: c.loanLimit }));
+  };
 
   return (
     <Screen
@@ -29,6 +36,19 @@ export default function CreateGame() {
     >
       <Button size="sm" variant="ghost" title="‹ Back" className="self-start" onPress={() => goBack('/')} />
       <Text className="text-4xl font-black text-cream">New game</Text>
+      {/* First on the screen: it has the focus (and the keyboard) when the screen opens, so it must not sit below the settings. */}
+      <TextField
+        label="Your name"
+        value={name}
+        onChangeText={setName}
+        placeholder="e.g. Tanmay"
+        autoFocus
+        maxLength={20}
+        returnKeyType="go"
+        onSubmitEditing={create}
+        error={error}
+        testID="host-name"
+      />
       <Label className="text-cream/70">Board</Label>
       <Card testID="game-option-business" className="border-2 border-saffron">
         <View className="flex-row items-center justify-between">
@@ -36,7 +56,7 @@ export default function CreateGame() {
           <Pill tone="gold">Selected</Pill>
         </View>
         <Text className="mt-1 text-sm text-stone-600">
-          Indian edition · {PROPERTY_KEYS.length} properties · start with {formatINR(BUSINESS_MVP_RULES.startingCash)} · {BUSINESS_MVP_RULES.players.min}–
+          Indian edition · {PROPERTY_KEYS.length} properties · start with {formatINR(config.startingCash)} · {BUSINESS_MVP_RULES.players.min}–
           {BUSINESS_MVP_RULES.players.max} players
         </Text>
       </Card>
@@ -47,7 +67,7 @@ export default function CreateGame() {
           return (
             <Pressable
               key={m.mode}
-              onPress={() => setGameMode(m.mode)}
+              onPress={() => chooseMode(m.mode)}
               accessibilityRole="radio"
               accessibilityState={{ selected }}
               accessibilityLabel={`${m.title}. ${m.points.join('. ')}`}
@@ -68,18 +88,13 @@ export default function CreateGame() {
         })}
       </View>
       <Text className="text-xs text-cream/60">Everyone who joins plays the mode you pick. It can’t be changed after the game is created.</Text>
-      <TextField
-        label="Your name"
-        value={name}
-        onChangeText={setName}
-        placeholder="e.g. Tanmay"
-        autoFocus
-        maxLength={20}
-        returnKeyType="go"
-        onSubmitEditing={create}
-        error={error}
-        testID="host-name"
-      />
+      <Label className="text-cream/70">Game settings</Label>
+      <Card testID="game-settings">
+        <GameConfigEditor mode={gameMode} value={config} onChange={setConfig} />
+      </Card>
+      <Card testID="game-review">
+        <GameConfigSummary mode={gameMode} config={config} title="Review" note="You can still change these settings in the lobby, until you start the game." />
+      </Card>
     </Screen>
   );
 }

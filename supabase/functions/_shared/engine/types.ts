@@ -1,6 +1,8 @@
 import type { PropertyKey } from './businessBoard.ts';
 import type { CardTable, Deck } from './cards.ts';
+import type { GameConfig } from './gameConfig.ts';
 import type { GameMode, IntermediateState } from './intermediateState.ts';
+import type { ObjectivesState } from './objectives.ts';
 
 export type GameStatus = 'WAITING' | 'ACTIVE' | 'PAUSED' | 'FINISHED';
 
@@ -225,6 +227,16 @@ export interface GameState {
   rulesVersion: string;
   /** The ruleset, chosen by the host when the game was created. Never changes. */
   mode: GameMode;
+  /**
+   * The rules the host customised (starting cash, loan limit, market volatility, secret objectives).
+   * Editable by the host while the game is WAITING; locked from START_GAME on.
+   */
+  config: GameConfig;
+  /**
+   * Secret objectives: null in Classic games, when the host disabled them, and before the game starts.
+   * A device only ever holds its own assignment until the game has finished (see redactObjectives).
+   */
+  objectives: ObjectivesState | null;
   /** Intermediate Mode's economy (financial year, market, loans, credit). Null in Classic games and before the game starts. */
   intermediate: IntermediateState | null;
   status: GameStatus;
@@ -275,6 +287,7 @@ export type TransactionType =
   | 'UNMORTGAGE'
   | 'BANKRUPTCY_SETTLEMENT'
   | 'COLLATERAL_SURPLUS'
+  | 'OBJECTIVE_REWARD'
   | 'UNDO_REVERSAL';
 
 export interface TransactionRecord {

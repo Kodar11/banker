@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { Share, Text, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
-import { BUSINESS_MVP_RULES } from '@/engine/index.ts';
-import { Button, Card, ConnectionBanner, Label, Pill, PlayerBadge, Screen } from '@/components/ui';
+import { BUSINESS_MVP_RULES, configOf, type GameConfig } from '@/engine/index.ts';
+import { Button, Card, ConnectionBanner, Label, Pill, PlayerBadge, Screen, Sheet } from '@/components/ui';
 import { joinLink } from '@/constants/app';
 import { COLORS } from '@/constants/theme';
 import type { GameView } from '@/features/game/useGameView';
 import { LeaveGameDialog } from '@/features/game/LeaveGameDialog';
-import { useGameAction } from '@/features/game/useGameAction';
+import { sendFailure, useGameAction } from '@/features/game/useGameAction';
+import { GameConfigEditor, GameConfigSummary } from './GameConfigEditor';
 import { useGameStore } from '@/store/gameStore';
 import { formatINR } from '@/utils/currency';
 
@@ -18,6 +19,18 @@ export function LobbyView({ view }: { view: GameView }) {
   const { state } = view.snapshot;
   const me = view.me;
   const [confirmLeave, setConfirmLeave] = useState(false);
+  // The server's settings for this game: what every player in the lobby sees, and what the game will start with.
+  const config = configOf(state);
+  /** The host's unsaved edit, while the settings sheet is open. */
+  const [draft, setDraft] = useState<GameConfig | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const saveConfig = async () => {
+    if (!draft) return;
+    setSaveError(null);
+    const failure = sendFailure(await send({ type: 'UPDATE_CONFIG', config: draft }, { silent: true }));
+    if (failure === null) setDraft(null);
+    else setSaveError(failure);
+  };
   // Players who left the lobby keep a row on the server but are no longer at the table.
   const players = state.players.filter((p) => p.status !== 'LEFT');
   const enough = players.length >= BUSINESS_MVP_RULES.players.min;
@@ -69,6 +82,28 @@ export function LobbyView({ view }: { view: GameView }) {
         />
       </Card>
 
+      <Card testID="lobby-rules">
+        <GameConfigSummary
+          mode={state.mode}
+          config={config}
+          note={view.isHost ? 'These settings lock when you start the game.' : 'Set by the host. They lock when the game starts.'}
+        />
+        {view.isHost ? (
+          <Button
+            className="mt-3 self-start"
+            size="sm"
+            variant="secondary"
+            title="Change settings"
+            testID="lobby-edit-config"
+            disabled={!!pending}
+            onPress={() => {
+              setSaveError(null);
+              setDraft(config);
+            }}
+          />
+        ) : null}
+      </Card>
+
       <Card testID="lobby-players">
         <Label>
           Players ({players.length}/{BUSINESS_MVP_RULES.players.max})
@@ -90,11 +125,26 @@ export function LobbyView({ view }: { view: GameView }) {
         </View>
       </Card>
       <Text className="text-center text-sm text-cream/70">
-        Everyone starts with {formatINR(BUSINESS_MVP_RULES.startingCash)}. Keep your tokens on the real board — the phone is just the bank.
+        Everyone starts with {formatINR(config.startingCash)}. Keep your tokens on the real board — the phone is just the bank.
         {state.mode === 'intermediate' ? ' This game uses Intermediate Mode: financial years, changing property values, loans and credit scores.' : ''}
       </Text>
       {me ? <Button size="sm" variant="ghost" title="Leave game" testID="lobby-leave" className="self-center" onPress={() => setConfirmLeave(true)} /> : null}
       <LeaveGameDialog visible={confirmLeave} onClose={() => setConfirmLeave(false)} />
+      <Sheet
+        visible={!!draft && view.isHost}
+        title="Game settings"
+        onClose={() => setDraft(null)}
+        testID="lobby-config-sheet"
+        footer={<Button title="SAVE SETTINGS" size="md" testID="lobby-save-config" loading={pending === 'UPDATE_CONFIG'} disabled={!!pending} onPress={saveConfig} />}
+      >
+        {draft ? <GameConfigEditor mode={state.mode} value={draft} onChange={setDraft} /> : null}
+        {saveError ? (
+          <Text className="text-sm font-bold text-brick" testID="lobby-config-error" accessibilityRole="alert">
+            {saveError}
+          </Text>
+        ) : null}
+        <Text className="text-xs text-stone-500">The mode can’t be changed after the game is created. Everything here locks when you start the game.</Text>
+      </Sheet>
     </Screen>
   );
 }

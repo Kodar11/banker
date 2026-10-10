@@ -1,5 +1,6 @@
 import { getDeed, type PropertyKey } from './businessBoard.ts';
 import { formatINR } from './format.ts';
+import { configOf, type ConfigAware } from './gameConfig.ts';
 import { INTERMEDIATE_RULES as IR, LOAN_PRODUCT_KEYS, type LoanProductKey } from './intermediateConfig.ts';
 import {
   accruedInterest,
@@ -113,8 +114,12 @@ export function intermediatePrincipalOwed(eco: IntermediateState, playerId: stri
   return loansOf(eco, playerId).reduce((sum, l) => sum + loanOutstandingPrincipal(l), 0);
 }
 
-export function borrowingCapacity(eco: IntermediateState, playerId: string): number {
-  return Math.max(0, LOANS.maxOutstandingPrincipal - intermediatePrincipalOwed(eco, playerId));
+/**
+ * How much more principal this player may borrow in total under the game's loan limit (`limit`:
+ * configOf(state).loanLimit). Each product's own maximum and its collateral still apply on top.
+ */
+export function borrowingCapacity(eco: IntermediateState, playerId: string, limit: number): number {
+  return Math.max(0, limit - intermediatePrincipalOwed(eco, playerId));
 }
 
 export function overdueInstallments(eco: IntermediateState, playerId: string): { loan: IntermediateLoan; installment: Installment }[] {
@@ -176,7 +181,7 @@ export interface LoanOffer {
   collateral: CollateralOption[];
 }
 
-type OfferState = Pick<GameState, 'properties' | 'players' | 'status' | 'mode' | 'intermediate'>;
+type OfferState = Pick<GameState, 'properties' | 'players' | 'status' | 'mode' | 'intermediate'> & ConfigAware;
 
 /** The five loan offers as they stand for one player: personalised rate, limits, and why any is unavailable. */
 export function loanOffers(state: OfferState, playerId: string): LoanOffer[] {
@@ -184,7 +189,8 @@ export function loanOffers(state: OfferState, playerId: string): LoanOffer[] {
   if (!eco) return [];
   const player = state.players.find((p) => p.id === playerId);
   const score = creditScoreOf(eco, playerId);
-  const capacity = borrowingCapacity(eco, playerId);
+  const limit = configOf(state).loanLimit;
+  const capacity = borrowingCapacity(eco, playerId, limit);
   const collateral = eligibleCollateral(state, playerId);
   const general =
     state.status !== 'ACTIVE'
@@ -203,7 +209,7 @@ export function loanOffers(state: OfferState, playerId: string): LoanOffer[] {
     const blocked =
       general ??
       (capacity < LOANS.minAmount
-        ? `You have reached the ${formatINR(LOANS.maxOutstandingPrincipal)} borrowing limit.`
+        ? `You have reached the ${formatINR(limit)} borrowing limit.`
         : def.secured && secured.length === 0
           ? 'Needs a property you own outright: not mortgaged, not already pledged, and with no buildings.'
           : null);
@@ -232,8 +238,9 @@ export function loanRequestBlocker(state: OfferState, playerId: string, product:
   if (amount % LOANS.step !== 0) return `Loans come in steps of ${formatINR(LOANS.step)}.`;
   if (amount > offer.productLimit) return `${offer.name}s go up to ${formatINR(offer.productLimit)}.`;
   const eco = economyOf(state)!;
-  const capacity = borrowingCapacity(eco, playerId);
-  if (amount > capacity) return `Your total borrowing limit is ${formatINR(LOANS.maxOutstandingPrincipal)}. You can borrow ${formatINR(capacity)} more.`;
+  const limit = configOf(state).loanLimit;
+  const capacity = borrowingCapacity(eco, playerId, limit);
+  if (amount > capacity) return `Your total borrowing limit is ${formatINR(limit)}. You can borrow ${formatINR(capacity)} more.`;
   if (!offer.secured) return collateralKey ? 'This loan takes no collateral.' : null;
   if (!collateralKey) return 'Choose the property to pledge.';
   const pledge = offer.collateral.find((c) => c.key === collateralKey);
@@ -363,7 +370,7 @@ export interface FinancialOverview {
   borrowingCapacity: number;
 }
 
-export function financialOverview(state: Pick<GameState, 'properties' | 'players' | 'mode' | 'intermediate'>, playerId: string): FinancialOverview | null {
+export function financialOverview(state: Pick<GameState, 'properties' | 'players' | 'mode' | 'intermediate'> & ConfigAware, playerId: string): FinancialOverview | null {
   const eco = economyOf(state);
   const player = state.players.find((p) => p.id === playerId);
   if (!eco || !player) return null;
@@ -406,6 +413,6 @@ export function financialOverview(state: Pick<GameState, 'properties' | 'players
     defaultedAmount: defaultedLoans(eco, playerId).reduce((s, l) => s + l.defaultBalance, 0),
     cashAfterNextPayment: player.balance - (nextPayment?.amount ?? 0),
     borrowingBlocked: borrowingBlock(eco, playerId),
-    borrowingCapacity: borrowingCapacity(eco, playerId),
+    borrowingCapacity: borrowingCapacity(eco, playerId, configOf(state).loanLimit),
   };
 }

@@ -2,7 +2,7 @@ import { useCallback, useContext, useEffect, useRef, useState, type ReactNode } 
 import { ScrollView, Text, useWindowDimensions, View, type LayoutChangeEvent } from 'react-native';
 import { SafeAreaInsetsContext, SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { economyOf, isIntermediate, isPropertyKey, positionOfProperty, spaceAt, spaceName, topUndoable, yearProgressPercent, type UndoableRecord } from '@/engine/index.ts';
+import { configOf, economyOf, isIntermediate, isPropertyKey, positionOfProperty, spaceAt, spaceName, topUndoable, yearProgressPercent, type UndoableRecord } from '@/engine/index.ts';
 import { Button, ConfirmDialog, ConnectionBanner, Sheet } from '@/components/ui';
 import { ClassicBoard } from '@/features/board/ClassicBoard';
 import { SquareDetails } from '@/features/board/SquareDetails';
@@ -10,6 +10,8 @@ import { FinanceHub, type FinanceTab } from '@/features/finance/FinanceHub';
 import { FinanceNotices } from '@/features/finance/FinanceNotices';
 import { IntermediateIntro } from '@/features/finance/IntermediateIntro';
 import { LoanSheet } from '@/features/loan/LoanSheet';
+import { GameConfigSummary } from '@/features/lobby/GameConfigEditor';
+import { MyObjective } from '@/features/objectives/ObjectiveCard';
 import { PlayerDetails, PlayerDetailsActions, PlayerDetailsHeader } from '@/features/player/PlayerDetails';
 import { PropertyDeed } from '@/features/player/PropertyDeed';
 import { TradeOffers } from '@/features/trade/TradeOffers';
@@ -39,7 +41,9 @@ type Panel =
   | { kind: 'requests' }
   | { kind: 'more' }
   | { kind: 'log' }
-  | { kind: 'standings' };
+  | { kind: 'standings' }
+  | { kind: 'config' }
+  | { kind: 'objective' };
 
 /** The existing money/trade sheets, optionally prefilled with a player. */
 type Tool = { kind: 'pay'; to: string | null } | { kind: 'trade'; to: string | null } | { kind: 'loan'; tab?: FinanceTab };
@@ -206,7 +210,13 @@ export function GameScreen({ view }: { view: GameView }) {
       },
     );
   }
+  // Intermediate with secret objectives only, and only my own: the label and hint say nothing about which one it is.
+  const hasObjective = !!me && !!state.objectives?.assignments[me.id];
+  if (hasObjective) {
+    moreItems.push({ key: 'objective', icon: '🎯', label: 'My secret objective', hint: 'Only you can see this', testID: 'open-objective', onPress: () => setPanel({ kind: 'objective' }) });
+  }
   moreItems.push(
+    { key: 'config', icon: '⚙️', label: 'Game settings', hint: 'The rules this game was started with', testID: 'open-config', onPress: () => setPanel({ kind: 'config' }) },
     { key: 'log', icon: '📜', label: 'Game log', hint: 'What happened so far', testID: 'open-log', onPress: () => setPanel({ kind: 'log' }) },
     {
       key: 'rules',
@@ -243,7 +253,8 @@ export function GameScreen({ view }: { view: GameView }) {
     !!panel &&
     (panel.kind !== 'decision' || decision) &&
     (panel.kind !== 'requests' || hasRequests) &&
-    (panel.kind !== 'standings' || state.status === 'FINISHED');
+    (panel.kind !== 'standings' || state.status === 'FINISHED') &&
+    (panel.kind !== 'objective' || hasObjective);
   let panelTitle = '';
   let panelBody: ReactNode = null;
   let panelHeader: ReactNode = null;
@@ -330,6 +341,14 @@ export function GameScreen({ view }: { view: GameView }) {
       case 'standings':
         panelTitle = 'Final standings';
         panelBody = <FinishedView view={view} />;
+        break;
+      case 'config':
+        panelTitle = 'Game settings';
+        panelBody = <GameConfigSummary mode={state.mode} config={configOf(state)} title="This game" note="Locked when the game started. The same for every player." />;
+        break;
+      case 'objective':
+        panelTitle = 'My secret objective';
+        panelBody = <MyObjective view={view} />;
         break;
     }
   }

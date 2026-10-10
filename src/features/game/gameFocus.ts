@@ -171,6 +171,7 @@ export interface ContextItem {
 /** Events that never deserve the card on their own (the turn bar / board already say it). */
 const ROUTINE_EVENTS: ReadonlySet<string> = new Set([
   'GAME_CREATED',
+  'GAME_CONFIG_UPDATED',
   'PLAYER_JOINED',
   'PLAYER_READY',
   'GAME_STARTED',

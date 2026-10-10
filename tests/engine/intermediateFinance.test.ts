@@ -28,7 +28,7 @@ describe('Intermediate config', () => {
   it('holds the agreed starting values', () => {
     expect(IR.year.spacesPerYear).toBe(36);
     expect(IR.inflation.ratePercent).toBe(5);
-    expect(IR.market.changes).toEqual([
+    expect(IR.market.profiles.balanced).toEqual([
       { percent: -20, weight: 10 },
       { percent: -10, weight: 20 },
       { percent: 0, weight: 20 },
@@ -51,7 +51,7 @@ describe('Intermediate config', () => {
     const copy = () => JSON.parse(JSON.stringify(IR));
     expect(() => validateIntermediateRules(copy())).not.toThrow();
     const weights = copy();
-    weights.market.changes[0].weight = 11;
+    weights.market.profiles.balanced[0].weight = 11;
     expect(() => validateIntermediateRules(weights)).toThrow(/sum to 100/);
     const bands = copy();
     bands.credit.bands[1].max = 700;

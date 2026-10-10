@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import {
   borrowingCapacity,
+  configOf,
   clockLabel,
   creditBand,
   economyOf,
@@ -458,7 +459,7 @@ function BorrowTab({ view, eco, send, onDone }: { view: GameView; eco: Intermedi
       <View className="gap-3" testID="finance-borrow">
         <Text className="text-sm text-stone-600">
           Your credit score is {eco.credit[me.id] ?? IR.credit.start} ({creditBand(eco.credit[me.id] ?? IR.credit.start).label}), so each rate below is already adjusted for you. You can
-          borrow {formatINR(borrowingCapacity(eco, me.id))} more in total.
+          borrow {formatINR(borrowingCapacity(eco, me.id, configOf(state).loanLimit))} more in total.
         </Text>
         {offers.map((o) => (
           <Card key={o.product} className="gap-1 bg-white" testID={`offer-${o.product}`}>
