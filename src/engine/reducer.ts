@@ -22,13 +22,14 @@ import {
   incomeTaxDue,
   loansWithInterestDue,
   loanTerms,
-  mortgageResolution,
+  mortgagePayout,
   netWorth,
   outstandingPrincipal,
   propertyActionBlocker,
   sellBuildingRefund,
   topUndoable,
   tradeBlocker,
+  tradePropertyLabel,
   undoBlocker,
   unmortgageCost,
   wealthTaxDue,
@@ -1323,8 +1324,10 @@ function propertyAction(d: Draft, actor: PlayerState, key: PropertyKey, kind: Pr
   const prop = d.state.properties[key];
   const deed = getDeed(key);
   const before = snapshotProps(d, [key]);
-  const undoable = (description: string) =>
+  const undoable = (description: string) => {
     recordUndoable(d, { actionType: kind, actorId: actor.id, description, propertyKey: key, before });
+    expireTradesFor(d, [key], before);
+  };
   switch (kind) {
     case 'BUILD_HOUSE': {
       if (deed.kind !== 'CITY') return;
@@ -1347,8 +1350,9 @@ function propertyAction(d: Draft, actor: PlayerState, key: PropertyKey, kind: Pr
       const refund = sellBuildingRefund(key, prop);
       const wasHotel = prop.hotel;
       if (wasHotel) {
+        // Sold whole: the refund already covers the 3 houses the hotel replaced.
         prop.hotel = false;
-        prop.houses = RULES.building.maxHouses;
+        prop.houses = 0;
       } else {
         prop.houses -= 1;
       }
@@ -1377,28 +1381,19 @@ function propertyAction(d: Draft, actor: PlayerState, key: PropertyKey, kind: Pr
       return;
     }
     case 'MORTGAGE_PROPERTY': {
-      const m = mortgageResolution(prop);
-      if (m.buildingValue > 0) {
-        d.transfer({
-          type: m.hotelReturned ? 'HOTEL_SALE' : 'HOUSE_SALE',
-          from: null,
-          to: actor.id,
-          amount: m.buildingValue,
-          propertyKey: key,
-          memo: `Buildings on ${deed.name} returned to the bank (mortgage)`,
-        });
-      }
-      d.transfer({ type: 'MORTGAGE', from: null, to: actor.id, amount: m.mortgageValue, propertyKey: key, memo: `Mortgaged ${deed.name}` });
-      prop.houses = 0;
-      prop.hotel = false;
+      // The deed's mortgage value only. Houses/hotel are neither paid for nor removed: they stay on
+      // the site, inactive (no rent, no building, no selling), until it is unmortgaged.
+      const payout = mortgagePayout(key);
+      d.transfer({ type: 'MORTGAGE', from: null, to: actor.id, amount: payout, propertyKey: key, memo: `Mortgaged ${deed.name}` });
       prop.mortgaged = true;
-      const buildings = m.hotelReturned ? 'hotel' : m.housesReturned > 0 ? `${m.housesReturned} house${m.housesReturned > 1 ? 's' : ''}` : null;
-      d.event(
-        'PROPERTY_MORTGAGED',
-        actor.id,
-        `${actor.name} mortgaged ${deed.name} for ${formatINR(m.payout)}${buildings ? ` (incl. ${formatINR(m.buildingValue)} for the ${buildings})` : ''}`,
-        { propertyKey: key, payout: m.payout, buildingValue: m.buildingValue, mortgageValue: m.mortgageValue },
-      );
+      const kept = prop.hotel ? 'hotel stays' : prop.houses > 0 ? `${plural(prop.houses, 'house')} ${prop.houses > 1 ? 'stay' : 'stays'}` : null;
+      d.event('PROPERTY_MORTGAGED', actor.id, `${actor.name} mortgaged ${deed.name} for ${formatINR(payout)}${kept ? ` (${kept}, inactive)` : ''}`, {
+        propertyKey: key,
+        payout,
+        mortgageValue: payout,
+        houses: prop.houses,
+        hotel: prop.hotel,
+      });
       undoable(`${actor.name} mortgaged ${deed.name}`);
       return;
     }
@@ -1406,7 +1401,12 @@ function propertyAction(d: Draft, actor: PlayerState, key: PropertyKey, kind: Pr
       const cost = unmortgageCost(key);
       d.transfer({ type: 'UNMORTGAGE', from: actor.id, to: null, amount: cost, propertyKey: key, memo: `Unmortgaged ${deed.name}` });
       prop.mortgaged = false;
-      d.event('PROPERTY_UNMORTGAGED', actor.id, `${actor.name} unmortgaged ${deed.name} for ${formatINR(cost)}`, { propertyKey: key });
+      // Whatever was built on the site is still there, and active again from now.
+      d.event('PROPERTY_UNMORTGAGED', actor.id, `${actor.name} unmortgaged ${deed.name} for ${formatINR(cost)}`, {
+        propertyKey: key,
+        houses: prop.houses,
+        hotel: prop.hotel,
+      });
       undoable(`${actor.name} unmortgaged ${deed.name}`);
       return;
     }
@@ -1490,8 +1490,8 @@ function pruneTrades(d: Draft): void {
   d.state.trades = d.state.trades.filter((t) => !drop.has(t.id));
 }
 
-function describeTradeSide(keys: PropertyKey[], money: number): string {
-  const parts = keys.map((k) => getDeed(k).name);
+function describeTradeSide(d: Draft, keys: PropertyKey[], money: number): string {
+  const parts = keys.map((k) => tradePropertyLabel(d.state, k));
   if (money > 0) parts.push(formatINR(money));
   return parts.join(' + ');
 }
@@ -1519,7 +1519,7 @@ function createTrade(d: Draft, actor: PlayerState, input: Extract<GameAction, { 
   d.event(
     'TRADE_OFFERED',
     actor.id,
-    `${actor.name} offered ${to.name}: ${describeTradeSide(trade.offeredPropertyKeys, trade.offeredMoney)} ⇄ ${describeTradeSide(trade.requestedPropertyKeys, trade.requestedMoney)}`,
+    `${actor.name} offered ${to.name}: ${describeTradeSide(d, trade.offeredPropertyKeys, trade.offeredMoney)} ⇄ ${describeTradeSide(d, trade.requestedPropertyKeys, trade.requestedMoney)}`,
     { tradeId: trade.id, toPlayerId: to.id },
   );
 }
@@ -1546,13 +1546,14 @@ function acceptTrade(d: Draft, actor: PlayerState, tradeId: string): void {
   const keys = [...trade.offeredPropertyKeys, ...trade.requestedPropertyKeys];
   const before = snapshotProps(d, keys);
   const label = `Trade ${from.name} ⇄ ${actor.name}`;
+  // Described before ownership moves: the buildings named are the ones changing hands.
+  const summary = `${from.name} gave ${describeTradeSide(d, trade.offeredPropertyKeys, trade.offeredMoney)} for ${describeTradeSide(d, trade.requestedPropertyKeys, trade.requestedMoney)}`;
   if (trade.offeredMoney > 0) d.transfer({ type: 'TRADE_PAYMENT', from: from.id, to: actor.id, amount: trade.offeredMoney, memo: label });
   if (trade.requestedMoney > 0) d.transfer({ type: 'TRADE_PAYMENT', from: actor.id, to: from.id, amount: trade.requestedMoney, memo: label });
   for (const key of trade.offeredPropertyKeys) d.state.properties[key].ownerId = actor.id;
   for (const key of trade.requestedPropertyKeys) d.state.properties[key].ownerId = from.id;
   trade.status = 'ACCEPTED';
   trade.resolvedAt = d.ctx.now;
-  const summary = `${from.name} gave ${describeTradeSide(trade.offeredPropertyKeys, trade.offeredMoney)} for ${describeTradeSide(trade.requestedPropertyKeys, trade.requestedMoney)}`;
   d.event('TRADE_ACCEPTED', actor.id, `${actor.name} accepted: ${summary}`, {
     tradeId: trade.id,
     fromPlayerId: from.id,
@@ -1584,6 +1585,27 @@ function expireTrades(d: Draft, match: (t: TradeOffer) => boolean): void {
       t.status = 'EXPIRED';
       t.resolvedAt = d.ctx.now;
     }
+  }
+}
+
+/**
+ * A property goes into a trade as it stood when the offer was made — its houses, hotel and mortgage
+ * go with it. When any of that changes, open offers that include the property are closed, so nobody
+ * can accept a deal for something other than what they were shown.
+ */
+function expireTradesFor(d: Draft, keys: readonly PropertyKey[], before: readonly PropertyState[]): void {
+  const changed = keys.filter((k) => {
+    const was = before.find((p) => p.key === k);
+    const now = d.state.properties[k];
+    return !!was && (was.houses !== now.houses || was.hotel !== now.hotel || was.mortgaged !== now.mortgaged);
+  });
+  if (changed.length === 0) return;
+  const hit = d.state.trades.filter((t) => t.status === 'PENDING' && changed.some((k) => t.offeredPropertyKeys.includes(k) || t.requestedPropertyKeys.includes(k)));
+  if (hit.length === 0) return;
+  expireTrades(d, (t) => hit.includes(t));
+  for (const t of hit) {
+    const key = changed.find((k) => t.offeredPropertyKeys.includes(k) || t.requestedPropertyKeys.includes(k))!;
+    d.event('TRADE_EXPIRED', null, `Trade offer from ${d.name(t.fromPlayerId)} to ${d.name(t.toPlayerId)} closed — ${getDeed(key).name} changed`, { tradeId: t.id, propertyKey: key });
   }
 }
 
@@ -1683,7 +1705,9 @@ function approveUndo(d: Draft, actor: PlayerState, requestId: string): void {
   const blocked = undoBlocker(d.state, top);
   if (blocked) fail('UNDO_NOT_ALLOWED', blocked);
 
+  const undone = snapshotProps(d, top.propertiesBefore.map((p) => p.key));
   for (const before of top.propertiesBefore) d.state.properties[before.key] = { ...before };
+  expireTradesFor(d, undone.map((p) => p.key), undone);
 
   for (const move of [...top.moves].reverse()) {
     try {

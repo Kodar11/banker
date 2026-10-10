@@ -1,7 +1,7 @@
 /**
  * BUSINESS — Chance and Community Chest.
  *
- * ✅ CONFIRMED by the owner of the physical cards. Each deck has TWO tables: the
+ * Each deck has TWO tables: the
  * dice total that landed the player on the square picks the EVEN or the ODD
  * table, and the entry with that number (BUSINESS_MVP_RULES.cards.selection).
  *

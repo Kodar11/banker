@@ -2,7 +2,7 @@
 import { StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
-import { netWorth, outstandingDebt } from '@/engine/index.ts';
+import { netWorth, outstandingDebt, RULE_SECTIONS, TOP_RULES } from '@/engine/index.ts';
 import { GameScreen } from '@/features/game/GameScreen';
 import type { GameView } from '@/features/game/useGameView';
 import { LoanSheet } from '@/features/loan/LoanSheet';
@@ -256,6 +256,79 @@ describe('Trading UI', () => {
     await waitFor(() => expect(api.action.mock.calls[0]![3]).toEqual({ type: 'ACCEPT_TRADE', tradeId: f.state.trades[0]!.id }));
   });
 
+  it('a mortgaged property in an offer says so, with what unmortgaging costs, before anyone accepts', async () => {
+    const f = withRailway();
+    f.act('Asha', { type: 'MORTGAGE_PROPERTY', propertyKey: 'RAILWAY' });
+    f.act('Asha', {
+      type: 'CREATE_TRADE',
+      toPlayerId: f.ids.Bilal!,
+      offeredPropertyKeys: ['RAILWAY'],
+      requestedPropertyKeys: [],
+      offeredMoney: 0,
+      requestedMoney: 6000,
+    }).loadAs('Bilal');
+    await render(<GameScreen view={viewFor(f, 'Bilal')} />);
+    await fireEvent.press(screen.getByTestId('context-cta'));
+    // Railway: mortgage value 4,750 + 10%.
+    const note = 'Railway is mortgaged and stays mortgaged — ₹5,225 to unmortgage.';
+    expect(within(screen.getByTestId('trade-incoming')).getByTestId('trade-mortgage-note')).toHaveTextContent(note);
+    await fireEvent.press(screen.getByTestId('trade-accept'));
+    expect(screen.getByTestId('trade-accept-dialog')).toHaveTextContent(note, { exact: false });
+    expect(api.action).not.toHaveBeenCalled();
+  });
+
+  it('the trade builder marks a mortgaged property and what it will cost its new owner', async () => {
+    const f = withRailway();
+    f.act('Asha', { type: 'MORTGAGE_PROPERTY', propertyKey: 'RAILWAY' }).loadAs('Asha');
+    await render(<TradeSheet visible onClose={jest.fn()} view={viewFor(f, 'Asha')} send={jest.fn()} initialPlayerId={f.ids.Bilal!} />);
+    expect(screen.queryByTestId('trade-give-mortgage-note')).toBeNull();
+    expect(screen.getByTestId('trade-give-RAILWAY').props.accessibilityLabel).toMatch(/Railway, mortgaged/);
+    await fireEvent.press(screen.getByTestId('trade-give-RAILWAY'));
+    expect(screen.getByTestId('trade-give-mortgage-note')).toHaveTextContent('Railway is mortgaged and stays mortgaged — ₹5,225 to unmortgage.');
+  });
+
+  it('a property with buildings can be picked in the trade builder, and the chip says what is built on it', async () => {
+    const f = withRailway();
+    Object.assign(f.state.properties.SHIMLA, { ownerId: f.ids.Asha!, houses: 2 });
+    Object.assign(f.state.properties.AGRA, { ownerId: f.ids.Bilal!, hotel: true });
+    f.loadAs('Asha');
+    const send = jest.fn().mockResolvedValue({ ok: true });
+    await render(<TradeSheet visible onClose={jest.fn()} view={viewFor(f, 'Asha')} send={send} initialPlayerId={f.ids.Bilal!} />);
+    const shimla = screen.getByTestId('trade-give-SHIMLA');
+    expect(shimla.props.accessibilityState.disabled).toBe(false);
+    expect(shimla.props.accessibilityLabel).toBe('Shimla, with 2 houses');
+    expect(screen.getByTestId('trade-give-SHIMLA-built')).toHaveTextContent('· 2 houses');
+    expect(screen.getByTestId('trade-want-AGRA-built')).toHaveTextContent('· hotel');
+    // A property with nothing on it carries no such mark.
+    expect(screen.queryByTestId('trade-give-RAILWAY-built')).toBeNull();
+    await fireEvent.press(shimla);
+    await fireEvent.press(screen.getByTestId('trade-want-AGRA'));
+    await fireEvent.press(screen.getByTestId('trade-send'));
+    expect(send).toHaveBeenCalledWith(expect.objectContaining({ offeredPropertyKeys: ['SHIMLA'], requestedPropertyKeys: ['AGRA'] }), expect.anything());
+  });
+
+  it('an offer names the buildings on both sides, on the card and in the confirmation', async () => {
+    const f = withRailway();
+    Object.assign(f.state.properties.SHIMLA, { ownerId: f.ids.Asha!, houses: 2 });
+    Object.assign(f.state.properties.AGRA, { ownerId: f.ids.Bilal!, houses: 1 });
+    f.act('Asha', {
+      type: 'CREATE_TRADE',
+      toPlayerId: f.ids.Bilal!,
+      offeredPropertyKeys: ['SHIMLA'],
+      requestedPropertyKeys: ['AGRA'],
+      offeredMoney: 0,
+      requestedMoney: 500,
+    }).loadAs('Bilal');
+    await render(<GameScreen view={viewFor(f, 'Bilal')} />);
+    expect(screen.getByTestId('context-card')).toHaveTextContent(/You get Shimla \(2 houses\) ↔ you give Agra \(1 house\) \+ ₹500/);
+    await fireEvent.press(screen.getByTestId('context-cta'));
+    const card = screen.getByTestId('trade-incoming');
+    expect(card).toHaveTextContent(/You get: Shimla \(2 houses\)/);
+    expect(card).toHaveTextContent(/You give: Agra \(1 house\) \+ ₹500/);
+    await fireEvent.press(screen.getByTestId('trade-accept'));
+    expect(screen.getByTestId('trade-accept-dialog-summary')).toHaveTextContent(/You get Shimla \(2 houses\).*You give Agra \(1 house\) \+ ₹500/s);
+  });
+
   it('recipient can reject; creator can cancel', async () => {
     const f = withRailway();
     f.act('Asha', {
@@ -305,16 +378,44 @@ describe('Trading UI', () => {
 });
 
 describe('Mortgage UI', () => {
-  it('a developed site can be mortgaged; the button shows the payout incl. buildings', async () => {
+  it('a developed site can be mortgaged; the button shows the deed mortgage value only, and says the buildings stay', async () => {
     const f = new Fixture().roll('Asha', 2, 4).act('Asha', { type: 'BUY_PROPERTY' }); // Indore
-    f.act('Asha', { type: 'BUILD_HOUSE', propertyKey: 'INDORE' }).act('Asha', { type: 'BUILD_HOUSE', propertyKey: 'INDORE' }).loadAs('Asha');
+    f.state.properties.INDORE.houses = 2;
+    f.loadAs('Asha');
     api.action.mockResolvedValue(ok(f.snapshot()));
     await render(<PropertyView view={viewFor(f, 'Asha')} propertyKey="INDORE" />);
-    // Indore: mortgage 750 + 2 houses × 1,000 sell-back.
-    expect(screen.getByText('Mortgage · +₹2,750')).toBeTruthy();
-    expect(screen.getByTestId('action-note-MORTGAGE_PROPERTY')).toHaveTextContent(/buildings.*go back to the bank/);
+    // Indore: mortgage value 750. Nothing is added for the 2 houses.
+    expect(screen.getByText('Mortgage · +₹750')).toBeTruthy();
+    expect(screen.getByTestId('action-note-MORTGAGE_PROPERTY')).toHaveTextContent('Your buildings stay, but earn no rent until you unmortgage.');
     await fireEvent.press(screen.getByTestId('action-MORTGAGE_PROPERTY'));
     await waitFor(() => expect(api.action.mock.calls[0]![3]).toEqual({ type: 'MORTGAGE_PROPERTY', propertyKey: 'INDORE' }));
+  });
+
+  it('a mortgaged site keeps showing its buildings; building and selling them wait for the unmortgage', async () => {
+    const f = new Fixture().roll('Asha', 2, 4).act('Asha', { type: 'BUY_PROPERTY' });
+    f.state.properties.INDORE.houses = 2;
+    f.act('Asha', { type: 'MORTGAGE_PROPERTY', propertyKey: 'INDORE' }).loadAs('Asha');
+    await render(<PropertyView view={viewFor(f, 'Asha')} propertyKey="INDORE" />);
+    expect(screen.getByText('Mortgaged — no rent')).toBeTruthy();
+    expect(screen.getByTestId('current-rent')).toHaveTextContent('₹0');
+    expect(screen.getByTestId('property-built')).toHaveTextContent(/2 houses/);
+    // 750 + 10%.
+    expect(screen.getByTestId('action-UNMORTGAGE_PROPERTY')).toHaveTextContent('Unmortgage · ₹825');
+    expect(screen.getByTestId('action-note-UNMORTGAGE_PROPERTY')).toHaveTextContent('Mortgage value + 10%. Your buildings earn rent again.');
+    for (const kind of ['BUILD_HOUSE', 'SELL_BUILDING']) {
+      expect(screen.getByTestId(`action-${kind}`).props.accessibilityState.disabled).toBe(true);
+      expect(screen.getByTestId(`action-note-${kind}`)).toHaveTextContent('Unmortgage this property first.');
+    }
+  });
+
+  it('building works with a single property of a colour: Build House is enabled', async () => {
+    const f = new Fixture().roll('Asha', 2, 4).act('Asha', { type: 'BUY_PROPERTY' }).loadAs('Asha');
+    api.action.mockResolvedValue(ok(f.snapshot()));
+    await render(<PropertyView view={viewFor(f, 'Asha')} propertyKey="INDORE" />);
+    expect(screen.getByTestId('action-BUILD_HOUSE').props.accessibilityState.disabled).toBe(false);
+    expect(screen.queryByTestId('action-note-BUILD_HOUSE')).toBeNull();
+    await fireEvent.press(screen.getByTestId('action-BUILD_HOUSE'));
+    await waitFor(() => expect(api.action.mock.calls[0]![3]).toEqual({ type: 'BUILD_HOUSE', propertyKey: 'INDORE' }));
   });
 
   it('a mortgaged property shows no rent and offers unmortgage', async () => {
@@ -391,15 +492,38 @@ describe('Special squares & cards', () => {
 });
 
 describe('Settings', () => {
-  it('lists the finalized Classic rules as confirmed, not as assumptions', async () => {
+  it('one rulebook: the five rules to know first, then every other rule once, with no confirmed / assumed split', async () => {
     await render(<Settings />);
-    const confirmed = screen.getByTestId('confirmed-rules');
-    for (const title of ['Colour sets', 'Income Tax', 'Wealth Taxes', 'Club', 'Jail', 'Rest House', 'Auction timer']) {
-      expect(within(confirmed).getByText(title)).toBeTruthy();
+    const top = screen.getByTestId('top-rules');
+    expect(within(top).getByText('The 5 rules to know')).toBeTruthy();
+    TOP_RULES.forEach((rule, i) => {
+      const row = within(top).getByTestId(`top-rules-${i + 1}`);
+      expect(row).toHaveTextContent(new RegExp(`^${i + 1}`));
+      expect(within(row).getByText(rule.title)).toBeTruthy();
+      for (const line of rule.lines) expect(within(row).getByText(line)).toBeTruthy();
+    });
+    expect(within(top).queryByTestId('top-rules-6')).toBeNull();
+    for (const section of RULE_SECTIONS) {
+      const card = screen.getByTestId(`rules-${section.id}`);
+      expect(within(card).getByText(section.title)).toBeTruthy();
+      section.rules.forEach((rule, i) => {
+        const row = within(card).getByTestId(`rules-${section.id}-${i + 1}`);
+        expect(within(row).getByText(rule.title)).toBeTruthy();
+        for (const line of rule.lines) expect(within(row).getByText(line)).toBeTruthy();
+        if (rule.example) expect(row).toHaveTextContent(rule.example, { exact: false });
+      });
     }
-    const assumptions = screen.getByTestId('assumptions-list');
-    expect(within(assumptions).queryByText('Club')).toBeNull();
-    expect(within(assumptions).queryByText('Jail')).toBeNull();
+    // The old two-part page is gone, and so is its wording.
+    expect(screen.queryByTestId('confirmed-rules')).toBeNull();
+    expect(screen.queryByTestId('assumptions-list')).toBeNull();
+    expect(screen.getByTestId('settings-screen')).not.toHaveTextContent(/confirmed|assum|verify|MVP/i);
+  });
+
+  it('shows the amounts the game uses', async () => {
+    await render(<Settings />);
+    const page = screen.getByTestId('settings-screen');
+    for (const amount of ['₹25,000', '₹1,500', '₹4,250', '₹4,675']) expect(page).toHaveTextContent(amount, { exact: false });
+    expect(within(screen.getByTestId('rules-property-money')).getByText(/You keep Mumbai and both houses, but collect no rent/)).toBeTruthy();
   });
 });
 

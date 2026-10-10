@@ -3,7 +3,7 @@ import { Text, View } from 'react-native';
 import {
   BUSINESS_MVP_RULES,
   getDeed,
-  mortgageResolution,
+  mortgagePayout,
   propertyActionBlocker,
   sellBuildingRefund,
   unmortgageCost,
@@ -44,8 +44,8 @@ export function PropertyManage({ view, propertyKey }: { view: GameView; property
   const deed = getDeed(propertyKey);
   const why = (kind: PropertyActionKind) => propertyActionBlocker(state, me.id, propertyKey, kind);
   const actions: ManageAction[] = [];
+  const built = prop.hotel || prop.houses > 0;
   if (deed.kind === 'CITY') {
-    const built = prop.hotel || prop.houses > 0;
     if (!prop.hotel) {
       const housesFull = prop.houses >= BUSINESS_MVP_RULES.building.maxHouses;
       if (!housesFull) actions.push({ kind: 'BUILD_HOUSE', title: `Build House · ${formatINR(deed.houseCost)}`, variant: 'primary', why: why('BUILD_HOUSE') });
@@ -58,19 +58,26 @@ export function PropertyManage({ view, propertyKey }: { view: GameView; property
         kind: 'SELL_BUILDING',
         title: `Sell ${prop.hotel ? 'Hotel' : 'House'} · +${formatINR(sellBuildingRefund(propertyKey, prop))}`,
         variant: 'secondary',
+        note: prop.hotel ? `Sells the hotel and the ${BUSINESS_MVP_RULES.building.maxHouses} houses it replaced.` : undefined,
         why: why('SELL_BUILDING'),
       });
     }
   }
   if (prop.mortgaged) {
-    actions.push({ kind: 'UNMORTGAGE_PROPERTY', title: `Unmortgage · ${formatINR(unmortgageCost(propertyKey))}`, variant: 'primary', why: why('UNMORTGAGE_PROPERTY') });
+    const interest = `${Math.round(BUSINESS_MVP_RULES.mortgage.unmortgageInterestRate * 100)}%`;
+    actions.push({
+      kind: 'UNMORTGAGE_PROPERTY',
+      title: `Unmortgage · ${formatINR(unmortgageCost(propertyKey))}`,
+      variant: 'primary',
+      note: `Mortgage value + ${interest}.${built ? ' Your buildings earn rent again.' : ''}`,
+      why: why('UNMORTGAGE_PROPERTY'),
+    });
   } else {
-    const mortgage = mortgageResolution(prop);
     actions.push({
       kind: 'MORTGAGE_PROPERTY',
-      title: `Mortgage · +${formatINR(mortgage.payout)}`,
+      title: `Mortgage · +${formatINR(mortgagePayout(propertyKey))}`,
       variant: 'secondary',
-      note: mortgage.buildingValue > 0 ? 'Includes the buildings, which go back to the bank.' : undefined,
+      note: built ? 'Your buildings stay, but earn no rent until you unmortgage.' : 'No rent while it is mortgaged.',
       why: why('MORTGAGE_PROPERTY'),
     });
   }

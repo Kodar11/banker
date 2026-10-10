@@ -152,14 +152,12 @@ describe('Game log', () => {
 });
 
 describe('House rules & settings', () => {
-  it('keeps every rule, in two labelled sections, and the leave control when a game is attached', async () => {
+  it('keeps every rule, in ranked sections, and the leave control when a game is attached', async () => {
     const view = await render(<Settings />);
-    expect(within(screen.getByTestId('confirmed-rules')).getByText('Confirmed for your physical board')).toBeTruthy();
-    expect(within(screen.getByTestId('confirmed-rules')).getByText('Starting cash')).toBeTruthy();
-    const assumed = screen.getByTestId('assumptions-list');
-    expect(within(assumed).getByText('Configured assumptions — verify against your physical rulebook.')).toBeTruthy();
-    for (const title of ['Players', 'Dice', 'Mortgage', 'Winning']) expect(within(assumed).getByText(title)).toBeTruthy();
-    expect(screen.getByText('Version')).toBeTruthy();
+    expect(within(screen.getByTestId('top-rules')).getByText('Buy properties and collect rent')).toBeTruthy();
+    for (const title of ['Mortgages', 'Loans', 'Trading']) expect(within(screen.getByTestId('rules-property-money')).getByText(title)).toBeTruthy();
+    for (const title of ['Jail', 'Rest House', 'Club']) expect(within(screen.getByTestId('rules-squares-cards')).getByText(title)).toBeTruthy();
+    for (const title of ['Undo', 'Winning', 'Net worth']) expect(within(screen.getByTestId('rules-game-flow')).getByText(title)).toBeTruthy();
     expect(screen.queryByTestId('leave-game')).toBeNull();
     await view.unmount();
 

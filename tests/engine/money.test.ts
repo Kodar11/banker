@@ -132,7 +132,7 @@ describe('tax and transfers', () => {
 describe('houses, hotels, mortgage', () => {
   it('builds up to 3 houses then a hotel, charging deed costs', () => {
     const g = new TestGame();
-    g.give('Asha', 'MUMBAI');
+    g.giveGroup('Asha', 'MUMBAI');
     for (let i = 1; i <= 3; i += 1) {
       g.act('Asha', { type: 'BUILD_HOUSE', propertyKey: 'MUMBAI' });
       expect(g.state.properties.MUMBAI.houses).toBe(i);
@@ -149,10 +149,10 @@ describe('houses, hotels, mortgage', () => {
 
   it('hotel requires 3 houses; cannot build on transport, off-turn, or on others’ property', () => {
     const g = new TestGame();
-    g.give('Asha', 'INDORE');
+    g.giveGroup('Asha', 'DELHI');
     g.give('Asha', 'RAILWAY');
     g.give('Bilal', 'AGRA');
-    expect(() => g.act('Asha', { type: 'BUILD_HOTEL', propertyKey: 'INDORE' })).toThrow('Build 3 houses first.');
+    expect(() => g.act('Asha', { type: 'BUILD_HOTEL', propertyKey: 'DELHI' })).toThrow('Build 3 houses first.');
     expect(() => g.act('Asha', { type: 'BUILD_HOUSE', propertyKey: 'RAILWAY' })).toThrow('You can only build on city sites.');
     expect(() => g.act('Asha', { type: 'BUILD_HOUSE', propertyKey: 'AGRA' })).toThrow("You don't own this property.");
     expect(() => g.act('Bilal', { type: 'BUILD_HOUSE', propertyKey: 'AGRA' })).toThrow('You can only build during your turn.');
@@ -160,7 +160,7 @@ describe('houses, hotels, mortgage', () => {
 
   it('sells buildings back at 50%', () => {
     const g = new TestGame();
-    g.give('Asha', 'INDORE');
+    g.giveGroup('Asha', 'INDORE');
     g.act('Asha', { type: 'BUILD_HOUSE', propertyKey: 'INDORE' });
     const r = g.act('Asha', { type: 'SELL_BUILDING', propertyKey: 'INDORE' });
     expect(r.transactions[0]).toMatchObject({ type: 'HOUSE_SALE', amount: 1000, toPlayerId: g.id('Asha') });
@@ -190,7 +190,7 @@ describe('houses, hotels, mortgage', () => {
 });
 
 describe('net worth', () => {
-  it('cash + property at cost + buildings − loans', () => {
+  it('cash + property at deed price + buildings at cost − loans', () => {
     const g = new TestGame();
     g.give('Asha', 'INDORE', { houses: 2 });
     g.act('Asha', { type: 'REQUEST_LOAN', amount: 1000 });

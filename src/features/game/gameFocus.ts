@@ -298,7 +298,7 @@ export function pickContext(view: Pick<GameView, 'snapshot' | 'me' | 'current' |
         icon: '🔄',
         label: incoming.length > 1 ? `Trade offers (${incoming.length})` : 'Trade offer',
         title: `${view.playerName(offer.fromPlayerId)} wants to trade`,
-        detail: `You get ${describeTradeSide(offer.offeredPropertyKeys, offer.offeredMoney)} ↔ you give ${describeTradeSide(offer.requestedPropertyKeys, offer.requestedMoney)}`,
+        detail: `You get ${describeTradeSide(offer.offeredPropertyKeys, offer.offeredMoney, state)} ↔ you give ${describeTradeSide(offer.requestedPropertyKeys, offer.requestedMoney, state)}`,
         cta: { label: 'Review Offer', target: { kind: 'requests' } },
       };
     }
@@ -375,7 +375,7 @@ export function pickContext(view: Pick<GameView, 'snapshot' | 'me' | 'current' |
         icon: '🔄',
         label: 'Your offer',
         title: `Waiting for ${view.playerName(mine.toPlayerId)}`,
-        detail: `${describeTradeSide(mine.offeredPropertyKeys, mine.offeredMoney)} ↔ ${describeTradeSide(mine.requestedPropertyKeys, mine.requestedMoney)}`,
+        detail: `${describeTradeSide(mine.offeredPropertyKeys, mine.offeredMoney, state)} ↔ ${describeTradeSide(mine.requestedPropertyKeys, mine.requestedMoney, state)}`,
         cta: { label: 'View', target: { kind: 'requests' } },
       };
     }

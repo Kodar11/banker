@@ -105,7 +105,7 @@ describe('undo history (multiple undo, newest first)', () => {
     const g = new TestGame();
     g.roll('Asha', 1, 2); // Railway
     g.act('Asha', { type: 'BUY_PROPERTY' });
-    g.give('Asha', 'INDORE');
+    g.giveGroup('Asha', 'INDORE');
     g.act('Asha', { type: 'BUILD_HOUSE', propertyKey: 'INDORE' });
     g.act('Asha', { type: 'BUILD_HOUSE', propertyKey: 'INDORE' });
     undoTop(g, 'Asha');
@@ -134,19 +134,40 @@ describe('undo history (multiple undo, newest first)', () => {
 
   it('undo after a hotel restores the 3 houses and refunds the hotel', () => {
     const g = new TestGame();
-    g.give('Asha', 'INDORE', { houses: 3 });
+    g.giveGroup('Asha', 'INDORE', { houses: 3 });
     g.act('Asha', { type: 'BUILD_HOTEL', propertyKey: 'INDORE' });
     undoTop(g, 'Asha');
     expect(g.state.properties.INDORE).toMatchObject({ hotel: false, houses: 3 });
     expect(g.balance('Asha')).toBe(START);
   });
 
-  it('undo after mortgage with buildings restores the buildings and takes the payout back', () => {
+  it('undo after mortgage with buildings clears the mortgage, keeps the buildings and takes the payout back', () => {
     const g = new TestGame();
     g.give('Asha', 'MUMBAI', { houses: 2 });
     g.act('Asha', { type: 'MORTGAGE_PROPERTY', propertyKey: 'MUMBAI' });
+    expect(g.state.properties.MUMBAI).toMatchObject({ mortgaged: true, houses: 2 });
     undoTop(g, 'Asha');
-    expect(g.state.properties.MUMBAI).toMatchObject({ mortgaged: false, houses: 2 });
+    expect(g.state.properties.MUMBAI).toMatchObject({ mortgaged: false, houses: 2, hotel: false, ownerId: g.id('Asha') });
+    expect(g.balance('Asha')).toBe(START);
+  });
+
+  it('undo after unmortgage puts the mortgage back, buildings untouched, and refunds value + 10%', () => {
+    const g = new TestGame();
+    g.give('Asha', 'MUMBAI', { hotel: true, mortgaged: true });
+    g.act('Asha', { type: 'UNMORTGAGE_PROPERTY', propertyKey: 'MUMBAI' });
+    expect(g.balance('Asha')).toBe(START - 4675);
+    undoTop(g, 'Asha');
+    expect(g.state.properties.MUMBAI).toMatchObject({ mortgaged: true, hotel: true, houses: 0 });
+    expect(g.balance('Asha')).toBe(START);
+  });
+
+  it('undo after selling a hotel brings the hotel back and returns the refund', () => {
+    const g = new TestGame();
+    g.give('Asha', 'INDORE', { hotel: true });
+    g.act('Asha', { type: 'SELL_BUILDING', propertyKey: 'INDORE' });
+    expect(g.state.properties.INDORE).toMatchObject({ hotel: false, houses: 0 });
+    undoTop(g, 'Asha');
+    expect(g.state.properties.INDORE).toMatchObject({ hotel: true, houses: 0 });
     expect(g.balance('Asha')).toBe(START);
   });
 

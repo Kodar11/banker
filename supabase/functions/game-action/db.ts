@@ -211,7 +211,7 @@ export async function insertNewGame(tx: Tx, result: EngineResult, hostTokenHash:
       turn_phase, turn_number, turn, assumptions_version, created_at, expires_at)
     values (${s.id}, ${s.code}, ${s.rulesVersion}, ${s.status}, ${s.version}, ${host.id}, null,
       ${s.turn.phase}, ${s.turn.number}, ${tx.json(s.turn as unknown as postgres.JSONValue)},
-      ${BUSINESS_MVP_RULES.assumptionsVersion}, ${s.createdAt}, ${s.expiresAt})`;
+      ${BUSINESS_MVP_RULES.rulesetVersion}, ${s.createdAt}, ${s.expiresAt})`;
   await insertPlayer(tx, s.id, host, hostTokenHash);
   const rows = PROPERTY_KEYS.map((key) => ({ game_id: s.id, rules_version: s.rulesVersion, property_key: key }));
   await tx`insert into public.properties ${tx(rows, 'game_id', 'rules_version', 'property_key')}`;

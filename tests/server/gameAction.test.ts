@@ -964,22 +964,119 @@ describe.skipIf(!DATABASE_URL)('game-action handler (Postgres)', () => {
       await ledgerOk(g.gameId);
     });
 
-    it('mortgage with buildings: buildings returned, payout includes them, state persisted', async () => {
+    /** Asha owns Indore (bought on her first roll) with `houses` / `hotel` put on it directly in the database. */
+    async function indoreWith(built: { houses: number; hotel: boolean }) {
       const g = await setupGame(['Asha', 'Bilal']);
       ok(await g.act('Asha', { type: 'START_GAME' }));
       await sql`update public.players set position = 3 where id = ${playerRow(g, 'Asha')}`;
       queuedDice = [1, 2]; // 3 + 3 = 6 Indore
       ok(await g.act('Asha', { type: 'ROLL_DICE' }));
       ok(await g.act('Asha', { type: 'BUY_PROPERTY' }));
-      ok(await g.act('Asha', { type: 'BUILD_HOUSE', propertyKey: 'INDORE' }));
-      ok(await g.act('Asha', { type: 'BUILD_HOUSE', propertyKey: 'INDORE' }));
+      await sql`update public.properties set houses = ${built.houses}, hotel = ${built.hotel} where game_id = ${g.gameId} and property_key = 'INDORE'`;
+      return g;
+    }
+    const indore = async (gameId: string) =>
+      (await sql`select owner_player_id, houses, hotel, mortgaged from public.properties where game_id = ${gameId} and property_key = 'INDORE'`)[0]!;
+    const balanceOf = async (g: { gameId: string; seats: Record<string, Seat> }, name: string) =>
+      (await state(g.gameId, g.seats[name]!)).state.players.find((p) => p.name === name)!.balance;
+
+    it.each([
+      ['two houses', { houses: 2, hotel: false }],
+      ['a hotel', { houses: 0, hotel: true }],
+    ])('mortgage with %s: deed value only, buildings and owner persisted unchanged; unmortgage restores them', async (_label, built) => {
+      const g = await indoreWith(built);
       ok(await g.act('Asha', { type: 'MORTGAGE_PROPERTY', propertyKey: 'INDORE' }));
-      const [prop] = await sql`select houses, hotel, mortgaged from public.properties where game_id = ${g.gameId} and property_key = 'INDORE'`;
-      expect(prop).toMatchObject({ houses: 0, hotel: false, mortgaged: true });
-      const snap = await state(g.gameId, g.seats.Asha!);
-      // 25,000 − 1,500 − 2×2,000 + (2×1,000 + 750)
-      expect(snap.state.players.find((p) => p.name === 'Asha')!.balance).toBe(25000 - 1500 - 4000 + 2750);
+      // The database accepts a mortgaged property that still has its buildings.
+      expect(await indore(g.gameId)).toMatchObject({ owner_player_id: playerRow(g, 'Asha'), ...built, mortgaged: true });
+      // 25,000 − 1,500 (Indore) + 750 (mortgage value) — nothing for the buildings.
+      expect(await balanceOf(g, 'Asha')).toBe(25000 - 1500 + 750);
+      let snap = await state(g.gameId, g.seats.Asha!);
+      expect(snap.transactions.filter((t) => t.type === 'HOUSE_SALE' || t.type === 'HOTEL_SALE')).toEqual([]);
+      expect(snap.transactions.filter((t) => t.type === 'MORTGAGE').map((t) => t.amount)).toEqual([750]);
+      // Frozen while mortgaged.
+      const sell = await g.act('Asha', { type: 'SELL_BUILDING', propertyKey: 'INDORE' });
+      expect(sell.ok ? null : sell.error.message).toBe('Unmortgage this property first.');
+      ok(await g.act('Asha', { type: 'UNMORTGAGE_PROPERTY', propertyKey: 'INDORE' }));
+      expect(await indore(g.gameId)).toMatchObject({ owner_player_id: playerRow(g, 'Asha'), ...built, mortgaged: false });
+      expect(await balanceOf(g, 'Asha')).toBe(25000 - 1500 + 750 - 825);
+      snap = await state(g.gameId, g.seats.Asha!);
+      expect(snap.transactions.filter((t) => t.type === 'HOUSE_PURCHASE' || t.type === 'HOTEL_PURCHASE')).toEqual([]);
       await ledgerOk(g.gameId);
+    });
+
+    it('mortgage / unmortgage retried with the same action id apply once', async () => {
+      const g = await indoreWith({ houses: 3, hotel: false });
+      const mortgage = randomUUID();
+      ok(await g.act('Asha', { type: 'MORTGAGE_PROPERTY', propertyKey: 'INDORE' }, { actionId: mortgage }));
+      const versionAfter = g.version;
+      ok(await g.act('Asha', { type: 'MORTGAGE_PROPERTY', propertyKey: 'INDORE' }, { actionId: mortgage, expectedVersion: versionAfter - 1 }));
+      expect(g.version).toBe(versionAfter);
+      expect(await balanceOf(g, 'Asha')).toBe(25000 - 1500 + 750);
+      const unmortgage = randomUUID();
+      ok(await g.act('Asha', { type: 'UNMORTGAGE_PROPERTY', propertyKey: 'INDORE' }, { actionId: unmortgage }));
+      ok(await g.act('Asha', { type: 'UNMORTGAGE_PROPERTY', propertyKey: 'INDORE' }, { actionId: unmortgage }));
+      expect(await balanceOf(g, 'Asha')).toBe(25000 - 1500 + 750 - 825);
+      expect(await indore(g.gameId)).toMatchObject({ houses: 3, hotel: false, mortgaged: false });
+      const snap = await state(g.gameId, g.seats.Asha!);
+      expect(snap.transactions.filter((t) => t.type === 'MORTGAGE')).toHaveLength(1);
+      expect(snap.transactions.filter((t) => t.type === 'UNMORTGAGE')).toHaveLength(1);
+      await ledgerOk(g.gameId);
+    });
+
+    it('concurrent mortgage requests: one payout, buildings neither lost nor duplicated', async () => {
+      const g = await indoreWith({ houses: 2, hotel: false });
+      const v = g.version;
+      const results = await Promise.all(
+        Array.from({ length: 6 }, () => g.act('Asha', { type: 'MORTGAGE_PROPERTY', propertyKey: 'INDORE' }, { expectedVersion: v })),
+      );
+      expect(results.filter((r) => r.ok)).toHaveLength(1);
+      for (const r of results) if (!r.ok) expect(r.error.code).not.toBe('SERVER_ERROR');
+      expect(await indore(g.gameId)).toMatchObject({ houses: 2, hotel: false, mortgaged: true });
+      expect(await balanceOf(g, 'Asha')).toBe(25000 - 1500 + 750);
+      // A mortgage racing a building sale: whichever is applied second is judged on the other's result.
+      const h = await indoreWith({ houses: 2, hotel: false });
+      const hv = h.version;
+      const [m, sold] = await Promise.all([
+        h.act('Asha', { type: 'MORTGAGE_PROPERTY', propertyKey: 'INDORE' }, { expectedVersion: hv }),
+        h.act('Asha', { type: 'SELL_BUILDING', propertyKey: 'INDORE' }, { expectedVersion: hv }),
+      ]);
+      const row = await indore(h.gameId);
+      expect(row.houses).toBe(sold.ok ? 1 : 2);
+      expect(row.mortgaged).toBe(m.ok);
+      expect(await balanceOf(h, 'Asha')).toBe(25000 - 1500 + (m.ok ? 750 : 0) + (sold.ok ? 1000 : 0));
+      await ledgerOk(g.gameId);
+      await ledgerOk(h.gameId);
+    });
+
+    it('undo of a mortgage through the server restores the exact property row', async () => {
+      const g = await indoreWith({ houses: 0, hotel: true });
+      ok(await g.act('Asha', { type: 'MORTGAGE_PROPERTY', propertyKey: 'INDORE' }));
+      let snap = await state(g.gameId, g.seats.Asha!);
+      ok(await g.act('Asha', { type: 'REQUEST_UNDO', targetActionId: snap.state.undoStack.at(-1)!.actionId }));
+      snap = await state(g.gameId, g.seats.Asha!);
+      ok(await g.act('Bilal', { type: 'APPROVE_UNDO', requestId: snap.state.undoRequest!.id }));
+      expect(await indore(g.gameId)).toMatchObject({ owner_player_id: playerRow(g, 'Asha'), houses: 0, hotel: true, mortgaged: false });
+      expect(await balanceOf(g, 'Asha')).toBe(25000 - 1500);
+      await ledgerOk(g.gameId);
+    });
+
+    it('a mortgaged property with buildings charges no rent on landing', async () => {
+      const g = await indoreWith({ houses: 3, hotel: false });
+      ok(await g.act('Asha', { type: 'MORTGAGE_PROPERTY', propertyKey: 'INDORE' }));
+      ok(await g.act('Asha', { type: 'END_TURN' }));
+      await sql`update public.players set position = 3 where id = ${playerRow(g, 'Bilal')}`;
+      queuedDice = [1, 2];
+      ok(await g.act('Bilal', { type: 'ROLL_DICE' }));
+      const snap = await state(g.gameId, g.seats.Bilal!);
+      expect(snap.state.turn).toMatchObject({ phase: 'TURN_COMPLETE', pending: null });
+      expect(snap.transactions.filter((t) => t.type === 'RENT_PAYMENT')).toEqual([]);
+      expect(await balanceOf(g, 'Bilal')).toBe(25000);
+    });
+
+    it('new games are stamped with the Classic V1 rule set', async () => {
+      const g = await setupGame(['Asha', 'Bilal']);
+      const [row] = await sql`select rules_version, assumptions_version from public.games where id = ${g.gameId}`;
+      expect(row).toMatchObject({ rules_version: 'BUSINESS_V2', assumptions_version: 'CLASSIC-V1' });
     });
 
     it('trade: create → accept executes once (same action id twice) and persists ownership + money', async () => {

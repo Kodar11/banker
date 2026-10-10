@@ -2,6 +2,8 @@ import {
   applyAction,
   BOARD_SIZE,
   createGame,
+  getDeed,
+  groupMembers,
   joinGame,
   ledgerViolations,
   playerViolations,
@@ -174,6 +176,11 @@ export class TestGame {
   /** Test-only state surgery that bypasses the ledger (use for ownership setup only). */
   give(name: string, key: PropertyKey, patch: Partial<GameState['properties'][PropertyKey]> = {}): void {
     this.state.properties[key] = { ...this.state.properties[key], ownerId: this.id(name), ...patch };
+  }
+
+  /** Give `name` every property of `key`'s colour — what building on it requires (test setup only). */
+  giveGroup(name: string, key: PropertyKey, patch: Partial<GameState['properties'][PropertyKey]> = {}): void {
+    for (const member of groupMembers(getDeed(key).group)) this.give(name, member, member === key ? patch : {});
   }
 
   assertInvariants(): void {

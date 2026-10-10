@@ -7,7 +7,8 @@ import {
   BOARD_SIZE,
   computeRent,
   getDeed,
-  mortgageResolution,
+  groupMembers,
+  mortgagePayout,
   netWorth,
   outstandingDebt,
   positionOfProperty,
@@ -58,6 +59,11 @@ function table() {
   Object.assign(f.state.properties.MUMBAI, { ownerId: f.ids.Shamin!, houses: 2 });
   player(f, 'Shamin').position = positionOfSpecial('JAIL');
   return f;
+}
+
+/** Tanmay owns every Pink property (Delhi's colour): what building on Delhi requires. */
+function givePink(f: Fixture) {
+  for (const key of groupMembers('PINK')) f.state.properties[key].ownerId = f.ids.Tanmay!;
 }
 
 beforeEach(() => {
@@ -156,7 +162,7 @@ describe('interactive, read-only board', () => {
 
   it('my own property: details and Manage property share one sheet; building updates it in place, no navigation', async () => {
     const f = table();
-    f.state.properties.DELHI.ownerId = f.ids.Tanmay!;
+    givePink(f);
     f.loadAs('Tanmay');
     const ui = await render(<GameScreen view={viewFor(f, 'Tanmay')} />);
     // My own sheet → the property.
@@ -172,7 +178,7 @@ describe('interactive, read-only board', () => {
     const deed = getDeed('DELHI');
     if (deed.kind !== 'CITY') throw new Error('Delhi is a city site');
     expect(within(manage).getByTestId('action-BUILD_HOUSE')).toHaveTextContent(`Build House · ${formatINR(deed.houseCost)}`);
-    expect(within(manage).getByTestId('action-MORTGAGE_PROPERTY')).toHaveTextContent(`Mortgage · +${formatINR(mortgageResolution(f.state.properties.DELHI).payout)}`);
+    expect(within(manage).getByTestId('action-MORTGAGE_PROPERTY')).toHaveTextContent(`Mortgage · +${formatINR(mortgagePayout('DELHI'))}`);
     expect(within(manage).getByTestId('action-SELL_PROPERTY')).toHaveTextContent(`Sell to Bank · +${formatINR(deed.mortgageValue)}`);
     for (const kind of ['BUILD_HOUSE', 'MORTGAGE_PROPERTY', 'SELL_PROPERTY']) expect(screen.getByTestId(`action-${kind}`).props.accessibilityState.disabled).toBe(false);
     expect(screen.queryByTestId('action-SELL_BUILDING')).toBeNull();
@@ -202,7 +208,7 @@ describe('interactive, read-only board', () => {
     await fireEvent.press(screen.getByTestId(`board-square-${positionOfProperty('DELHI')}`));
 
     const before = player(f, 'Tanmay').balance;
-    const payout = mortgageResolution(f.state.properties.DELHI).payout;
+    const payout = mortgagePayout('DELHI');
     f.act('Tanmay', { type: 'MORTGAGE_PROPERTY', propertyKey: 'DELHI' }).loadAs('Tanmay');
     api.action.mockResolvedValue(ok(f.snapshot()));
     await fireEvent.press(screen.getByTestId('action-MORTGAGE_PROPERTY'));
@@ -243,7 +249,7 @@ describe('interactive, read-only board', () => {
 
   it('manage actions follow the engine: no cash, a hotel, a paused game, and a refusal from the server', async () => {
     const f = table();
-    Object.assign(f.state.properties.DELHI, { ownerId: f.ids.Tanmay! });
+    givePink(f);
     Object.assign(f.state.properties.MADRAS, { ownerId: f.ids.Tanmay!, houses: 0, hotel: true });
     player(f, 'Tanmay').balance = 100;
     f.loadAs('Tanmay');
@@ -263,14 +269,16 @@ describe('interactive, read-only board', () => {
     await waitFor(() => expect(screen.getByTestId('property-manage-error')).toHaveTextContent('Wait for the auction to finish.'));
     expect(screen.getByTestId(`square-details-${positionOfProperty('DELHI')}`)).toBeTruthy();
 
-    // A hotel: nothing more to build; sell the hotel before the site; mortgaging returns the buildings.
+    // A hotel: nothing more to build; sell the hotel before the site; mortgaging pays the deed value and keeps the hotel.
     await fireEvent.press(screen.getByTestId(`board-square-${positionOfProperty('MADRAS')}`));
     expect(screen.queryByTestId('property-manage-error')).toBeNull();
     expect(screen.getByTestId('property-built')).toHaveTextContent(/Hotel/);
     expect(screen.queryByTestId('action-BUILD_HOUSE')).toBeNull();
     expect(screen.queryByTestId('action-BUILD_HOTEL')).toBeNull();
     expect(screen.getByTestId('action-SELL_BUILDING')).toHaveTextContent(`Sell Hotel · +${formatINR(sellBuildingRefund('MADRAS', f.state.properties.MADRAS))}`);
-    expect(screen.getByTestId('action-note-MORTGAGE_PROPERTY')).toHaveTextContent(/buildings.*go back to the bank/);
+    expect(screen.getByTestId('action-note-SELL_BUILDING')).toHaveTextContent('Sells the hotel and the 3 houses it replaced.');
+    expect(screen.getByTestId('action-MORTGAGE_PROPERTY')).toHaveTextContent(`Mortgage · +${formatINR(getDeed('MADRAS').mortgageValue)}`);
+    expect(screen.getByTestId('action-note-MORTGAGE_PROPERTY')).toHaveTextContent('Your buildings stay, but earn no rent until you unmortgage.');
     expect(screen.getByTestId('action-note-SELL_PROPERTY')).toHaveTextContent('Sell the buildings first.');
 
     // Paused: every action disabled, the reason said once.

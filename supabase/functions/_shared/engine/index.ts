@@ -6,6 +6,7 @@ export * from './format.ts';
 export * from './invariants.ts';
 export * from './reducer.ts';
 export * from './rules.ts';
+export * from './rulebook.ts';
 export * from './selectors.ts';
 export * from './stateMachine.ts';
 export * from './types.ts';

@@ -40,7 +40,8 @@ export function developmentRent(prop: PropertyState): number {
 /**
  * THE rent calculation (engine and UI both use it). Order:
  * current development rent → colour-set multiplier (3+ same colour ⇒ ×2).
- * Mortgaged properties charge nothing. Transport/utility use their paired rule.
+ * Mortgaged properties charge nothing — whatever is built on them. Transport/utility use
+ * their paired rule; a mortgaged partner does not raise the pair's rent.
  */
 export function computeRent(state: StateLike, key: PropertyKey, diceTotal: number): number {
   const prop = state.properties[key];
@@ -138,17 +139,36 @@ export function loansWithInterestDue(loans: LoanState[], playerId: string, circu
   });
 }
 
-export function propertyValue(prop: PropertyState): number {
+/**
+ * What the buildings standing on a property cost to build (deed costs): each house at the house
+ * cost; a hotel at the hotel cost plus the 3 houses it replaced. The one building valuation —
+ * net worth uses it at full cost, selling back to the bank pays building.sellBackRate of it.
+ */
+export function buildingCost(prop: PropertyState): number {
   const deed = getDeed(prop.key);
-  let value = prop.mortgaged ? deed.price - deed.mortgageValue : deed.price;
-  if (deed.kind === 'CITY') {
-    if (prop.hotel) value += deed.houseCost * RULES.building.maxHouses + deed.hotelCost;
-    else value += deed.houseCost * prop.houses;
-  }
-  return value;
+  if (deed.kind !== 'CITY') return 0;
+  return prop.hotel ? deed.hotelCost + deed.houseCost * RULES.building.maxHouses : deed.houseCost * prop.houses;
 }
 
-/** Basic net worth (MVP definition): cash + property at cost (minus mortgage) + buildings at cost − loans owed. */
+/** A property's worth to its owner: deed price (less the mortgage value while mortgaged) + its buildings at cost. */
+export function propertyValue(prop: PropertyState): number {
+  const deed = getDeed(prop.key);
+  return (prop.mortgaged ? deed.price - deed.mortgageValue : deed.price) + buildingCost(prop);
+}
+
+/** Loan interest that has been charged at Start but not paid yet (the player is still raising the money). */
+export function unpaidLoanInterest(loans: LoanState[], playerId: string): number {
+  return loans
+    .filter((l) => l.playerId === playerId && l.status !== 'DEFAULTED')
+    .reduce((sum, l) => sum + Math.max(0, l.interestCharges * l.interestAmount - l.interestPaid), 0);
+}
+
+/**
+ * THE net worth (winner of an early end, standings, every screen):
+ * cash + each property at its deed price (less its mortgage value while mortgaged)
+ * + houses/hotels at what they cost to build − loan principal still owed
+ * − loan interest already charged but not yet paid.
+ */
 export function netWorth(state: Pick<GameState, 'properties' | 'loans' | 'players'>, playerId: string): number {
   const player = state.players.find((p) => p.id === playerId);
   if (!player) return 0;
@@ -156,7 +176,7 @@ export function netWorth(state: Pick<GameState, 'properties' | 'loans' | 'player
     const p = state.properties[k];
     return p ? sum + propertyValue(p) : sum;
   }, 0);
-  return player.balance + props - outstandingDebt(state.loans, playerId);
+  return player.balance + props - outstandingDebt(state.loans, playerId) - unpaidLoanInterest(state.loans, playerId);
 }
 
 export function ownsWholeGroup(state: StateLike, playerId: string, key: PropertyKey): boolean {
@@ -169,48 +189,24 @@ export function unmortgageCost(key: PropertyKey): number {
   return mv + Math.round(mv * RULES.mortgage.unmortgageInterestRate);
 }
 
+/**
+ * What ONE sale back to the bank pays (SELL_BUILDING): building.sellBackRate of the original cost.
+ * Houses are sold one at a time. A hotel is sold whole — the hotel and the 3 houses it replaced —
+ * and leaves the site empty, so those houses can never be refunded a second time.
+ */
 export function sellBuildingRefund(key: PropertyKey, prop: PropertyState): number {
   const deed = getDeed(key);
   if (deed.kind !== 'CITY') return 0;
-  const cost = prop.hotel ? deed.hotelCost : deed.houseCost;
+  const cost = prop.hotel ? buildingCost(prop) : prop.houses > 0 ? deed.houseCost : 0;
   return Math.floor(cost * RULES.building.sellBackRate);
 }
 
-export interface MortgageResolution {
-  /** Deed mortgage value. */
-  mortgageValue: number;
-  /** Value paid for the buildings handed back to the bank. */
-  buildingValue: number;
-  /** Total paid to the owner. */
-  payout: number;
-  housesReturned: number;
-  hotelReturned: boolean;
-}
-
 /**
- * THE mortgage rule (BUSINESS_MVP_RULES.mortgage.buildingsOnMortgage). A developed
- * site can be mortgaged: its buildings go back to the bank and are paid at the
- * existing building sell-back value — exactly what selling them one by one
- * (SELL_BUILDING) would pay: a hotel = its sell-back + the houses it replaced.
- * Then the deed's mortgage value is added.
+ * THE mortgage payout (BUSINESS_MVP_RULES.mortgage): the deed's printed mortgage value and nothing
+ * else. Houses/hotel on the site are not paid for — they stay attached, inactive, until unmortgaged.
  */
-export function mortgageResolution(prop: PropertyState): MortgageResolution {
-  const deed = getDeed(prop.key);
-  let buildingValue = 0;
-  let housesReturned = 0;
-  if (deed.kind === 'CITY') {
-    const house = Math.floor(deed.houseCost * RULES.building.sellBackRate);
-    const hotel = Math.floor(deed.hotelCost * RULES.building.sellBackRate);
-    housesReturned = prop.hotel ? RULES.building.maxHouses : prop.houses;
-    buildingValue = (prop.hotel ? hotel : 0) + housesReturned * house;
-  }
-  return {
-    mortgageValue: deed.mortgageValue,
-    buildingValue,
-    payout: deed.mortgageValue + buildingValue,
-    housesReturned: prop.hotel ? 0 : housesReturned,
-    hotelReturned: prop.hotel,
-  };
+export function mortgagePayout(key: PropertyKey): number {
+  return getDeed(key).mortgageValue;
 }
 
 /** Loan amounts. Interest is NOT owed at borrowing time — it is charged at the next Start. */
@@ -222,6 +218,19 @@ export function loanTerms(amount: number): { principal: number; interest: number
 // ---------------------------------------------------------------------------
 // Trades
 // ---------------------------------------------------------------------------
+
+/** What stands on a property, in words ("1 house", "2 houses", "hotel"), or null when nothing does. */
+export function buildingLabel(prop: Pick<PropertyState, 'houses' | 'hotel'> | undefined): string | null {
+  if (!prop) return null;
+  if (prop.hotel) return 'hotel';
+  return prop.houses > 0 ? `${prop.houses} house${prop.houses === 1 ? '' : 's'}` : null;
+}
+
+/** A property as it is named in a trade: with what is built on it, so nobody trades buildings away unseen. */
+export function tradePropertyLabel(state: StateLike, key: PropertyKey): string {
+  const built = buildingLabel(state.properties[key]);
+  return built ? `${getDeed(key).name} (${built})` : getDeed(key).name;
+}
 
 /** Why one side's property can't be traded right now, or null. */
 export function tradePropertyBlocker(state: StateLike, ownerId: string, key: PropertyKey): string | null {
@@ -327,7 +336,7 @@ export function propertyActionBlocker(
       if (RULES.building.onlyOnOwnTurn && !isMyTurn) return 'You can only build during your turn.';
       if (prop.mortgaged) return 'Unmortgage this property first.';
       if (RULES.building.requireFullGroup && !ownsWholeGroup(state, playerId, key)) {
-        return 'You need every site in this colour group first.';
+        return 'Own every property of this colour to build here.';
       }
       if (prop.hotel) return 'This site already has a hotel.';
       if (kind === 'BUILD_HOUSE') {
@@ -343,13 +352,15 @@ export function propertyActionBlocker(
     }
     case 'SELL_BUILDING':
       if (deed.kind !== 'CITY' || (!prop.hotel && prop.houses === 0)) return 'Nothing built here.';
+      // Buildings on a mortgaged site are frozen with it.
+      if (prop.mortgaged) return 'Unmortgage this property first.';
       return null;
     case 'SELL_PROPERTY':
       if (prop.hotel || prop.houses > 0) return 'Sell the buildings first.';
       if (prop.mortgaged) return 'Unmortgage before selling.';
       return null;
     case 'MORTGAGE_PROPERTY':
-      // Buildings are allowed: they are handed back to the bank (mortgageResolution).
+      // Buildings are allowed: they stay on the site, inactive, until it is unmortgaged.
       if (prop.mortgaged) return 'Already mortgaged.';
       return null;
     case 'UNMORTGAGE_PROPERTY':

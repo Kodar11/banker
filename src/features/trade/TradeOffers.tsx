@@ -5,7 +5,7 @@ import { Button, Card, ConfirmDialog, Label } from '@/components/ui';
 import { sendFailure } from '@/features/game/useGameAction';
 import type { GameView } from '@/features/game/useGameView';
 import { useGameStore } from '@/store/gameStore';
-import { describeTradeSide } from './TradeSheet';
+import { describeTradeSide, tradeMortgageNotes } from './TradeSheet';
 
 /** Open trade offers that involve this player: accept/reject incoming, cancel outgoing. */
 export function TradeOffers({ view, send }: { view: GameView; send: (a: GameAction) => Promise<unknown> }) {
@@ -24,9 +24,11 @@ export function TradeOffers({ view, send }: { view: GameView; send: (a: GameActi
         const incoming = t.toPlayerId === me.id;
         const other = view.playerName(incoming ? t.fromPlayerId : t.toPlayerId);
         // From my point of view: what I get / what I give.
-        const youGet = incoming ? describeTradeSide(t.offeredPropertyKeys, t.offeredMoney) : describeTradeSide(t.requestedPropertyKeys, t.requestedMoney);
-        const youGive = incoming ? describeTradeSide(t.requestedPropertyKeys, t.requestedMoney) : describeTradeSide(t.offeredPropertyKeys, t.offeredMoney);
+        const youGet = incoming ? describeTradeSide(t.offeredPropertyKeys, t.offeredMoney, state) : describeTradeSide(t.requestedPropertyKeys, t.requestedMoney, state);
+        const youGive = incoming ? describeTradeSide(t.requestedPropertyKeys, t.requestedMoney, state) : describeTradeSide(t.offeredPropertyKeys, t.offeredMoney, state);
         const problem = tradeBlocker(state, t);
+        // Shown before anyone accepts: a mortgage travels with its property.
+        const mortgageNotes = tradeMortgageNotes(state, [...t.offeredPropertyKeys, ...t.requestedPropertyKeys]);
         return (
           <Card key={t.id} testID={incoming ? 'trade-incoming' : 'trade-outgoing'} className="border-b-4 border-saffron bg-amber-50">
             <Label>{incoming ? `Trade offer from ${other}` : `Your offer to ${other}`}</Label>
@@ -38,6 +40,11 @@ export function TradeOffers({ view, send }: { view: GameView; send: (a: GameActi
               <Text className="font-extrabold">You give: </Text>
               {youGive}
             </Text>
+            {mortgageNotes.map((note) => (
+              <Text key={note} className="mt-1 text-sm font-semibold text-stone-700" testID="trade-mortgage-note">
+                {note}
+              </Text>
+            ))}
             {problem ? <Text className="mt-1 text-sm font-semibold text-brick">{problem}</Text> : null}
             <View className="mt-3 flex-row gap-3">
               {incoming ? (
@@ -59,6 +66,7 @@ export function TradeOffers({ view, send }: { view: GameView; send: (a: GameActi
                     summary={`You get ${youGet}
 You give ${youGive}`}
                     message={`The trade with ${other} happens right away.`}
+                    detail={mortgageNotes.length ? mortgageNotes.join('\n') : undefined}
                     confirmTitle="Accept trade"
                     loading={accepting?.busy}
                     error={accepting?.error}

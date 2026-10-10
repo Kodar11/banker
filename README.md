@@ -36,7 +36,7 @@ app/                     Routes only (Expo Router)
   auction/[auctionId].tsx
   player/[playerId].tsx  Wallet: balance, properties, loans, net worth, history
   property/[key].tsx     Title deed + allowed actions
-  settings.tsx           House-rule assumptions, leave game
+  settings.tsx           House rules (the rulebook), leave game
 src/
   components/ui/         Button, Card, Screen, Sheet, TextField, toasts/banners
   features/              game, lobby, auction, loan, trade, player, transactions
@@ -55,13 +55,14 @@ tests/
 .maestro/                Maestro E2E flows (+ bot script that plays the second seat)
 ```
 
-## Business data (BUSINESS_V2) vs. assumptions
+## Business data (BUSINESS_V2) and the rule set
 
 * `src/engine/businessBoard.ts` — the single board source of truth:
   * **title deeds** (prices, rents, house/hotel costs, mortgage values, paired transport/utility rules), from the photographed cards;
   * **`BOARD_ROWS`** — the four sides of the physical board exactly as dictated (corner → corner). The 36-square cycle `BOARD_LAYOUT` is *derived* from the rows by `deriveBoardCycle`, which validates shared corners, closure back to Start and duplicates at module load. The DB catalog is generated from this file (`scripts/print-catalog-sql.ts`) and a test keeps them in sync.
 * `src/engine/cards.ts` — the confirmed Chance / Community Chest **EVEN and ODD tables** (dice total picks the table and the entry). The only total with no entry (Chance odd 11) is resolved by hand.
-* `src/engine/rules.ts` — **`BUSINESS_MVP_RULES`**, each value marked ✅ confirmed (₹25,000 start, ₹1,500 at Start, 3+ same colour ×2 rent, loan interest at next Start, trading, multi-undo, and the finalized Classic rules: Income Tax ₹50/property max ₹500, Wealth Taxes ₹100/house + ₹200/hotel max ₹500, Club pays ₹100 to each player, Rest House collects ₹100 from each player then skips a turn, Jail up to 3 turns or ₹500 to leave, 5-second auction countdown) or ⚠️ assumption (other auction details, building sell-back rate, how buildings are valued on mortgage, …). Players see both lists in-app under **House rules**.
+* `src/engine/rules.ts` — **`BUSINESS_MVP_RULES`**, the Classic Mode V1 rule set (`rulesetVersion: 'CLASSIC-V1'`): every configurable value the engine reads — ₹25,000 start, ₹1,500 at Start, 3+ same colour ×2 rent, build on any owned city site (3 houses then a hotel), 50% building sell-back, mortgage = deed value with buildings kept and inactive, unmortgage = value + 10%, loan interest once at the next Start, Income Tax, Wealth Taxes, Club, Rest House, Jail, the 5-second auction countdown, trading, multi-undo.
+* `src/engine/rulebook.ts` — the player-facing rulebook shown under **House rules**: the five rules to know first, then three ranked sections. Its text is generated from `BUSINESS_MVP_RULES` and the deed data, so the page cannot state a value the engine does not use (`tests/engine/classicV1.test.ts` checks it).
 
 ## Setup
 

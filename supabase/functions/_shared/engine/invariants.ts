@@ -37,7 +37,6 @@ export function propertyViolations(state: Pick<GameState, 'players' | 'propertie
     if (prop.ownerId === null && (prop.houses > 0 || prop.hotel || prop.mortgaged)) problems.push(`${key}: bank-owned but developed`);
     if (prop.houses < 0 || prop.houses > 3) problems.push(`${key}: invalid house count ${prop.houses}`);
     if (prop.hotel && prop.houses !== 0) problems.push(`${key}: hotel with houses`);
-    if (prop.mortgaged && (prop.houses > 0 || prop.hotel)) problems.push(`${key}: mortgaged with buildings`);
   }
   return problems;
 }

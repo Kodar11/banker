@@ -1,67 +1,65 @@
 
 import { goBack } from '@/utils/navigation';
-import { useState, type ReactNode } from 'react';
+import { useState } from 'react';
 import { Text, View } from 'react-native';
-import {
-  BUSINESS_MVP_RULES,
-  CONFIRMED_RULES,
-  MVP_ASSUMPTIONS,
-  RULES_VERSION,
-} from '@/engine/index.ts';
-import { Button, Card, Pill, Screen } from '@/components/ui';
+import { RULE_SECTIONS, TOP_RULES, type RuleEntry } from '@/engine/index.ts';
+import { Button, Card, Screen } from '@/components/ui';
 import { LeaveGameDialog } from '@/features/game/LeaveGameDialog';
 import { useSessionStore } from '@/store/sessionStore';
 
-interface RuleSectionProps {
-  testID: string;
-  badge: ReactNode;
-  title: string;
-  intro?: string;
-  rules: readonly { title: string; detail: string }[];
-}
-
-/** One group of rules: a clean heading followed by divided rule rows. */
-function RuleSection({
-  testID,
-  badge,
-  title,
-  intro,
-  rules,
-}: RuleSectionProps) {
+/** One rule: its rank, a title, short statements and (for the tricky ones) a worked example. */
+function RuleRow({ rank, rule, testID }: { rank: number; rule: RuleEntry; testID: string }) {
   return (
-    <Card testID={testID} className="overflow-hidden p-0">
-      <View className="gap-3 px-5 pb-4 pt-5">
-        <View className="flex-row flex-wrap items-center justify-between gap-2">
-          <Text
-            accessibilityRole="header"
-            className="flex-1 text-lg font-extrabold leading-6 text-ink"
-          >
-            {title}
-          </Text>
+    <View testID={testID} className="flex-row gap-3 border-t border-stone-200 px-5 py-3">
+      <Text className="w-5 text-base font-extrabold text-stone-500" accessibilityElementsHidden importantForAccessibility="no">
+        {rank}
+      </Text>
 
-          {badge}
-        </View>
+      <View className="flex-1 gap-1">
+        <Text accessibilityLabel={`${rank}. ${rule.title}`} className="text-base font-extrabold text-ink">
+          {rule.title}
+        </Text>
 
-        {intro ? (
-          <Text className="text-sm leading-5 text-stone-600">
-            {intro}
+        {rule.lines.map((line) => (
+          <Text key={line} className="text-sm leading-5 text-stone-600">
+            {line}
           </Text>
+        ))}
+
+        {rule.example ? (
+          <View className="mt-1 rounded-xl bg-white px-3 py-2">
+            <Text className="text-sm leading-5 text-stone-700">
+              <Text className="font-extrabold text-ink">Example: </Text>
+              {rule.example}
+            </Text>
+          </View>
         ) : null}
       </View>
+    </View>
+  );
+}
 
-      {rules.map((rule) => (
-        <View
-          key={rule.title}
-          className="gap-0.5 border-t border-stone-200 px-5 py-3"
-        >
-          <Text className="text-base font-extrabold text-ink">
-            {rule.title}
-          </Text>
+interface RuleSectionProps {
+  testID: string;
+  title: string;
+  intro?: string;
+  rules: readonly RuleEntry[];
+}
 
-          <Text className="text-sm leading-5 text-stone-600">
-            {rule.detail}
-          </Text>
-        </View>
+/** One group of rules: a clean heading followed by divided, numbered rule rows. */
+function RuleSection({ testID, title, intro, rules }: RuleSectionProps) {
+  return (
+    <Card testID={testID} className="overflow-hidden p-0">
+      <View className="gap-1 px-5 pb-4 pt-5">
+        <Text accessibilityRole="header" className="text-lg font-extrabold leading-6 text-ink">
+          {title}
+        </Text>
+
+        {intro ? <Text className="text-sm leading-5 text-stone-600">{intro}</Text> : null}
+      </View>
+
+      {rules.map((rule, i) => (
+        <RuleRow key={rule.title} rank={i + 1} rule={rule} testID={`${testID}-${i + 1}`} />
       ))}
     </Card>
   );
@@ -86,20 +84,15 @@ export default function Settings() {
       </Text>
 
       <RuleSection
-        testID="confirmed-rules"
-        badge={<Pill tone="good">Confirmed</Pill>}
-        title="Confirmed for your physical board"
-        rules={CONFIRMED_RULES}
+        testID="top-rules"
+        title="The 5 rules to know"
+        intro="Read these and you can play. Everything after them is detail for when a question comes up."
+        rules={TOP_RULES}
       />
 
-      <RuleSection
-        testID="assumptions-list"
-        badge={<Pill tone="warn">Verify</Pill>}
-        title="Configured assumptions"
-        intro="Verify these against your physical rulebook. Prices, rents, building costs, mortgage values, board order and card tables are confirmed. The rules below are defaults the app uses until the actual rule is confirmed."
-        rules={MVP_ASSUMPTIONS}
-      />
-
+      {RULE_SECTIONS.map((section) => (
+        <RuleSection key={section.id} testID={`rules-${section.id}`} title={section.title} rules={section.rules} />
+      ))}
 
       {session ? (
         <Button

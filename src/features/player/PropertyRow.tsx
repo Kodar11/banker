@@ -5,12 +5,19 @@ import { PROPERTY_GROUP_THEME } from '@/constants/theme';
 import { formatINR } from '@/utils/currency';
 import { openProperty } from '@/utils/navigation';
 
-/** What stands on (or hangs over) a property, for the row's trailing tag. A mortgaged site has no buildings. */
+/** What stands on (or hangs over) a property, for the row's trailing tag. A mortgaged site keeps its buildings. */
 function propertyStatus(prop: PropertyState): { text: string; spoken: string; warn: boolean } | null {
-  if (prop.mortgaged) return { text: 'Mortgaged', spoken: 'mortgaged', warn: true };
-  if (prop.hotel) return { text: '🏨 Hotel', spoken: 'hotel', warn: false };
-  if (prop.houses > 0) return { text: `🏠 × ${prop.houses}`, spoken: `${prop.houses} house${prop.houses === 1 ? '' : 's'}`, warn: false };
-  return null;
+  const built = prop.hotel
+    ? { text: '🏨 Hotel', spoken: 'hotel' }
+    : prop.houses > 0
+      ? { text: `🏠 × ${prop.houses}`, spoken: `${prop.houses} house${prop.houses === 1 ? '' : 's'}` }
+      : null;
+  if (prop.mortgaged) {
+    return built
+      ? { text: `Mortgaged · ${built.text}`, spoken: `mortgaged, ${built.spoken}`, warn: true }
+      : { text: 'Mortgaged', spoken: 'mortgaged', warn: true };
+  }
+  return built ? { ...built, warn: false } : null;
 }
 
 /** One owned property. Opens the property screen unless `onPress` says otherwise (e.g. the in-game details sheet). */

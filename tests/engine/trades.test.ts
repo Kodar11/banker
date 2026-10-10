@@ -127,8 +127,6 @@ describe('trade validation', () => {
     expect(bad('Asha', 'Bilal', {}, { keys: ['DELHI'] })).toThrow('Offer something.');
     expect(bad('Asha', 'Bilal', { keys: ['MUMBAI'], money: START + 1 }, { keys: ['DELHI'] })).toThrow("Asha doesn't have the offered money.");
     expect(bad('Asha', 'Bilal', { keys: ['MUMBAI', 'MUMBAI'] }, { keys: ['DELHI'] })).toThrow('A property can only appear once in a trade.');
-    g.give('Asha', 'MUMBAI', { houses: 1 });
-    expect(bad('Asha', 'Bilal', { keys: ['MUMBAI'] }, { keys: ['DELHI'] })).toThrow('Sell the buildings on Mumbai before trading it.');
     expect(g.state.trades).toHaveLength(0);
   });
 
@@ -172,12 +170,15 @@ describe('trade validation', () => {
     expect(() => g.act('Bilal', { type: 'ACCEPT_TRADE', tradeId: t.id })).toThrow(/Asha doesn't have the offered money/);
   });
 
-  it('accept re-validates buildings added since', () => {
+  it('a house built after the offer closes it: the deal shown is no longer the deal', () => {
     const g = new TestGame();
     g.give('Asha', 'MUMBAI');
     const t = offer(g, 'Asha', 'Bilal', { keys: ['MUMBAI'] }, { money: 100 });
-    g.act('Asha', { type: 'BUILD_HOUSE', propertyKey: 'MUMBAI' });
-    expect(() => g.act('Bilal', { type: 'ACCEPT_TRADE', tradeId: t.id })).toThrow(/Sell the buildings on Mumbai/);
+    const r = g.act('Asha', { type: 'BUILD_HOUSE', propertyKey: 'MUMBAI' });
+    expect(g.state.trades.find((x) => x.id === t.id)!.status).toBe('EXPIRED');
+    expect(r.events.find((e) => e.type === 'TRADE_EXPIRED')!.message).toBe('Trade offer from Asha to Bilal closed — Mumbai changed');
+    expect(() => g.act('Bilal', { type: 'ACCEPT_TRADE', tradeId: t.id })).toThrow('This offer was already expired.');
+    expect(g.state.properties.MUMBAI).toMatchObject({ ownerId: g.id('Asha'), houses: 1 });
   });
 
   it('offers involving a bankrupt player expire', () => {
@@ -197,5 +198,95 @@ describe('trade validation', () => {
     const t = offer(g, 'Asha', 'Bilal', { keys: ['INDORE'] }, { money: 100 });
     g.act('Chitra', { type: 'PAUSE_GAME' });
     expect(() => g.act('Bilal', { type: 'ACCEPT_TRADE', tradeId: t.id })).toThrow('Game is paused.');
+  });
+});
+
+describe('trading a property with buildings — the buildings go with it', () => {
+  const built: [string, { houses: number; hotel: boolean }, string][] = [
+    ['one house', { houses: 1, hotel: false }, 'Shimla (1 house)'],
+    ['two houses', { houses: 2, hotel: false }, 'Shimla (2 houses)'],
+    ['three houses', { houses: 3, hotel: false }, 'Shimla (3 houses)'],
+    ['a hotel', { houses: 0, hotel: true }, 'Shimla (hotel)'],
+  ];
+
+  it('the rule set allows it', () => {
+    expect(BUSINESS_MVP_RULES.trades).toMatchObject({ requireNoBuildings: false, allowMortgaged: true });
+  });
+
+  it.each(built)('%s: offered, named in the log, and transferred exactly as built', (_label, patch, label) => {
+    const g = new TestGame();
+    g.give('Asha', 'SHIMLA', patch);
+    g.give('Bilal', 'AGRA');
+    const t = offer(g, 'Asha', 'Bilal', { keys: ['SHIMLA'] }, { keys: ['AGRA'], money: 500 });
+    expect(g.results.at(-1)!.events.find((e) => e.type === 'TRADE_OFFERED')!.message).toBe(`Asha offered Bilal: ${label} ⇄ Agra + ₹500`);
+    const r = g.act('Bilal', { type: 'ACCEPT_TRADE', tradeId: t.id });
+    expect(r.events.find((e) => e.type === 'TRADE_ACCEPTED')!.message).toBe(`Bilal accepted: Asha gave ${label} for Agra + ₹500`);
+    expect(g.state.properties.SHIMLA).toEqual({ key: 'SHIMLA', ownerId: g.id('Bilal'), mortgaged: false, ...patch });
+    expect(g.state.properties.AGRA).toMatchObject({ ownerId: g.id('Asha'), houses: 0, hotel: false });
+    // Only the agreed money moved: the buildings are neither paid for nor refunded.
+    expect(r.transactions.map((x) => [x.type, x.amount])).toEqual([['TRADE_PAYMENT', 500]]);
+    expect(g.balance('Asha')).toBe(START + 500);
+    expect(g.balance('Bilal')).toBe(START - 500);
+  });
+
+  it('the new owner collects the rent of the buildings, and can sell them', () => {
+    const g = new TestGame();
+    g.give('Asha', 'SHIMLA', { houses: 2 }); // rent with 2 houses 2,750; house cost 3,500
+    const t = offer(g, 'Asha', 'Bilal', { keys: ['SHIMLA'] }, { money: 1000 });
+    g.act('Bilal', { type: 'ACCEPT_TRADE', tradeId: t.id });
+    g.placeBefore('Asha', 'SHIMLA', 4);
+    g.roll('Asha', 2, 2);
+    expect(g.state.turn.pending).toMatchObject({ reason: 'RENT', amount: 2750, toPlayerId: g.id('Bilal') });
+    g.act('Bilal', { type: 'SELL_BUILDING', propertyKey: 'SHIMLA' });
+    expect(g.balance('Bilal')).toBe(START - 1000 + 1750);
+  });
+
+  it('a mortgaged property with buildings is traded with both', () => {
+    const g = new TestGame();
+    g.give('Asha', 'SHIMLA', { hotel: true, mortgaged: true });
+    const t = offer(g, 'Asha', 'Bilal', { keys: ['SHIMLA'] }, { money: 100 });
+    g.act('Bilal', { type: 'ACCEPT_TRADE', tradeId: t.id });
+    expect(g.state.properties.SHIMLA).toEqual({ key: 'SHIMLA', ownerId: g.id('Bilal'), houses: 0, hotel: true, mortgaged: true });
+  });
+
+  it.each([
+    ['selling a house', { houses: 2 }, 'SELL_BUILDING'],
+    ['mortgaging it', { houses: 2 }, 'MORTGAGE_PROPERTY'],
+    ['unmortgaging it', { houses: 2, mortgaged: true }, 'UNMORTGAGE_PROPERTY'],
+  ] as const)('%s after the offer closes the offer, on either side of the trade', (_label, patch, type) => {
+    const g = new TestGame();
+    g.give('Asha', 'SHIMLA', patch);
+    g.give('Bilal', 'AGRA');
+    const mine = offer(g, 'Asha', 'Bilal', { keys: ['SHIMLA'] }, { money: 100 });
+    const theirs = offer(g, 'Bilal', 'Asha', { keys: ['AGRA'] }, { keys: ['SHIMLA'] });
+    const other = offer(g, 'Bilal', 'Chitra', { keys: ['AGRA'] }, { money: 100 });
+    g.act('Asha', { type, propertyKey: 'SHIMLA' });
+    const status = (id: string) => g.state.trades.find((x) => x.id === id)!.status;
+    expect([status(mine.id), status(theirs.id)]).toEqual(['EXPIRED', 'EXPIRED']);
+    // An offer that does not include the changed property is untouched.
+    expect(status(other.id)).toBe('PENDING');
+    expect(() => g.act('Bilal', { type: 'ACCEPT_TRADE', tradeId: mine.id })).toThrow('This offer was already expired.');
+  });
+
+  it('undoing a build that an offer was made on closes that offer too', () => {
+    const g = new TestGame();
+    g.give('Asha', 'SHIMLA');
+    g.act('Asha', { type: 'BUILD_HOUSE', propertyKey: 'SHIMLA' });
+    const t = offer(g, 'Asha', 'Bilal', { keys: ['SHIMLA'] }, { money: 100 });
+    g.act('Asha', { type: 'REQUEST_UNDO', targetActionId: g.state.undoStack.at(-1)!.actionId });
+    g.act(g.state.players.find((p) => g.state.undoRequest!.approverIds.includes(p.id))!.name, { type: 'APPROVE_UNDO', requestId: g.state.undoRequest!.id });
+    expect(g.state.properties.SHIMLA.houses).toBe(0);
+    expect(g.state.trades.find((x) => x.id === t.id)!.status).toBe('EXPIRED');
+  });
+
+  it('undoing the trade returns the property with the same buildings', () => {
+    const g = new TestGame();
+    g.give('Asha', 'SHIMLA', { houses: 3 });
+    const t = offer(g, 'Asha', 'Bilal', { keys: ['SHIMLA'] }, { money: 2000 });
+    g.act('Bilal', { type: 'ACCEPT_TRADE', tradeId: t.id });
+    g.act('Asha', { type: 'REQUEST_UNDO', targetActionId: g.state.undoStack.at(-1)!.actionId });
+    g.act('Bilal', { type: 'APPROVE_UNDO', requestId: g.state.undoRequest!.id });
+    expect(g.state.properties.SHIMLA).toEqual({ key: 'SHIMLA', ownerId: g.id('Asha'), houses: 3, hotel: false, mortgaged: false });
+    expect([g.balance('Asha'), g.balance('Bilal')]).toEqual([START, START]);
   });
 });

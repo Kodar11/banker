@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { getDeed, ownedBy, tradeBlocker, tradePropertyBlocker, type GameAction, type PropertyKey } from '@/engine/index.ts';
+import { buildingLabel, getDeed, ownedBy, tradeBlocker, tradePropertyBlocker, tradePropertyLabel, unmortgageCost, type GameAction, type GameState, type PropertyKey } from '@/engine/index.ts';
 import { Button, MoneyField, PlayerPicker, Sheet } from '@/components/ui';
 import { PROPERTY_GROUP_THEME } from '@/constants/theme';
 import type { GameView } from '@/features/game/useGameView';
@@ -163,6 +163,7 @@ interface TradeSideProps {
 function TradeSide({ title, moneyLabel, ownerId, view, selected, onToggle, money, onMoney, testID }: TradeSideProps) {
   const { state } = view.snapshot;
   const keys = ownedBy(state, ownerId);
+  const mortgageNotes = tradeMortgageNotes(state, selected);
   return (
     <View className="gap-3 rounded-2xl bg-felt p-3" testID={testID}>
       <Text className="text-sm font-extrabold uppercase tracking-widest text-cream" numberOfLines={1}>
@@ -174,6 +175,8 @@ function TradeSide({ title, moneyLabel, ownerId, view, selected, onToggle, money
             const deed = getDeed(key);
             const blocked = tradePropertyBlocker(state, ownerId, key);
             const on = selected.includes(key);
+            // What is built here goes with the property: say so on the chip, before it is picked.
+            const built = buildingLabel(state.properties[key]);
             return (
               <Pressable
                 key={key}
@@ -181,13 +184,14 @@ function TradeSide({ title, moneyLabel, ownerId, view, selected, onToggle, money
                 onPress={() => onToggle(key)}
                 accessibilityRole="checkbox"
                 accessibilityState={{ checked: on, disabled: !!blocked }}
-                accessibilityLabel={`${deed.name}${state.properties[key].mortgaged ? ', mortgaged' : ''}${blocked ? `, ${blocked}` : ''}`}
+                accessibilityLabel={`${deed.name}${built ? `, with ${built}` : ''}${state.properties[key].mortgaged ? ', mortgaged' : ''}${blocked ? `, ${blocked}` : ''}`}
                 testID={`${testID}-${key}`}
                 className={`min-h-[44px] flex-row items-center gap-2 rounded-xl border-2 px-3 ${on ? 'border-saffron-dark bg-saffron' : 'border-transparent bg-cream'} ${blocked ? 'opacity-40' : ''}`}
               >
                 <View style={{ backgroundColor: PROPERTY_GROUP_THEME[deed.group].mark }} className="h-3.5 w-3.5 rounded-full border border-white" />
                 <Text className="text-base font-bold text-ink">
                   {deed.name}
+                  {built ? <Text className="font-semibold text-stone-600" testID={`${testID}-${key}-built`}> · {built}</Text> : null}
                   {state.properties[key].mortgaged ? <Text className="font-semibold text-stone-600"> (M)</Text> : null}
                 </Text>
                 {on ? <Text className="text-base font-black text-ink">✓</Text> : null}
@@ -200,14 +204,29 @@ function TradeSide({ title, moneyLabel, ownerId, view, selected, onToggle, money
           <Text className="text-center text-sm font-semibold text-cream/70">No properties available</Text>
         </View>
       )}
+      {mortgageNotes.map((note) => (
+        <Text key={note} className="text-sm font-semibold text-cream/80" testID={`${testID}-mortgage-note`}>
+          {note}
+        </Text>
+      ))}
       <MoneyField label={moneyLabel} placeholder="0" value={money} onChangeValue={onMoney} testID={`${testID}-money`} />
     </View>
   );
 }
 
-/** One line summary: "Mumbai + ₹2,000". */
-export function describeTradeSide(keys: PropertyKey[], money: number): string {
-  const parts = keys.map((k) => getDeed(k).name);
+/**
+ * What changing hands with a mortgage means, one line per mortgaged property: the mortgage goes
+ * with it, and this is what its new owner pays to unmortgage (the engine's own figure).
+ */
+export function tradeMortgageNotes(state: Pick<GameState, 'properties'>, keys: readonly PropertyKey[]): string[] {
+  return keys
+    .filter((k) => state.properties[k].mortgaged)
+    .map((k) => `${getDeed(k).name} is mortgaged and stays mortgaged — ${formatINR(unmortgageCost(k))} to unmortgage.`);
+}
+
+/** One line summary: "Mumbai (2 houses) + ₹2,000". Buildings are named when `state` is given — they go with the property. */
+export function describeTradeSide(keys: PropertyKey[], money: number, state?: Pick<GameState, 'properties'>): string {
+  const parts = keys.map((k) => (state ? tradePropertyLabel(state, k) : getDeed(k).name));
   if (money > 0) parts.push(formatINR(money));
   return parts.length ? parts.join(' + ') : 'nothing';
 }

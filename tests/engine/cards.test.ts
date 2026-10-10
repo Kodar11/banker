@@ -200,7 +200,7 @@ describe('Community Chest — EVEN', () => {
     for (const n of ['Bilal', 'Chitra', 'Dev']) expect(g.balance(n)).toBe(START - 500);
   });
 
-  it('2: Birthday — a player short of ₹500 pays what they have (configured assumption)', () => {
+  it('2: Birthday — a player short of ₹500 pays what they have', () => {
     const g = new TestGame();
     g.act('Bilal', { type: 'TRANSFER_MONEY', toPlayerId: g.id('Chitra'), amount: START - 200 });
     const r = g.landOn('Asha', CHEST, 2);

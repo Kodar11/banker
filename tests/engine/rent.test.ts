@@ -93,11 +93,20 @@ describe('transport / utility paired ownership', () => {
     expect(rent(g, 'ELECTRIC_COMPANY', 8)).toBe(800);
   });
 
-  it('a mortgaged partner still counts for the pair (MVP assumption)', () => {
+  it('a mortgaged partner does not raise the rent of the other property', () => {
     const g = new TestGame();
     g.give('Asha', 'RAILWAY');
     g.give('Asha', 'BEST', { mortgaged: true });
+    expect(rent(g, 'RAILWAY')).toBe(1000);
+    expect(rent(g, 'BEST')).toBe(0);
+    g.give('Asha', 'MOTOR_BOAT');
+    g.give('Asha', 'ELECTRIC_COMPANY', { mortgaged: true });
+    expect(rent(g, 'MOTOR_BOAT', 8)).toBe(800);
+    // Unmortgaged again: the pair counts again.
+    g.give('Asha', 'BEST', { mortgaged: false });
+    g.give('Asha', 'ELECTRIC_COMPANY', { mortgaged: false });
     expect(rent(g, 'RAILWAY')).toBe(1350);
+    expect(rent(g, 'MOTOR_BOAT', 8)).toBe(1600);
   });
 });
 
@@ -145,7 +154,7 @@ describe('3+ same colour doubles the CURRENT rent', () => {
     expect(rent(g, 'AHMEDABAD')).toBe(3000);
   });
 
-  it('a mortgaged property charges no rent, but still counts towards the set (configured)', () => {
+  it('a mortgaged property charges no rent, but still counts towards the set', () => {
     const g = new TestGame();
     g.give('Asha', 'MUMBAI', { mortgaged: true });
     g.give('Asha', 'AHMEDABAD');

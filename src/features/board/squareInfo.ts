@@ -18,12 +18,13 @@ export function specialSquareInfo(type: SpecialSpaceType, state: GameState, me: 
     case 'START':
       return [
         `Collect ${formatINR(RULES.start.passReward)} every time you pass or land on Start.`,
-        'Interest on open bank loans is charged when you reach Start.',
+        `Interest on a bank loan is charged ${RULES.loans.interestEveryCircuit ? 'each time' : 'once, the next time'} you pass or land on Start.`,
       ];
     case 'JAIL':
       return [
         `Landing here locks you in Jail for up to ${RULES.jail.maxTurns} turns.`,
         `On each Jail turn: pay ${formatINR(RULES.jail.fine)} to leave and roll, or stay and miss the turn.`,
+        `After ${RULES.jail.maxTurns} missed turns you are released. Doubles do not get you out.`,
       ];
     case 'CLUB':
       return [
@@ -33,6 +34,7 @@ export function specialSquareInfo(type: SpecialSpaceType, state: GameState, me: 
     case 'REST_HOUSE':
       return [
         `Collect ${formatINR(RULES.restHouse.collectFromEachPlayer)} from every other player, then miss your next turn.`,
+        'Sent here by a card? You miss your next turn but collect nothing.',
       ];
     case 'INCOME_TAX':
       return [

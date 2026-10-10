@@ -38,8 +38,8 @@ export function LoanSheet({ visible, onClose, view, send }: LoanSheetProps) {
   return (
     <Sheet visible={visible} onClose={onClose} title="Bank loan" testID="loan-sheet">
       <Text className="text-sm text-stone-600">
-        You get the full amount now. {RULES.interestRatePercent}% interest is paid when you next reach or pass Start
-        {RULES.interestEveryCircuit ? ', and again every Start while the loan is open' : ''}.
+        You get the full amount now. {RULES.interestRatePercent}% interest is charged {RULES.interestEveryCircuit ? 'every time' : 'once, the next time'} you
+        pass or land on Start. Repay the loan before then to pay no interest.
       </Text>
       <View className="flex-row flex-wrap gap-2">
         {QUICK.filter((q) => q <= room).map((q) => (
