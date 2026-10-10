@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { PROPERTY_KEYS, type PropertyKey } from './businessBoard.ts';
+import { LOAN_PRODUCT_KEYS } from './intermediateConfig.ts';
 
 const propertyKey = z.enum(PROPERTY_KEYS as [PropertyKey, ...PropertyKey[]]);
 const id = z.string().uuid();
@@ -48,6 +49,24 @@ export const GameActionSchema = z.discriminatedUnion('type', [
     .strict(),
   z.object({ type: z.literal('REQUEST_LOAN'), amount: rupees }).strict(),
   z.object({ type: z.literal('REPAY_LOAN'), loanId: id, amount: rupees }).strict(),
+  // ---- Intermediate Mode banking (refused in a Classic game) ----
+  z
+    .object({
+      type: z.literal('TAKE_INTERMEDIATE_LOAN'),
+      product: z.enum(LOAN_PRODUCT_KEYS),
+      amount: rupees,
+      /** Secured Loan only: the property pledged. */
+      collateralKey: propertyKey.optional(),
+      /** The annual rate on the contract the player confirmed; a different rate now means the offer changed. */
+      expectedRatePercent: z.number().int().min(0).max(100),
+    })
+    .strict(),
+  /** Pay the oldest installment that has fallen due on this loan. */
+  z.object({ type: z.literal('PAY_LOAN_INSTALLMENT'), loanId: id }).strict(),
+  /** Repay principal early (plus the interest accrued on it). */
+  z.object({ type: z.literal('PREPAY_INTERMEDIATE_LOAN'), loanId: id, amount: rupees }).strict(),
+  /** Pay down a defaulted loan's remaining balance. */
+  z.object({ type: z.literal('PAY_DEFAULTED_LOAN'), loanId: id, amount: rupees }).strict(),
   z.object({ type: z.literal('PLACE_BID'), auctionId: id, amount: rupees }).strict(),
   z.object({ type: z.literal('PASS_AUCTION'), auctionId: id }).strict(),
   z.object({ type: z.literal('CLOSE_AUCTION'), auctionId: id }).strict(),

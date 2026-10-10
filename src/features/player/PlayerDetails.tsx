@@ -1,5 +1,5 @@
 import { Pressable, Text, View } from 'react-native';
-import { netWorth, outstandingDebt, ownedBy, spaceName } from '@/engine/index.ts';
+import { netWorth, ownedBy, spaceName, totalDebt } from '@/engine/index.ts';
 import { Button, Pill, PlayerBadge } from '@/components/ui';
 import { COLORS } from '@/constants/theme';
 import { ActionIcon } from '@/features/game/ActionIcon';
@@ -71,7 +71,7 @@ export function PlayerDetails({ view, playerId, onPropertyPress, onOpenWallet }:
   const found = findPlayer(view, playerId);
   if (!found) return <Text className="text-base text-stone-600">Player not found.</Text>;
   const { state, player, isMe } = found;
-  const debt = outstandingDebt(state.loans, player.id);
+  const debt = totalDebt(state, player.id);
   const canManage = isMe && state.status === 'ACTIVE' && player.status === 'ACTIVE';
 
   return (
@@ -91,6 +91,7 @@ export function PlayerDetails({ view, playerId, onPropertyPress, onOpenWallet }:
 
       <PropertyList
         testID="player-details-properties"
+        state={state}
         properties={ownedBy(state, player.id).map((k) => state.properties[k])}
         onPropertyPress={onPropertyPress}
         hint={canManage ? 'Tap a property to build, mortgage or sell.' : undefined}

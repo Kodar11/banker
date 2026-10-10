@@ -3,6 +3,7 @@
 import postgres from 'postgres';
 import {
   BUSINESS_MVP_RULES,
+  normalizeGameMode,
   PROPERTY_KEYS,
   type AuctionState,
   type EngineResult,
@@ -172,6 +173,9 @@ export async function loadState(tx: Tx, game: Row): Promise<GameState> {
     id,
     code: game.code as string,
     rulesVersion: game.rules_version as string,
+    // A row without a mode (written before modes existed) is a Classic game.
+    mode: normalizeGameMode(game.game_mode),
+    intermediate: (game.intermediate as GameState['intermediate']) ?? null,
     status: game.status as GameState['status'],
     pausedFrom: (game.paused_from as GameState['pausedFrom']) ?? null,
     pausedAt: isoOrNull(game.paused_at),
@@ -207,9 +211,9 @@ export async function insertNewGame(tx: Tx, result: EngineResult, hostTokenHash:
   const host = s.players[0];
   if (!host) throw new Error('createGame produced no host');
   await tx`
-    insert into public.games (id, code, rules_version, status, state_version, host_player_id, current_player_id,
+    insert into public.games (id, code, rules_version, game_mode, status, state_version, host_player_id, current_player_id,
       turn_phase, turn_number, turn, assumptions_version, created_at, expires_at)
-    values (${s.id}, ${s.code}, ${s.rulesVersion}, ${s.status}, ${s.version}, ${host.id}, null,
+    values (${s.id}, ${s.code}, ${s.rulesVersion}, ${s.mode}, ${s.status}, ${s.version}, ${host.id}, null,
       ${s.turn.phase}, ${s.turn.number}, ${tx.json(s.turn as unknown as postgres.JSONValue)},
       ${BUSINESS_MVP_RULES.rulesetVersion}, ${s.createdAt}, ${s.expiresAt})`;
   await insertPlayer(tx, s.id, host, hostTokenHash);
@@ -293,6 +297,7 @@ export async function persistResult(tx: Tx, prevVersion: number, result: EngineR
       paused_at = ${s.pausedAt},
       undo_stack = ${tx.json(s.undoStack as unknown as postgres.JSONValue)},
       undo_request = ${json(s.undoRequest)},
+      intermediate = ${json(s.intermediate)},
       current_auction_id = ${s.auction?.id ?? null},
       expires_at = ${s.expiresAt},
       updated_at = now()

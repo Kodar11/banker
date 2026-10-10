@@ -71,15 +71,18 @@ export function ActionPanel({ view, send, onOpenLoan }: ActionPanelProps) {
     case 'AWAITING_DECISION': {
       if (turn.pending?.kind !== 'BUY') return null;
       const deed = getDeed(turn.pending.propertyKey);
-      const canAfford = me.balance >= deed.price;
+      const price = turn.pending.price;
+      const canAfford = me.balance >= price;
       return (
         <Card testID="buy-card">
           <Pill tone="good">Property available</Pill>
           <Text className="mt-2 text-3xl font-black text-ink">{deed.name}</Text>
-          <Text className="text-base text-stone-600">Price {formatINR(deed.price)}</Text>
+          <Text className="text-base text-stone-600">
+            {price === deed.price ? 'Price' : 'Market price'} {formatINR(price)}
+          </Text>
           <View className="mt-4 gap-3">
             <Button
-              title={`BUY ${formatINR(deed.price)}`}
+              title={`BUY ${formatINR(price)}`}
               testID="buy-button"
               variant="success"
               loading={busy('BUY_PROPERTY')}

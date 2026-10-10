@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { netWorth, outstandingDebt, type GameSnapshot, type PlayerState } from '@/engine/index.ts';
+import { netWorth, totalDebt, type GameSnapshot, type PlayerState } from '@/engine/index.ts';
 import { useGameStore } from '@/store/gameStore';
 import { useSessionStore } from '@/store/sessionStore';
 
@@ -33,7 +33,7 @@ export function useGameView(): GameView | null {
       isHost: !!me?.isHost,
       playerName: (id) => (id === null ? 'Bank' : (names.get(id) ?? 'Unknown')),
       myNetWorth: me ? netWorth(state, me.id) : 0,
-      myDebt: me ? outstandingDebt(state.loans, me.id) : 0,
+      myDebt: me ? totalDebt(state, me.id) : 0,
     };
   }, [snapshot, playerId]);
 }

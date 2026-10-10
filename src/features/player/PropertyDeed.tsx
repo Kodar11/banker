@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react';
 import { Text, View } from 'react-native';
-import { computeRent, getDeed, GROUP_LABELS, rentMultiplier, rentTable, type GameState, type PropertyKey } from '@/engine/index.ts';
+import { computeRent, getDeed, GROUP_LABELS, isIntermediate, purchasePrice, rentMultiplier, rentTable, type GameState, type PropertyKey } from '@/engine/index.ts';
 import { Button, Card, Label, Pill, PlayerBadge } from '@/components/ui';
 import { PROPERTY_GROUP_THEME } from '@/constants/theme';
+import { PropertyValuation } from '@/features/finance/PropertyValuation';
 import { formatINR } from '@/utils/currency';
 
 interface PropertyDeedProps {
@@ -51,14 +52,17 @@ export function PropertyDeed({ state, propertyKey, playerName, onOwnerPress, chi
             </View>
           </View>
           <View className="items-end">
-            <Label>Price</Label>
-            <Text className="text-lg font-bold text-ink">{formatINR(deed.price)}</Text>
+            <Label>{isIntermediate(state) ? 'Market price' : 'Price'}</Label>
+            <Text className="text-lg font-bold text-ink" testID="property-price">
+              {formatINR(purchasePrice(state, propertyKey))}
+            </Text>
           </View>
         </View>
         {owner && onOwnerPress ? (
           <Button size="sm" variant="secondary" title={`View ${owner.name}`} testID="property-view-owner" onPress={() => onOwnerPress(owner.id)} />
         ) : null}
         {prop.mortgaged ? <Pill tone="bad">Mortgaged — no rent</Pill> : null}
+        <PropertyValuation state={state} propertyKey={propertyKey} />
         {prop.ownerId ? (
           <View>
             <Label>Current rent</Label>

@@ -138,7 +138,7 @@ async function createOp(
     try {
       const snapshot = await deps.sql.begin(async (tx) => {
         const ctx: EngineContext = { actionId: req.actionId, now: now(), random, newId };
-        const result = createGame({ gameId, code, hostPlayerId: playerId, hostName: req.name }, ctx);
+        const result = createGame({ gameId, code, hostPlayerId: playerId, hostName: req.name, mode: req.mode }, ctx);
         await insertNewGame(tx, result, tokenHash);
         await tx`insert into public.game_actions (action_id, game_id, player_id, type, payload, state_version_after)
           values (${req.actionId}, ${gameId}, ${playerId}, 'CREATE_GAME', '{}'::jsonb, ${result.state.version})`;

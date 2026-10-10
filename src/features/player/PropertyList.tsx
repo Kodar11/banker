@@ -1,5 +1,5 @@
 import { Text, View } from 'react-native';
-import type { PropertyState } from '@/engine/index.ts';
+import type { GameState, PropertyState } from '@/engine/index.ts';
 import { Label } from '@/components/ui';
 import { PropertyRow } from './PropertyRow';
 
@@ -11,10 +11,12 @@ interface PropertyListProps {
   /** One line under the heading, e.g. what tapping a row does. Hidden while the list is empty. */
   hint?: string;
   testID?: string;
+  /** The game, so a row can show Intermediate Mode's market value and collateral status. */
+  state?: GameState;
 }
 
 /** A player's properties: heading with the count, then one row each, or a compact empty state. */
-export function PropertyList({ properties, onPropertyPress, hint, testID }: PropertyListProps) {
+export function PropertyList({ properties, onPropertyPress, hint, testID, state }: PropertyListProps) {
   return (
     <View className="gap-2" testID={testID}>
       <View className="flex-row items-center justify-between">
@@ -27,7 +29,7 @@ export function PropertyList({ properties, onPropertyPress, hint, testID }: Prop
         <>
           {hint ? <Text className="text-xs text-stone-500">{hint}</Text> : null}
           {properties.map((p) => (
-            <PropertyRow key={p.key} prop={p} onPress={onPropertyPress ? () => onPropertyPress(p.key) : undefined} />
+            <PropertyRow key={p.key} prop={p} state={state} onPress={onPropertyPress ? () => onPropertyPress(p.key) : undefined} />
           ))}
         </>
       ) : (

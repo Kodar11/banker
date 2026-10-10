@@ -2,9 +2,10 @@
 import { goBack } from '@/utils/navigation';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
-import { RULE_SECTIONS, TOP_RULES, type RuleEntry } from '@/engine/index.ts';
+import { INTERMEDIATE_RULE_ENTRIES, RULE_SECTIONS, TOP_RULES, type RuleEntry } from '@/engine/index.ts';
 import { Button, Card, Screen } from '@/components/ui';
 import { LeaveGameDialog } from '@/features/game/LeaveGameDialog';
+import { useGameStore } from '@/store/gameStore';
 import { useSessionStore } from '@/store/sessionStore';
 
 /** One rule: its rank, a title, short statements and (for the tricky ones) a worked example. */
@@ -68,6 +69,8 @@ function RuleSection({ testID, title, intro, rules }: RuleSectionProps) {
 export default function Settings() {
   const session = useSessionStore((state) => state.session);
   const [confirmLeave, setConfirmLeave] = useState(false);
+  // Only a game played in Intermediate Mode shows its extra rules; Classic games read exactly as before.
+  const intermediate = useGameStore((state) => state.snapshot?.state.mode === 'intermediate');
 
   return (
     <Screen scroll testID="settings-screen">
@@ -93,6 +96,15 @@ export default function Settings() {
       {RULE_SECTIONS.map((section) => (
         <RuleSection key={section.id} testID={`rules-${section.id}`} title={section.title} rules={section.rules} />
       ))}
+
+      {intermediate ? (
+        <RuleSection
+          testID="rules-intermediate"
+          title="Intermediate Mode"
+          intro="This game adds a financial layer. Every Classic rule above still applies."
+          rules={INTERMEDIATE_RULE_ENTRIES}
+        />
+      ) : null}
 
       {session ? (
         <Button

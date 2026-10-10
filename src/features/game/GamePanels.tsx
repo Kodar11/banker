@@ -107,7 +107,11 @@ export function FinishedView({ view }: { view: GameView }) {
           </View>
         ))}
       </View>
-      <Text className="mt-3 text-center text-xs text-stone-500">Net worth = cash + property at cost + buildings − loans owed</Text>
+      <Text className="mt-3 text-center text-xs text-stone-500">
+        {state.mode === 'intermediate'
+          ? 'Net worth = cash + property at market value + buildings at cost − mortgages to redeem − loans owed'
+          : 'Net worth = cash + property at cost + buildings − loans owed'}
+      </Text>
     </Card>
   );
 }

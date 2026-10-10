@@ -1,10 +1,15 @@
 import {
   BUSINESS_MVP_RULES,
+  clockLabel,
   DECK_LABELS,
+  economyOf,
   getDeed,
+  INTERMEDIATE_RULES,
   isPropertyKey,
   minimumNextBid,
+  paymentsOwedNow,
   positionOfProperty,
+  purchasePrice,
   spaceAt,
   spaceName,
   type GameEventRecord,
@@ -148,7 +153,9 @@ export type ContextTarget =
   | { kind: 'square'; index: number }
   | { kind: 'auction'; auctionId: string }
   | { kind: 'log' }
-  | { kind: 'standings' };
+  | { kind: 'standings' }
+  /** Intermediate Mode: the bank, on My Loans. */
+  | { kind: 'bank' };
 
 export type ContextKind = 'offer' | 'undo' | 'auction' | 'decision' | 'payment' | 'event' | 'news' | 'position' | 'paused' | 'finished' | 'neutral';
 
@@ -229,7 +236,7 @@ function positionItem(view: Pick<GameView, 'snapshot' | 'me' | 'current' | 'isMy
       icon: '📍',
       label,
       title: deed.name,
-      detail: `${formatINR(deed.price)} · ${owner}${prop.mortgaged ? ' · Mortgaged' : ''}`,
+      detail: `${formatINR(purchasePrice(state, space.propertyKey))} · ${owner}${prop.mortgaged ? ' · Mortgaged' : ''}`,
       cta: squareTarget(index, 'property'),
     };
   }
@@ -311,7 +318,7 @@ export function pickContext(view: Pick<GameView, 'snapshot' | 'me' | 'current' |
           kind: 'decision',
           icon: '🏷️',
           label: 'For sale',
-          title: `${deed.name} · ${formatINR(deed.price)}`,
+          title: `${deed.name} · ${formatINR(pending.price)}`,
           detail: BUSINESS_MVP_RULES.auction.enabled ? 'Not owned — buy it or send it to auction' : 'Not owned — buy it or pass',
           cta: { label: 'Choose', target: { kind: 'decision' } },
         };
@@ -361,6 +368,21 @@ export function pickContext(view: Pick<GameView, 'snapshot' | 'me' | 'current' |
           cta: squareTarget(pending.propertyKey ? positionOfProperty(pending.propertyKey) : (view.current?.position ?? 0), pending.propertyKey ? 'property' : 'square'),
         };
       }
+    }
+
+    // Intermediate Mode: a loan installment of mine that is due or overdue stays on the table until it is paid.
+    const eco = economyOf(state);
+    const owed = eco ? paymentsOwedNow(eco, me.id)[0] : undefined;
+    if (eco && owed) {
+      const overdue = owed.status === 'OVERDUE';
+      return {
+        kind: 'payment',
+        icon: '🏦',
+        label: overdue ? 'Loan payment overdue' : 'Loan payment due',
+        title: `${formatINR(owed.amount)} · ${INTERMEDIATE_RULES.loans.products[owed.loan.product].name}`,
+        detail: overdue ? `Pay before ${clockLabel(eco, owed.deadline)} or the loan defaults` : `Pay by ${clockLabel(eco, owed.deadline)} to stay on time`,
+        cta: { label: 'Pay', target: { kind: 'bank' } },
+      };
     }
   }
 

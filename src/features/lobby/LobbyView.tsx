@@ -48,7 +48,9 @@ export function LobbyView({ view }: { view: GameView }) {
       }
     >
       <ConnectionBanner />
-      <Text className="mt-2 text-center text-sm font-bold uppercase tracking-[4px] text-cream/70">Business · Lobby</Text>
+      <Text className="mt-2 text-center text-sm font-bold uppercase tracking-[4px] text-cream/70" testID="lobby-title">
+        Business · {state.mode === 'intermediate' ? 'Intermediate Mode' : 'Lobby'}
+      </Text>
       <Card className="items-center">
         <Label>Game code</Label>
         <Text className="text-6xl font-black tracking-[10px] text-ink" testID="game-code" accessibilityLabel={`Game code ${code.split('').join(' ')}`}>
@@ -89,6 +91,7 @@ export function LobbyView({ view }: { view: GameView }) {
       </Card>
       <Text className="text-center text-sm text-cream/70">
         Everyone starts with {formatINR(BUSINESS_MVP_RULES.startingCash)}. Keep your tokens on the real board — the phone is just the bank.
+        {state.mode === 'intermediate' ? ' This game uses Intermediate Mode: financial years, changing property values, loans and credit scores.' : ''}
       </Text>
       {me ? <Button size="sm" variant="ghost" title="Leave game" testID="lobby-leave" className="self-center" onPress={() => setConfirmLeave(true)} /> : null}
       <LeaveGameDialog visible={confirmLeave} onClose={() => setConfirmLeave(false)} />

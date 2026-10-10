@@ -15,6 +15,8 @@ import { DECK_LABELS, findCard, type CardDefinition, type Deck, type MoveDirecti
 import { Draft } from './draft.ts';
 import { fail, GameError } from './errors.ts';
 import { formatINR } from './format.ts';
+import { initEconomy, payDefaultedLoan, payInstallment, prepayLoan, recordDiceMovement, takeLoan, writeOffLoans } from './intermediateEngine.ts';
+import { isIntermediate, normalizeGameMode, type GameMode } from './intermediateState.ts';
 import { BUSINESS_MVP_RULES as RULES } from './rules.ts';
 import {
   buildingCount,
@@ -26,6 +28,7 @@ import {
   netWorth,
   outstandingPrincipal,
   propertyActionBlocker,
+  purchasePrice,
   sellBuildingRefund,
   topUndoable,
   tradeBlocker,
@@ -83,7 +86,7 @@ function newPlayer(id: string, name: string, seat: number, isHost: boolean): Pla
 }
 
 export function createGame(
-  input: { gameId: string; code: string; hostPlayerId: string; hostName: string },
+  input: { gameId: string; code: string; hostPlayerId: string; hostName: string; mode?: GameMode },
   ctx: EngineContext,
 ): EngineResult {
   const name = PlayerNameSchema.safeParse(input.hostName);
@@ -95,6 +98,9 @@ export function createGame(
     id: input.gameId,
     code: input.code,
     rulesVersion: RULES_VERSION,
+    // No mode given (an older client) means Classic. Joining players never choose: they get the host's.
+    mode: normalizeGameMode(input.mode),
+    intermediate: null,
     status: 'WAITING',
     pausedFrom: null,
     pausedAt: null,
@@ -260,10 +266,24 @@ export function applyAction(state: GameState, actorId: string, rawAction: unknow
       transferMoney(d, actor, action.toPlayerId, action.amount, action.memo);
       break;
     case 'REQUEST_LOAN':
+      if (isIntermediate(d.state)) fail('LOAN_NOT_ALLOWED', 'Choose one of the bank’s loan offers.');
       requestLoan(d, actor, action.amount);
       break;
     case 'REPAY_LOAN':
       repayLoan(d, actor, action.loanId, action.amount);
+      break;
+    // Intermediate Mode banking. Each of these refuses a Classic game.
+    case 'TAKE_INTERMEDIATE_LOAN':
+      takeLoan(d, actor, { product: action.product, amount: action.amount, collateralKey: action.collateralKey ?? null, expectedRatePercent: action.expectedRatePercent });
+      break;
+    case 'PAY_LOAN_INSTALLMENT':
+      payInstallment(d, actor, action.loanId);
+      break;
+    case 'PREPAY_INTERMEDIATE_LOAN':
+      prepayLoan(d, actor, action.loanId, action.amount);
+      break;
+    case 'PAY_DEFAULTED_LOAN':
+      payDefaultedLoan(d, actor, action.loanId, action.amount);
       break;
     case 'PLACE_BID':
       placeBid(d, actor, action.auctionId, action.amount);
@@ -345,6 +365,8 @@ function startGame(d: Draft, actor: PlayerState): void {
   for (const p of ordered) {
     d.transfer({ type: 'STARTING_FUNDS', from: null, to: p.id, amount: RULES.startingCash, memo: 'Starting cash' });
   }
+  // Intermediate Mode only: the game's economy is generated here, once, after the turn-order draw.
+  if (isIntermediate(d.state)) initEconomy(d, ordered);
   const first = ordered[0];
   if (!first) fail('NOT_ENOUGH_PLAYERS', 'No players.');
   d.state.turn = { ...freshTurn(), playerId: first.id, number: 1 };
@@ -395,6 +417,8 @@ function rollDice(d: Draft, actor: PlayerState): void {
     to: move.to,
     destination: spaceName(move.to),
   });
+  // Intermediate Mode only: the dice move feeds the shared financial calendar (years, market, loan due dates).
+  if (isIntermediate(d.state)) recordDiceMovement(d, actor, total);
   d.setPhase('RESOLVING');
   if (!settleDueInterest(d, actor, { kind: 'RESOLVE_LANDING', rollTotal: total, depth: 0 })) return;
   resolveLanding(d, actor, total, 0);
@@ -595,7 +619,7 @@ function resolveLanding(d: Draft, player: PlayerState, rollTotal: number, depth:
     const prop = d.state.properties[key];
     const deed = getDeed(key);
     if (prop.ownerId === null) {
-      turn.pending = { kind: 'BUY', propertyKey: key, price: deed.price };
+      turn.pending = { kind: 'BUY', propertyKey: key, price: purchasePrice(d.state, key) };
       d.setPhase('AWAITING_DECISION');
       return;
     }
@@ -883,20 +907,22 @@ function buyProperty(d: Draft, actor: PlayerState): void {
   const prop = d.state.properties[pending.propertyKey];
   if (prop.ownerId !== null) fail('ALREADY_OWNED', 'That property was already purchased.');
   const deed = getDeed(pending.propertyKey);
-  if (actor.balance < deed.price) fail('INSUFFICIENT_FUNDS', 'Not enough money for this purchase.');
+  // Classic: the deed price. Intermediate: the bank sells at today's market value.
+  const price = purchasePrice(d.state, deed.key);
+  if (actor.balance < price) fail('INSUFFICIENT_FUNDS', 'Not enough money for this purchase.');
   const before = snapshotProps(d, [deed.key]);
   d.setPhase('TRANSACTION');
   d.transfer({
     type: 'PROPERTY_PURCHASE',
     from: actor.id,
     to: null,
-    amount: deed.price,
+    amount: price,
     propertyKey: deed.key,
     memo: `Bought ${deed.name}`,
   });
   prop.ownerId = actor.id;
   turn.pending = null;
-  d.event('PROPERTY_PURCHASED', actor.id, `${actor.name} bought ${deed.name} for ${formatINR(deed.price)}`, {
+  d.event('PROPERTY_PURCHASED', actor.id, `${actor.name} bought ${deed.name} for ${formatINR(price)}`, {
     propertyKey: deed.key,
   });
   recordUndoable(d, { actionType: 'BUY_PROPERTY', actorId: actor.id, description: `${actor.name} bought ${deed.name}`, propertyKey: deed.key, before });
@@ -1183,6 +1209,7 @@ function declareBankruptcy(d: Draft, actor: PlayerState): void {
       loan.closedAt = d.ctx.now;
     }
   }
+  writeOffLoans(d, actor.id);
   expireTrades(d, (t) => t.fromPlayerId === actor.id || t.toPlayerId === actor.id);
   // Ownership was reset wholesale: no earlier action can be compensated safely.
   d.state.undoStack = [];

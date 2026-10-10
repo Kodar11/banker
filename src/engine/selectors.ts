@@ -1,8 +1,11 @@
 import { getDeed, groupMembers, PROPERTY_KEYS, type ColorGroup, type PropertyKey } from './businessBoard.ts';
+import { economyOf, isPledged, loanLiability, type GameMode, type IntermediateState } from './intermediateState.ts';
 import { BUSINESS_MVP_RULES as RULES } from './rules.ts';
 import type { GameState, LoanState, PlayerState, PropertyState, TradeOffer, UndoableRecord } from './types.ts';
 
 type StateLike = Pick<GameState, 'properties'>;
+/** Mode-aware selectors accept states that carry the mode; without one they read as Classic. */
+type ModeAware = { mode?: GameMode; intermediate?: IntermediateState | null };
 
 export function ownedBy(state: StateLike, playerId: string): PropertyKey[] {
   return PROPERTY_KEYS.filter((k) => state.properties[k]?.ownerId === playerId);
@@ -169,14 +172,50 @@ export function unpaidLoanInterest(loans: LoanState[], playerId: string): number
  * + houses/hotels at what they cost to build − loan principal still owed
  * − loan interest already charged but not yet paid.
  */
-export function netWorth(state: Pick<GameState, 'properties' | 'loans' | 'players'>, playerId: string): number {
+export function netWorth(state: Pick<GameState, 'properties' | 'loans' | 'players'> & ModeAware, playerId: string): number {
   const player = state.players.find((p) => p.id === playerId);
   if (!player) return 0;
+  const eco = economyOf(state);
+  if (eco) return intermediateNetAssets(state, eco, playerId) - intermediateDebt(eco, playerId);
   const props = ownedBy(state, playerId).reduce((sum, k) => {
     const p = state.properties[k];
     return p ? sum + propertyValue(p) : sum;
   }, 0);
   return player.balance + props - outstandingDebt(state.loans, playerId) - unpaidLoanInterest(state.loans, playerId);
+}
+
+// ---------------------------------------------------------------------------
+// Intermediate Mode valuation (never reached in a Classic game)
+// ---------------------------------------------------------------------------
+
+/** What the bank charges for an unowned property: its market value in Intermediate Mode, the deed price in Classic. */
+export function purchasePrice(state: ModeAware, key: PropertyKey): number {
+  return economyOf(state)?.market[key]?.value ?? getDeed(key).price;
+}
+
+/** Everything a player owes on Intermediate loans today (principal, interest already due, defaulted balances). */
+export function intermediateDebt(eco: IntermediateState, playerId: string): number {
+  return eco.loans.filter((l) => l.playerId === playerId).reduce((sum, l) => sum + loanLiability(l), 0);
+}
+
+/**
+ * Intermediate net asset value: cash + every owned property at its current market value
+ * + its buildings at what they cost to build − what it would cost to redeem each mortgage
+ * (mortgage value + the redemption charge). Loans are not subtracted here.
+ */
+export function intermediateNetAssets(state: Pick<GameState, 'properties' | 'players'>, eco: IntermediateState, playerId: string): number {
+  const cash = state.players.find((p) => p.id === playerId)?.balance ?? 0;
+  return ownedBy(state, playerId).reduce((sum, k) => {
+    const p = state.properties[k];
+    if (!p) return sum;
+    return sum + (eco.market[k]?.value ?? getDeed(k).price) + buildingCost(p) - (p.mortgaged ? unmortgageCost(k) : 0);
+  }, cash);
+}
+
+/** What a player owes the bank on loans, in either mode (Classic: loan principal still owed). */
+export function totalDebt(state: Pick<GameState, 'loans'> & ModeAware, playerId: string): number {
+  const eco = economyOf(state);
+  return eco ? intermediateDebt(eco, playerId) : outstandingDebt(state.loans, playerId);
 }
 
 export function ownsWholeGroup(state: StateLike, playerId: string, key: PropertyKey): boolean {
@@ -233,12 +272,13 @@ export function tradePropertyLabel(state: StateLike, key: PropertyKey): string {
 }
 
 /** Why one side's property can't be traded right now, or null. */
-export function tradePropertyBlocker(state: StateLike, ownerId: string, key: PropertyKey): string | null {
+export function tradePropertyBlocker(state: StateLike & ModeAware, ownerId: string, key: PropertyKey): string | null {
   const prop = state.properties[key];
   const name = getDeed(key).name;
   if (!prop || prop.ownerId !== ownerId) return `${name} no longer belongs to that player.`;
   if (RULES.trades.requireNoBuildings && (prop.hotel || prop.houses > 0)) return `Sell the buildings on ${name} before trading it.`;
   if (!RULES.trades.allowMortgaged && prop.mortgaged) return `${name} is mortgaged.`;
+  if (isPledged(state, key)) return `${name} is pledged as loan collateral.`;
   return null;
 }
 
@@ -247,7 +287,7 @@ export function tradePropertyBlocker(state: StateLike, ownerId: string, key: Pro
  * again when accepting). Returns the first problem, or null if it can execute.
  */
 export function tradeBlocker(
-  state: Pick<GameState, 'players' | 'properties' | 'status'>,
+  state: Pick<GameState, 'players' | 'properties' | 'status'> & ModeAware,
   trade: Pick<TradeOffer, 'fromPlayerId' | 'toPlayerId' | 'offeredPropertyKeys' | 'requestedPropertyKeys' | 'offeredMoney' | 'requestedMoney'>,
 ): string | null {
   if (state.status !== 'ACTIVE') return 'The game is not running.';
@@ -291,8 +331,9 @@ function sameProperty(a: PropertyState | undefined, b: PropertyState): boolean {
  * A record is superseded when any property it touched has changed since, or
  * when a player it touched is no longer in the game.
  */
-export function undoBlocker(state: Pick<GameState, 'properties' | 'players'>, record: UndoableRecord): string | null {
+export function undoBlocker(state: Pick<GameState, 'properties' | 'players'> & ModeAware, record: UndoableRecord): string | null {
   for (const after of record.propertiesAfter) {
+    if (isPledged(state, after.key)) return `${getDeed(after.key).name} is pledged as loan collateral — can’t undo.`;
     if (!sameProperty(state.properties[after.key], after)) return `${getDeed(after.key).name} has changed since — can’t undo.`;
   }
   for (const id of [record.actorId, ...record.counterpartyIds]) {
@@ -328,6 +369,12 @@ export function propertyActionBlocker(
   if (state.turn.phase === 'AUCTION') return 'Wait for the auction to finish.';
   const deed = getDeed(key);
   const isMyTurn = state.turn.playerId === playerId;
+  // Intermediate Mode: a property securing a loan can't take a second claim, change or leave its owner.
+  if (isPledged(state, key)) {
+    if (kind === 'MORTGAGE_PROPERTY') return 'Pledged as loan collateral — it can’t also be mortgaged.';
+    if (kind === 'SELL_PROPERTY') return 'Pledged as loan collateral — repay that loan first.';
+    if (kind === 'BUILD_HOUSE' || kind === 'BUILD_HOTEL') return 'Pledged as loan collateral — repay that loan before building.';
+  }
 
   switch (kind) {
     case 'BUILD_HOUSE':

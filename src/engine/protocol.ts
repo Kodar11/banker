@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { GameCodeSchema } from './actions.ts';
 import type { GameErrorCode } from './errors.ts';
+import { GAME_MODES, type GameMode } from './intermediateState.ts';
 import type { GameEventRecord, GameState, TransactionRecord } from './types.ts';
 
 /** 32 random bytes as hex, generated on the device. The server stores only its SHA-256. */
@@ -10,7 +11,16 @@ const uuid = z.string().uuid();
 
 /** Body of a POST to the `game-action` Edge Function. */
 export const ApiRequestSchema = z.discriminatedUnion('op', [
-  z.object({ op: z.literal('create'), actionId: uuid, token: PlayerTokenSchema, name: z.string() }).strict(),
+  z
+    .object({
+      op: z.literal('create'),
+      actionId: uuid,
+      token: PlayerTokenSchema,
+      name: z.string(),
+      /** The ruleset for the whole game. Omitted (an older app) means Classic. Only `create` takes it: joiners inherit the host's. */
+      mode: z.enum(GAME_MODES as [GameMode, ...GameMode[]]).optional(),
+    })
+    .strict(),
   z.object({ op: z.literal('join'), actionId: uuid, token: PlayerTokenSchema, code: GameCodeSchema, name: z.string() }).strict(),
   z.object({ op: z.literal('state'), gameId: uuid, playerId: uuid, token: PlayerTokenSchema }).strict(),
   z

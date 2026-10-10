@@ -2,10 +2,13 @@ import { useCallback, useContext, useEffect, useRef, useState, type ReactNode } 
 import { ScrollView, Text, useWindowDimensions, View, type LayoutChangeEvent } from 'react-native';
 import { SafeAreaInsetsContext, SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { isPropertyKey, positionOfProperty, spaceAt, spaceName, topUndoable, type UndoableRecord } from '@/engine/index.ts';
+import { economyOf, isIntermediate, isPropertyKey, positionOfProperty, spaceAt, spaceName, topUndoable, yearProgressPercent, type UndoableRecord } from '@/engine/index.ts';
 import { Button, ConfirmDialog, ConnectionBanner, Sheet } from '@/components/ui';
 import { ClassicBoard } from '@/features/board/ClassicBoard';
 import { SquareDetails } from '@/features/board/SquareDetails';
+import { FinanceHub, type FinanceTab } from '@/features/finance/FinanceHub';
+import { FinanceNotices } from '@/features/finance/FinanceNotices';
+import { IntermediateIntro } from '@/features/finance/IntermediateIntro';
 import { LoanSheet } from '@/features/loan/LoanSheet';
 import { PlayerDetails, PlayerDetailsActions, PlayerDetailsHeader } from '@/features/player/PlayerDetails';
 import { PropertyDeed } from '@/features/player/PropertyDeed';
@@ -39,7 +42,7 @@ type Panel =
   | { kind: 'standings' };
 
 /** The existing money/trade sheets, optionally prefilled with a player. */
-type Tool = { kind: 'pay'; to: string | null } | { kind: 'trade'; to: string | null } | { kind: 'loan' };
+type Tool = { kind: 'pay'; to: string | null } | { kind: 'trade'; to: string | null } | { kind: 'loan'; tab?: FinanceTab };
 
 /** The auction this device was last taken to: one push per auction, however many screens are mounted. */
 let openedAuctionId: string | null = null;
@@ -123,8 +126,12 @@ export function GameScreen({ view }: { view: GameView }) {
   };
   const openContext = (target: ContextTarget) => {
     if (target.kind === 'auction') router.push(`/auction/${target.auctionId}`);
+    else if (target.kind === 'bank') openTool({ kind: 'loan', tab: 'loans' });
     else setPanel(target);
   };
+
+  // Intermediate Mode only (null in a Classic game): the economy behind the year indicator, the bank and its notices.
+  const eco = economyOf(state);
 
   const last = topUndoable(state);
   const canRequestUndo =
@@ -167,7 +174,7 @@ export function GameScreen({ view }: { view: GameView }) {
       { key: 'properties', icon: '🏠', label: 'My Properties', testID: 'more-properties', hint: 'Cash, properties, loans and history', onPress: () => openWallet(me.id) },
       { key: 'trade', icon: '🤝', label: 'Transfer', hint: 'Trade properties and money with a player', testID: 'more-trade', onPress: () => openTool({ kind: 'trade', to: null }) },
       { key: 'pay', icon: '💰', label: 'Pay Money', hint: 'Pay another player', testID: 'more-pay', onPress: () => openTool({ kind: 'pay', to: null }) },
-      { key: 'loan', icon: '🏦', label: 'Bank / Loan', hint: 'Borrow or repay', testID: 'more-loan', onPress: () => openTool({ kind: 'loan' }) },
+      { key: 'loan', icon: '🏦', label: 'Bank / Loan', hint: eco ? 'Loans, payments and credit score' : 'Borrow or repay', testID: 'more-loan', onPress: () => openTool({ kind: 'loan' }) },
       {
         key: 'auction',
         icon: '🔨',
@@ -347,7 +354,17 @@ export function GameScreen({ view }: { view: GameView }) {
           <ConnectionBanner />
           <View className="flex-row items-baseline justify-between px-1" testID="game-header" accessibilityRole="header">
             <Text className="text-lg font-black tracking-[3px] text-cream">BUSINESS</Text>
-            <Text className="text-xs font-bold uppercase tracking-[2px] text-cream/60">Classic · India</Text>
+            {eco ? (
+              <Text
+                className="text-xs font-bold uppercase tracking-[2px] text-cream/80"
+                testID="year-indicator"
+                accessibilityLabel={`Intermediate Mode, financial year ${eco.year}, ${yearProgressPercent(eco)} percent through`}
+              >
+                Intermediate · Year {eco.year}
+              </Text>
+            ) : (
+              <Text className="text-xs font-bold uppercase tracking-[2px] text-cream/60">{isIntermediate(state) ? 'Intermediate · India' : 'Classic · India'}</Text>
+            )}
           </View>
           <PlayersStrip view={view} onSelect={openPlayer} />
         </View>
@@ -390,7 +407,21 @@ export function GameScreen({ view }: { view: GameView }) {
         view={view}
         send={send}
       />
-      <LoanSheet visible={tool?.kind === 'loan'} onClose={() => setTool(null)} view={view} send={send} />
+      {/* Classic keeps its loan sheet. Intermediate opens the bank from the same Bank / Loan button. */}
+      {eco ? (
+        <FinanceHub visible={tool?.kind === 'loan'} initialTab={tool?.kind === 'loan' ? tool.tab : undefined} onClose={() => setTool(null)} view={view} send={send} />
+      ) : (
+        <LoanSheet visible={tool?.kind === 'loan'} onClose={() => setTool(null)} view={view} send={send} />
+      )}
+      {eco && playing ? (
+        <FinanceNotices
+          view={view}
+          eco={eco}
+          suspended={panelOpen || !!tool || !!auctionId || confirmEnd || confirmLeave}
+          onOpenLoans={() => openTool({ kind: 'loan', tab: 'loans' })}
+        />
+      ) : null}
+      {eco && playing ? <IntermediateIntro /> : null}
       <TradeSheet
         key={`trade-${preselect.trade}`}
         visible={tool?.kind === 'trade'}

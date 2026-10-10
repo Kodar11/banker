@@ -29,6 +29,7 @@ export const TRANSACTION_LABELS: Record<TransactionType, string> = {
   MORTGAGE: 'Mortgage',
   UNMORTGAGE: 'Unmortgage',
   BANKRUPTCY_SETTLEMENT: 'Bankruptcy',
+  COLLATERAL_SURPLUS: 'Collateral surplus',
   UNDO_REVERSAL: 'Undo',
 };
 

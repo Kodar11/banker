@@ -1,5 +1,6 @@
 import type { PropertyKey } from './businessBoard.ts';
 import type { CardTable, Deck } from './cards.ts';
+import type { GameMode, IntermediateState } from './intermediateState.ts';
 
 export type GameStatus = 'WAITING' | 'ACTIVE' | 'PAUSED' | 'FINISHED';
 
@@ -222,6 +223,10 @@ export interface GameState {
   id: string;
   code: string;
   rulesVersion: string;
+  /** The ruleset, chosen by the host when the game was created. Never changes. */
+  mode: GameMode;
+  /** Intermediate Mode's economy (financial year, market, loans, credit). Null in Classic games and before the game starts. */
+  intermediate: IntermediateState | null;
   status: GameStatus;
   /** Status to restore when resuming from PAUSED. */
   pausedFrom: GameStatus | null;
@@ -269,6 +274,7 @@ export type TransactionType =
   | 'MORTGAGE'
   | 'UNMORTGAGE'
   | 'BANKRUPTCY_SETTLEMENT'
+  | 'COLLATERAL_SURPLUS'
   | 'UNDO_REVERSAL';
 
 export interface TransactionRecord {

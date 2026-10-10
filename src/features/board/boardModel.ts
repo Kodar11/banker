@@ -5,6 +5,7 @@ import {
   BOARD_ROWS,
   BOARD_SIZE,
   getDeed,
+  purchasePrice,
   spaceName,
   spaceTypeOf,
   type GameState,
@@ -42,7 +43,7 @@ export interface BoardSpaceViewModel {
 
 const CORNER_SET: ReadonlySet<SquareId> = new Set(BOARD_CORNERS);
 
-export function buildBoardSpaces(state: Pick<GameState, 'players' | 'properties'>): BoardSpaceViewModel[] {
+export function buildBoardSpaces(state: Pick<GameState, 'players' | 'properties'> & Partial<Pick<GameState, 'mode' | 'intermediate'>>): BoardSpaceViewModel[] {
   const players = new Map(state.players.map((p) => [p.id, p]));
   const onBoard = state.players.filter((p) => p.status === 'ACTIVE').sort((a, b) => a.seat - b.seat);
   return BOARD_LAYOUT.map((space, index) => {
@@ -60,7 +61,8 @@ export function buildBoardSpaces(state: Pick<GameState, 'players' | 'properties'
       specialType: null,
       propertyKey: space.propertyKey,
       propertyGroup: deed.group,
-      purchasePrice: deed.price,
+      // Classic: the deed price. Intermediate: today's market value.
+      purchasePrice: purchasePrice(state, space.propertyKey),
       owner: owner ? { id: owner.id, name: owner.name, seat: owner.seat } : null,
       houses: prop?.hotel ? 0 : (prop?.houses ?? 0),
       hotel: !!prop?.hotel,

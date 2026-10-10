@@ -1,12 +1,14 @@
 import { memo } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { getDeed, type PropertyState } from '@/engine/index.ts';
+import { getDeed, isPledged, purchasePrice, type GameState, type PropertyState } from '@/engine/index.ts';
 import { PROPERTY_GROUP_THEME } from '@/constants/theme';
 import { formatINR } from '@/utils/currency';
 import { openProperty } from '@/utils/navigation';
 
 /** What stands on (or hangs over) a property, for the row's trailing tag. A mortgaged site keeps its buildings. */
-function propertyStatus(prop: PropertyState): { text: string; spoken: string; warn: boolean } | null {
+function propertyStatus(prop: PropertyState, pledged: boolean): { text: string; spoken: string; warn: boolean } | null {
+  // Intermediate Mode: securing a loan is a different claim from a mortgage, and is named as such.
+  if (pledged) return { text: 'Loan collateral', spoken: 'pledged as loan collateral', warn: true };
   const built = prop.hotel
     ? { text: '🏨 Hotel', spoken: 'hotel' }
     : prop.houses > 0
@@ -21,14 +23,16 @@ function propertyStatus(prop: PropertyState): { text: string; spoken: string; wa
 }
 
 /** One owned property. Opens the property screen unless `onPress` says otherwise (e.g. the in-game details sheet). */
-export const PropertyRow = memo(function PropertyRow({ prop, onPress }: { prop: PropertyState; onPress?: () => void }) {
+export const PropertyRow = memo(function PropertyRow({ prop, onPress, state }: { prop: PropertyState; onPress?: () => void; state?: GameState }) {
   const deed = getDeed(prop.key);
-  const status = propertyStatus(prop);
+  const status = propertyStatus(prop, !!state && isPledged(state, prop.key));
+  // Classic (and any list without the game state): the deed price. Intermediate: today's market value.
+  const price = state ? purchasePrice(state, prop.key) : deed.price;
   return (
     <Pressable
       onPress={onPress ?? (() => openProperty(prop.key))}
       accessibilityRole="button"
-      accessibilityLabel={`${deed.name}, ${formatINR(deed.price)}${status ? `, ${status.spoken}` : ''}`}
+      accessibilityLabel={`${deed.name}, ${formatINR(price)}${status ? `, ${status.spoken}` : ''}`}
       testID={`property-${prop.key}`}
       className="min-h-[56px] flex-row items-center overflow-hidden rounded-2xl bg-white active:opacity-80"
     >
@@ -36,7 +40,7 @@ export const PropertyRow = memo(function PropertyRow({ prop, onPress }: { prop: 
       {/* The name wraps rather than clips; the tag and chevron keep their size. */}
       <View className="flex-1 py-2.5 pl-3.5 pr-2">
         <Text className={`text-base font-bold ${prop.mortgaged ? 'text-stone-500' : 'text-ink'}`}>{deed.name}</Text>
-        <Text className="text-xs font-semibold text-stone-500">{formatINR(deed.price)}</Text>
+        <Text className="text-xs font-semibold text-stone-500">{formatINR(price)}</Text>
       </View>
       {status ? (
         <View testID={`property-status-${prop.key}`} className={`rounded-full px-2.5 py-1 ${status.warn ? 'bg-amber-100' : 'bg-stone-100'}`}>

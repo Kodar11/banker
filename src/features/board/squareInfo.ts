@@ -18,7 +18,9 @@ export function specialSquareInfo(type: SpecialSpaceType, state: GameState, me: 
     case 'START':
       return [
         `Collect ${formatINR(RULES.start.passReward)} every time you pass or land on Start.`,
-        `Interest on a bank loan is charged ${RULES.loans.interestEveryCircuit ? 'each time' : 'once, the next time'} you pass or land on Start.`,
+        state.mode === 'intermediate'
+          ? 'Loan payments follow the financial year, not Start: see Bank / Loan.'
+          : `Interest on a bank loan is charged ${RULES.loans.interestEveryCircuit ? 'each time' : 'once, the next time'} you pass or land on Start.`,
       ];
     case 'JAIL':
       return [

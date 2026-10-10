@@ -12,6 +12,7 @@ import {
   type EngineContext,
   type EngineResult,
   type GameAction,
+  type GameMode,
   type GameState,
   type PropertyKey,
   type TransactionRecord,
@@ -47,11 +48,11 @@ export class TestGame {
    * (`start: false`, then `queueRandom` + START_GAME), the harness pins it to the
    * joining order so every other test can script turns by name.
    */
-  constructor(names: string[] = ['Asha', 'Bilal', 'Chitra'], { start = true } = {}) {
+  constructor(names: string[] = ['Asha', 'Bilal', 'Chitra'], { start = true, mode }: { start?: boolean; mode?: GameMode } = {}) {
     const [host, ...others] = names;
     if (!host) throw new Error('need a host');
     this.ids[host] = testId();
-    const created = createGame({ gameId: testId(), code: '123456', hostPlayerId: this.ids[host], hostName: host }, this.ctx());
+    const created = createGame({ gameId: testId(), code: '123456', hostPlayerId: this.ids[host], hostName: host, mode }, this.ctx());
     this.state = created.state;
     for (const name of others) {
       this.ids[name] = testId();

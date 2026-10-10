@@ -1,10 +1,11 @@
 import { goBack } from '@/utils/navigation';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
-import { buildingCount, netWorth, nextInterestCircuit, outstandingDebt, ownedBy } from '@/engine/index.ts';
+import { buildingCount, clockLabel, creditScoreOf, economyOf, INTERMEDIATE_RULES, loanOutstandingPrincipal, loansOf, netWorth, nextInterestCircuit, nextScheduledInstallment, ownedBy, payableInstallment, totalDebt } from '@/engine/index.ts';
 import { Button, Card, Label, Pill, PlayerBadge, Screen } from '@/components/ui';
 import type { GameView } from '@/features/game/useGameView';
 import { useGameAction } from '@/features/game/useGameAction';
+import { FinanceHub } from '@/features/finance/FinanceHub';
 import { LoanSheet } from '@/features/loan/LoanSheet';
 import { TransactionList } from '@/features/transactions/TransactionList';
 import { formatINR } from '@/utils/currency';
@@ -27,7 +28,10 @@ export function PlayerView({ view, playerId }: { view: GameView; playerId: strin
   const keys = ownedBy(state, player.id);
   const { houses, hotels } = buildingCount(state, player.id);
   const loans = state.loans.filter((l) => l.playerId === player.id);
-  const debt = outstandingDebt(state.loans, player.id);
+  const debt = totalDebt(state, player.id);
+  // Intermediate Mode: the wallet lists this game's loan contracts and opens the bank instead of the Classic loan sheet.
+  const eco = economyOf(state);
+  const contracts = eco ? loansOf(eco, player.id) : [];
 
   return (
     <Screen scroll testID="player-screen">
@@ -48,11 +52,12 @@ export function PlayerView({ view, playerId }: { view: GameView; playerId: strin
           <Stat label="Loans owed" value={formatINR(debt)} warn={debt > 0} />
           <Stat label="Houses" value={String(houses)} />
           <Stat label="Hotels" value={String(hotels)} />
+          {eco ? <Stat label="Credit score" value={String(creditScoreOf(eco, player.id))} /> : null}
         </View>
       </Card>
 
       <Card>
-        <PropertyList properties={keys.map((k) => state.properties[k])} />
+        <PropertyList state={state} properties={keys.map((k) => state.properties[k])} />
       </Card>
 
       <Card>
@@ -63,7 +68,30 @@ export function PlayerView({ view, playerId }: { view: GameView; playerId: strin
           ) : null}
         </View>
         <View className="mt-3 gap-2">
-          {loans.length ? (
+          {eco ? (
+            contracts.length ? (
+              contracts.map((l) => {
+                const due = payableInstallment(l);
+                const next = nextScheduledInstallment(l);
+                return (
+                  <View key={l.id} className="flex-row items-center justify-between gap-2 rounded-xl bg-white px-4 py-3" testID="wallet-contract">
+                    <View className="flex-1">
+                      <Text className="text-base font-bold text-ink">
+                        {INTERMEDIATE_RULES.loans.products[l.product].name} · {formatINR(l.principal)}
+                      </Text>
+                      <Text className="text-xs text-stone-500">
+                        {l.ratePercent}% · left {formatINR(loanOutstandingPrincipal(l))}
+                        {due ? ` · ${formatINR(due.principal + due.interest)} ${due.status === 'OVERDUE' ? 'overdue' : 'due now'}` : next ? ` · next ${clockLabel(eco, next.dueAt)}` : ''}
+                      </Text>
+                    </View>
+                    <Pill tone={l.status === 'ACTIVE' ? 'warn' : l.status === 'REPAID' ? 'good' : l.status === 'DEFAULTED' ? 'bad' : 'neutral'}>{l.status.replace('_', ' ').toLowerCase()}</Pill>
+                  </View>
+                );
+              })
+            ) : (
+              <Text className="text-base text-stone-500">No loans.</Text>
+            )
+          ) : loans.length ? (
             loans.map((l) => (
               <View key={l.id} className="flex-row items-center justify-between rounded-xl bg-white px-4 py-3">
                 <View>
@@ -88,7 +116,8 @@ export function PlayerView({ view, playerId }: { view: GameView; playerId: strin
           <TransactionList transactions={transactions} playerId={player.id} nameOf={view.playerName} />
         </View>
       </Card>
-      {isMe ? <LoanSheet visible={loanOpen} onClose={() => setLoanOpen(false)} view={view} send={send} /> : null}
+      {isMe && !eco ? <LoanSheet visible={loanOpen} onClose={() => setLoanOpen(false)} view={view} send={send} /> : null}
+      {isMe && eco ? <FinanceHub visible={loanOpen} onClose={() => setLoanOpen(false)} view={view} send={send} initialTab="loans" /> : null}
     </Screen>
   );
 }

@@ -1,13 +1,14 @@
 import { useCallback, useRef, useState } from 'react';
 import { router } from 'expo-router';
-import { GameCodeSchema, PlayerNameSchema } from '@/engine/index.ts';
+import { GameCodeSchema, PlayerNameSchema, type GameMode } from '@/engine/index.ts';
 import { newActionId, newPlayerToken } from '@/lib/device';
 import { gameApi, isRetryable } from '@/lib/gameApi';
 import { useGameStore } from '@/store/gameStore';
 import { useSessionStore } from '@/store/sessionStore';
 import { haptics } from '@/utils/haptics';
 
-type Mode = { kind: 'create' } | { kind: 'join'; code: string };
+/** Creating picks the game's ruleset (Classic unless stated); joining takes whatever the host picked. */
+type Mode = { kind: 'create'; gameMode?: GameMode } | { kind: 'join'; code: string };
 
 /**
  * Create or join a game. The action id + device token are kept for the whole
@@ -30,17 +31,20 @@ export function useEnterGame() {
         setError('Game code is 6 digits');
         return;
       }
-      const key = `${mode.kind}:${mode.kind === 'join' ? mode.code : ''}:${name.data}`;
+      const key = `${mode.kind}:${mode.kind === 'join' ? mode.code : (mode.gameMode ?? 'classic')}:${name.data}`;
       if (attempt.current?.key !== key) attempt.current = { key, actionId: newActionId(), token: newPlayerToken() };
       const { actionId, token } = attempt.current;
 
       setBusy(true);
       setError(null);
       haptics.tap();
-      let res = mode.kind === 'create' ? await gameApi.create(actionId, token, name.data) : await gameApi.join(actionId, token, mode.code, name.data);
-      if (!res.ok && isRetryable(res.error)) {
-        res = mode.kind === 'create' ? await gameApi.create(actionId, token, name.data) : await gameApi.join(actionId, token, mode.code, name.data);
-      }
+      const enter = () => {
+        if (mode.kind === 'join') return gameApi.join(actionId, token, mode.code, name.data);
+        // A Classic game is created exactly as it always was; only Intermediate names its mode.
+        return mode.gameMode === 'intermediate' ? gameApi.create(actionId, token, name.data, 'intermediate') : gameApi.create(actionId, token, name.data);
+      };
+      let res = await enter();
+      if (!res.ok && isRetryable(res.error)) res = await enter();
       setBusy(false);
 
       if (!res.ok) {

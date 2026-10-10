@@ -4,6 +4,7 @@ import {
   joinGame,
   type EngineContext,
   type GameAction,
+  type GameMode,
   type GameSnapshot,
   type GameState,
   type TransactionRecord,
@@ -25,10 +26,10 @@ export class Fixture {
   private faces: number[] = [];
   private randoms: number[] = [];
 
-  constructor(names = ['Asha', 'Bilal'], { start = true } = {}) {
+  constructor(names = ['Asha', 'Bilal'], { start = true, mode }: { start?: boolean; mode?: GameMode } = {}) {
     const [host, ...rest] = names;
     this.ids[host!] = id();
-    this.state = this.absorb(createGame({ gameId: id(), code: '482915', hostPlayerId: this.ids[host!]!, hostName: host! }, this.ctx()));
+    this.state = this.absorb(createGame({ gameId: id(), code: '482915', hostPlayerId: this.ids[host!]!, hostName: host!, mode }, this.ctx()));
     for (const name of rest) {
       this.ids[name] = id();
       this.state = this.absorb(joinGame(this.state, { playerId: this.ids[name]!, name }, this.ctx()));

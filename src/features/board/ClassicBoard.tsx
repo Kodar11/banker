@@ -25,7 +25,7 @@ export const ClassicBoard = memo(function ClassicBoard({
   onSquarePress,
   onTokenPress,
 }: {
-  state: Pick<GameState, 'players' | 'properties' | 'turn'>;
+  state: Pick<GameState, 'players' | 'properties' | 'turn'> & Partial<Pick<GameState, 'mode' | 'intermediate'>>;
   size: number;
   onSquarePress?: (index: number) => void;
   onTokenPress?: (playerId: string) => void;
