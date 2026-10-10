@@ -17,7 +17,8 @@ import { haptics } from '@/utils/haptics';
 import { ActionPanel } from './ActionPanel';
 import { AdaptiveActionBar, type BarAction } from './AdaptiveActionBar';
 import { ContextualCard } from './ContextualCard';
-import { EventFeed, FinishedView, PlayersStrip, UndoBanner } from './GamePanels';
+import { GameLog } from './GameLog';
+import { FinishedView, PlayersStrip, UndoBanner } from './GamePanels';
 import { needsDecision, pickContext, type ContextTarget } from './gameFocus';
 import { leaveGame } from './leaveGame';
 import { planScreenLayout, SCREEN_PADDING, screenGutter, SECTION_GAP } from './layout';
@@ -277,7 +278,7 @@ export function GameScreen({ view }: { view: GameView }) {
         break;
       case 'log':
         panelTitle = 'Game log';
-        panelBody = <EventFeed events={events} limit={30} />;
+        panelBody = <GameLog events={events} players={state.players} limit={30} />;
         break;
       case 'standings':
         panelTitle = 'Final standings';

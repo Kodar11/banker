@@ -1,8 +1,8 @@
 import { goBack } from '@/utils/navigation';
 import { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
-import { auctionAcceptUntil, getDeed, minimumNextBid } from '@/engine/index.ts';
-import { Button, Card, ConnectionBanner, Label, Pill, Screen } from '@/components/ui';
+import { auctionAcceptUntil, getDeed, minimumNextBid, type AuctionState, type PlayerState } from '@/engine/index.ts';
+import { Button, Card, ConnectionBanner, Label, Screen } from '@/components/ui';
 import { PROPERTY_GROUP_THEME } from '@/constants/theme';
 import { useGameAction } from '@/features/game/useGameAction';
 import type { GameView } from '@/features/game/useGameView';
@@ -57,6 +57,17 @@ function useAuctionClock(endsAt: string | null, closeAt: number | null): { secon
 }
 
 const MAX_CLOSE_ATTEMPTS = 5;
+
+/**
+ * The one result line of a closed auction, the same on every phone: from the server's winner id and
+ * the player list of the same snapshot. Never a local guess — if the winner can't be named yet, the
+ * sale is still reported, without a name.
+ */
+export function auctionResult(auction: Pick<AuctionState, 'winnerId'>, players: readonly Pick<PlayerState, 'id' | 'name'>[]): { sold: boolean; text: string } {
+  if (auction.winnerId === null) return { sold: false, text: 'Unsold — stays with the bank' };
+  const name = players.find((p) => p.id === auction.winnerId)?.name.trim();
+  return { sold: true, text: name ? `Sold to ${name}` : 'Property sold' };
+}
 
 export function AuctionView({ view, auctionId }: { view: GameView; auctionId: string }) {
   const send = useGameAction();
@@ -120,6 +131,7 @@ export function AuctionView({ view, auctionId }: { view: GameView; auctionId: st
   const leading = !!me && auction.highBidderId === me.id;
   const groupTheme = PROPERTY_GROUP_THEME[deed.group];
   const bids = [min, min + 500, min + 1000].filter((b) => !!me && b <= me.balance);
+  const result = auctionResult(auction, state.players);
 
   return (
     <Screen scroll testID="auction-screen">
@@ -131,7 +143,7 @@ export function AuctionView({ view, auctionId }: { view: GameView; auctionId: st
           <Text style={{ color: groupTheme.onColor }} className="text-sm font-semibold opacity-80">List price {formatINR(deed.price)}</Text>
         </View>
         <View className="items-center gap-1 p-5">
-          <Label>{auction.highBid === null ? 'No bids yet' : `Highest bid · ${view.playerName(auction.highBidderId)}`}</Label>
+          <Label className="self-stretch text-center">{auction.highBid === null ? 'No bids yet' : `Highest bid · ${view.playerName(auction.highBidderId)}`}</Label>
           <Text className="text-hero text-ink" testID="current-bid">
             {auction.highBid === null ? '—' : formatINR(auction.highBid)}
           </Text>
@@ -158,13 +170,14 @@ export function AuctionView({ view, auctionId }: { view: GameView; auctionId: st
               )}
             </View>
           ) : (
-            <View className="mt-2 items-center gap-2" testID="auction-result">
-              <Text className={`text-4xl font-black ${auction.winnerId ? 'text-green-700' : 'text-stone-600'}`}>
-                {auction.winnerId ? 'SOLD' : 'CLOSED'}
-              </Text>
-              <Pill tone={auction.winnerId ? 'good' : 'neutral'}>
-                {auction.winnerId ? `Sold to ${view.playerName(auction.winnerId)}` : 'Unsold — stays with the bank'}
-              </Pill>
+            <View className="mt-2 items-center gap-2 self-stretch" testID="auction-result">
+              <Text className={`text-4xl font-black ${result.sold ? 'text-green-700' : 'text-stone-600'}`}>{result.sold ? 'SOLD' : 'CLOSED'}</Text>
+              {/* Full width, centred: a shrink-wrapped line can lose its last word (the name) on Android. */}
+              <View className={`self-stretch rounded-full px-3 py-1.5 ${result.sold ? 'bg-green-100' : 'bg-stone-200'}`}>
+                <Text testID="auction-result-text" className={`text-center text-sm font-extrabold ${result.sold ? 'text-green-800' : 'text-stone-700'}`}>
+                  {result.text}
+                </Text>
+              </View>
             </View>
           )}
         </View>

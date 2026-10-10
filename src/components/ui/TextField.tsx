@@ -23,7 +23,19 @@ export function TextField({ label, error, big = false, prefix, emphasis = 'norma
   return (
     <View className="gap-2">
       <Text className={`font-bold uppercase tracking-widest ${emphasis === 'quiet' ? 'text-xs text-cream/60' : 'text-sm text-cream/80'}`}>{label}</Text>
-      {prefix ? (
+      {big ? (
+        // A centred code. Android puts the cursor at the edge of a native placeholder (and shifts it with
+        // letter-spacing), so the placeholder is drawn here instead: the empty input has nothing to align
+        // the cursor to but its own centre, exactly where the digits then appear.
+        <View className={box}>
+          {input.placeholder && !input.value ? (
+            <View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" className="absolute inset-0 items-center justify-center">
+              <Text className={`text-stone-400 ${text}`}>{input.placeholder}</Text>
+            </View>
+          ) : null}
+          <TextInput accessibilityLabel={label} className={`px-4 text-ink ${text}`} {...input} placeholder={undefined} style={[{ textAlign: 'center' }, input.style]} />
+        </View>
+      ) : prefix ? (
         <View className={`flex-row items-center pl-4 ${box}`}>
           <Text className={`font-extrabold text-stone-500 ${emphasis === 'strong' ? 'text-3xl' : 'text-xl'}`}>{prefix}</Text>
           <TextInput accessibilityLabel={label} placeholderTextColor="#a8a29e" className={`flex-1 pl-2 pr-4 text-ink ${text}`} {...input} />

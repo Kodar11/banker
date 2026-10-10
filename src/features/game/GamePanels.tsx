@@ -1,27 +1,11 @@
 import { memo } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import type { GameAction, GameEventRecord } from '@/engine/index.ts';
+import type { GameAction } from '@/engine/index.ts';
 import { Button, Card, Label, PlayerBadge } from '@/components/ui';
 import { useGameStore } from '@/store/gameStore';
 import { formatINR } from '@/utils/currency';
 import type { GameView } from './useGameView';
-
-/** What happened lately, newest first (the "Game log" sheet). */
-export const EventFeed = memo(function EventFeed({ events, limit = 3 }: { events: GameEventRecord[]; limit?: number }) {
-  const shown = events.slice(0, limit);
-  if (!shown.length) return <Text className="text-base text-stone-500">Nothing has happened yet.</Text>;
-  return (
-    <View className="gap-2" testID="event-feed" accessibilityLiveRegion="polite">
-      {shown.map((e, i) => (
-        <Text key={e.id} className={i === 0 ? 'text-base font-bold text-ink' : 'text-sm text-stone-600'}>
-          {i === 0 ? '• ' : ''}
-          {e.message}
-        </Text>
-      ))}
-    </View>
-  );
-});
 
 /**
  * Everyone at the table, one compact chip each: colour + name, balance, whose
