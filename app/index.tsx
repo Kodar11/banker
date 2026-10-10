@@ -13,6 +13,7 @@ export default function Home() {
   const session = useSessionStore((s) => s.session);
   const hydrated = useSessionStore((s) => s.hydrated);
   const status = useGameStore((s) => (s.snapshot && s.snapshot.state.id === session?.gameId ? s.snapshot.state.status : null));
+  const left = useGameStore((s) => !!session && s.snapshot?.state.id === session.gameId && s.snapshot.state.players.find((p) => p.id === session.playerId)?.status === 'LEFT');
   const loadError = useGameStore((s) => s.loadError);
   const gone = !!loadError && ['FORBIDDEN', 'NOT_FOUND', 'GAME_EXPIRED'].includes(loadError.code);
   const target = session && status ? activeGameRoute(session.gameId, status) : null;
@@ -44,8 +45,8 @@ export default function Home() {
   // snapshot, realtime) so the next Create / Join starts from nothing. Only while Home is the screen
   // in front: it also sits underneath the game screen, where the final standings are still shown.
   useEffect(() => {
-    if (pathname === '/' && session && status === 'FINISHED') detachFromGame();
-  }, [pathname, session, status]);
+    if (pathname === '/' && session && (status === 'FINISHED' || left)) detachFromGame();
+  }, [pathname, session, status, left]);
 
   return (
     <Screen

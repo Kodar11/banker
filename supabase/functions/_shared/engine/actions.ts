@@ -72,6 +72,8 @@ export const GameActionSchema = z.discriminatedUnion('type', [
   bare('PAUSE_GAME'),
   bare('RESUME_GAME'),
   bare('END_GAME'),
+  /** Walk away from this game (any player, any time before it finishes). Never ends the game for the others by itself. */
+  bare('LEAVE_GAME'),
 ]);
 
 export type GameAction = z.infer<typeof GameActionSchema>;

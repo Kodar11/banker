@@ -55,5 +55,8 @@ export function GameGate({ gameId, area, children }: { gameId: string; area: Are
     );
   }
   if (!view) return <LoadingState />;
+  if (view.me?.status === 'LEFT') {
+    return <ErrorState title="You left this game" message="This phone is no longer playing in it." action={<Button title="Home" onPress={() => leaveGame()} />} />;
+  }
   return <>{children(view)}</>;
 }

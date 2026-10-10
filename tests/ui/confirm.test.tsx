@@ -1,5 +1,4 @@
 /// <reference types="jest" />
-import { router } from 'expo-router';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { netWorth, outstandingDebt } from '@/engine/index.ts';
 import { ConfirmDialog } from '@/components/ui';
@@ -8,7 +7,6 @@ import type { GameView } from '@/features/game/useGameView';
 import { gameApi } from '@/lib/gameApi';
 import { useGameStore } from '@/store/gameStore';
 import { useSessionStore } from '@/store/sessionStore';
-import Settings from '../../app/settings';
 import { Fixture, ok } from './fixtures';
 
 const api = gameApi as jest.Mocked<typeof gameApi>;
@@ -220,23 +218,5 @@ describe('Other confirmations use the same dialog', () => {
     expect(screen.queryByTestId('trade-accept-dialog')).toBeNull();
     expect(screen.getByTestId('trade-incoming')).toBeTruthy();
     expect(api.action).not.toHaveBeenCalled();
-  });
-
-  it('leaving a game: Cancel keeps the session; Leave game forgets it and goes home', async () => {
-    new Fixture().loadAs('Asha');
-    await render(<Settings />);
-    expect(screen.queryByTestId('leave-dialog')).toBeNull();
-    await fireEvent.press(screen.getByTestId('leave-game'));
-    expect(screen.getByTestId('leave-dialog')).toHaveTextContent(/Leave game\?.*This phone will forget the game\..*You can’t rejoin as the same player\./);
-    await fireEvent.press(screen.getByTestId('leave-dialog-cancel'));
-    expect(screen.queryByTestId('leave-dialog')).toBeNull();
-    expect(useSessionStore.getState().session).not.toBeNull();
-    expect(router.replace).not.toHaveBeenCalled();
-
-    await fireEvent.press(screen.getByTestId('leave-game'));
-    await fireEvent.press(screen.getByTestId('leave-dialog-confirm'));
-    await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/'));
-    expect(useSessionStore.getState().session).toBeNull();
-    expect(useGameStore.getState().snapshot).toBeNull();
   });
 });

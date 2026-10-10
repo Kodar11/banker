@@ -27,17 +27,18 @@ export const PlayersStrip = memo(function PlayersStrip({ view, onSelect }: { vie
         const isTurn = p.id === state.turn.playerId && state.status === 'ACTIVE';
         const isMe = p.id === view.me?.id;
         const isOnline = online.includes(p.id) || isMe;
-        const status = p.status === 'BANKRUPT' ? null : p.inJail ? `In Jail · ${p.jailTurnsLeft} left` : p.skipTurns > 0 ? 'Resting' : null;
-        const tag = p.status === 'BANKRUPT' ? null : p.inJail ? '🔒 Jail' : p.skipTurns > 0 ? '🛏️ Rest' : null;
+        const out = p.status === 'BANKRUPT' ? 'Bankrupt' : p.status === 'LEFT' ? 'Left' : null;
+        const status = out ? null : p.inJail ? `In Jail · ${p.jailTurnsLeft} left` : p.skipTurns > 0 ? 'Resting' : null;
+        const tag = out ? null : p.inJail ? '🔒 Jail' : p.skipTurns > 0 ? '🛏️ Rest' : null;
         return (
           <Pressable
             key={p.id}
             onPress={() => (onSelect ? onSelect(p.id) : router.push(`/player/${p.id}`))}
             accessibilityRole="button"
-            accessibilityLabel={`${p.name}${isMe ? ' (you)' : ''}, ${p.status === 'BANKRUPT' ? 'bankrupt' : formatINR(p.balance)}${status ? `, ${status}` : ''}${isTurn ? ', current turn' : ''}${isOnline ? '' : ', offline'}`}
+            accessibilityLabel={`${p.name}${isMe ? ' (you)' : ''}, ${out ? out.toLowerCase() : formatINR(p.balance)}${status ? `, ${status}` : ''}${isTurn ? ', current turn' : ''}${isOnline ? '' : ', offline'}`}
             testID={`player-chip-${p.id}`}
             style={fit ? { flex: 1, flexBasis: 0, minWidth: 0 } : { minWidth: 96, flexGrow: 1 }}
-            className={`min-h-[44px] justify-center rounded-xl px-2.5 py-1 ${isTurn ? 'border-2 border-saffron bg-felt-light' : 'border-2 border-transparent bg-felt-dark'} ${p.status === 'BANKRUPT' ? 'opacity-40' : ''}`}
+            className={`min-h-[44px] justify-center rounded-xl px-2.5 py-1 ${isTurn ? 'border-2 border-saffron bg-felt-light' : 'border-2 border-transparent bg-felt-dark'} ${out ? 'opacity-40' : ''}`}
           >
             <View className="flex-row items-center gap-1.5">
               <PlayerBadge player={p} size={16} testID={`player-badge-${p.name}`} />
@@ -48,7 +49,7 @@ export const PlayersStrip = memo(function PlayersStrip({ view, onSelect }: { vie
               {isOnline ? null : <View className="h-1.5 w-1.5 rounded-full bg-stone-500" />}
             </View>
             <Text numberOfLines={1} maxFontSizeMultiplier={1.3} className="text-[13px] font-extrabold text-cream">
-              {p.status === 'BANKRUPT' ? 'Bankrupt' : formatINR(p.balance)}
+              {out ?? formatINR(p.balance)}
               {tag ? <Text className="text-[10px] font-bold text-amber-300"> {tag}</Text> : null}
             </Text>
           </Pressable>

@@ -15,7 +15,7 @@ function statusOf(p: PlayerState): string | null {
 }
 
 function PlayersHere({ view, index, onPlayerPress }: { view: GameView; index: number; onPlayerPress: (id: string) => void }) {
-  const here = view.snapshot.state.players.filter((p) => p.status !== 'BANKRUPT' && p.position === index).sort((a, b) => a.seat - b.seat);
+  const here = view.snapshot.state.players.filter((p) => p.status === 'ACTIVE' && p.position === index).sort((a, b) => a.seat - b.seat);
   if (!here.length) return null;
   return (
     <View className="gap-2" testID="square-players">

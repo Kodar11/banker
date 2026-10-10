@@ -310,8 +310,15 @@ export async function persistResult(tx: Tx, prevVersion: number, result: EngineR
       where p.id = x.id and p.game_id = ${s.id}`;
   }
 
+  // LEAVE_GAME can hand the host role on. players_one_host_idx allows one host per game and is checked
+  // row by row, so the old host is cleared before the new one is written below.
+  if (result.events.some((e) => e.type === 'HOST_CHANGED')) {
+    await tx`update public.players set is_host = false where game_id = ${s.id} and is_host and id <> ${s.hostPlayerId}`;
+  }
+
   const playerRows = s.players.map((p) => ({
     id: p.id,
+    is_host: p.isHost,
     ready: p.ready,
     balance: p.balance,
     position: p.position,
@@ -323,10 +330,10 @@ export async function persistResult(tx: Tx, prevVersion: number, result: EngineR
   }));
   await tx`
     update public.players p set
-      ready = x.ready, balance = x.balance, position = x.position, status = x.status,
+      is_host = x.is_host, ready = x.ready, balance = x.balance, position = x.position, status = x.status,
       skip_turns = x.skip_turns, in_jail = x.in_jail, jail_turns_left = x.jail_turns_left, circuits = x.circuits
     from jsonb_to_recordset(${json(playerRows)}) as x(
-      id uuid, ready boolean, balance bigint, position int, status text, skip_turns int, in_jail boolean,
+      id uuid, is_host boolean, ready boolean, balance bigint, position int, status text, skip_turns int, in_jail boolean,
       jail_turns_left int, circuits int)
     where p.id = x.id and p.game_id = ${s.id}`;
 

@@ -187,6 +187,8 @@ const IMPORTANT_EVENTS: Readonly<Record<string, { icon: string; label: string }>
   SENT_TO_JAIL: { icon: '🔒', label: 'Sent to Jail' },
   JAIL_RELEASED: { icon: '🔓', label: 'Released' },
   PLAYER_BANKRUPT: { icon: '💥', label: 'Bankrupt' },
+  PLAYER_LEFT: { icon: '🚪', label: 'Left the game' },
+  HOST_CHANGED: { icon: '👑', label: 'New host' },
   AUCTION_WON: { icon: '🔨', label: 'Auction result' },
   AUCTION_UNSOLD: { icon: '🔨', label: 'Auction result' },
   REST_HOUSE: { icon: '🛏️', label: 'Rest House' },

@@ -29,7 +29,9 @@ export function PlayerDetailsHeader({ view, playerId }: { view: GameView; player
   const status =
     player.status === 'BANKRUPT'
       ? { tone: 'bad' as const, text: 'Bankrupt' }
-      : player.inJail
+      : player.status === 'LEFT'
+        ? { tone: 'neutral' as const, text: 'Left the game' }
+        : player.inJail
         ? { tone: 'warn' as const, text: `In Jail · ${player.jailTurnsLeft} left` }
         : player.skipTurns > 0
           ? { tone: 'warn' as const, text: 'Resting' }
@@ -81,7 +83,7 @@ export function PlayerDetails({ view, playerId, onPropertyPress, onOpenWallet }:
         </Text>
         {/* Label left, value right: stays aligned on a narrow phone, and a long square name wraps instead of squeezing. */}
         <View className="mt-4 gap-2.5 rounded-2xl bg-felt-dark px-4 py-3">
-          <SummaryRow label="Location" value={player.status === 'BANKRUPT' ? 'Off the board' : spaceName(player.position)} testID="player-details-location" />
+          <SummaryRow label="Location" value={player.status !== 'ACTIVE' ? 'Off the board' : spaceName(player.position)} testID="player-details-location" />
           <SummaryRow label="Net worth" value={formatINR(netWorth(state, player.id))} testID="player-details-net-worth" />
           <SummaryRow label="Loans owed" value={formatINR(debt)} warn={debt > 0} testID="player-details-loans" />
         </View>

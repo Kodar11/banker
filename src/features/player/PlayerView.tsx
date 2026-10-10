@@ -33,7 +33,7 @@ export function PlayerView({ view, playerId }: { view: GameView; playerId: strin
     <Screen scroll testID="player-screen">
       <View className="flex-row items-center justify-between">
         <Button size="sm" variant="ghost" title="‹ Back" onPress={() => goBack(`/game/${view.snapshot.state.id}`)} />
-        {player.status === 'BANKRUPT' ? <Pill tone="bad">Bankrupt</Pill> : null}
+        {player.status === 'BANKRUPT' ? <Pill tone="bad">Bankrupt</Pill> : player.status === 'LEFT' ? <Pill>Left the game</Pill> : null}
       </View>
       <Card>
         <View className="flex-row items-center gap-2">

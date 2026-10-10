@@ -129,6 +129,14 @@ export class TestGame {
     return this.absorb(applyAction(this.state, this.id(name), action, this.ctx(actionId)));
   }
 
+  /** A new player joins the lobby. */
+  join(name: string): EngineResult {
+    const id = testId();
+    const result = joinGame(this.state, { playerId: id, name }, this.ctx());
+    this.ids[name] = id;
+    return this.absorb(result);
+  }
+
   /** Absorb a result produced outside `act` (e.g. applyCardDefinition). */
   absorbResult(result: EngineResult): EngineResult {
     return this.absorb(result);

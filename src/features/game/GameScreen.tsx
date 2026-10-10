@@ -21,6 +21,7 @@ import { GameLog } from './GameLog';
 import { FinishedView, PlayersStrip, UndoBanner } from './GamePanels';
 import { needsDecision, pickContext, type ContextTarget } from './gameFocus';
 import { leaveGame } from './leaveGame';
+import { LeaveGameDialog } from './LeaveGameDialog';
 import { planScreenLayout, SCREEN_PADDING, screenGutter, SECTION_GAP } from './layout';
 import { MoreActions, type MoreItem } from './MoreActions';
 import { TurnActionBar } from './TurnActionBar';
@@ -60,6 +61,7 @@ export function GameScreen({ view }: { view: GameView }) {
   /** Who the pay / trade sheet was last opened for; changing it remounts (resets) that sheet. */
   const [preselect, setPreselect] = useState<{ pay: string | null; trade: string | null }>({ pay: null, trade: null });
   const [confirmEnd, setConfirmEnd] = useState(false);
+  const [confirmLeave, setConfirmLeave] = useState(false);
   /** The action the player is being asked to confirm an undo request for (asked from the More sheet). */
   const [undoAsk, setUndoAsk] = useState<{ record: UndoableRecord; busy: boolean; error: string | null } | null>(null);
   const ending = useGameStore((s) => s.pendingAction === 'END_GAME');
@@ -72,6 +74,7 @@ export function GameScreen({ view }: { view: GameView }) {
     (next: Panel | null) => {
       setPanelState(next ? { panel: next, auctionId } : null);
       setUndoAsk(null); // a confirmation belongs to the sheet it was opened from
+      setConfirmLeave(false);
     },
     [auctionId],
   );
@@ -209,6 +212,10 @@ export function GameScreen({ view }: { view: GameView }) {
       },
     },
   );
+  // Any player may walk away; only the host may end the game for everyone (below).
+  if (me && state.status !== 'FINISHED') {
+    moreItems.push({ key: 'leave', icon: '🚪', label: 'Leave game', hint: 'Return to the home screen', testID: 'leave-game-button', onPress: () => setConfirmLeave(true) });
+  }
   if (view.isHost && state.status !== 'FINISHED') {
     moreItems.push({
       key: 'end',
@@ -305,6 +312,7 @@ export function GameScreen({ view }: { view: GameView }) {
               onCancel={() => setUndoAsk(null)}
               onConfirm={requestUndo}
             />
+            <LeaveGameDialog visible={confirmLeave} onClose={() => setConfirmLeave(false)} />
           </>
         );
         break;

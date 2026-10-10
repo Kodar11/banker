@@ -23,7 +23,8 @@ export const TURN_TRANSITIONS: Readonly<Record<TurnPhase, readonly TurnPhase[]>>
 };
 
 export const GAME_STATUS_TRANSITIONS: Readonly<Record<GameStatus, readonly GameStatus[]>> = {
-  WAITING: ['ACTIVE'],
+  // FINISHED straight from the lobby: everyone left before the game started.
+  WAITING: ['ACTIVE', 'FINISHED'],
   ACTIVE: ['PAUSED', 'FINISHED'],
   PAUSED: ['ACTIVE', 'FINISHED'],
   FINISHED: [],

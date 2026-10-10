@@ -49,7 +49,7 @@ export function playerViolations(state: Pick<GameState, 'players'>): string[] {
     if (p.inJail !== p.jailTurnsLeft > 0) problems.push(`${p.name}: inJail=${p.inJail} but jailTurnsLeft=${p.jailTurnsLeft}`);
     if (p.jailTurnsLeft < 0 || p.jailTurnsLeft > RULES.jail.maxTurns) problems.push(`${p.name}: invalid jailTurnsLeft ${p.jailTurnsLeft}`);
     if (p.skipTurns < 0) problems.push(`${p.name}: negative skipTurns`);
-    if (p.status === 'BANKRUPT' && (p.inJail || p.skipTurns > 0)) problems.push(`${p.name}: bankrupt but still in Jail / resting`);
+    if (p.status !== 'ACTIVE' && (p.inJail || p.skipTurns > 0)) problems.push(`${p.name}: out of the game but still in Jail / resting`);
   }
   return problems;
 }

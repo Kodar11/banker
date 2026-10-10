@@ -44,7 +44,7 @@ const CORNER_SET: ReadonlySet<SquareId> = new Set(BOARD_CORNERS);
 
 export function buildBoardSpaces(state: Pick<GameState, 'players' | 'properties'>): BoardSpaceViewModel[] {
   const players = new Map(state.players.map((p) => [p.id, p]));
-  const onBoard = state.players.filter((p) => p.status !== 'BANKRUPT').sort((a, b) => a.seat - b.seat);
+  const onBoard = state.players.filter((p) => p.status === 'ACTIVE').sort((a, b) => a.seat - b.seat);
   return BOARD_LAYOUT.map((space, index) => {
     const squareId = BOARD_CYCLE[index]!;
     const playerIds = onBoard.filter((p) => p.position === index).map((p) => p.id);

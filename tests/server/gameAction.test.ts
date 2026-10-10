@@ -101,6 +101,9 @@ describe.skipIf(!DATABASE_URL)('game-action handler (Postgres)', () => {
     return { gameId, code, seats, act, get version() { return version; } };
   }
 
+  /** The only player in a lobby leaves it. */
+  const g2act = (g: Awaited<ReturnType<typeof setupGame>>) => g.act(Object.keys(g.seats)[0]!, { type: 'LEAVE_GAME' });
+
   async function state(gameId: string, seat: Seat): Promise<GameSnapshot> {
     return ok(await call({ op: 'state', gameId, playerId: seat.playerId, token: seat.token })).snapshot;
   }
@@ -216,6 +219,90 @@ describe.skipIf(!DATABASE_URL)('game-action handler (Postgres)', () => {
         firsts.add(started.snapshot.state.players.find((p) => p.id === started.snapshot.state.turn.playerId)!.name);
       }
       expect([...firsts].sort()).toEqual(['Shamin', 'Tanmay']);
+    });
+  });
+
+  describe('leaving a game', () => {
+    const NAMES = ['Tanmay', 'Shamin', 'Ram', 'Priya'];
+    const playerRows = async (gameId: string) =>
+      (await sql`select name, status, is_host, seat from public.players where game_id = ${gameId} order by seat`).map(
+        (r) => `${r.seat}:${r.name}:${r.status}${r.is_host ? ':host' : ''}`,
+      );
+
+    it('a non-host leaves: stored as LEFT, broadcast to the others, history intact, and they can no longer act', async () => {
+      const g = await setupGame(NAMES);
+      ok(await g.act('Tanmay', { type: 'START_GAME' }));
+      ok(await g.act('Ram', { type: 'TRANSFER_MONEY', toPlayerId: g.seats.Priya!.playerId, amount: 300 }));
+      const ledgerBefore = (await state(g.gameId, g.seats.Tanmay!)).transactions.length;
+      broadcasts.length = 0;
+      const left = ok(await g.act('Ram', { type: 'LEAVE_GAME' }));
+      expect(left.snapshot.state.status).toBe('ACTIVE');
+      expect(await playerRows(g.gameId)).toEqual(['0:Tanmay:ACTIVE:host', '1:Shamin:ACTIVE', '2:Ram:LEFT', '3:Priya:ACTIVE']);
+      expect(broadcasts.at(-1)!.payload.events.map((e) => e.type)).toEqual(['PLAYER_LEFT']);
+      // What another phone is served.
+      const seen = await state(g.gameId, g.seats.Priya!);
+      expect(seen.state.players.find((p) => p.name === 'Ram')).toMatchObject({ status: 'LEFT', balance: 25000 - 300 });
+      expect(seen.state.turn.playerId).toBe(g.seats.Tanmay!.playerId);
+      expect(seen.transactions).toHaveLength(ledgerBefore);
+      const ledger = await sql`select * from public.verify_game_ledger(${g.gameId})`;
+      expect(ledger.every((r) => r.ok)).toBe(true);
+      expect(await g.act('Ram', { type: 'TRANSFER_MONEY', toPlayerId: g.seats.Priya!.playerId, amount: 1 })).toMatchObject({ ok: false, error: { code: 'FORBIDDEN', message: 'You have left this game.' } });
+    });
+
+    it('a retried LEAVE_GAME (same action id) and a second one both leave the turn where the first put it', async () => {
+      const g = await setupGame(NAMES);
+      ok(await g.act('Tanmay', { type: 'START_GAME' }));
+      const actionId = randomUUID();
+      const first = ok(await g.act('Tanmay', { type: 'LEAVE_GAME' }, { actionId }));
+      expect(first.snapshot.state.turn).toMatchObject({ playerId: g.seats.Shamin!.playerId, number: 2 });
+      const retry = ok(await g.act('Tanmay', { type: 'LEAVE_GAME' }, { actionId }));
+      expect(retry.duplicate).toBe(true);
+      expect(await g.act('Tanmay', { type: 'LEAVE_GAME' })).toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } });
+      const snap = await state(g.gameId, g.seats.Ram!);
+      expect(snap.state.turn).toMatchObject({ playerId: g.seats.Shamin!.playerId, number: 2 });
+      expect(snap.events.filter((e) => e.type === 'PLAYER_LEFT')).toHaveLength(1);
+    });
+
+    it('the host leaves: exactly one host row afterwards, and only the new host can end the game', async () => {
+      const g = await setupGame(NAMES);
+      ok(await g.act('Tanmay', { type: 'START_GAME' }));
+      ok(await g.act('Tanmay', { type: 'LEAVE_GAME' }));
+      expect(await playerRows(g.gameId)).toEqual(['0:Tanmay:LEFT', '1:Shamin:ACTIVE:host', '2:Ram:ACTIVE', '3:Priya:ACTIVE']);
+      const [game] = await sql`select host_player_id, status, current_player_id from public.games where id = ${g.gameId}`;
+      expect(game).toMatchObject({ host_player_id: g.seats.Shamin!.playerId, status: 'ACTIVE', current_player_id: g.seats.Shamin!.playerId });
+      expect(await g.act('Ram', { type: 'END_GAME' })).toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } });
+      expect(await g.act('Tanmay', { type: 'END_GAME' })).toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } });
+      ok(await g.act('Shamin', { type: 'END_GAME' }));
+    });
+
+    it('nobody can leave for someone else: the token decides who the request is from', async () => {
+      const g = await setupGame(NAMES);
+      ok(await g.act('Tanmay', { type: 'START_GAME' }));
+      const forged = await call({
+        op: 'action',
+        gameId: g.gameId,
+        playerId: g.seats.Priya!.playerId,
+        token: g.seats.Ram!.token,
+        actionId: randomUUID(),
+        expectedVersion: g.version,
+        action: { type: 'LEAVE_GAME' },
+      });
+      expect(forged).toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } });
+      expect(await playerRows(g.gameId)).toEqual(['0:Tanmay:ACTIVE:host', '1:Shamin:ACTIVE', '2:Ram:ACTIVE', '3:Priya:ACTIVE']);
+    });
+
+    it('leaving the lobby: the others start without them, and the last one out frees the code', async () => {
+      const g = await setupGame(['Tanmay', 'Shamin', 'Ram']);
+      ok(await g.act('Ram', { type: 'LEAVE_GAME' }));
+      const started = ok(await g.act('Tanmay', { type: 'START_GAME' }, { randomOrder: true }));
+      expect(started.snapshot.state.players.filter((p) => p.status === 'ACTIVE').map((p) => p.seat)).toEqual([0, 1]);
+      expect(started.snapshot.state.players.find((p) => p.name === 'Ram')).toMatchObject({ status: 'LEFT', seat: 2, balance: 0 });
+
+      const alone = await setupGame(['Solo']);
+      const closed = ok(await g2act(alone));
+      expect(closed.snapshot.state.status).toBe('FINISHED');
+      const again = await call({ op: 'join', actionId: randomUUID(), token: token(), code: alone.code, name: 'Late' });
+      expect(again).toMatchObject({ ok: false, error: { code: 'NOT_FOUND' } });
     });
   });
 

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Share, Text, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { BUSINESS_MVP_RULES } from '@/engine/index.ts';
@@ -5,6 +6,7 @@ import { Button, Card, ConnectionBanner, Label, Pill, PlayerBadge, Screen } from
 import { joinLink } from '@/constants/app';
 import { COLORS } from '@/constants/theme';
 import type { GameView } from '@/features/game/useGameView';
+import { LeaveGameDialog } from '@/features/game/LeaveGameDialog';
 import { useGameAction } from '@/features/game/useGameAction';
 import { useGameStore } from '@/store/gameStore';
 import { formatINR } from '@/utils/currency';
@@ -15,7 +17,10 @@ export function LobbyView({ view }: { view: GameView }) {
   const online = useGameStore((s) => s.onlinePlayerIds);
   const { state } = view.snapshot;
   const me = view.me;
-  const enough = state.players.length >= BUSINESS_MVP_RULES.players.min;
+  const [confirmLeave, setConfirmLeave] = useState(false);
+  // Players who left the lobby keep a row on the server but are no longer at the table.
+  const players = state.players.filter((p) => p.status !== 'LEFT');
+  const enough = players.length >= BUSINESS_MVP_RULES.players.min;
   const code = state.code;
 
   return (
@@ -25,7 +30,7 @@ export function LobbyView({ view }: { view: GameView }) {
       footer={
         view.isHost ? (
           <Button
-            title={enough ? 'START GAME' : `Waiting for players (${state.players.length}/${BUSINESS_MVP_RULES.players.min})`}
+            title={enough ? 'START GAME' : `Waiting for players (${players.length}/${BUSINESS_MVP_RULES.players.min})`}
             testID="start-game-button"
             disabled={!enough || !!pending}
             loading={pending === 'START_GAME'}
@@ -64,10 +69,10 @@ export function LobbyView({ view }: { view: GameView }) {
 
       <Card testID="lobby-players">
         <Label>
-          Players ({state.players.length}/{BUSINESS_MVP_RULES.players.max})
+          Players ({players.length}/{BUSINESS_MVP_RULES.players.max})
         </Label>
         <View className="mt-3 gap-2">
-          {state.players.map((p) => (
+          {players.map((p) => (
             <View key={p.id} className="flex-row items-center justify-between rounded-xl bg-white px-4 py-3">
               <View className="flex-row items-center gap-2">
                 <PlayerBadge player={p} size={24} testID={`player-badge-${p.name}`} />
@@ -85,6 +90,8 @@ export function LobbyView({ view }: { view: GameView }) {
       <Text className="text-center text-sm text-cream/70">
         Everyone starts with {formatINR(BUSINESS_MVP_RULES.startingCash)}. Keep your tokens on the real board — the phone is just the bank.
       </Text>
+      {me ? <Button size="sm" variant="ghost" title="Leave game" testID="lobby-leave" className="self-center" onPress={() => setConfirmLeave(true)} /> : null}
+      <LeaveGameDialog visible={confirmLeave} onClose={() => setConfirmLeave(false)} />
     </Screen>
   );
 }

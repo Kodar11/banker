@@ -2,15 +2,14 @@
 import { goBack } from '@/utils/navigation';
 import { useState, type ReactNode } from 'react';
 import { Text, View } from 'react-native';
-import { router } from 'expo-router';
 import {
   BUSINESS_MVP_RULES,
   CONFIRMED_RULES,
   MVP_ASSUMPTIONS,
   RULES_VERSION,
 } from '@/engine/index.ts';
-import { Button, Card, ConfirmDialog, Label, Pill, Screen } from '@/components/ui';
-import { useGameStore } from '@/store/gameStore';
+import { Button, Card, Pill, Screen } from '@/components/ui';
+import { LeaveGameDialog } from '@/features/game/LeaveGameDialog';
 import { useSessionStore } from '@/store/sessionStore';
 
 interface RuleSectionProps {
@@ -70,9 +69,7 @@ function RuleSection({
 
 export default function Settings() {
   const session = useSessionStore((state) => state.session);
-  const clearSession = useSessionStore((state) => state.clearSession);
   const [confirmLeave, setConfirmLeave] = useState(false);
-  const [leaving, setLeaving] = useState(false);
 
   return (
     <Screen scroll testID="settings-screen">
@@ -108,29 +105,12 @@ export default function Settings() {
         <Button
           variant="danger"
           size="md"
-          title="Leave this game on this phone"
+          title="Leave game"
           testID="leave-game"
           onPress={() => setConfirmLeave(true)}
         />
       ) : null}
-      <ConfirmDialog
-        visible={confirmLeave && !!session}
-        title="Leave game?"
-        message="This phone will forget the game."
-        detail="You can’t rejoin as the same player."
-        confirmTitle="Leave game"
-        destructive
-        loading={leaving}
-        testID="leave-dialog"
-        onCancel={() => setConfirmLeave(false)}
-        onConfirm={async () => {
-          if (leaving) return;
-          setLeaving(true);
-          await clearSession();
-          useGameStore.getState().reset(null);
-          router.replace('/');
-        }}
-      />
+      <LeaveGameDialog visible={confirmLeave && !!session} onClose={() => setConfirmLeave(false)} />
     </Screen>
   );
 }

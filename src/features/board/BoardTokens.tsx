@@ -209,7 +209,7 @@ export const BoardTokens = memo(function BoardTokens({
 }) {
   const reduceMotion = useReduceMotion();
   const size = tokenSize(geo);
-  const active = players.filter((p) => p.status !== 'BANKRUPT').sort((a, b) => a.seat - b.seat);
+  const active = players.filter((p) => p.status === 'ACTIVE').sort((a, b) => a.seat - b.seat);
   const bySquare = new Map<number, string[]>();
   for (const p of active) bySquare.set(p.position, [...(bySquare.get(p.position) ?? []), p.id]);
   return (

@@ -122,7 +122,9 @@ export function joinGame(state: GameState, input: { playerId: string; name: stri
   if (state.status !== 'WAITING') fail('GAME_NOT_ACTIVE', 'This game has already started.');
   const name = PlayerNameSchema.safeParse(input.name);
   if (!name.success) fail('VALIDATION', name.error.issues[0]?.message ?? 'Invalid name.');
-  if (state.players.length >= RULES.players.max) fail('GAME_FULL', `This game is full (${RULES.players.max} players).`);
+  // People who left the lobby don't take a place. (Their name stays theirs: it still labels their events.)
+  const present = state.players.filter((p) => p.status !== 'LEFT');
+  if (present.length >= RULES.players.max) fail('GAME_FULL', `This game is full (${RULES.players.max} players).`);
   if (state.players.some((p) => p.name.toLowerCase() === name.data.toLowerCase())) {
     fail('NAME_TAKEN', 'Someone in this game already has that name.');
   }
@@ -184,18 +186,19 @@ export function applyAction(state: GameState, actorId: string, rawAction: unknow
   assertLoadable(state, ctx);
 
   if (state.status === 'WAITING') {
-    if (action.type !== 'SET_READY' && action.type !== 'START_GAME') {
+    if (action.type !== 'SET_READY' && action.type !== 'START_GAME' && action.type !== 'LEAVE_GAME') {
       fail('GAME_NOT_STARTED', 'The game has not started yet.');
     }
   } else if (state.status === 'PAUSED') {
-    if (action.type !== 'RESUME_GAME' && action.type !== 'END_GAME') fail('GAME_PAUSED', 'Game is paused.');
+    if (action.type !== 'RESUME_GAME' && action.type !== 'END_GAME' && action.type !== 'LEAVE_GAME') fail('GAME_PAUSED', 'Game is paused.');
   } else if (action.type === 'SET_READY' || action.type === 'START_GAME') {
     fail('INVALID_PHASE', 'The game has already started.');
   }
 
   const d = new Draft(state, ctx);
   const actor = d.player(actorId);
-  if (state.status !== 'WAITING' && actor.status !== 'ACTIVE' && action.type !== 'END_GAME') {
+  if (actor.status === 'LEFT') fail('FORBIDDEN', 'You have left this game.');
+  if (state.status !== 'WAITING' && actor.status !== 'ACTIVE' && action.type !== 'END_GAME' && action.type !== 'LEAVE_GAME') {
     fail('FORBIDDEN', 'You are out of the game.');
   }
   if (TURN_ACTIONS.has(action.type) && state.turn.playerId !== actorId) {
@@ -308,6 +311,9 @@ export function applyAction(state: GameState, actorId: string, rawAction: unknow
       if (!actor.isHost || !RULES.endGame.hostMayEnd) fail('FORBIDDEN', 'Only the host can end the game.');
       finishGame(d, 'HOST_ENDED');
       break;
+    case 'LEAVE_GAME':
+      leaveTable(d, actor);
+      break;
   }
 
   bumpVersion(d);
@@ -320,17 +326,21 @@ export function applyAction(state: GameState, actorId: string, rawAction: unknow
 
 function startGame(d: Draft, actor: PlayerState): void {
   if (!actor.isHost) fail('FORBIDDEN', 'Only the host can start the game.');
-  if (d.state.players.length < RULES.players.min) {
+  const bySeat = (a: PlayerState, b: PlayerState) => a.seat - b.seat;
+  const playing = d.activePlayers().sort(bySeat);
+  // Anyone who left the lobby keeps their row (events refer to it) but gets no turn and no cash.
+  const gone = d.state.players.filter((p) => p.status !== 'ACTIVE').sort(bySeat);
+  if (playing.length < RULES.players.min) {
     fail('NOT_ENOUGH_PLAYERS', `Need at least ${RULES.players.min} players to start.`);
   }
   d.setStatus('ACTIVE');
   // The turn order is drawn here, once, with the server's RNG, and stored as each player's seat:
   // seat 0 rolls first and every later turn follows seat order. Joining order (the host) means nothing.
-  const ordered = shuffled([...d.state.players].sort((a, b) => a.seat - b.seat), d.ctx.random);
-  ordered.forEach((p, seat) => {
+  const ordered = shuffled(playing, d.ctx.random);
+  d.state.players = [...ordered, ...gone];
+  d.state.players.forEach((p, seat) => {
     p.seat = seat;
   });
-  d.state.players = ordered;
   for (const p of ordered) {
     d.transfer({ type: 'STARTING_FUNDS', from: null, to: p.id, amount: RULES.startingCash, memo: 'Starting cash' });
   }
@@ -1017,10 +1027,14 @@ function finalizeAuction(d: Draft): void {
       amount: auction.highBid,
     });
   } else {
-    const why = winner ? `${winner.name} couldn't pay` : 'no bids';
+    const why = winner ? (winner.status === 'LEFT' ? `${winner.name} left the game` : `${winner.name} couldn't pay`) : 'no bids';
     d.event('AUCTION_UNSOLD', null, `${deed.name} stays with the bank (${why})`, { auctionId: auction.id });
   }
   d.setPhase('TURN_COMPLETE');
+  // The player whose turn this is left while the auction ran: nobody is there to end the turn.
+  // (The closed auction stays in state so every phone can still show its result.)
+  const owner = d.state.players.find((p) => p.id === d.state.turn.playerId);
+  if (owner && owner.status === 'LEFT') advanceTurn(d, owner.id);
 }
 
 // ---------------------------------------------------------------------------
@@ -1188,7 +1202,80 @@ function declareBankruptcy(d: Draft, actor: PlayerState): void {
   advanceTurn(d, actor.id);
 }
 
-function finishGame(d: Draft, reason: 'HOST_ENDED' | 'LAST_PLAYER_STANDING'): void {
+/**
+ * A player walks away from the table. NOT a bankruptcy and not an end of the game: nothing they
+ * hold is sold, handed over or forgiven — cash, properties and loans stay in their name, frozen
+ * (rent on their properties is still owed to them). They take no more turns and can no longer act.
+ * Whatever was waiting on them is closed so the others are never stuck:
+ *   - their open trade offers expire, and an undo request that needs them is dropped;
+ *   - in a running auction they count as passed; if they held the high bid the property goes unsold;
+ *   - if it was their turn, it passes to the next player in the drawn order (after the auction, if one is running);
+ *   - the host role moves to the next player in the drawn order;
+ *   - if fewer than two players are left, the game finishes (the last one wins, as with bankruptcy).
+ */
+function leaveTable(d: Draft, actor: PlayerState): void {
+  const started = d.state.status !== 'WAITING';
+  actor.status = 'LEFT';
+  actor.ready = false;
+  actor.skipTurns = 0;
+  actor.inJail = false;
+  actor.jailTurnsLeft = 0;
+  d.event('PLAYER_LEFT', actor.id, `${actor.name} left the game`);
+
+  const remaining = d.activePlayers().sort((a, b) => a.seat - b.seat);
+  const heir = remaining[0];
+  if (actor.isHost && heir) {
+    actor.isHost = false;
+    heir.isHost = true;
+    heir.ready = true;
+    d.state.hostPlayerId = heir.id;
+    d.event('HOST_CHANGED', heir.id, `${heir.name} is now the host`, { hostPlayerId: heir.id });
+  }
+  if (!started) {
+    if (remaining.length === 0) finishGame(d, 'PLAYERS_LEFT');
+    return;
+  }
+
+  expireTrades(d, (t) => t.fromPlayerId === actor.id || t.toPlayerId === actor.id);
+  const req = d.state.undoRequest;
+  if (req) {
+    req.approverIds = req.approverIds.filter((id) => id !== actor.id);
+    const top = topUndoable(d.state);
+    if (req.requestedBy === actor.id || req.approverIds.length === 0 || !top || undoBlocker(d.state, top)) {
+      d.state.undoRequest = null;
+      d.event('UNDO_REJECTED', null, `Undo request closed — ${actor.name} left the game`);
+    }
+  }
+
+  if (remaining.length < 2) {
+    finishGame(d, 'PLAYERS_LEFT');
+    return;
+  }
+
+  const auction = d.state.auction;
+  if (auction && auction.status === 'OPEN' && d.state.turn.phase === 'AUCTION' && auction.participantIds.includes(actor.id)) {
+    if (auction.highBidderId === actor.id) {
+      finalizeAuction(d);
+    } else {
+      if (!auction.passedIds.includes(actor.id)) auction.passedIds.push(actor.id);
+      const stillIn = auction.participantIds.filter((id) => !auction.passedIds.includes(id));
+      const decided = auction.highBidderId !== null ? stillIn.length === 1 && stillIn[0] === auction.highBidderId : stillIn.length === 0;
+      if (decided) finalizeAuction(d);
+    }
+  }
+
+  // Their turn (finalizeAuction above may already have passed it on).
+  if (d.state.turn.playerId !== actor.id) return;
+  // An auction the others are still bidding in runs to its end; closing it passes the turn on.
+  if (d.state.turn.phase === 'AUCTION' && d.state.auction?.status === 'OPEN') return;
+  d.state.turn.pending = null;
+  d.state.turn.followUp = null;
+  if (d.state.turn.phase !== 'AWAITING_ROLL') d.setPhase('TURN_COMPLETE');
+  d.state.auction = null;
+  advanceTurn(d, actor.id);
+}
+
+function finishGame(d: Draft, reason: 'HOST_ENDED' | 'LAST_PLAYER_STANDING' | 'PLAYERS_LEFT'): void {
   d.setStatus('FINISHED');
   d.state.pausedFrom = null;
   d.state.pausedAt = null;

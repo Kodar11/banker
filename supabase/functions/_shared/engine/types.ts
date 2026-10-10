@@ -19,7 +19,11 @@ export type TurnPhase =
   | 'TRANSACTION'
   | 'TURN_COMPLETE';
 
-export type PlayerStatus = 'ACTIVE' | 'BANKRUPT';
+/**
+ * ACTIVE plays. BANKRUPT lost everything to a debt. LEFT walked away (LEAVE_GAME): takes no more
+ * turns and can no longer act, but keeps what was in their name — nothing is sold or forgiven.
+ */
+export type PlayerStatus = 'ACTIVE' | 'BANKRUPT' | 'LEFT';
 
 export interface PlayerState {
   id: string;
