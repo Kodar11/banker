@@ -1,8 +1,8 @@
 import { useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import { Alert, ScrollView, Text, useWindowDimensions, View, type LayoutChangeEvent } from 'react-native';
+import { ScrollView, Text, useWindowDimensions, View, type LayoutChangeEvent } from 'react-native';
 import { SafeAreaInsetsContext, SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { isPropertyKey, positionOfProperty, spaceAt, spaceName, topUndoable } from '@/engine/index.ts';
+import { isPropertyKey, positionOfProperty, spaceAt, spaceName, topUndoable, type UndoableRecord } from '@/engine/index.ts';
 import { Button, ConfirmDialog, ConnectionBanner, Sheet } from '@/components/ui';
 import { ClassicBoard } from '@/features/board/ClassicBoard';
 import { SquareDetails } from '@/features/board/SquareDetails';
@@ -24,7 +24,7 @@ import { leaveGame } from './leaveGame';
 import { planScreenLayout, SCREEN_PADDING, screenGutter, SECTION_GAP } from './layout';
 import { MoreActions, type MoreItem } from './MoreActions';
 import { TurnActionBar } from './TurnActionBar';
-import { useGameAction } from './useGameAction';
+import { sendFailure, useGameAction } from './useGameAction';
 import type { GameView } from './useGameView';
 
 /** Information sheets (one at a time, content swapped in place): opening one never changes game state. A property I own is also managed from its sheet. */
@@ -60,13 +60,21 @@ export function GameScreen({ view }: { view: GameView }) {
   /** Who the pay / trade sheet was last opened for; changing it remounts (resets) that sheet. */
   const [preselect, setPreselect] = useState<{ pay: string | null; trade: string | null }>({ pay: null, trade: null });
   const [confirmEnd, setConfirmEnd] = useState(false);
+  /** The action the player is being asked to confirm an undo request for (asked from the More sheet). */
+  const [undoAsk, setUndoAsk] = useState<{ record: UndoableRecord; busy: boolean; error: string | null } | null>(null);
   const ending = useGameStore((s) => s.pendingAction === 'END_GAME');
   const { state, events } = view.snapshot;
   const me = view.me;
   const auctionId = state.auction?.status === 'OPEN' ? state.auction.id : null;
   // A sheet would cover the auction screen, so a sheet opened before an auction started is closed by it.
   const panel = panelState && (!auctionId || panelState.auctionId === auctionId) ? panelState.panel : null;
-  const setPanel = useCallback((next: Panel | null) => setPanelState(next ? { panel: next, auctionId } : null), [auctionId]);
+  const setPanel = useCallback(
+    (next: Panel | null) => {
+      setPanelState(next ? { panel: next, auctionId } : null);
+      setUndoAsk(null); // a confirmation belongs to the sheet it was opened from
+    },
+    [auctionId],
+  );
 
   // ---- Measured layout -----------------------------------------------------
   const screenSize = useWindowDimensions();
@@ -118,6 +126,16 @@ export function GameScreen({ view }: { view: GameView }) {
   const last = topUndoable(state);
   const canRequestUndo =
     !!me && !!last && !state.undoRequest && (last.actorId === me.id || last.counterpartyIds.includes(me.id)) && state.status === 'ACTIVE';
+  const requestUndo = async () => {
+    if (!undoAsk || undoAsk.busy) return;
+    const { record } = undoAsk;
+    setUndoAsk({ record, busy: true, error: null });
+    const failure = sendFailure(await send({ type: 'REQUEST_UNDO', targetActionId: record.actionId }, { silent: true }));
+    // Asked: back to the table, where the card now says the request is waiting for approval.
+    if (failure === null) setPanel(null);
+    // Still this dialog (not cancelled meanwhile, e.g. by an auction closing the sheet): keep it open to retry.
+    else setUndoAsk((now) => (now?.record.actionId === record.actionId ? { record, busy: false, error: failure } : now));
+  };
   const hasRequests =
     !!me &&
     ((!!state.undoRequest && (state.undoRequest.approverIds.includes(me.id) || state.undoRequest.requestedBy === me.id)) ||
@@ -164,12 +182,7 @@ export function GameScreen({ view }: { view: GameView }) {
         hint: last ? last.description : 'Nothing to undo',
         testID: 'request-undo',
         disabled: !canRequestUndo,
-        onPress: () =>
-          last &&
-          Alert.alert('Ask to undo?', `${last.description}\n\nAnother player must approve. Money is reversed with a new transaction.`, [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Ask', onPress: () => void send({ type: 'REQUEST_UNDO', targetActionId: last.actionId }) },
-          ]),
+        onPress: () => last && setUndoAsk({ record: last, busy: false, error: null }),
       },
       {
         key: 'pause',
@@ -274,7 +287,26 @@ export function GameScreen({ view }: { view: GameView }) {
         break;
       case 'more':
         panelTitle = 'More';
-        panelBody = <MoreActions items={moreItems} />;
+        panelBody = (
+          <>
+            <MoreActions items={moreItems} />
+            {/* Inside the sheet, so it opens above it and Cancel returns to the same More list. */}
+            <ConfirmDialog
+              visible={!!undoAsk}
+              title="Request undo?"
+              summary={undoAsk?.record.description}
+              message="Another player must approve this request."
+              detail="If approved, it is reversed with a new transaction. Nothing changes until then."
+              confirmTitle="Request undo"
+              intent="warning"
+              loading={undoAsk?.busy}
+              error={undoAsk?.error}
+              testID="undo-dialog"
+              onCancel={() => setUndoAsk(null)}
+              onConfirm={requestUndo}
+            />
+          </>
+        );
         break;
       case 'log':
         panelTitle = 'Game log';

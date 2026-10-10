@@ -1,6 +1,8 @@
-import { Alert, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Text, View } from 'react-native';
 import { tradeBlocker, type GameAction } from '@/engine/index.ts';
-import { Button, Card, Label } from '@/components/ui';
+import { Button, Card, ConfirmDialog, Label } from '@/components/ui';
+import { sendFailure } from '@/features/game/useGameAction';
 import type { GameView } from '@/features/game/useGameView';
 import { useGameStore } from '@/store/gameStore';
 import { describeTradeSide } from './TradeSheet';
@@ -8,6 +10,8 @@ import { describeTradeSide } from './TradeSheet';
 /** Open trade offers that involve this player: accept/reject incoming, cancel outgoing. */
 export function TradeOffers({ view, send }: { view: GameView; send: (a: GameAction) => Promise<unknown> }) {
   const pending = useGameStore((s) => s.pendingAction);
+  /** The incoming offer being confirmed. */
+  const [accepting, setAccepting] = useState<{ tradeId: string; busy: boolean; error: string | null } | null>(null);
   const me = view.me;
   const { state } = view.snapshot;
   if (!me) return null;
@@ -46,12 +50,26 @@ export function TradeOffers({ view, send }: { view: GameView; send: (a: GameActi
                     testID="trade-accept"
                     disabled={!!problem || !!pending}
                     loading={pending === 'ACCEPT_TRADE'}
-                    onPress={() =>
-                      Alert.alert('Accept this trade?', `You get ${youGet}.\nYou give ${youGive}.`, [
-                        { text: 'Cancel', style: 'cancel' },
-                        { text: 'Accept', onPress: () => void send({ type: 'ACCEPT_TRADE', tradeId: t.id }) },
-                      ])
-                    }
+                    onPress={() => setAccepting({ tradeId: t.id, busy: false, error: null })}
+                  />
+                  <ConfirmDialog
+                    visible={accepting?.tradeId === t.id}
+                    icon="🤝"
+                    title="Accept this trade?"
+                    summary={`You get ${youGet}
+You give ${youGive}`}
+                    message={`The trade with ${other} happens right away.`}
+                    confirmTitle="Accept trade"
+                    loading={accepting?.busy}
+                    error={accepting?.error}
+                    testID="trade-accept-dialog"
+                    onCancel={() => setAccepting(null)}
+                    onConfirm={async () => {
+                      if (accepting?.busy) return;
+                      setAccepting({ tradeId: t.id, busy: true, error: null });
+                      const failure = sendFailure(await send({ type: 'ACCEPT_TRADE', tradeId: t.id }));
+                      setAccepting((now) => (now?.tradeId === t.id && failure !== null ? { tradeId: t.id, busy: false, error: failure } : null));
+                    }}
                   />
                   <Button
                     className="flex-1"

@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { Alert, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { DECK_LABELS, getDeed, BUSINESS_MVP_RULES, type GameAction } from '@/engine/index.ts';
-import { Button, Card, Label, Pill, TextField } from '@/components/ui';
+import { Button, Card, ConfirmDialog, Label, Pill, TextField } from '@/components/ui';
 import { useGameStore } from '@/store/gameStore';
 import { formatINR } from '@/utils/currency';
 import { describeWaiting } from './describe';
 import { PAY_ACTION } from './gameFocus';
+import { sendFailure } from './useGameAction';
 import type { GameView } from './useGameView';
 
 interface ActionPanelProps {
@@ -18,6 +19,7 @@ interface ActionPanelProps {
 /** Shows exactly the next valid action for this player. Nothing else. */
 export function ActionPanel({ view, send, onOpenLoan }: ActionPanelProps) {
   const pending = useGameStore((s) => s.pendingAction);
+  const [bankruptcy, setBankruptcy] = useState<{ busy: boolean; error: string | null } | null>(null);
   const { snapshot, me, current, isMyTurn, playerName } = view;
   const { state } = snapshot;
   const { turn } = state;
@@ -139,12 +141,26 @@ export function ActionPanel({ view, send, onOpenLoan }: ActionPanelProps) {
                   variant="danger"
                   title="Declare bankruptcy"
                   testID="bankrupt-button"
-                  onPress={() =>
-                    Alert.alert('Declare bankruptcy?', 'Your cash goes to the creditor and your properties return to the bank. You leave the game.', [
-                      { text: 'Cancel', style: 'cancel' },
-                      { text: 'Declare', style: 'destructive', onPress: () => void send({ type: 'DECLARE_BANKRUPTCY' }) },
-                    ])
-                  }
+                  onPress={() => setBankruptcy({ busy: false, error: null })}
+                />
+                {/* Rendered inside the decision sheet, so it opens above it. */}
+                <ConfirmDialog
+                  visible={!!bankruptcy}
+                  title="Declare bankruptcy?"
+                  message="Your cash goes to the creditor and your properties return to the bank."
+                  detail="You leave the game. This can’t be taken back."
+                  confirmTitle="Declare"
+                  destructive
+                  loading={bankruptcy?.busy}
+                  error={bankruptcy?.error}
+                  testID="bankrupt-dialog"
+                  onCancel={() => setBankruptcy(null)}
+                  onConfirm={async () => {
+                    if (bankruptcy?.busy) return;
+                    setBankruptcy({ busy: true, error: null });
+                    const failure = sendFailure(await send({ type: 'DECLARE_BANKRUPTCY' }));
+                    setBankruptcy((now) => (now && failure !== null ? { busy: false, error: failure } : null));
+                  }}
                 />
               </View>
             ) : null}

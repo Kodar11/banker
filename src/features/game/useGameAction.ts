@@ -70,3 +70,9 @@ export function useGameAction() {
     [session],
   );
 }
+
+/** Why a send() did not go through, or null when it did. For dialogs that stay open to retry. */
+export function sendFailure(result: unknown): string | null {
+  const r = result as SendResult | undefined;
+  return r && r.ok === false ? r.error.message : null;
+}

@@ -1,5 +1,5 @@
 /// <reference types="jest" />
-import { Alert, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { netWorth, outstandingDebt } from '@/engine/index.ts';
@@ -100,12 +100,12 @@ describe('Adaptive action bar + More', () => {
     expect(screen.getByTestId('request-undo').props.accessibilityState.disabled).toBe(true);
 
     f.act('Asha', { type: 'TRANSFER_MONEY', toPlayerId: f.ids.Bilal!, amount: 500 }).loadAs('Asha');
-    jest.spyOn(Alert, 'alert').mockImplementation((_t, _m, buttons) => buttons?.[1]?.onPress?.());
     api.action.mockResolvedValue(ok(f.snapshot()));
     await render(<GameScreen view={viewFor(f, 'Asha')} />);
     await fireEvent.press(screen.getByTestId('open-more'));
     expect(screen.getByTestId('request-undo').props.accessibilityState.disabled).toBe(false);
     await fireEvent.press(screen.getByTestId('request-undo'));
+    await fireEvent.press(screen.getByTestId('undo-dialog-confirm'));
     await waitFor(() => expect(api.action.mock.calls[0]![3]).toEqual({ type: 'REQUEST_UNDO', targetActionId: f.state.undoStack.at(-1)!.actionId }));
   });
 
@@ -116,11 +116,11 @@ describe('Adaptive action bar + More', () => {
     f.act('Asha', { type: 'TRANSFER_MONEY', toPlayerId: f.ids.Bilal!, amount: 200 });
     f.act('Asha', { type: 'REQUEST_UNDO', targetActionId: f.state.undoStack.at(-1)!.actionId });
     f.act('Bilal', { type: 'APPROVE_UNDO', requestId: f.state.undoRequest!.id }).loadAs('Asha');
-    jest.spyOn(Alert, 'alert').mockImplementation((_t, _m, buttons) => buttons?.[1]?.onPress?.());
     api.action.mockResolvedValue(ok(f.snapshot()));
     await render(<GameScreen view={viewFor(f, 'Asha')} />);
     await fireEvent.press(screen.getByTestId('open-more'));
     await fireEvent.press(screen.getByTestId('request-undo'));
+    await fireEvent.press(screen.getByTestId('undo-dialog-confirm'));
     await waitFor(() => expect(api.action.mock.calls[0]![3]).toEqual({ type: 'REQUEST_UNDO', targetActionId: first }));
   });
 });
@@ -242,7 +242,6 @@ describe('Trading UI', () => {
       offeredMoney: 0,
       requestedMoney: 6000,
     }).loadAs('Bilal');
-    jest.spyOn(Alert, 'alert').mockImplementation((_t, _m, buttons) => buttons?.[1]?.onPress?.());
     api.action.mockResolvedValue(ok(f.snapshot()));
     await render(<GameScreen view={viewFor(f, 'Bilal')} />);
     expect(screen.getByTestId('context-offer')).toBeTruthy();
@@ -253,6 +252,7 @@ describe('Trading UI', () => {
     expect(card).toHaveTextContent(/You get: Railway/);
     expect(card).toHaveTextContent(/You give: ₹6,000/);
     await fireEvent.press(screen.getByTestId('trade-accept'));
+    await fireEvent.press(screen.getByTestId('trade-accept-dialog-confirm'));
     await waitFor(() => expect(api.action.mock.calls[0]![3]).toEqual({ type: 'ACCEPT_TRADE', tradeId: f.state.trades[0]!.id }));
   });
 
