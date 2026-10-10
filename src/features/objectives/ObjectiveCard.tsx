@@ -26,8 +26,18 @@ export function MyObjective({ view }: { view: GameView }) {
       </Text>
       {finished ? null : (
         <View className="rounded-xl bg-cream px-3 py-2">
-          <Label>Right now</Label>
-          <Text className="text-base font-bold text-ink" testID="my-objective-progress">
+          <View className="flex-row items-center justify-between gap-2">
+            <Label>Right now</Label>
+            <Pill tone={mine.check.completed ? 'good' : 'neutral'}>{mine.check.completed ? 'On track' : 'Not yet'}</Pill>
+          </View>
+          <View testID="my-objective-measures">
+            {mine.measures.map((line) => (
+              <Text key={line} className="text-lg font-black text-ink">
+                {line}
+              </Text>
+            ))}
+          </View>
+          <Text className="text-sm text-stone-600" testID="my-objective-progress">
             {mine.check.progress}
           </Text>
           <Text className="text-xs text-stone-500">{mine.check.completed ? 'On track — it is checked when the game ends.' : 'Not there yet — it is checked when the game ends.'}</Text>
@@ -56,7 +66,7 @@ export function ObjectiveResults({ view }: { view: GameView }) {
             <Pill tone={r.completed ? 'good' : 'neutral'}>{r.completed ? 'Completed' : 'Not completed'}</Pill>
           </View>
           <Text className="text-sm text-stone-600">{r.detail}</Text>
-          {r.completed ? <Text className="text-sm font-extrabold text-green-700">Bonus: +{formatINR(r.reward)}</Text> : null}
+          {r.completed ? <Text className="text-sm font-extrabold text-green-700">Bonus: +{formatINR(r.reward)}</Text> : <Text className="text-sm font-bold text-stone-500">No bonus</Text>}
         </View>
       ))}
       <Text className="text-xs text-stone-500">Bonuses are paid by the bank, separately from the game’s other money, and are included in the net worth above.</Text>

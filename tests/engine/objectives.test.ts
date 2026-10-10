@@ -786,3 +786,40 @@ describe('the end of the game', () => {
     expect(g.balance('Bilal')).toBe(48000);
   });
 });
+
+describe('progress as the owner’s screen shows it', () => {
+  const measures = (g: TestGame, name: string) => objectiveView(redactObjectives(g.state, g.id(name)), g.id(name))!.measures;
+
+  it('Property Mogul counts properties and their printed prices against this game’s target', () => {
+    const g = newGame(['Asha', 'Bilal'], { startingCash: 10000 });
+    assign(g, { Asha: 'PROPERTY_MOGUL', Bilal: 'BUILDER' });
+    expect(measures(g, 'Asha')).toEqual(['0 / 3 properties', '₹0 / ₹4,800 property value']);
+    g.give('Asha', 'MUMBAI');
+    g.give('Asha', 'INDORE');
+    const total = getDeed('MUMBAI').price + getDeed('INDORE').price;
+    expect(measures(g, 'Asha')).toEqual(['2 / 3 properties', `₹${total.toLocaleString('en-IN')} / ₹4,800 property value`]);
+  });
+
+  it('The Builder counts standing houses', () => {
+    const g = newGame();
+    assign(g, { Asha: 'BUILDER', Bilal: 'DEAL_MAKER' });
+    g.give('Asha', 'INDORE', { houses: 2 });
+    expect(measures(g, 'Asha')).toEqual(['2 / 3 houses']);
+  });
+
+  it('Cash Guardian shows cash against the target and the loan condition', () => {
+    const g = newGame();
+    assign(g, { Asha: 'CASH_GUARDIAN', Bilal: 'DEAL_MAKER' });
+    expect(measures(g, 'Asha')).toEqual(['₹25,000 / ₹12,000 cash', 'No overdue installments']);
+  });
+
+  it('Deal Maker counts completed trades, and is always read from the game state', () => {
+    const g = newGame();
+    assign(g, { Asha: 'DEAL_MAKER', Bilal: 'DEAL_MAKER' });
+    expect(measures(g, 'Asha')).toEqual(['0 / 2 trades']);
+    g.give('Asha', 'INDORE');
+    trade(g, 'Asha', 'Bilal', 'INDORE');
+    expect(measures(g, 'Asha')).toEqual(['1 / 2 trades']);
+    expect(measures(g, 'Bilal')).toEqual(['1 / 2 trades']);
+  });
+});

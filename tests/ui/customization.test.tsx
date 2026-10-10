@@ -1,12 +1,15 @@
 /// <reference types="jest" />
 import { router } from 'expo-router';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
+import * as SecureStore from 'expo-secure-store';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { netWorth, OBJECTIVE_IDS, OBJECTIVES, redactObjectives, totalDebt, type GameSnapshot, type ObjectiveId } from '@/engine/index.ts';
+import { INTRO_SEEN_KEY } from '@/features/finance/IntermediateIntro';
 import { GameScreen } from '@/features/game/GameScreen';
 import { FinishedView } from '@/features/game/GamePanels';
 import type { GameView } from '@/features/game/useGameView';
 import { LoanSheet } from '@/features/loan/LoanSheet';
 import { LobbyView } from '@/features/lobby/LobbyView';
+import { OBJECTIVE_SEEN_KEY, objectiveSeenValue } from '@/features/objectives/ObjectiveReveal';
 import { gameApi } from '@/lib/gameApi';
 import { useGameStore } from '@/store/gameStore';
 import { useSessionStore } from '@/store/sessionStore';
@@ -46,7 +49,9 @@ function loadAs(f: Fixture, name: string) {
   useGameStore.getState().setConnection('live');
 }
 
-async function renderGame(f: Fixture, name: string) {
+/** `revealed: false` is a phone that has not shown this player their objective yet (a game that has just started). */
+async function renderGame(f: Fixture, name: string, { revealed = true }: { revealed?: boolean } = {}) {
+  if (revealed && f.state.objectives) await SecureStore.setItemAsync(OBJECTIVE_SEEN_KEY, objectiveSeenValue(f.state.id, f.ids[name]!));
   loadAs(f, name);
   const view = await render(<GameScreen view={viewFor(f, name)} />);
   await fireEvent(screen.getByTestId('game-scroll'), 'layout', { nativeEvent: { layout: { width: 412, height: 840 } } });
@@ -61,10 +66,13 @@ const press = async (testID: string, times = 1) => {
   for (let i = 0; i < times; i += 1) await fireEvent.press(screen.getByTestId(testID));
 };
 
-beforeEach(() => {
+beforeEach(async () => {
   jest.clearAllMocks();
   useSessionStore.setState({ session: null, hydrated: true });
   useGameStore.getState().reset(null);
+  // The one-time Intermediate introduction has its own tests; here this phone has already seen it.
+  await SecureStore.setItemAsync(INTRO_SEEN_KEY, '1');
+  await SecureStore.deleteItemAsync(OBJECTIVE_SEEN_KEY);
 });
 
 // ---------------------------------------------------------------------------
@@ -334,6 +342,9 @@ describe('Secret objective: a private entry point', () => {
     expect(screen.getByTestId('my-objective')).toHaveTextContent(/₹4,000 bonus/);
     expect(screen.getByTestId('my-objective-description')).toHaveTextContent(/hold at least ₹12,000 in cash/);
     expect(screen.getByTestId('my-objective-progress')).toHaveTextContent('₹25,000 cash (needs ₹12,000)');
+    expect(screen.getByTestId('my-objective-measures')).toHaveTextContent(/₹25,000 \/ ₹12,000 cash/);
+    expect(screen.getByTestId('my-objective-measures')).toHaveTextContent(/No overdue installments/);
+    expect(screen.getByTestId('my-objective')).toHaveTextContent(/On track/);
     expect(screen.getByTestId('my-objective')).toHaveTextContent(/Only you can see this/);
     expect(screen.queryByText(/Property Mogul/)).toBeNull();
   });
@@ -371,6 +382,136 @@ describe('Secret objective: a private entry point', () => {
   });
 });
 
+describe('Secret objective: the reveal when the game starts', () => {
+  const twoPlayers = () => {
+    const f = new Fixture(['Asha', 'Bilal'], { mode: 'intermediate' });
+    assign(f, { Asha: 'DEAL_MAKER', Bilal: 'PROPERTY_MOGUL' });
+    return f;
+  };
+  const reveal = () => waitFor(() => expect(screen.getByTestId('objective-reveal')).toBeTruthy());
+  const settled = () => act(async () => {});
+
+  it('opens covered, shows only my own objective when asked, and is remembered once read', async () => {
+    const f = twoPlayers();
+    const first = await renderGame(f, 'Asha', { revealed: false });
+    await reveal();
+    // Covered: a phone lying on the table names nothing.
+    for (const id of OBJECTIVE_IDS) expect(screen.queryByText(new RegExp(OBJECTIVES[id].name))).toBeNull();
+    // The table underneath is there and was never blocked by anyone else's phone.
+    expect(screen.getByTestId('classic-board')).toBeTruthy();
+    await fireEvent.press(screen.getByTestId('objective-reveal-show'));
+    expect(screen.getByTestId('objective-reveal-name')).toHaveTextContent('Deal Maker');
+    expect(screen.getByTestId('objective-reveal-description')).toHaveTextContent(/Complete at least 2 property trades/);
+    expect(screen.getByTestId('objective-reveal-reward')).toHaveTextContent('Reward: ₹4,000');
+    expect(screen.queryByText(/Property Mogul/)).toBeNull();
+    await fireEvent.press(screen.getByTestId('objective-reveal-done'));
+    expect(screen.queryByTestId('objective-reveal')).toBeNull();
+    expect(await SecureStore.getItemAsync(OBJECTIVE_SEEN_KEY)).toBe(objectiveSeenValue(f.state.id, f.ids.Asha!));
+    // Reconnecting, reopening the app, the game moving on: it is not shown a second time.
+    await first.unmount();
+    f.roll('Asha', 1, 2);
+    await renderGame(f, 'Asha', { revealed: false });
+    await settled();
+    expect(screen.queryByTestId('objective-reveal')).toBeNull();
+    // …and the entry is still there.
+    await fireEvent.press(screen.getByTestId('open-more'));
+    await fireEvent.press(screen.getByTestId('open-objective'));
+    expect(screen.getByTestId('my-objective-name')).toHaveTextContent('Deal Maker');
+  });
+
+  it('the other player gets their own reveal, with this game’s scaled numbers', async () => {
+    const f = new Fixture(['Asha', 'Bilal'], { mode: 'intermediate', config: { startingCash: 10000 } });
+    assign(f, { Asha: 'DEAL_MAKER', Bilal: 'PROPERTY_MOGUL' });
+    await renderGame(f, 'Bilal', { revealed: false });
+    await reveal();
+    await fireEvent.press(screen.getByTestId('objective-reveal-show'));
+    expect(screen.getByTestId('objective-reveal-name')).toHaveTextContent('Property Mogul');
+    expect(screen.getByTestId('objective-reveal-description')).toHaveTextContent(/₹4,800 or more/);
+    expect(screen.getByTestId('objective-reveal-reward')).toHaveTextContent('Reward: ₹2,000');
+    expect(screen.queryByText(/Deal Maker/)).toBeNull();
+  });
+
+  it('“Later” puts it away without marking it read: it is offered again when the game is next opened', async () => {
+    const f = twoPlayers();
+    const first = await renderGame(f, 'Asha', { revealed: false });
+    await reveal();
+    await fireEvent.press(screen.getByTestId('objective-reveal-later'));
+    expect(screen.queryByTestId('objective-reveal')).toBeNull();
+    expect(await SecureStore.getItemAsync(OBJECTIVE_SEEN_KEY)).toBeNull();
+    await first.unmount();
+    await renderGame(f, 'Asha', { revealed: false });
+    await reveal();
+  });
+
+  it('a player who missed it — a phone that never showed it — still gets it mid-game, even while paused', async () => {
+    const f = twoPlayers();
+    f.roll('Asha', 1, 2);
+    f.act('Asha', { type: 'PAUSE_GAME' });
+    await renderGame(f, 'Bilal', { revealed: false });
+    await reveal();
+  });
+
+  it('opening it from More counts as having read it', async () => {
+    const f = twoPlayers();
+    const first = await renderGame(f, 'Asha', { revealed: false });
+    await reveal();
+    await fireEvent.press(screen.getByTestId('objective-reveal-later'));
+    await fireEvent.press(screen.getByTestId('open-more'));
+    await fireEvent.press(screen.getByTestId('open-objective'));
+    expect(screen.getByTestId('my-objective-name')).toHaveTextContent('Deal Maker');
+    expect(await SecureStore.getItemAsync(OBJECTIVE_SEEN_KEY)).toBe(objectiveSeenValue(f.state.id, f.ids.Asha!));
+    await first.unmount();
+    await renderGame(f, 'Asha', { revealed: false });
+    await settled();
+    expect(screen.queryByTestId('objective-reveal')).toBeNull();
+  });
+
+  it('waits behind the Intermediate introduction instead of covering it', async () => {
+    await SecureStore.deleteItemAsync(INTRO_SEEN_KEY);
+    await renderGame(twoPlayers(), 'Asha', { revealed: false });
+    await waitFor(() => expect(screen.getByTestId('intermediate-intro')).toBeTruthy());
+    expect(screen.queryByTestId('objective-reveal')).toBeNull();
+    await fireEvent.press(screen.getByTestId('intro-skip'));
+    await reveal();
+  });
+
+  it('is first in More and on my own player sheet, never on anyone else’s', async () => {
+    const f = twoPlayers();
+    await renderGame(f, 'Asha');
+    await fireEvent.press(screen.getByTestId('open-more'));
+    const first = within(screen.getByTestId('more-actions')).getAllByRole('button')[0]!;
+    expect(first.props.testID).toBe('open-objective');
+    await fireEvent.press(screen.getByTestId(`player-chip-${f.ids.Bilal}`));
+    expect(screen.queryByTestId('player-open-objective')).toBeNull();
+    await fireEvent.press(screen.getByTestId(`player-chip-${f.ids.Asha}`));
+    await fireEvent.press(screen.getByTestId('player-open-objective'));
+    expect(screen.getByTestId('my-objective-name')).toHaveTextContent('Deal Maker');
+    expect(screen.getByTestId('my-objective-measures')).toHaveTextContent('0 / 2 trades');
+    expect(screen.getByTestId('my-objective')).toHaveTextContent(/Not yet/);
+  });
+
+  it.each([
+    ['a Classic game', {}],
+    ['an Intermediate game with objectives off', { mode: 'intermediate' as const, config: { secretObjectives: false } }],
+  ])('%s has no reveal and keeps no note of one', async (_label, options) => {
+    const f = new Fixture(['Asha', 'Bilal'], options);
+    await renderGame(f, 'Asha', { revealed: false });
+    await settled();
+    expect(screen.queryByTestId('objective-reveal')).toBeNull();
+    expect(SecureStore.getItemAsync).not.toHaveBeenCalledWith(OBJECTIVE_SEEN_KEY);
+    await fireEvent.press(screen.getByTestId(`player-chip-${f.ids.Asha}`));
+    expect(screen.queryByTestId('player-open-objective')).toBeNull();
+  });
+
+  it('a finished game reveals through the standings, not through the private pop-up', async () => {
+    const f = twoPlayers();
+    f.act('Asha', { type: 'END_GAME' });
+    await renderGame(f, 'Bilal', { revealed: false });
+    await settled();
+    expect(screen.queryByTestId('objective-reveal')).toBeNull();
+  });
+});
+
 describe('End of the game: the reveal', () => {
   it('shows every player’s objective, the outcome, the bonus and why', async () => {
     const f = new Fixture(['Asha', 'Bilal'], { mode: 'intermediate' });
@@ -386,7 +527,8 @@ describe('End of the game: the reveal', () => {
     const bilal = screen.getByTestId(`objective-result-${f.ids.Bilal}`);
     expect(bilal).toHaveTextContent(/Bilal · Deal Maker/);
     expect(bilal).toHaveTextContent(/Not completed/);
-    expect(bilal).not.toHaveTextContent(/Bonus/);
+    expect(bilal).not.toHaveTextContent(/Bonus:/);
+    expect(bilal).toHaveTextContent(/No bonus/);
     // The standings above already include the bonus, and the winner matches them.
     expect(screen.getByTestId('finished-card')).toHaveTextContent(/Asha wins!/);
     expect(screen.getByTestId('finished-card')).toHaveTextContent(/1\. Asha\s*₹29,000/);

@@ -13,6 +13,7 @@ import { LessonSuggestion } from '@/features/learning/LessonSuggestion';
 import { LoanSheet } from '@/features/loan/LoanSheet';
 import { GameConfigSummary } from '@/features/lobby/GameConfigEditor';
 import { MyObjective } from '@/features/objectives/ObjectiveCard';
+import { ObjectiveReveal, useObjectiveSeen } from '@/features/objectives/ObjectiveReveal';
 import { PlayerDetails, PlayerDetailsActions, PlayerDetailsHeader } from '@/features/player/PlayerDetails';
 import { PropertyDeed } from '@/features/player/PropertyDeed';
 import { TradeOffers } from '@/features/trade/TradeOffers';
@@ -75,6 +76,14 @@ export function GameScreen({ view }: { view: GameView }) {
   const ending = useGameStore((s) => s.pendingAction === 'END_GAME');
   const { state, events } = view.snapshot;
   const me = view.me;
+  // Intermediate with secret objectives only, and only my own: this phone holds nobody else's.
+  const hasObjective = !!me && !!state.objectives?.assignments[me.id];
+  const objectiveSeen = useObjectiveSeen(state.id, hasObjective && me ? me.id : null);
+  /** "Later" on the reveal: not offered again until the game is next opened. */
+  const [revealLater, setRevealLater] = useState(false);
+  /** The Intermediate introduction has finished (or was not needed): the reveal waits its turn behind it. */
+  const [introSettled, setIntroSettled] = useState(false);
+  const settleIntro = useCallback(() => setIntroSettled(true), []);
   const auctionId = state.auction?.status === 'OPEN' ? state.auction.id : null;
   // A sheet would cover the auction screen, so a sheet opened before an auction started is closed by it.
   const panel = panelState && (!auctionId || panelState.auctionId === auctionId) ? panelState.panel : null;
@@ -170,10 +179,18 @@ export function GameScreen({ view }: { view: GameView }) {
       hint: auctionId ? 'Open the live auction' : 'Starts when a player declines a property',
       onPress: () => auctionId && router.push(`/auction/${auctionId}`),
     },
-    { key: 'more', icon: 'more', label: 'More', testID: 'open-more', hint: 'Mortgage, undo, pause, log and rules', onPress: () => setPanel({ kind: 'more' }) },
+    { key: 'more', icon: 'more', label: 'More', testID: 'open-more', hint: hasObjective ? 'Your secret objective, mortgage, undo, pause, log and rules' : 'Mortgage, undo, pause, log and rules', onPress: () => setPanel({ kind: 'more' }) },
   ];
 
+  const openObjective = () => {
+    objectiveSeen.markSeen();
+    setPanel({ kind: 'objective' });
+  };
   const moreItems: MoreItem[] = [];
+  // First in the list, so it is never below the fold. The label and hint say nothing about which objective it is.
+  if (hasObjective) {
+    moreItems.push({ key: 'objective', icon: '🎯', label: 'My secret objective', hint: 'Only you can see this', testID: 'open-objective', onPress: openObjective });
+  }
   if (playing && me) {
     moreItems.push(
       { key: 'properties', icon: '🏠', label: 'My Properties', testID: 'more-properties', hint: 'Cash, properties, loans and history', onPress: () => openWallet(me.id) },
@@ -210,11 +227,6 @@ export function GameScreen({ view }: { view: GameView }) {
         },
       },
     );
-  }
-  // Intermediate with secret objectives only, and only my own: the label and hint say nothing about which one it is.
-  const hasObjective = !!me && !!state.objectives?.assignments[me.id];
-  if (hasObjective) {
-    moreItems.push({ key: 'objective', icon: '🎯', label: 'My secret objective', hint: 'Only you can see this', testID: 'open-objective', onPress: () => setPanel({ kind: 'objective' }) });
   }
   moreItems.push(
     { key: 'config', icon: '⚙️', label: 'Game settings', hint: 'The rules this game was started with', testID: 'open-config', onPress: () => setPanel({ kind: 'config' }) },
@@ -290,8 +302,10 @@ export function GameScreen({ view }: { view: GameView }) {
             onOpenWallet={openWallet}
           />
         );
-        // Dealing is with someone else; my own sheet (and a spectator's view) has no pinned actions.
-        if (me && panel.id !== me.id) {
+        // Dealing is with someone else; my own sheet only offers my objective (a spectator's view has no pinned actions).
+        if (me && panel.id === me.id && hasObjective) {
+          panelFooter = <Button size="md" variant="secondary" title="🎯 My secret objective" testID="player-open-objective" onPress={openObjective} />;
+        } else if (me && panel.id !== me.id) {
           panelFooter = (
             <PlayerDetailsActions
               view={view}
@@ -376,6 +390,15 @@ export function GameScreen({ view }: { view: GameView }) {
     }
   }
 
+  // The reveal: once per player per game, never over another sheet or dialog, and after the introduction.
+  const introPending = !!eco && playing && !introSettled;
+  const revealVisible =
+    hasObjective &&
+    state.status !== 'FINISHED' &&
+    objectiveSeen.seen === false &&
+    !revealLater &&
+    !(panelOpen || !!tool || !!auctionId || confirmEnd || confirmLeave || introPending);
+
   const context = pickContext(view);
   const gutter = screenGutter(width);
 
@@ -459,11 +482,12 @@ export function GameScreen({ view }: { view: GameView }) {
         <FinanceNotices
           view={view}
           eco={eco}
-          suspended={panelOpen || !!tool || !!auctionId || confirmEnd || confirmLeave}
+          suspended={panelOpen || !!tool || !!auctionId || confirmEnd || confirmLeave || revealVisible}
           onOpenLoans={() => openTool({ kind: 'loan', tab: 'loans' })}
         />
       ) : null}
-      {eco && playing ? <IntermediateIntro /> : null}
+      {eco && playing ? <IntermediateIntro onSettled={settleIntro} /> : null}
+      {revealVisible ? <ObjectiveReveal view={view} onLater={() => setRevealLater(true)} onSeen={objectiveSeen.markSeen} /> : null}
       <TradeSheet
         key={`trade-${preselect.trade}`}
         visible={tool?.kind === 'trade'}

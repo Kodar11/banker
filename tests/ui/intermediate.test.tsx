@@ -15,6 +15,7 @@ import {
 } from '@/engine/index.ts';
 import { FinanceHub } from '@/features/finance/FinanceHub';
 import { INTRO_SEEN_KEY } from '@/features/finance/IntermediateIntro';
+import { OBJECTIVE_SEEN_KEY, objectiveSeenValue } from '@/features/objectives/ObjectiveReveal';
 import { GameScreen } from '@/features/game/GameScreen';
 import type { GameView } from '@/features/game/useGameView';
 import { LobbyView } from '@/features/lobby/LobbyView';
@@ -77,6 +78,8 @@ async function introSeen(seen: boolean) {
 
 async function renderGame(f: Fixture, name: string) {
   f.loadAs(name);
+  // These players have already read their secret objective (its reveal is covered in customization.test.tsx).
+  if (f.state.objectives) await SecureStore.setItemAsync(OBJECTIVE_SEEN_KEY, objectiveSeenValue(f.state.id, f.ids[name]!));
   const view = await render(<GameScreen view={viewFor(f, name)} />);
   await fireEvent(screen.getByTestId('game-scroll'), 'layout', { nativeEvent: { layout: { width: 412, height: 840 } } });
   return view;

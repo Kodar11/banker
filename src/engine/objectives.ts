@@ -80,9 +80,17 @@ export interface ObjectiveDefinition {
   describe: (terms: ObjectiveTerms) => string;
   /** Checks the goal against a state. Used live for the owner's private progress, and once at the end for the result. */
   evaluate: (state: ObjectiveStateView, playerId: string, terms: ObjectiveTerms) => ObjectiveCheck;
+  /** The same standing as "have / need" lines for the owner's own screen ("2 / 3 houses"). Read from the state, never stored. */
+  measures: (state: ObjectiveStateView, playerId: string, terms: ObjectiveTerms) => string[];
 }
 
 const count = (n: number, word: string, many = `${word}s`) => `${n} ${n === 1 ? word : many}`;
+
+/** Installments overdue plus loans in default: either one disqualifies Cash Guardian. */
+function loanPaymentsBehind(state: ObjectiveStateView, playerId: string): number {
+  const eco = economyOf(state);
+  return eco ? overdueInstallments(eco, playerId).length + defaultedLoans(eco, playerId).length : 0;
+}
 
 export const OBJECTIVES: Record<ObjectiveId, ObjectiveDefinition> = {
   PROPERTY_MOGUL: {
@@ -103,6 +111,11 @@ export const OBJECTIVES: Record<ObjectiveId, ObjectiveDefinition> = {
         progress: `${count(keys.length, 'property', 'properties')} with original prices of ${formatINR(total)} (needs 3 or more, ${formatINR(t.cashTarget ?? 0)})`,
       };
     },
+    measures: (state, playerId, t) => {
+      const keys = ownedBy(state, playerId);
+      const total = keys.reduce((sum, key) => sum + getDeed(key).price, 0);
+      return [`${keys.length} / 3 properties`, `${formatINR(total)} / ${formatINR(t.cashTarget ?? 0)} property value`];
+    },
   },
   BUILDER: {
     id: 'BUILDER',
@@ -118,6 +131,7 @@ export const OBJECTIVES: Record<ObjectiveId, ObjectiveDefinition> = {
       const { houses } = buildingCount(state, playerId);
       return { completed: houses >= 3, progress: `${count(houses, 'house')} (needs 3)` };
     },
+    measures: (state, playerId) => [`${buildingCount(state, playerId).houses} / 3 houses`],
   },
   CASH_GUARDIAN: {
     id: 'CASH_GUARDIAN',
@@ -130,13 +144,16 @@ export const OBJECTIVES: Record<ObjectiveId, ObjectiveDefinition> = {
       `When the game ends, hold at least ${formatINR(t.cashTarget ?? 0)} in cash, with no loan installment overdue and no loan in default. Only cash counts — not property, rent you expect, or money you could still borrow.`,
     evaluate: (state, playerId, t) => {
       const cash = state.players.find((p) => p.id === playerId)?.balance ?? 0;
-      const eco = economyOf(state);
-      const behind = eco ? overdueInstallments(eco, playerId).length + defaultedLoans(eco, playerId).length : 0;
+      const behind = loanPaymentsBehind(state, playerId);
       return {
         completed: cash >= (t.cashTarget ?? 0) && behind === 0,
         progress: `${formatINR(cash)} cash (needs ${formatINR(t.cashTarget ?? 0)})${behind > 0 ? ', with a loan payment overdue or in default' : ''}`,
       };
     },
+    measures: (state, playerId, t) => [
+      `${formatINR(state.players.find((p) => p.id === playerId)?.balance ?? 0)} / ${formatINR(t.cashTarget ?? 0)} cash`,
+      loanPaymentsBehind(state, playerId) > 0 ? 'A loan payment is overdue or in default' : 'No overdue installments',
+    ],
   },
   DEAL_MAKER: {
     id: 'DEAL_MAKER',
@@ -151,6 +168,7 @@ export const OBJECTIVES: Record<ObjectiveId, ObjectiveDefinition> = {
       const done = completedTradeCount(state.objectives, playerId);
       return { completed: done >= 2, progress: `${count(done, 'trade')} completed (needs 2)` };
     },
+    measures: (state, playerId) => [`${completedTradeCount(state.objectives, playerId)} / 2 trades`],
   },
 };
 
@@ -288,6 +306,8 @@ export interface ObjectiveView {
   terms: ObjectiveTerms;
   description: string;
   check: ObjectiveCheck;
+  /** "have / need" lines for the progress display. */
+  measures: string[];
 }
 
 /** A player's objective as their own device shows it, or null when they have none. */
@@ -296,7 +316,13 @@ export function objectiveView(state: ObjectiveStateView & { config?: GameState['
   if (!id) return null;
   const definition = OBJECTIVES[id];
   const terms = objectiveTerms(id, configOf(state).startingCash);
-  return { definition, terms, description: definition.describe(terms), check: definition.evaluate(state, playerId, terms) };
+  return {
+    definition,
+    terms,
+    description: definition.describe(terms),
+    check: definition.evaluate(state, playerId, terms),
+    measures: definition.measures(state, playerId, terms),
+  };
 }
 
 /**

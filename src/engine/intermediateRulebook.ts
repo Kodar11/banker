@@ -19,7 +19,7 @@ function secretObjectivesEntry(config: GameConfig): RuleEntry {
   return {
     title: 'Secret objectives',
     lines: [
-      'When the game starts each player is dealt one objective. Only you can see yours (More → My secret objective). It cannot be changed or swapped.',
+      'When the game starts each player is dealt one objective. Only you can see yours: it is shown to you when the game starts, and stays under More → My secret objective. It cannot be changed or swapped.',
       `The objectives in play: ${OBJECTIVE_IDS.map((id) => `${OBJECTIVES[id].name} (${formatINR(objectiveTerms(id, config.startingCash).reward)} bonus)`).join(', ')}.`,
       'When the game ends every objective is revealed and checked. A completed one pays its bonus from the bank before the winner is decided.',
       'A player who went bankrupt or left before the end earns no bonus.',

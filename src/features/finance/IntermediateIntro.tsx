@@ -41,7 +41,7 @@ const SLIDES: { icon: string; title: string; body: string }[] = [
  * game starts. It can be skipped at any moment and closes by itself after about half a minute.
  * It is only this phone's overlay: the shared game never waits for it.
  */
-export function IntermediateIntro() {
+export function IntermediateIntro({ onSettled }: { /** It is over, or was never going to show: anything waiting behind it may now appear. */ onSettled?: () => void }) {
   const [visible, setVisible] = useState(false);
   const [slide, setSlide] = useState(0);
 
@@ -49,19 +49,26 @@ export function IntermediateIntro() {
     let cancelled = false;
     SecureStore.getItemAsync(INTRO_SEEN_KEY)
       .then((seen) => {
-        if (!cancelled && !seen) setVisible(true);
+        if (cancelled) return;
+        if (seen) onSettled?.();
+        else setVisible(true);
       })
       // Storage unavailable: better to skip the introduction than to show it every time.
-      .catch(() => undefined);
+      .catch(() => {
+        if (!cancelled) onSettled?.();
+      });
     return () => {
       cancelled = true;
     };
+    // Asked once, when the introduction mounts.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const finish = useCallback(() => {
     setVisible(false);
     SecureStore.setItemAsync(INTRO_SEEN_KEY, '1').catch(() => undefined);
-  }, []);
+    onSettled?.();
+  }, [onSettled]);
 
   useEffect(() => {
     if (!visible) return;
