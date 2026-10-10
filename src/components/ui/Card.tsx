@@ -1,19 +1,10 @@
 import type { ReactNode } from 'react';
 import { Text, View } from 'react-native';
 
-export function Card({
-  children,
-  className = '',
-  testID,
-  bottomBorder = true,
-}: {
-  children: ReactNode;
-  className?: string;
-  testID?: string;
-  bottomBorder?: boolean;
-}) {
+/** A plain cream surface. No edge of its own: a card that needs an accent edge asks for one in `className`. */
+export function Card({ children, className = '', testID }: { children: ReactNode; className?: string; testID?: string }) {
   return (
-    <View testID={testID} className={`rounded-3xl ${bottomBorder ? 'border-b-4 border-stone-300' : ''} bg-cream p-5 ${className}`}>
+    <View testID={testID} className={`rounded-3xl bg-cream p-5 ${className}`}>
       {children}
     </View>
   );

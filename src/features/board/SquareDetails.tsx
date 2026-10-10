@@ -91,7 +91,7 @@ export function SquareDetails({ view, index, onPlayerPress }: SquareDetailsProps
         </View>
       </Card>
       {showCard ? (
-        <Card className="border-saffron bg-amber-50" testID="special-square-current-card">
+        <Card className="border-b-4 border-saffron bg-amber-50" testID="special-square-current-card">
           <Label>
             Current card · {DECK_LABELS[card.deck]} {card.table.toLowerCase()} {card.rollTotal}
           </Label>

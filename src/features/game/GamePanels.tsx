@@ -68,7 +68,7 @@ export function UndoBanner({ view, send }: { view: GameView; send: (a: GameActio
   const mine = req.requestedBy === me.id;
   if (!canAnswer && !mine) return null;
   return (
-    <Card testID="undo-banner" className="border-amber-400 bg-amber-50">
+    <Card testID="undo-banner" className="border-b-4 border-amber-400 bg-amber-50">
       <Label>Undo request</Label>
       <Text className="mt-1 text-lg font-bold text-ink">
         {mine ? 'You asked to undo:' : `${view.playerName(req.requestedBy)} wants to undo:`} {req.description}

@@ -67,7 +67,7 @@ export function ConfirmDialog({
           accessibilityLabel={cancelTitle}
           testID={testID ? `${testID}-backdrop` : undefined}
         />
-        <View testID={testID} accessibilityViewIsModal className="max-h-full w-full max-w-sm rounded-3xl border-b-4 border-stone-300 bg-cream">
+        <View testID={testID} accessibilityViewIsModal className="max-h-full w-full max-w-sm rounded-3xl bg-cream">
           {/* Long text (or a large font size) scrolls inside the card; the buttons stay in reach below it. */}
           <ScrollView bounces={false} style={{ flexGrow: 0 }} contentContainerClassName="items-center px-6 pt-7">
             {icon ? <Text className="text-6xl">{icon}</Text> : null}

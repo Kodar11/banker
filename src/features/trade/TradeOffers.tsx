@@ -28,7 +28,7 @@ export function TradeOffers({ view, send }: { view: GameView; send: (a: GameActi
         const youGive = incoming ? describeTradeSide(t.requestedPropertyKeys, t.requestedMoney) : describeTradeSide(t.offeredPropertyKeys, t.offeredMoney);
         const problem = tradeBlocker(state, t);
         return (
-          <Card key={t.id} testID={incoming ? 'trade-incoming' : 'trade-outgoing'} className="border-saffron bg-amber-50">
+          <Card key={t.id} testID={incoming ? 'trade-incoming' : 'trade-outgoing'} className="border-b-4 border-saffron bg-amber-50">
             <Label>{incoming ? `Trade offer from ${other}` : `Your offer to ${other}`}</Label>
             <Text className="mt-1 text-base text-ink">
               <Text className="font-extrabold">You get: </Text>
