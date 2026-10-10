@@ -6,11 +6,13 @@ import { Button, Screen, TextField } from '@/components/ui';
 import { parseJoinCode } from '@/constants/app';
 import { QrScanner } from '@/features/lobby/QrScanner';
 import { useEnterGame } from '@/features/lobby/useEnterGame';
+import { useAccountStore } from '@/store/accountStore';
 
 export default function JoinGame() {
   const params = useLocalSearchParams<{ code?: string }>();
   const [code, setCode] = useState(() => parseJoinCode(params.code ?? '') ?? '');
-  const [name, setName] = useState('');
+  // Starts from the player's nickname; what they type here is only their name in this game.
+  const [name, setName] = useState(() => useAccountStore.getState().profile?.nickname ?? '');
   const [scanning, setScanning] = useState(false);
   const { submit, busy, error } = useEnterGame();
 

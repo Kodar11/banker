@@ -35,6 +35,8 @@ do $$ begin
 end $$;
 grant usage on schema public to anon, authenticated, service_role;
 SQL
+# Supabase also provides the auth schema (users, identities, auth.uid()); a minimal stand-in for tests.
+$PSQL -d $DB -f "$ROOT/scripts/local-auth-stub.sql"
 for f in "$ROOT"/supabase/migrations/*.sql; do
   $PSQL -d $DB -f "$f"
 done

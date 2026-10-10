@@ -25,6 +25,12 @@ jest.mock('expo-crypto', () => {
   };
 });
 
+jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn(async () => true) }));
+
+jest.mock('expo-web-browser', () => ({ openAuthSessionAsync: jest.fn(async () => ({ type: 'cancel' })) }));
+
+jest.mock('expo-linking', () => ({ createURL: (path: string) => `businessbanker://${path}` }));
+
 jest.mock('expo-camera', () => ({
   CameraView: () => null,
   useCameraPermissions: () => [{ granted: false }, jest.fn()],
@@ -52,3 +58,26 @@ jest.mock('@/lib/gameApi', () => ({
   isRetryable: (e: { code: string }) => e.code === 'NETWORK' || e.code === 'TIMEOUT',
   callGameApi: jest.fn(),
 }));
+
+// The account layer never reaches Supabase in UI tests. Defaults describe a phone with no network;
+// tests/ui/account.test.tsx sets what each scenario needs.
+jest.mock('@/lib/accountApi', () => {
+  const offline = { ok: false, error: { code: 'NETWORK', message: 'No connection. Check your internet and try again.' } };
+  return {
+    DELETE_FUNCTION_NAME: 'delete-account',
+    accountApi: {
+      restoreSession: jest.fn(async () => offline),
+      signInAnonymously: jest.fn(async () => offline),
+      initProfile: jest.fn(async () => offline),
+      verifyUser: jest.fn(async () => offline),
+      updateNickname: jest.fn(async () => offline),
+      linkGoogle: jest.fn(async () => offline),
+      signInWithGoogle: jest.fn(async () => offline),
+      restoreTokens: jest.fn(async () => offline),
+      signOutLocal: jest.fn(async () => undefined),
+      deleteAccount: jest.fn(async () => offline),
+      onSignedOut: jest.fn(() => () => undefined),
+      setForeground: jest.fn(),
+    },
+  };
+});

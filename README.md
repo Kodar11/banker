@@ -21,7 +21,7 @@ App (Expo Router)  ──POST action──▶  Edge Function `game-action`  ─�
 * **Auction timing.** One deadline, on the server's clock: `auctions.ends_at`, set when the auction opens and again by each accepted bid. Every phone counts down to it using an estimate of the server clock taken from request/response timing (`src/lib/serverClock.ts`) — never from when an update happened to arrive or a screen mounted. A bid is on time if the server *received* it less than `auction.bidGraceSeconds` (1 s, never shown) after that deadline; client timestamps are not used. From that instant the auction can be closed, exactly once: by a timer the Edge Function arms for each deadline, with phones on the auction screen asking too as a backstop.
 * **Stale actions.** Decision actions carry the `state_version` the player saw; if the game moved on, the server rejects with “The game just changed”.
 * **Realtime.** Broadcast pings carry only the new version; a client refetches only when the ping is *ahead* of its snapshot. It also reconciles once after a reconnect and once when the app returns from the background. Polling (every 5 s) runs **only while realtime is down** — a healthy idle connection does no work (`src/features/game/sync.ts`, dev counters in `src/lib/syncStats.ts`).
-* **No accounts.** Each phone generates a random device token; the server stores only its SHA-256.
+* **A seat is not an account.** Each phone joins a game with a random device token; the server stores only its SHA-256. The player account (see Accounts below) is separate and never needed to play.
 
 ## Project structure
 
@@ -37,20 +37,24 @@ app/                     Routes only (Expo Router)
   player/[playerId].tsx  Wallet: balance, properties, loans, net worth, history
   property/[key].tsx     Title deed + allowed actions
   settings.tsx           House rules (the rulebook), leave game
+  account.tsx            Settings: player profile, Google link / restore, delete account
+  auth-callback.tsx      Where Google sign-in returns to (businessbanker://auth-callback)
 src/
   components/ui/         Button, Card, Screen, Sheet, TextField, toasts/banners
   features/              game, lobby, auction, loan, trade, player, transactions
   engine/                Pure game logic + Business board/card data + rules config + API contract
-  lib/                   supabase client, game API, realtime, device ids
-  store/                 Zustand: sessionStore (device credentials), gameStore (server snapshot)
+  lib/                   supabase client (+ secure session storage), game API, account API, realtime, device ids
+  store/                 Zustand: sessionStore (device credentials), gameStore (server snapshot), accountStore (player account)
   constants/ utils/
 supabase/
   migrations/            Schema, constraints, append-only triggers, RLS lockdown, catalog
   functions/game-action/ Edge Function (index.ts = Deno entry, handler.ts, db.ts)
+  functions/delete-account/  Edge Function: permanent account deletion
   functions/_shared/engine/  Generated copy of src/engine
 tests/
   engine/                Vitest — rules, data, money, auctions, loans, cards, undo, invariants
-  server/                Vitest + real Postgres — handler, idempotency, concurrency, RLS
+  server/                Vitest + real Postgres — handler, idempotency, concurrency, RLS, profiles
+  account/               Vitest — nickname rules, session storage, OAuth redirect, deletion handler
   ui/                    Jest + React Native Testing Library
 .maestro/                Maestro E2E flows (+ bot script that plays the second seat)
 ```
@@ -77,7 +81,7 @@ Deploy the backend once (needs the Supabase CLI logged in and linked: `npx supab
 
 ```bash
 npm run deploy:db          # supabase db push — applies supabase/migrations
-npm run deploy:functions   # syncs the engine, deploys game-action (verify_jwt = false)
+npm run deploy:functions   # syncs the engine, deploys game-action and delete-account
 ```
 
 The function uses the platform-provided `SUPABASE_DB_URL`, `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`; nothing secret ships in the app. Realtime **Broadcast** must allow public channels (the default).
@@ -133,12 +137,42 @@ The host can customise a small, fixed set of rules on **New game** and, until th
 
 Deploying this: `npm run deploy:db` (migration `20261012000000_game_customization.sql`, additive), then `npm run deploy:functions`, then ship the app. An app that sends settings to a function deployed before this migration is refused.
 
+## Accounts: guest, Google link, restore, delete
+
+Nobody signs in to play. On first launch the app creates a Supabase **anonymous** user and a profile for it; from then on the stored session is restored.
+
+* **Identity** — Supabase Auth, on the app's one client (`src/lib/supabase.ts`). The session is kept in the platform keystore (`src/lib/secureSessionStorage.ts`: expo-secure-store, split into pieces, switched over atomically so a failed write can never destroy the previous session).
+* **Profile** — `public.profiles` (migration `20261014000000_player_profiles.sql`), one row per Auth user: `player_id` (`RR-` + 6 of `23456789ABCDEFGHJKLMNPQRSTUVWXYZ`, generated in Postgres, unique, immutable by trigger), `nickname` (default `Player1234`), `google_linked_at` (mirrors `auth.identities`). The app can only *read its own row* (RLS). All writes go through two `SECURITY DEFINER` functions that act on `auth.uid()`: `init_profile()` (create-or-load, idempotent) and `update_nickname(text)`.
+* **Nickname rules** — NFC, spaces collapsed and trimmed, 3–20 characters, no control or invisible formatting characters, at most 5 changes per 24 hours. Nicknames are not unique; the Player ID is. Checked on the phone for feedback (`src/features/account/nickname.ts`) and enforced in `update_nickname`.
+* **Moderation policy** — `public.nickname_blocklist` (server-only data, editable without a deploy). The nickname is folded (lower case, look-alike digits/symbols mapped to letters, everything but a–z dropped) and refused if it *contains* a `contains` term or *equals* an `exact` term. `exact` is used for words that also occur inside ordinary names and for staff-like names (admin, moderator, …).
+* **Link Google** — `supabase.auth.linkIdentity` in the system browser (PKCE). It adds Google to the *current* user: same user id, same Player ID. A Google account that already belongs to another player comes back as an error and nothing changes. "Linked" is shown only after `init_profile()` reports the identity.
+* **Restore on another phone** — Settings → *Restore with Google* (`signInWithOAuth`), after an explicit confirmation that the phone will switch players. If nobody is linked to that Google account, the previous session is put back and the empty account the sign-in created is deleted.
+* **Delete** — Settings → Danger zone → two steps (read, then type DELETE) → Edge Function `delete-account`: verifies the caller's token with Supabase Auth, requires a Google sign-in from the last 10 minutes for linked accounts, then deletes the Auth user (sessions, refresh tokens, Google identity; the profile goes with it by `ON DELETE CASCADE`). The phone clears its session and cache only after the server confirms, then starts over as a new guest.
+* **What deletion does not touch** — games. A seat is a device token, not an account: no game row refers to a profile, an active game continues, and games expire on their own. Financial Learning progress lives on the phone only and is kept.
+* **Failure rules** (`src/store/accountStore.ts`) — a network or server error never creates a new account and never discards a session; a session is treated as ended only when Supabase Auth says the account is gone; a phone that *had* an account and lost its session asks (restore with Google / start a new guest) instead of silently starting over.
+
+### One-time setup (dashboards — not done by the code)
+
+Package / bundle id: `com.boardgamebank.businessbanker`. Scheme: `businessbanker`. Supabase project ref: `zlsimveghdbanvlupduz`.
+
+1. **Supabase → Authentication → Sign In / Providers**: enable **Anonymous sign-ins**; enable **Manual linking**.
+2. **Google Cloud Console → APIs & Services → Credentials**: create an OAuth client of type **Web application**. Authorised redirect URI: `https://zlsimveghdbanvlupduz.supabase.co/auth/v1/callback`. Configure the OAuth consent screen (scopes: openid, email, profile) and publish it (or add test users).
+3. **Supabase → Authentication → Providers → Google**: enable, paste that client's **Client ID** and **Client secret** (the secret stays in Supabase; it is never in the app).
+4. **Supabase → Authentication → URL Configuration → Redirect URLs**: add `businessbanker://auth-callback` (and, only for trying it in Expo Go, the `exp://…/--/auth-callback` URL Expo prints).
+5. `npm run deploy:db`, then `npm run deploy:functions`.
+6. Recommended before release: turn on CAPTCHA for anonymous sign-ins (abuse protection) and schedule a clean-up of old, never-linked anonymous users.
+
+No Android OAuth client or SHA-1 fingerprint is needed: sign-in runs in the browser against the Web client. They become necessary only if this is later replaced by the native Google Sign-In SDK (then: an Android client for `com.boardgamebank.businessbanker` with the SHA-1 of the EAS build keystore — `eas credentials` — and of Play App Signing).
+
+`expo-web-browser` and `expo-clipboard` are included in Expo Go; a development or release build needs to be rebuilt once because they are native modules.
+
 ## Checks & tests
 
 ```bash
 npx tsc --noEmit          # typecheck
 npx expo lint             # lint
 npm run test:engine       # Vitest: engine + exact Business data + drift checks
+npm run test:account      # Vitest: nickname rules, secure session storage, deletion handler
 npm run test:ui           # Jest + RNTL
 npm run db:local          # throwaway local Postgres (no Docker) with the migrations
 DATABASE_URL=postgres://postgres@127.0.0.1:54329/banker npm run test:server

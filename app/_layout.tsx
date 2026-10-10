@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NoticeToast } from '@/components/ui';
 import { COLORS } from '@/constants/theme';
+import { AccountHost } from '@/features/account/AccountHost';
 import { GameSyncHost } from '@/features/game/sync';
 import { useLearningStore } from '@/store/learningStore';
 import { useSessionStore } from '@/store/sessionStore';
@@ -32,6 +33,7 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
+      <AccountHost />
       <GameSyncHost />
       <StatusBar style="light" />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: COLORS.felt }, animation: 'fade_from_bottom' }}>

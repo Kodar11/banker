@@ -5,6 +5,7 @@ import { BUSINESS_MVP_RULES, defaultGameConfig, PROPERTY_KEYS, type GameConfig, 
 import { Button, Card, Label, Pill, Screen, TextField } from '@/components/ui';
 import { GameConfigEditor, GameConfigSummary } from '@/features/lobby/GameConfigEditor';
 import { useEnterGame } from '@/features/lobby/useEnterGame';
+import { useAccountStore } from '@/store/accountStore';
 import { formatINR } from '@/utils/currency';
 
 const MODES: { mode: GameMode; title: string; points: string[] }[] = [
@@ -17,7 +18,8 @@ const MODES: { mode: GameMode; title: string; points: string[] }[] = [
 ];
 
 export default function CreateGame() {
-  const [name, setName] = useState('');
+  // Starts from the player's nickname; what they type here is only their name in this game.
+  const [name, setName] = useState(() => useAccountStore.getState().profile?.nickname ?? '');
   const [gameMode, setGameMode] = useState<GameMode>('classic');
   const [config, setConfig] = useState<GameConfig>(() => defaultGameConfig('classic'));
   const { submit, busy, error } = useEnterGame();

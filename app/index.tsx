@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Text, View } from 'react-native';
 import { router, usePathname } from 'expo-router';
 import { Button, Screen } from '@/components/ui';
+import { ProfileEntry } from '@/features/account/ProfileEntry';
 import { detachFromGame } from '@/features/game/leaveGame';
 import { activeGameRoute } from '@/utils/navigation';
 import { startupRouting } from '@/utils/startupRouting';
@@ -65,10 +66,11 @@ export default function Home() {
           <Button title="CREATE GAME" subtitle="You're the host" testID="create-game" onPress={() => router.push('/create-game')} />
           <Button title="JOIN GAME" subtitle="Scan QR or enter code" testID="join-game" variant="secondary" onPress={() => router.push('/join-game')} />
           <Button title="Financial Learning" size="sm" variant="ghost" testID="open-learning" onPress={() => router.push('/learning')} />
-          <Button title="House rules & settings" size="sm" variant="ghost" onPress={() => router.push('/settings')} />
+          <Button title="How to play · House rules" size="sm" variant="ghost" testID="open-rules" onPress={() => router.push('/settings')} />
         </>
       }
     >
+      <ProfileEntry />
       <View className="flex-1 items-center justify-center gap-3">
         <Text className="text-7xl">🏦</Text>
         <Text className="text-center text-5xl font-black text-cream">Business{'\n'}Banker</Text>
