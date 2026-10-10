@@ -9,6 +9,7 @@ import { SquareDetails } from '@/features/board/SquareDetails';
 import { FinanceHub, type FinanceTab } from '@/features/finance/FinanceHub';
 import { FinanceNotices } from '@/features/finance/FinanceNotices';
 import { IntermediateIntro } from '@/features/finance/IntermediateIntro';
+import { LessonSuggestion } from '@/features/learning/LessonSuggestion';
 import { LoanSheet } from '@/features/loan/LoanSheet';
 import { GameConfigSummary } from '@/features/lobby/GameConfigEditor';
 import { MyObjective } from '@/features/objectives/ObjectiveCard';
@@ -228,6 +229,17 @@ export function GameScreen({ view }: { view: GameView }) {
         router.push('/settings');
       },
     },
+    {
+      key: 'learning',
+      icon: '🎓',
+      label: 'Financial Learning',
+      hint: 'Short money stories. They never change this game',
+      testID: 'open-learning',
+      onPress: () => {
+        setPanel(null);
+        router.push('/learning');
+      },
+    },
   );
   // Any player may walk away; only the host may end the game for everyone (below).
   if (me && state.status !== 'FINISHED') {
@@ -340,7 +352,18 @@ export function GameScreen({ view }: { view: GameView }) {
         break;
       case 'standings':
         panelTitle = 'Final standings';
-        panelBody = <FinishedView view={view} />;
+        panelBody = (
+          <>
+            <FinishedView view={view} />
+            {/* Optional and dismissible; the standings above never wait for it. */}
+            <LessonSuggestion
+              onOpen={(lessonId) => {
+                setPanel(null);
+                router.push(`/learning/${lessonId}`);
+              }}
+            />
+          </>
+        );
         break;
       case 'config':
         panelTitle = 'Game settings';

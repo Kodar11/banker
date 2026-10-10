@@ -33,7 +33,7 @@ jest.mock('expo-camera', () => ({
 jest.mock('react-native-qrcode-svg', () => () => null);
 
 jest.mock('expo-router', () => {
-  const router = { push: jest.fn(), replace: jest.fn(), back: jest.fn(), canGoBack: jest.fn(() => true), canDismiss: jest.fn(() => false), dismissAll: jest.fn() };
+  const router = { push: jest.fn(), replace: jest.fn(), back: jest.fn(), canGoBack: jest.fn(() => true), canDismiss: jest.fn(() => false), dismissAll: jest.fn(), dismissTo: jest.fn() };
   return {
     router,
     useRouter: () => router,

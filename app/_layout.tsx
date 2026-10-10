@@ -6,6 +6,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NoticeToast } from '@/components/ui';
 import { COLORS } from '@/constants/theme';
 import { GameSyncHost } from '@/features/game/sync';
+import { useLearningStore } from '@/store/learningStore';
 import { useSessionStore } from '@/store/sessionStore';
 
 /**
@@ -23,9 +24,11 @@ export const unstable_settings = {
 
 export default function RootLayout() {
   const hydrate = useSessionStore((s) => s.hydrate);
+  const hydrateLearning = useLearningStore((s) => s.hydrate);
   useEffect(() => {
     void hydrate();
-  }, [hydrate]);
+    void hydrateLearning();
+  }, [hydrate, hydrateLearning]);
 
   return (
     <SafeAreaProvider>

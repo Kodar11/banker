@@ -6,7 +6,7 @@ export default defineConfig({
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
   test: {
-    include: ['tests/engine/**/*.test.ts', 'tests/server/**/*.test.ts'],
+    include: ['tests/engine/**/*.test.ts', 'tests/server/**/*.test.ts', 'tests/learning/**/*.test.ts'],
     environment: 'node',
     // Server integration tests share one Postgres database; run files sequentially.
     fileParallelism: false,
