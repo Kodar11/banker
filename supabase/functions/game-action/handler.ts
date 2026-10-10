@@ -12,12 +12,14 @@ import {
   isGameError,
   joinGame,
   applyAction,
+  auctionAcceptUntil,
   RULES_VERSION,
   STALE_SENSITIVE_ACTIONS,
   type ApiRequest,
   type ApiResponse,
   type EngineContext,
   type GameActionType,
+  type GameState,
   type StateBroadcast,
 } from '../_shared/engine/index.ts';
 import { insertNewGame, insertPlayer, loadSnapshot, loadState, lockGame, persistResult, type Sql, type Tx } from './db.ts';
@@ -26,6 +28,11 @@ export interface HandlerDeps {
   sql: Sql;
   /** Fire-and-forget realtime notification after commit. */
   broadcast?: (gameId: string, payload: StateBroadcast) => Promise<void>;
+  /**
+   * Runs `task` after `delayMs`, outside the request (Edge: EdgeRuntime.waitUntil). Used to close
+   * an auction when its deadline passes without depending on any phone staying connected.
+   */
+  defer?: (delayMs: number, task: () => Promise<void>) => void;
   now?: () => Date;
   random?: () => number;
   newId?: () => string;
@@ -66,6 +73,9 @@ export async function handleRequest(rawBody: unknown, deps: HandlerDeps): Promis
   if (!parsed.success) return errorResult('VALIDATION', 'That request is not valid.', 400);
   const req = parsed.data;
   const now = () => (deps.now ? deps.now() : new Date()).toISOString();
+  // Server receipt time, taken before any waiting (connection pool, game lock). This — never a
+  // client timestamp — decides whether a bid arrived in time.
+  const receivedAt = now();
   const random = deps.random ?? secureRandom;
   const newId = deps.newId ?? (() => crypto.randomUUID());
 
@@ -78,7 +88,7 @@ export async function handleRequest(rawBody: unknown, deps: HandlerDeps): Promis
       case 'state':
         return await stateOp(req, deps);
       case 'action':
-        return await actionOp(req, deps, now, random, newId);
+        return await actionOp(req, deps, now, random, newId, receivedAt);
     }
   } catch (error) {
     if (isGameError(error)) return errorResult(error.code, error.message);
@@ -214,6 +224,7 @@ async function actionOp(
   now: () => string,
   random: () => number,
   newId: () => string,
+  receivedAt: string,
 ): Promise<HandlerResult> {
   const actionType = (req.action as { type?: unknown })?.type;
 
@@ -242,23 +253,81 @@ async function actionOp(
     }
 
     const state = await loadState(tx, game);
-    const result = applyAction(state, req.playerId, req.action, { actionId: req.actionId, now: now(), random, newId });
+    const result = applyAction(state, req.playerId, req.action, { actionId: req.actionId, now: now(), receivedAt, random, newId });
     await persistResult(tx, currentVersion, result);
     await tx`insert into public.game_actions (action_id, game_id, player_id, type, payload, state_version_after, result)
       values (${req.actionId}, ${req.gameId}, ${req.playerId}, ${String(actionType)},
         ${tx.json(req.action as never)}, ${result.state.version},
         ${tx.json({ transactions: result.transactions.map((t) => t.id), events: result.events.map((e) => e.type) })})`;
     const [fresh] = await tx`select * from public.games where id = ${req.gameId}`;
-    return { duplicate: false as const, snapshot: await loadSnapshot(tx, fresh!), result };
+    const deadlineSet = result.state.auction?.id !== state.auction?.id || result.state.auction?.endsAt !== state.auction?.endsAt;
+    return { duplicate: false as const, snapshot: await loadSnapshot(tx, fresh!), result, deadlineSet };
   });
 
   if (!outcome.duplicate) {
+    if (outcome.deadlineSet) scheduleAuctionClose(deps, outcome.result.state);
     await notify(deps, req.gameId, outcome.result.state.version, outcome.result.events);
   }
   return {
     status: 200,
     body: { ok: true, gameId: req.gameId, playerId: req.playerId, snapshot: outcome.snapshot, duplicate: outcome.duplicate || undefined },
   };
+}
+
+/** Past the acceptance deadline by this much before the server's own close fires. */
+const CLOSE_TIMER_SLACK_MS = 25;
+
+/** Arms the server-side close for the deadline an action just set (auction opened, bid accepted, game resumed). */
+function scheduleAuctionClose(deps: HandlerDeps, state: GameState): void {
+  const auction = state.auction;
+  if (!deps.defer || !auction || auction.status !== 'OPEN' || state.status !== 'ACTIVE') return;
+  const nowMs = (deps.now ? deps.now() : new Date()).getTime();
+  const delay = Math.max(0, auctionAcceptUntil(auction) - nowMs) + CLOSE_TIMER_SLACK_MS;
+  deps.defer(delay, async () => {
+    try {
+      await closeAuctionIfDue(state.id, auction.id, deps);
+    } catch (error) {
+      // Phones on the auction screen also ask for the close, so this is not the only path.
+      console.error('auction close timer failed', error);
+    }
+  });
+}
+
+/**
+ * Server-owned auction closure: finalizes `auctionId` if it is still the game's open auction and
+ * its acceptance deadline has passed. Same lock, same engine rule and same exactly-once guarantee
+ * as a player's CLOSE_AUCTION, so it is safe to call any number of times, alongside bids and
+ * player close requests. A timer armed for a deadline that a later bid moved does nothing.
+ * Returns true when this call closed the auction.
+ */
+export async function closeAuctionIfDue(gameId: string, auctionId: string, deps: HandlerDeps): Promise<boolean> {
+  const random = deps.random ?? secureRandom;
+  const newId = deps.newId ?? (() => crypto.randomUUID());
+  const result = await deps.sql.begin(async (tx) => {
+    const game = await lockGame(tx, gameId);
+    if (!game || game.current_auction_id !== auctionId || game.status !== 'ACTIVE' || game.rules_version !== RULES_VERSION) return null;
+    const state = await loadState(tx, game);
+    // The engine needs an acting player; closing has no actor of its own (the events name the winner).
+    const actor = state.players.find((p) => p.status === 'ACTIVE');
+    if (!actor) return null;
+    const actionId = newId();
+    const action = { type: 'CLOSE_AUCTION', auctionId };
+    let closed;
+    try {
+      closed = applyAction(state, actor.id, action, { actionId, now: (deps.now ? deps.now() : new Date()).toISOString(), random, newId });
+    } catch (error) {
+      if (isGameError(error)) return null; // already closed, or the deadline moved
+      throw error;
+    }
+    await persistResult(tx, state.version, closed);
+    await tx`insert into public.game_actions (action_id, game_id, player_id, type, payload, state_version_after, result)
+      values (${actionId}, ${gameId}, null, 'CLOSE_AUCTION', ${tx.json({ ...action, by: 'SERVER_TIMER' })}, ${closed.state.version},
+        ${tx.json({ transactions: closed.transactions.map((t) => t.id), events: closed.events.map((e) => e.type) })})`;
+    return closed;
+  });
+  if (!result) return false;
+  await notify(deps, gameId, result.state.version, result.events);
+  return true;
 }
 
 async function notify(

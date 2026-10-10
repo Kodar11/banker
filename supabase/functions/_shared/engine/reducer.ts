@@ -944,11 +944,20 @@ export function minimumNextBid(auction: { highBid: number | null; minimumOpening
   return auction.highBid === null ? auction.minimumOpeningBid : auction.highBid + auction.minimumIncrement;
 }
 
+/**
+ * Server-clock ms until which a bid is still accepted: the displayed deadline plus the hidden
+ * delivery grace. One boundary for everything — a bid counts when the server received it strictly
+ * before this instant; the auction can be closed at or after it.
+ */
+export function auctionAcceptUntil(auction: { endsAt: string }): number {
+  return Date.parse(auction.endsAt) + RULES.auction.bidGraceSeconds * 1000;
+}
+
 function placeBid(d: Draft, actor: PlayerState, auctionId: string, amount: number): void {
   const auction = openAuction(d, auctionId);
   if (!auction.participantIds.includes(actor.id)) fail('FORBIDDEN', "You're not in this auction.");
   if (auction.passedIds.includes(actor.id)) fail('INVALID_BID', 'You already passed on this auction.');
-  if (Date.parse(d.ctx.now) > Date.parse(auction.endsAt)) fail('AUCTION_CLOSED', 'Bidding has ended.');
+  if (Date.parse(d.ctx.receivedAt ?? d.ctx.now) >= auctionAcceptUntil(auction)) fail('AUCTION_CLOSED', 'Bidding has ended.');
   if (auction.highBidderId === actor.id) fail('INVALID_BID', 'You already have the highest bid.');
   const min = minimumNextBid(auction);
   if (amount < min) fail('INVALID_BID', `Minimum bid is ${formatINR(min)}.`);
@@ -979,7 +988,7 @@ function passAuction(d: Draft, actor: PlayerState, auctionId: string): void {
 
 function closeAuction(d: Draft, auctionId: string): void {
   const auction = openAuction(d, auctionId);
-  if (Date.parse(d.ctx.now) < Date.parse(auction.endsAt)) fail('INVALID_PHASE', 'The auction is still running.');
+  if (Date.parse(d.ctx.now) < auctionAcceptUntil(auction)) fail('INVALID_PHASE', 'The auction is still running.');
   finalizeAuction(d);
 }
 

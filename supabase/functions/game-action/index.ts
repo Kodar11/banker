@@ -29,6 +29,15 @@ async function broadcast(gameId: string, payload: StateBroadcast): Promise<void>
   if (!res.ok) throw new Error(`broadcast ${res.status}: ${await res.text()}`);
 }
 
+// Supabase Edge Runtime global: keeps the worker alive until the promise settles.
+declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void } | undefined;
+
+/** Runs `task` after the response has been sent (the auction close timer, a few seconds at most). */
+function defer(delayMs: number, task: () => Promise<void>): void {
+  const run = new Promise<void>((resolve) => setTimeout(resolve, delayMs)).then(task);
+  if (typeof EdgeRuntime !== 'undefined') EdgeRuntime.waitUntil(run);
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405, headers: CORS });
@@ -38,7 +47,7 @@ Deno.serve(async (req: Request) => {
   } catch {
     body = null;
   }
-  const result = await handleRequest(body, { sql, broadcast });
+  const result = await handleRequest(body, { sql, broadcast, defer });
   return new Response(JSON.stringify(result.body), {
     status: result.status,
     headers: { ...CORS, 'Content-Type': 'application/json' },

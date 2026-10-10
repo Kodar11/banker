@@ -1,5 +1,6 @@
 import { FunctionsHttpError } from '@supabase/supabase-js';
 import type { ApiRequest, ApiResponse, GameAction } from '@/engine/index.ts';
+import { recordServerTime } from './serverClock';
 import { getSupabase } from './supabase';
 
 export const FUNCTION_NAME = 'game-action';
@@ -10,10 +11,12 @@ export type ApiError = Extract<ApiResponse, { ok: false }>['error'];
 /** Thin, typed wrapper around the referee Edge Function. Never throws. */
 export async function callGameApi(body: ApiRequest): Promise<ApiResponse> {
   try {
+    const sentAt = Date.now();
     const { data, error } = await getSupabase().functions.invoke<ApiResponse>(FUNCTION_NAME, {
       body,
       timeout: TIMEOUT_MS,
     });
+    const receivedAt = Date.now();
     if (error) {
       if (error instanceof FunctionsHttpError) {
         try {
@@ -33,6 +36,7 @@ export async function callGameApi(body: ApiRequest): Promise<ApiResponse> {
       };
     }
     if (!data) return { ok: false, error: { code: 'SERVER_ERROR', message: 'Empty response from the server.' } };
+    if (data.ok) recordServerTime(data.snapshot.serverTime, sentAt, receivedAt);
     return data;
   } catch {
     return { ok: false, error: { code: 'NETWORK', message: 'Connection lost. Reconnecting…' } };

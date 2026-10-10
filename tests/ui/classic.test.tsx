@@ -6,6 +6,7 @@ import { AuctionView } from '@/features/auction/AuctionView';
 import { GameScreen } from '@/features/game/GameScreen';
 import type { GameView } from '@/features/game/useGameView';
 import { gameApi } from '@/lib/gameApi';
+import { recordServerTime, resetServerClock, serverNow } from '@/lib/serverClock';
 import { useGameStore } from '@/store/gameStore';
 import { useSessionStore } from '@/store/sessionStore';
 import { Fixture, ok } from './fixtures';
@@ -188,8 +189,25 @@ describe('End Game confirmation', () => {
 });
 
 describe('auction countdown (5 seconds, display only)', () => {
-  beforeEach(() => jest.useFakeTimers({ now: new Date('2026-01-01T10:00:00.000Z'), doNotFake: ['setImmediate'] }));
-  afterEach(() => jest.useRealTimers());
+  beforeEach(() => {
+    jest.useFakeTimers({ now: new Date('2026-01-01T10:00:00.000Z'), doNotFake: ['setImmediate'] });
+    resetServerClock();
+  });
+  afterEach(() => {
+    jest.useRealTimers();
+    resetServerClock();
+  });
+
+  const countdown = () => screen.getByTestId('auction-countdown');
+  const tick = (ms: number) => act(async () => jest.advanceTimersByTime(ms));
+  /** Asha declined Railway at 10:00:00.000 server time: the deadline is 10:00:05.000. */
+  function openAuction(as = 'Asha') {
+    const f = new Fixture(['Asha', 'Bilal']);
+    f.roll('Asha', 1, 2).act('Asha', { type: 'DECLINE_PROPERTY' }).loadAs(as);
+    return { f, auctionId: f.state.auction!.id };
+  }
+  /** A response that just arrived saying the server's clock is `serverAheadMs` ahead of this phone's. */
+  const syncClock = (serverAheadMs: number) => recordServerTime(new Date(Date.now() + serverAheadMs).toISOString(), Date.now(), Date.now());
 
   it('counts 5 → 4 → 3 → 2 → 1, then CLOSING… and asks the server to close; late bid buttons disappear', async () => {
     const f = new Fixture(['Asha', 'Bilal']);
@@ -197,7 +215,6 @@ describe('auction countdown (5 seconds, display only)', () => {
     const auctionId = f.state.auction!.id;
     api.action.mockResolvedValue({ ok: false, error: { code: 'AUCTION_CLOSED', message: 'That auction has finished.' } });
     await render(<AuctionView view={viewFor(f, 'Asha')} auctionId={auctionId} />);
-    const countdown = () => screen.getByTestId('auction-countdown');
     expect(countdown()).toHaveTextContent('5');
     for (const n of ['4', '3', '2', '1']) {
       await act(async () => jest.advanceTimersByTime(1000));
@@ -207,6 +224,12 @@ describe('auction countdown (5 seconds, display only)', () => {
     await act(async () => jest.advanceTimersByTime(1000));
     expect(countdown()).toHaveTextContent('CLOSING…');
     expect(screen.queryByTestId('bid-button')).toBeNull();
+    // The hidden grace second: still CLOSING…, no sixth second, no winner, and no close request yet.
+    await act(async () => jest.advanceTimersByTime(990));
+    expect(countdown()).toHaveTextContent('CLOSING…');
+    expect(screen.queryByTestId('auction-result')).toBeNull();
+    expect(api.action).not.toHaveBeenCalled();
+    await act(async () => jest.advanceTimersByTime(10));
     await act(async () => jest.advanceTimersByTime(10));
     expect(api.action).toHaveBeenCalledTimes(1);
     expect(api.action.mock.calls[0]![3]).toEqual({ type: 'CLOSE_AUCTION', auctionId });
@@ -222,13 +245,114 @@ describe('auction countdown (5 seconds, display only)', () => {
     api.action.mockResolvedValueOnce({ ok: false, error: { code: 'INVALID_PHASE', message: 'The auction is still running.' } });
     api.action.mockResolvedValue({ ok: false, error: { code: 'AUCTION_CLOSED', message: 'That auction has finished.' } });
     await render(<AuctionView view={viewFor(f, 'Asha')} auctionId={auctionId} />);
-    await act(async () => jest.advanceTimersByTime(5000));
+    await act(async () => jest.advanceTimersByTime(6000));
     await act(async () => jest.advanceTimersByTime(10));
     expect(api.action).toHaveBeenCalledTimes(1);
     await act(async () => jest.advanceTimersByTime(1100));
     expect(api.action).toHaveBeenCalledTimes(2);
     await act(async () => jest.advanceTimersByTime(5000));
     expect(api.action).toHaveBeenCalledTimes(2);
+  });
+
+  it('two phones with different clocks count down to the same server deadline', async () => {
+    // This phone's clock is 2.4 s behind the server's: the server is already 2.4 s into the auction.
+    const { f, auctionId } = openAuction();
+    syncClock(2400);
+    await render(<AuctionView view={viewFor(f, 'Asha')} auctionId={auctionId} />);
+    expect(countdown()).toHaveTextContent('3');
+    await tick(590);
+    expect(countdown()).toHaveTextContent('3');
+    await tick(10); // exactly 2.000 s left on the server's clock
+    expect(countdown()).toHaveTextContent('2');
+    await tick(2000);
+    expect(countdown()).toHaveTextContent('CLOSING…');
+  });
+
+  it('a phone whose clock runs ahead does not close early or hide the bid buttons', async () => {
+    const { f, auctionId } = openAuction('Bilal');
+    // The auction opened this instant on the server, but this phone's clock reads 30 s later.
+    jest.setSystemTime(Date.now() + 30_000);
+    syncClock(-30_000);
+    await render(<AuctionView view={viewFor(f, 'Bilal')} auctionId={auctionId} />);
+    expect(countdown()).toHaveTextContent('5');
+    expect(screen.getByTestId('bid-button')).toBeTruthy();
+  });
+
+  it('server clock: measured from when the response arrived, tightest round trip wins, a changed phone clock starts over', () => {
+    const t = Date.now();
+    // Server stamped +7.000 s; the response took 400 ms there and back → the server is ~7.2 s ahead at arrival.
+    recordServerTime(new Date(t + 7000).toISOString(), t - 400, t);
+    expect(serverNow() - Date.now()).toBe(7200);
+    // Rendering late changes nothing: the offset belongs to the arrival, not to "now".
+    jest.advanceTimersByTime(3000);
+    expect(serverNow() - Date.now()).toBe(7200);
+    // A slower response (wider error bar) that still agrees does not replace it…
+    recordServerTime(new Date(Date.now() + 6900).toISOString(), Date.now() - 1000, Date.now());
+    expect(serverNow() - Date.now()).toBe(7200);
+    // …a tighter one does.
+    recordServerTime(new Date(Date.now() + 7150).toISOString(), Date.now() - 100, Date.now());
+    expect(serverNow() - Date.now()).toBe(7200);
+    recordServerTime(new Date(Date.now() + 7230).toISOString(), Date.now() - 40, Date.now());
+    expect(serverNow() - Date.now()).toBe(7250);
+    // The phone's clock was set forward an hour: the samples disagree beyond their error bars.
+    recordServerTime(new Date(Date.now() - 3_600_000).toISOString(), Date.now() - 300, Date.now());
+    expect(serverNow() - Date.now()).toBe(-3_600_000 + 150);
+  });
+
+  it('remounting (reconnect, back and forth) resumes from the same deadline instead of restarting at 5', async () => {
+    const { f, auctionId } = openAuction();
+    const view = viewFor(f, 'Asha');
+    const first = await render(<AuctionView view={view} auctionId={auctionId} />);
+    await tick(2500);
+    expect(countdown()).toHaveTextContent('3');
+    await first.unmount();
+    await tick(700);
+    // Same snapshot object as before, mounted 3.2 s after it was issued.
+    await render(<AuctionView view={view} auctionId={auctionId} />);
+    expect(countdown()).toHaveTextContent('2');
+    await tick(800);
+    expect(countdown()).toHaveTextContent('1');
+  });
+
+  it('a bid moves the countdown to the new server deadline — however late the update arrives, it never restarts at 5', async () => {
+    const { f, auctionId } = openAuction();
+    const view = await render(<AuctionView view={viewFor(f, 'Asha')} auctionId={auctionId} />);
+    await tick(3000);
+    expect(countdown()).toHaveTextContent('2');
+    // Bilal bids: accepted at 10:00:03.000, so the deadline is 10:00:08.000. This phone hears 1.3 s later.
+    f.act('Bilal', { type: 'PLACE_BID', auctionId, amount: 500 });
+    expect(f.state.auction!.endsAt).toBe('2026-01-01T10:00:08.000Z');
+    await tick(1300);
+    expect(countdown()).toHaveTextContent('1');
+    await view.rerender(<AuctionView view={viewFor(f, 'Asha')} auctionId={auctionId} />);
+    expect(countdown()).toHaveTextContent('4'); // 3.7 s left, not a fresh 5
+    expect(screen.getByTestId('current-bid')).toHaveTextContent('₹500');
+    await tick(700);
+    expect(countdown()).toHaveTextContent('3');
+  });
+
+  it('at zero the phone never names a winner by itself; an older "open" update cannot reopen a closed auction', async () => {
+    const { f, auctionId } = openAuction();
+    f.act('Bilal', { type: 'PLACE_BID', auctionId, amount: 500 }).loadAs('Asha');
+    const openSnapshot = f.snapshot();
+    api.action.mockResolvedValue({ ok: false, error: { code: 'NETWORK', message: 'offline' } });
+    const view = await render(<AuctionView view={viewFor(f, 'Asha')} auctionId={auctionId} />);
+    await tick(5500);
+    expect(countdown()).toHaveTextContent('CLOSING…');
+    expect(screen.queryByTestId('auction-result')).toBeNull();
+    expect(screen.getByTestId('current-bid')).toHaveTextContent('₹500');
+
+    // The closure arrives from the server: SOLD, from authoritative state.
+    jest.setSystemTime(Date.now() + 600);
+    f.act('Asha', { type: 'CLOSE_AUCTION', auctionId });
+    expect(useGameStore.getState().applySnapshot(f.snapshot())).toBe(true);
+    await view.rerender(<AuctionView view={viewFor(f, 'Asha')} auctionId={auctionId} />);
+    expect(screen.getByTestId('auction-result')).toHaveTextContent(/SOLD.*Sold to Bilal/);
+    expect(screen.queryByTestId('auction-countdown')).toBeNull();
+
+    // A delayed response or refetch from before the closure is ignored by version.
+    expect(useGameStore.getState().applySnapshot(openSnapshot)).toBe(false);
+    expect(useGameStore.getState().snapshot!.state.auction).toMatchObject({ status: 'CLOSED', winnerId: f.ids.Bilal });
   });
 
   it('shows SOLD with the winner, or CLOSED when unsold', async () => {

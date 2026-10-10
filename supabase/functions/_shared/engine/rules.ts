@@ -166,6 +166,12 @@ export const BUSINESS_MVP_RULES = {
     openingTimerSeconds: 5,
     /** ✅ Each bid resets the countdown to this many seconds. */
     bidTimerSeconds: 5,
+    /**
+     * Hidden bid-delivery grace: the server still accepts a bid that reaches it up to this long
+     * after the displayed deadline (network latency), and closes the auction only once it has
+     * passed. Server logic only — never shown, never added to the countdown.
+     */
+    bidGraceSeconds: 1,
   },
 
   loans: {

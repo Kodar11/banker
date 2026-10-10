@@ -9,9 +9,9 @@
  * Skipped when DATABASE_URL is not set.
  */
 import { randomBytes, randomUUID } from 'node:crypto';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createSql, type Sql } from '../../supabase/functions/game-action/db.ts';
-import { handleRequest, type HandlerDeps } from '../../supabase/functions/game-action/handler.ts';
+import { closeAuctionIfDue, handleRequest, type HandlerDeps } from '../../supabase/functions/game-action/handler.ts';
 import type { ApiResponse, GameAction, GameSnapshot, StateBroadcast } from '../../supabase/functions/_shared/engine/index.ts';
 import { orderRandoms } from '../engine/harness.ts';
 
@@ -444,6 +444,180 @@ describe.skipIf(!DATABASE_URL)('game-action handler (Postgres)', () => {
     const [auction] = await sql`select status, winner_player_id from public.auctions where id = ${auctionId}`;
     expect(auction).toMatchObject({ status: 'CLOSED', winner_player_id: g.seats.Bilal!.playerId });
     await ledgerOk(g.gameId);
+  });
+
+  describe('auction deadline: hidden grace second, server-owned closure', () => {
+    /** Moves the server's clock forward without waiting. */
+    let skewMs = 0;
+    let deferred: { delayMs: number; task: () => Promise<void> }[] = [];
+
+    beforeEach(() => {
+      skewMs = 0;
+      deferred = [];
+      deps.now = () => new Date(Date.now() + skewMs);
+      deps.defer = (delayMs, task) => void deferred.push({ delayMs, task });
+    });
+    afterEach(() => {
+      delete deps.now;
+      delete deps.defer;
+    });
+
+    /** Asha declines Railway; Bilal bids 1,000. */
+    async function auctionWithBid(names = ['Asha', 'Bilal', 'Chitra']) {
+      const g = await setupGame(names);
+      ok(await g.act('Asha', { type: 'START_GAME' }));
+      queuedDice = [1, 2];
+      ok(await g.act('Asha', { type: 'ROLL_DICE' }));
+      const opened = ok(await g.act('Asha', { type: 'DECLINE_PROPERTY' })).snapshot.state.auction!;
+      const bid = ok(await g.act('Bilal', { type: 'PLACE_BID', auctionId: opened.id, amount: 1000 })).snapshot.state.auction!;
+      return { g, auctionId: opened.id, opened, endsAt: Date.parse(bid.endsAt) };
+    }
+    /** Puts the server clock `ms` past the displayed deadline. */
+    const jumpTo = (endsAt: number, ms: number) => {
+      skewMs = endsAt + ms - Date.now();
+    };
+    const payments = (gameId: string) => sql`select * from public.transactions where game_id = ${gameId} and type = 'AUCTION_PAYMENT'`;
+
+    it('one persisted deadline: every phone and every reconnect is served the same endsAt; refetching never moves it', async () => {
+      const { g, opened, endsAt } = await auctionWithBid();
+      expect(Date.parse(opened.endsAt) - Date.parse(opened.createdAt)).toBe(5000);
+      const version = g.version;
+      for (const name of ['Asha', 'Bilal', 'Chitra', 'Asha', 'Chitra']) {
+        const snap = await state(g.gameId, g.seats[name]!);
+        expect(Date.parse(snap.state.auction!.endsAt)).toBe(endsAt);
+        expect(snap.state.version).toBe(version);
+      }
+    });
+
+    it('a bid that reaches the server inside the grace second is accepted; invalid ones are still refused', async () => {
+      const { g, auctionId, endsAt } = await auctionWithBid();
+      jumpTo(endsAt, 300);
+      expect(await g.act('Chitra', { type: 'PLACE_BID', auctionId, amount: 1000 })).toMatchObject({ ok: false, error: { code: 'INVALID_BID' } });
+      expect(await g.act('Bilal', { type: 'PLACE_BID', auctionId, amount: 2000 })).toMatchObject({ ok: false, error: { code: 'INVALID_BID' } });
+      expect(await g.act('Asha', { type: 'CLOSE_AUCTION', auctionId })).toMatchObject({ ok: false, error: { code: 'INVALID_PHASE' } });
+      const accepted = ok(await g.act('Chitra', { type: 'PLACE_BID', auctionId, amount: 1100 })).snapshot.state.auction!;
+      expect(accepted).toMatchObject({ status: 'OPEN', highBid: 1100, highBidderId: g.seats.Chitra!.playerId });
+    });
+
+    it('a bid that arrives at or after the acceptance deadline is rejected and changes nothing', async () => {
+      const { g, auctionId, endsAt } = await auctionWithBid();
+      jumpTo(endsAt, 1000);
+      expect(await g.act('Chitra', { type: 'PLACE_BID', auctionId, amount: 1100 })).toMatchObject({ ok: false, error: { code: 'AUCTION_CLOSED' } });
+      const snap = await state(g.gameId, g.seats.Asha!);
+      expect(snap.state.auction).toMatchObject({ highBid: 1000, highBidderId: g.seats.Bilal!.playerId });
+      expect(await sql`select * from public.auction_bids where auction_id = ${auctionId}`).toHaveLength(1);
+    });
+
+    it('the server arms its own close for each new deadline and closes exactly once, with no phone involved', async () => {
+      const { g, auctionId, endsAt } = await auctionWithBid();
+      // One timer per deadline set: the opening one, then the one Bilal's bid moved it to.
+      expect(deferred).toHaveLength(2);
+      expect(deferred[1]!.delayMs).toBeGreaterThan(5000);
+      expect(deferred[1]!.delayMs).toBeLessThanOrEqual(6025);
+      ok(await g.act('Asha', { type: 'PASS_AUCTION', auctionId })); // no new deadline → no new timer
+      expect(deferred).toHaveLength(2);
+
+      // The opening deadline's timer fires while the auction is still running: nothing happens.
+      jumpTo(endsAt, 800);
+      await deferred[0]!.task();
+      expect((await state(g.gameId, g.seats.Asha!)).state.auction!.status).toBe('OPEN');
+
+      jumpTo(endsAt, 1025);
+      broadcasts.length = 0;
+      await Promise.all([deferred[1]!.task(), deferred[0]!.task(), deferred[1]!.task()]);
+      const snap = await state(g.gameId, g.seats.Chitra!);
+      expect(snap.state.auction).toMatchObject({ status: 'CLOSED', winnerId: g.seats.Bilal!.playerId, highBid: 1000 });
+      expect(snap.state.properties.RAILWAY.ownerId).toBe(g.seats.Bilal!.playerId);
+      expect(await payments(g.gameId)).toHaveLength(1);
+      expect(broadcasts.filter((b) => b.gameId === g.gameId)).toHaveLength(1);
+      expect(broadcasts.at(-1)!.payload.version).toBe(snap.state.version);
+      expect(broadcasts.at(-1)!.payload.events.map((e) => e.type)).toContain('AUCTION_WON');
+      const closes = await sql`select player_id from public.game_actions where game_id = ${g.gameId} and type = 'CLOSE_AUCTION'`;
+      expect(closes.map((r) => r.player_id)).toEqual([null]);
+      await ledgerOk(g.gameId);
+    });
+
+    it('phones and the server timer all asking at once: one closure, one payment, everyone reads the same result', async () => {
+      const { g, auctionId, endsAt } = await auctionWithBid();
+      jumpTo(endsAt, 1000);
+      const asked = await Promise.all([
+        ...['Asha', 'Bilal', 'Chitra'].map((n) => g.act(n, { type: 'CLOSE_AUCTION', auctionId })),
+        closeAuctionIfDue(g.gameId, auctionId, deps),
+        closeAuctionIfDue(g.gameId, auctionId, deps),
+      ]);
+      expect(asked.filter((r) => r === true || (typeof r === 'object' && r.ok))).toHaveLength(1);
+      for (const r of asked) if (typeof r === 'object' && !r.ok) expect(r.error.code).toBe('AUCTION_CLOSED');
+      expect(await payments(g.gameId)).toHaveLength(1);
+      const seen = await Promise.all(['Asha', 'Bilal', 'Chitra'].map((n) => state(g.gameId, g.seats[n]!)));
+      for (const snap of seen) {
+        expect(snap.state.version).toBe(seen[0]!.state.version);
+        expect(snap.state.auction).toMatchObject({ status: 'CLOSED', winnerId: g.seats.Bilal!.playerId, highBid: 1000 });
+      }
+      await ledgerOk(g.gameId);
+    });
+
+    it('a late bid racing the closure never wins and never reopens the auction', async () => {
+      const { g, auctionId, endsAt } = await auctionWithBid();
+      jumpTo(endsAt, 1000);
+      const [bid] = await Promise.all([
+        g.act('Chitra', { type: 'PLACE_BID', auctionId, amount: 5000 }),
+        closeAuctionIfDue(g.gameId, auctionId, deps),
+        g.act('Asha', { type: 'CLOSE_AUCTION', auctionId }),
+      ]);
+      // Refused as late if it got the lock first, as stale if the closure did.
+      expect(bid.ok).toBe(false);
+      if (!bid.ok) expect(['AUCTION_CLOSED', 'STALE_STATE']).toContain(bid.error.code);
+      const snap = await state(g.gameId, g.seats.Chitra!);
+      expect(snap.state.auction).toMatchObject({ status: 'CLOSED', winnerId: g.seats.Bilal!.playerId, highBid: 1000 });
+      expect(await g.act('Chitra', { type: 'PLACE_BID', auctionId, amount: 5000 }, { expectedVersion: snap.state.version })).toMatchObject({
+        ok: false,
+        error: { code: 'AUCTION_CLOSED' },
+      });
+      expect(await payments(g.gameId)).toHaveLength(1);
+    });
+
+    it('a grace-second bid retried with the same action id is recorded once, even if the retry lands after the close', async () => {
+      const { g, auctionId, endsAt } = await auctionWithBid();
+      jumpTo(endsAt, 700);
+      const actionId = randomUUID();
+      const v = g.version;
+      const first = ok(await g.act('Chitra', { type: 'PLACE_BID', auctionId, amount: 1500 }, { actionId, expectedVersion: v }));
+      jumpTo(Date.parse(first.snapshot.state.auction!.endsAt), 1000);
+      expect(await closeAuctionIfDue(g.gameId, auctionId, deps)).toBe(true);
+      const retry = ok(await g.act('Chitra', { type: 'PLACE_BID', auctionId, amount: 1500 }, { actionId, expectedVersion: v }));
+      expect(retry.duplicate).toBe(true);
+      expect(retry.snapshot.state.auction).toMatchObject({ status: 'CLOSED', winnerId: g.seats.Chitra!.playerId, highBid: 1500 });
+      expect(await sql`select * from public.auction_bids where auction_id = ${auctionId}`).toHaveLength(2);
+      expect(await payments(g.gameId)).toHaveLength(1);
+    });
+
+    it('nobody bids: the server closes the auction unsold on its own', async () => {
+      const g = await setupGame(['Asha', 'Bilal']);
+      ok(await g.act('Asha', { type: 'START_GAME' }));
+      queuedDice = [1, 2];
+      ok(await g.act('Asha', { type: 'ROLL_DICE' }));
+      const auction = ok(await g.act('Asha', { type: 'DECLINE_PROPERTY' })).snapshot.state.auction!;
+      expect(deferred).toHaveLength(1);
+      jumpTo(Date.parse(auction.endsAt), 1025);
+      await deferred[0]!.task();
+      const snap = await state(g.gameId, g.seats.Bilal!);
+      expect(snap.state.auction).toMatchObject({ status: 'CLOSED', winnerId: null });
+      expect(snap.state.properties.RAILWAY.ownerId).toBeNull();
+      expect(snap.state.turn.phase).toBe('TURN_COMPLETE');
+      expect(await payments(g.gameId)).toHaveLength(0);
+    });
+
+    it('a paused auction is not closed by its timer; resuming arms a new one for the moved deadline', async () => {
+      const { g, auctionId, endsAt } = await auctionWithBid();
+      ok(await g.act('Asha', { type: 'PAUSE_GAME' }));
+      jumpTo(endsAt, 30_000);
+      await deferred[1]!.task();
+      expect(await closeAuctionIfDue(g.gameId, auctionId, deps)).toBe(false);
+      const resumed = ok(await g.act('Asha', { type: 'RESUME_GAME' })).snapshot.state.auction!;
+      expect(resumed.status).toBe('OPEN');
+      expect(Date.parse(resumed.endsAt)).toBeGreaterThan(endsAt + 25_000);
+      expect(deferred).toHaveLength(3);
+    });
   });
 
   it('host can end a paused game (persists without violating constraints)', async () => {

@@ -1,6 +1,6 @@
 /** Finalized Classic Mode rules: Jail, Rest House, Club, Income Tax, Wealth Taxes, 5-second auctions. */
 import { describe, expect, it } from 'vitest';
-import { BUSINESS_MVP_RULES, incomeTaxDue, PROPERTY_KEYS, positionOfSpecial, wealthTaxDue, type PropertyKey } from '@/engine/index.ts';
+import { applyAction, auctionAcceptUntil, BUSINESS_MVP_RULES, incomeTaxDue, PROPERTY_KEYS, positionOfSpecial, wealthTaxDue, type PropertyKey } from '@/engine/index.ts';
 import { TestGame } from './harness.ts';
 
 const START = BUSINESS_MVP_RULES.startingCash;
@@ -339,6 +339,8 @@ describe('Wealth Taxes — ₹100 per house + ₹200 per hotel, max ₹500', () 
 });
 
 describe('auction — 5-second countdown (server authoritative)', () => {
+  const GRACE = BUSINESS_MVP_RULES.auction.bidGraceSeconds;
+
   function auctionGame() {
     const g = new TestGame();
     g.roll('Asha', 1, 2); // Railway
@@ -356,28 +358,70 @@ describe('auction — 5-second countdown (server authoritative)', () => {
     expect(Date.parse(g.state.auction!.endsAt)).toBe(g.nowMs + 5000);
   });
 
-  it('a bid at exactly the deadline counts; a bid after it is rejected; CLOSE only after it, exactly once', () => {
+  it('a bid in the hidden grace second counts; one at the acceptance deadline is rejected; CLOSE only from then, exactly once', () => {
+    expect(GRACE).toBe(1);
     const { g, auction } = auctionGame();
     g.act('Bilal', { type: 'PLACE_BID', auctionId: auction.id, amount: 500 });
-    g.advance(4.999);
+    g.advance(5); // the displayed deadline: phones show zero, the server is still accepting
     expect(() => g.act('Asha', { type: 'CLOSE_AUCTION', auctionId: auction.id })).toThrow('The auction is still running.');
-    g.advance(0.001); // exactly at the deadline
+    g.advance(GRACE - 0.001); // 1 ms before the acceptance deadline
+    expect(() => g.act('Asha', { type: 'CLOSE_AUCTION', auctionId: auction.id })).toThrow('The auction is still running.');
     g.act('Chitra', { type: 'PLACE_BID', auctionId: auction.id, amount: 600 });
-    g.advance(5.001);
+    // Existing rule: an accepted bid restarts the 5-second countdown from the server's clock.
+    expect(Date.parse(g.state.auction!.endsAt)).toBe(g.nowMs + 5000);
+    g.advance(5 + GRACE); // exactly the acceptance deadline
     expect(() => g.act('Bilal', { type: 'PLACE_BID', auctionId: auction.id, amount: 700 })).toThrow('Bidding has ended.');
     const close = g.act('Asha', { type: 'CLOSE_AUCTION', auctionId: auction.id });
     expect(close.transactions).toMatchObject([{ type: 'AUCTION_PAYMENT', amount: 600, fromPlayerId: g.id('Chitra') }]);
+    expect(close.events.filter((e) => e.type.startsWith('AUCTION_')).map((e) => e.type)).toEqual(['AUCTION_WON']);
     expect(g.state.properties.RAILWAY.ownerId).toBe(g.id('Chitra'));
     expect(() => g.act('Bilal', { type: 'CLOSE_AUCTION', auctionId: auction.id })).toThrow(/no longer running|has finished/);
+    expect(() => g.act('Bilal', { type: 'PLACE_BID', auctionId: auction.id, amount: 700 })).toThrow(/no longer running|has finished/);
     expect(g.ledger.filter((t) => t.type === 'AUCTION_PAYMENT')).toHaveLength(1);
   });
 
-  it('no bids within 5 seconds → closes unsold', () => {
+  it('the grace second is not part of the deadline phones count down to; passes and refused bids never move it', () => {
     const { g, auction } = auctionGame();
-    g.advance(5.001);
+    expect(Date.parse(auction.endsAt) - Date.parse(auction.createdAt)).toBe(5000);
+    expect(auctionAcceptUntil(auction) - Date.parse(auction.endsAt)).toBe(GRACE * 1000);
+    g.advance(2);
+    g.act('Asha', { type: 'PASS_AUCTION', auctionId: auction.id });
+    expect(() => g.act('Bilal', { type: 'PLACE_BID', auctionId: auction.id, amount: 50 })).toThrow('Minimum bid');
+    expect(g.state.auction!.endsAt).toBe(auction.endsAt);
+  });
+
+  it('invalid bids stay invalid during the grace second', () => {
+    const { g, auction } = auctionGame();
+    g.act('Bilal', { type: 'PLACE_BID', auctionId: auction.id, amount: 500 });
+    g.act('Asha', { type: 'PASS_AUCTION', auctionId: auction.id });
+    g.advance(5.5);
+    const bid = (name: string, amount: number) => () => g.act(name, { type: 'PLACE_BID', auctionId: auction.id, amount });
+    expect(bid('Chitra', 500)).toThrow('Minimum bid is ₹600.');
+    expect(bid('Bilal', 900)).toThrow('You already have the highest bid.');
+    expect(bid('Asha', 900)).toThrow('You already passed on this auction.');
+    expect(bid('Chitra', START + 100)).toThrow(/bid more than your balance/);
+    expect(g.state.auction).toMatchObject({ highBid: 500, highBidderId: g.id('Bilal') });
+  });
+
+  it('timeliness is judged by when the server received the bid, not by how long it then queued', () => {
+    const { g, auction } = auctionGame();
+    const action = { type: 'PLACE_BID', auctionId: auction.id, amount: 500 } as const;
+    g.advance(5 + GRACE + 0.2); // processed 200 ms after the acceptance deadline…
+    const processedAt = new Date(g.nowMs).toISOString();
+    expect(() => applyAction(g.state, g.id('Bilal'), action, { ...g.ctx(), receivedAt: processedAt })).toThrow('Bidding has ended.');
+    // …but received 300 ms earlier, inside the grace second: accepted, and the countdown restarts from processing time.
+    const receivedAt = new Date(g.nowMs - 300).toISOString();
+    const r = applyAction(g.state, g.id('Bilal'), action, { ...g.ctx(), receivedAt });
+    expect(r.state.auction).toMatchObject({ highBid: 500, endsAt: new Date(g.nowMs + 5000).toISOString() });
+  });
+
+  it('no bids within 5 seconds → closes unsold, once the grace second has passed', () => {
+    const { g, auction } = auctionGame();
+    g.advance(5 + GRACE);
     expect(() => g.act('Bilal', { type: 'PLACE_BID', auctionId: auction.id, amount: 100 })).toThrow('Bidding has ended.');
     g.act('Bilal', { type: 'CLOSE_AUCTION', auctionId: auction.id });
     expect(g.state.auction).toMatchObject({ status: 'CLOSED', winnerId: null });
     expect(g.state.properties.RAILWAY.ownerId).toBeNull();
+    expect(() => g.act('Asha', { type: 'CLOSE_AUCTION', auctionId: auction.id })).toThrow(/no longer running|has finished/);
   });
 });

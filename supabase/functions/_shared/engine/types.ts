@@ -95,7 +95,11 @@ export interface AuctionState {
   highBidderId: string | null;
   minimumOpeningBid: number;
   minimumIncrement: number;
-  /** ISO timestamp. Bidding closes after this unless someone bids. */
+  /**
+   * ISO timestamp on the server's clock: the deadline every device counts down to. Set by the
+   * server when the auction opens and again by each accepted bid — never by a client. The server
+   * accepts bids for a short hidden grace after it (reducer.auctionAcceptUntil).
+   */
   endsAt: string;
   participantIds: string[];
   passedIds: string[];
@@ -300,6 +304,11 @@ export interface EngineContext {
   actionId: string;
   /** ISO timestamp of "now" on the server. */
   now: string;
+  /**
+   * ISO timestamp at which the server received this request, before it queued for the game lock.
+   * Decides whether a bid arrived in time; defaults to `now`. Never a client-supplied time.
+   */
+  receivedAt?: string;
   /** Uniform random in [0, 1). Injected so tests are deterministic. */
   random: () => number;
   newId: () => string;

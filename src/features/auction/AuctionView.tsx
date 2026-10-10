@@ -1,27 +1,59 @@
 import { goBack } from '@/utils/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
-import { getDeed, minimumNextBid } from '@/engine/index.ts';
+import { auctionAcceptUntil, getDeed, minimumNextBid } from '@/engine/index.ts';
 import { Button, Card, ConnectionBanner, Label, Pill, Screen } from '@/components/ui';
 import { PROPERTY_GROUP_THEME } from '@/constants/theme';
 import { useGameAction } from '@/features/game/useGameAction';
 import type { GameView } from '@/features/game/useGameView';
+import { serverNow } from '@/lib/serverClock';
 import { useGameStore } from '@/store/gameStore';
 import { formatINR } from '@/utils/currency';
 
-/** Current time on the server's clock (corrects phone clock skew), ticking 4×/s. Display only — the server decides. */
-function useServerNow(serverTime: string): number {
-  const offset = useRef(0);
-  // Until the first tick, the snapshot's server time is the best estimate of "now".
-  const [now, setNow] = useState(() => Date.parse(serverTime));
+/** Longest the countdown goes without re-reading the clock (picks up a corrected server-clock estimate). */
+const MAX_TICK_MS = 250;
+
+/** Whole seconds shown for `ms` left: rounded up, so the last second reads 1 until the deadline itself. */
+const wholeSeconds = (ms: number) => Math.max(0, Math.ceil(ms / 1000));
+
+/**
+ * Where the auction stands against its server deadline. Nothing here counts ticks: both values are
+ * recomputed from the persisted deadline and the server clock every time, so a remount, a
+ * reconnect or a late update can't restart or shift the countdown. The timer only decides when to
+ * look again, and wakes right on each whole-second boundary so every phone flips together.
+ * Display only — the server decides.
+ */
+function useAuctionClock(endsAt: string | null, closeAt: number | null): { secondsLeft: number; closeDue: boolean } {
+  const read = () => {
+    const now = serverNow();
+    return { secondsLeft: endsAt ? wholeSeconds(Date.parse(endsAt) - now) : 0, closeDue: closeAt !== null && now >= closeAt };
+  };
+  const [clock, setClock] = useState(read);
+  const [seen, setSeen] = useState({ endsAt, closeAt });
+  if (seen.endsAt !== endsAt || seen.closeAt !== closeAt) {
+    // A new deadline from the server (a bid was accepted): show it at once, not at the next tick.
+    setSeen({ endsAt, closeAt });
+    setClock(read());
+  }
   useEffect(() => {
-    offset.current = Date.parse(serverTime) - Date.now();
-  }, [serverTime]);
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now() + offset.current), 250);
-    return () => clearInterval(t);
-  }, []);
-  return now;
+    if (!endsAt) return;
+    const deadline = Date.parse(endsAt);
+    let timer: ReturnType<typeof setTimeout>;
+    const tick = () => {
+      const now = serverNow();
+      const left = deadline - now;
+      const secondsLeft = wholeSeconds(left);
+      const closeDue = closeAt !== null && now >= closeAt;
+      setClock((prev) => (prev.secondsLeft === secondsLeft && prev.closeDue === closeDue ? prev : { secondsLeft, closeDue }));
+      if (closeDue) return;
+      // Next change: the countdown's next whole second, or (once it shows zero) the close.
+      const next = left > 0 ? left - (secondsLeft - 1) * 1000 : (closeAt ?? now) - now;
+      timer = setTimeout(tick, Math.min(MAX_TICK_MS, Math.max(1, next)));
+    };
+    tick();
+    return () => clearTimeout(timer);
+  }, [endsAt, closeAt]);
+  return clock;
 }
 
 const MAX_CLOSE_ATTEMPTS = 5;
@@ -29,24 +61,25 @@ const MAX_CLOSE_ATTEMPTS = 5;
 export function AuctionView({ view, auctionId }: { view: GameView; auctionId: string }) {
   const send = useGameAction();
   const pending = useGameStore((s) => s.pendingAction);
-  const { state, serverTime } = view.snapshot;
+  const { state } = view.snapshot;
   const auction = state.auction?.id === auctionId ? state.auction : null;
-  const now = useServerNow(serverTime);
   const endsAt = auction?.endsAt ?? null;
   const liveAuctionId = auction?.id ?? null;
+  const open = auction?.status === 'OPEN' && state.status === 'ACTIVE';
+  // When the server will agree to close: a moment after the countdown ends. Never shown.
+  const { secondsLeft, closeDue } = useAuctionClock(open ? endsAt : null, open && auction ? auctionAcceptUntil(auction) : null);
   // Close attempts per deadline: a new deadline (someone bid) re-arms the automatic close.
   const [attempts, setAttempts] = useState<{ endsAt: string | null; n: number }>({ endsAt: null, n: 0 });
   const closeAttempt = attempts.endsAt === endsAt ? attempts.n : 0;
 
-  const secondsLeft = endsAt ? Math.max(0, Math.ceil((Date.parse(endsAt) - now) / 1000)) : 0;
-  const open = auction?.status === 'OPEN' && state.status === 'ACTIVE';
   const expired = open && secondsLeft === 0;
 
-  // When the countdown runs out, any device may ask the server to close; the server checks the
-  // time and closes exactly once (others get AUCTION_CLOSED). If it says "still running" (clock
-  // skew) or the request didn't go through, try again shortly — until the realtime update arrives.
+  // The server closes the auction itself when the deadline passes. As a backstop, any device
+  // watching may also ask; the server checks its own clock and closes exactly once (others get
+  // AUCTION_CLOSED). If it says "still running" (clock skew, or a last-moment bid got in) or the
+  // request didn't go through, try again shortly — until the realtime update arrives.
   useEffect(() => {
-    if (!expired || !liveAuctionId || closeAttempt >= MAX_CLOSE_ATTEMPTS) return;
+    if (!expired || !closeDue || !liveAuctionId || closeAttempt >= MAX_CLOSE_ATTEMPTS) return;
     let cancelled = false;
     const delay = closeAttempt === 0 ? (view.me?.seat ?? 0) * 300 : 1000;
     const t = setTimeout(async () => {
@@ -57,7 +90,7 @@ export function AuctionView({ view, auctionId }: { view: GameView; auctionId: st
       cancelled = true;
       clearTimeout(t);
     };
-  }, [expired, liveAuctionId, endsAt, closeAttempt, send, view.me?.seat]);
+  }, [expired, closeDue, liveAuctionId, endsAt, closeAttempt, send, view.me?.seat]);
 
   useEffect(() => {
     if (auction && auction.status === 'CLOSED') {
