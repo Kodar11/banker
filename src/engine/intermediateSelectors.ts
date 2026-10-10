@@ -16,6 +16,7 @@ import {
   type ScheduleLine,
 } from './intermediateFinance.ts';
 import {
+  crisisOwed,
   economyOf,
   gameClock,
   isPledged,
@@ -356,7 +357,9 @@ export interface FinancialOverview {
   loanPrincipal: number;
   /** Principal plus interest already due. */
   loanLiability: number;
-  /** netAssets − loanLiability. */
+  /** A crisis bill this player still owes (0 when none). */
+  crisisOwed: number;
+  /** netAssets − loanLiability − crisisOwed. */
   netWorth: number;
   creditScore: number;
   creditBand: string;
@@ -404,7 +407,8 @@ export function financialOverview(state: Pick<GameState, 'properties' | 'players
     netAssets,
     loanPrincipal,
     loanLiability: liability,
-    netWorth: netAssets - liability,
+    crisisOwed: crisisOwed(eco, playerId),
+    netWorth: netAssets - liability - crisisOwed(eco, playerId),
     creditScore: score,
     creditBand: creditBand(score).label,
     debtRatio: debtRatio(loanPrincipal, netAssets),

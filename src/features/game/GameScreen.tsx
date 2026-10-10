@@ -2,13 +2,14 @@ import { useCallback, useContext, useEffect, useRef, useState, type ReactNode } 
 import { ScrollView, Text, useWindowDimensions, View, type LayoutChangeEvent } from 'react-native';
 import { SafeAreaInsetsContext, SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { configOf, economyOf, isIntermediate, isPropertyKey, positionOfProperty, spaceAt, spaceName, topUndoable, yearProgressPercent, type UndoableRecord } from '@/engine/index.ts';
+import { configOf, economyOf, isIntermediate, isPropertyKey, pendingCrisisOf, positionOfProperty, spaceAt, spaceName, topUndoable, yearProgressPercent, type UndoableRecord } from '@/engine/index.ts';
 import { Button, ConfirmDialog, ConnectionBanner, Sheet } from '@/components/ui';
 import { ClassicBoard } from '@/features/board/ClassicBoard';
 import { SquareDetails } from '@/features/board/SquareDetails';
 import { FinanceHub, type FinanceTab } from '@/features/finance/FinanceHub';
 import { FinanceNotices } from '@/features/finance/FinanceNotices';
 import { IntermediateIntro } from '@/features/finance/IntermediateIntro';
+import { CrisisNotice, CrisisSettlement } from '@/features/insurance/CrisisSettlement';
 import { LessonSuggestion } from '@/features/learning/LessonSuggestion';
 import { LoanSheet } from '@/features/loan/LoanSheet';
 import { GameConfigSummary } from '@/features/lobby/GameConfigEditor';
@@ -146,6 +147,8 @@ export function GameScreen({ view }: { view: GameView }) {
 
   // Intermediate Mode only (null in a Classic game): the economy behind the year indicator, the bank and its notices.
   const eco = economyOf(state);
+  // A crisis bill of mine that is not settled yet: until it is, the table shows that and nothing else.
+  const myCrisis = playing && me ? pendingCrisisOf(state, me.id) : null;
 
   const last = topUndoable(state);
   const canRequestUndo =
@@ -197,6 +200,22 @@ export function GameScreen({ view }: { view: GameView }) {
       { key: 'trade', icon: '🤝', label: 'Transfer', hint: 'Trade properties and money with a player', testID: 'more-trade', onPress: () => openTool({ kind: 'trade', to: null }) },
       { key: 'pay', icon: '💰', label: 'Pay Money', hint: 'Pay another player', testID: 'more-pay', onPress: () => openTool({ kind: 'pay', to: null }) },
       { key: 'loan', icon: '🏦', label: 'Bank / Loan', hint: eco ? 'Loans, payments and credit score' : 'Borrow or repay', testID: 'more-loan', onPress: () => openTool({ kind: 'loan' }) },
+      // Intermediate Mode with insurance only: a Classic game never lists it.
+      ...(eco?.insurance
+        ? [
+            {
+              key: 'insurance',
+              icon: '🛡️',
+              label: 'Property Insurance',
+              hint: 'Premiums, your policies and crises',
+              testID: 'more-insurance',
+              onPress: () => {
+                setPanel(null);
+                router.push('/insurance');
+              },
+            },
+          ]
+        : []),
       {
         key: 'auction',
         icon: '🔨',
@@ -433,32 +452,46 @@ export function GameScreen({ view }: { view: GameView }) {
           </View>
           <PlayersStrip view={view} onSelect={openPlayer} />
         </View>
-        <TurnActionBar view={view} send={send} dense={plan.dense} height={plan.turnBarHeight} onChoose={() => setPanel({ kind: 'decision' })} />
+        {myCrisis ? (
+          // Instead of the board and its actions — not over them — so there is nothing underneath to tap.
+          <CrisisSettlement
+            view={view}
+            crisis={myCrisis}
+            send={send}
+            onOpenLoan={() => openTool({ kind: 'loan', tab: 'borrow' })}
+            onOpenProperties={() => me && openWallet(me.id)}
+            onOpenMore={() => setPanel({ kind: 'more' })}
+          />
+        ) : (
+          <>
+            <TurnActionBar view={view} send={send} dense={plan.dense} height={plan.turnBarHeight} onChoose={() => setPanel({ kind: 'decision' })} />
 
-        {/*
-          The board has ONE size: the planned square, and its slot is exactly that tall — no slack
-          above or below it. (A growing slot put a tall phone's spare height around the board as two
-          empty bands; a `flex: 1` slot let Yoga collapse it below the board on a tight screen.)
-        */}
-        <View testID="board-area" style={{ flexShrink: 0, height: plan.board, alignItems: 'center' }}>
-          <ClassicBoard state={state} size={plan.board} onSquarePress={openSquare} onTokenPress={openPlayer} />
-        </View>
-
-        <ContextualCard item={context} height={plan.contextHeight} onAction={openContext} />
-
-        {/* Any height the sections could not use sits here, so the actions stay at the bottom of the screen. */}
-        <View testID="action-area" style={{ flexGrow: 1, justifyContent: 'flex-end' }}>
-          {state.status === 'FINISHED' ? (
-            // The game is over: the way out is the normal Create / Join flow, with nothing of this game kept.
-            <View testID="game-over-actions" style={{ flexDirection: 'row', gap: 6, minHeight: plan.actionButtonHeight }}>
-              <Button className="flex-1 px-2" size="sm" title="Create New Game" testID="new-game-button" onPress={() => leaveGame('/create-game')} />
-              <Button className="flex-1 px-2" size="sm" variant="secondary" title="Join Game" testID="join-another-button" onPress={() => leaveGame('/join-game')} />
-              <Button className="px-3" size="sm" variant="ghost" title="More" testID="open-more" onPress={() => setPanel({ kind: 'more' })} />
+            {/*
+              The board has ONE size: the planned square, and its slot is exactly that tall — no slack
+              above or below it. (A growing slot put a tall phone's spare height around the board as two
+              empty bands; a `flex: 1` slot let Yoga collapse it below the board on a tight screen.)
+            */}
+            <View testID="board-area" style={{ flexShrink: 0, height: plan.board, alignItems: 'center' }}>
+              <ClassicBoard state={state} size={plan.board} onSquarePress={openSquare} onTokenPress={openPlayer} />
             </View>
-          ) : (
-            <AdaptiveActionBar layout={plan.actions} buttonHeight={plan.actionButtonHeight} actions={playing ? barActions : barActions.filter((a) => a.key === 'more')} />
-          )}
-        </View>
+
+            <ContextualCard item={context} height={plan.contextHeight} onAction={openContext} />
+
+            {/* Any height the sections could not use sits here, so the actions stay at the bottom of the screen. */}
+            <View testID="action-area" style={{ flexGrow: 1, justifyContent: 'flex-end' }}>
+              {state.status === 'FINISHED' ? (
+                // The game is over: the way out is the normal Create / Join flow, with nothing of this game kept.
+                <View testID="game-over-actions" style={{ flexDirection: 'row', gap: 6, minHeight: plan.actionButtonHeight }}>
+                  <Button className="flex-1 px-2" size="sm" title="Create New Game" testID="new-game-button" onPress={() => leaveGame('/create-game')} />
+                  <Button className="flex-1 px-2" size="sm" variant="secondary" title="Join Game" testID="join-another-button" onPress={() => leaveGame('/join-game')} />
+                  <Button className="px-3" size="sm" variant="ghost" title="More" testID="open-more" onPress={() => setPanel({ kind: 'more' })} />
+                </View>
+              ) : (
+                <AdaptiveActionBar layout={plan.actions} buttonHeight={plan.actionButtonHeight} actions={playing ? barActions : barActions.filter((a) => a.key === 'more')} />
+              )}
+            </View>
+          </>
+        )}
       </ScrollView>
 
       <Sheet visible={panelOpen} title={panelTitle} header={panelHeader} footer={panelFooter} onClose={() => setPanel(null)} testID={panel ? `sheet-${panel.kind}` : undefined}>
@@ -482,10 +515,11 @@ export function GameScreen({ view }: { view: GameView }) {
         <FinanceNotices
           view={view}
           eco={eco}
-          suspended={panelOpen || !!tool || !!auctionId || confirmEnd || confirmLeave || revealVisible}
+          suspended={panelOpen || !!tool || !!auctionId || confirmEnd || confirmLeave || revealVisible || !!myCrisis}
           onOpenLoans={() => openTool({ kind: 'loan', tab: 'loans' })}
         />
       ) : null}
+      {eco?.insurance ? <CrisisNotice view={view} suspended={panelOpen || !!tool || !!auctionId || confirmEnd || confirmLeave || revealVisible || introPending} /> : null}
       {eco && playing ? <IntermediateIntro onSettled={settleIntro} /> : null}
       {revealVisible ? <ObjectiveReveal view={view} onLater={() => setRevealLater(true)} onSeen={objectiveSeen.markSeen} /> : null}
       <TradeSheet

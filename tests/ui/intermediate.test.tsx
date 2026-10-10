@@ -5,6 +5,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import {
   BOARD_SIZE,
   buildSchedule,
+  crisisCheckpointClock,
   gameClock,
   INTERMEDIATE_RULES,
   netWorth,
@@ -58,6 +59,10 @@ function jumpTo(f: Fixture, target: number): Fixture {
   const ids = Object.keys(movement);
   for (const id of ids) movement[id] = 0;
   movement[ids[0]!] = target - 2;
+  // The teleport is about loan dates and years. The crisis schedule moves along with it, so the checkpoints
+  // it jumps over do not all fire on this one roll (crises have their own tests in insurance.test.tsx).
+  const ins = eco(f).insurance!;
+  while (crisisCheckpointClock(eco(f), ins.nextCheckpoint) <= target) ins.nextCheckpoint += 1;
   const name = currentName(f);
   f.state.players.find((p) => p.id === f.ids[name])!.position = BOARD_SIZE - 2;
   f.roll(name, 1, 1).act(name, { type: 'END_TURN' });

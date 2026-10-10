@@ -3,6 +3,8 @@ import type { Draft } from './draft.ts';
 import { fail } from './errors.ts';
 import { formatINR } from './format.ts';
 import { configOf } from './gameConfig.ts';
+import { processCrisisCheckpoints } from './insurance.ts';
+import { freshInsurance } from './insuranceState.ts';
 import { INTERMEDIATE_RULES as IR, type CreditEventType, type LoanProductKey } from './intermediateConfig.ts';
 import {
   accruedInterest,
@@ -120,6 +122,7 @@ export function initEconomy(d: Draft, starters: readonly PlayerState[]): void {
     loans: [],
     yearFlags: Object.fromEntries(starters.map((p) => [p.id, { borrowed: false, late: false }])),
     lastReport: null,
+    insurance: freshInsurance(),
   };
 }
 
@@ -132,7 +135,8 @@ export function initEconomy(d: Draft, starters: readonly PlayerState[]): void {
  *   1. the mover's cumulative movement grows by the spaces the dice moved them;
  *   2. every financial year the shared average has now completed is started, one at a time;
  *   3. loan checkpoints the clock has passed are processed (rate reviews, due, overdue, default);
- *   4. each year that ended pays its clean-year credit reward and is announced.
+ *   4. each year that ended pays its clean-year credit reward and is announced;
+ *   5. crisis checkpoints the clock has reached are resolved, and insurance cover that has run out ends.
  *
  * Only dice movement counts. Card moves, Jail and Rest House placements, reconnects and retried
  * requests never reach this function, so they can never advance the calendar.
@@ -146,6 +150,7 @@ export function recordDiceMovement(d: Draft, player: PlayerState, spaces: number
   while (eco.year < target) reports.push(startNextYear(d, eco));
   processLoanCheckpoints(d, eco);
   for (const report of reports) closeYear(d, eco, report);
+  processCrisisCheckpoints(d, eco);
 }
 
 /** Starts the next financial year: one market change per property, drawn once and stored. */

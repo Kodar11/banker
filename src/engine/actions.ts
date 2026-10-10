@@ -19,7 +19,12 @@ export const GameActionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('UPDATE_CONFIG'), config: z.record(z.string(), z.unknown()) }).strict(),
   bare('START_GAME'),
   bare('ROLL_DICE'),
-  bare('BUY_PROPERTY'),
+  /**
+   * Buy the property I landed on. Intermediate Mode only: `insurePremium` also insures it in the same
+   * action — the premium the player was shown; the server charges its own and refuses the whole purchase
+   * if the two differ. Without it this is the plain purchase it has always been.
+   */
+  z.object({ type: z.literal('BUY_PROPERTY'), insurePremium: rupees.optional() }).strict(),
   bare('DECLINE_PROPERTY'),
   bare('START_AUCTION'),
   bare('PAY_RENT'),
@@ -72,6 +77,21 @@ export const GameActionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('PREPAY_INTERMEDIATE_LOAN'), loanId: id, amount: rupees }).strict(),
   /** Pay down a defaulted loan's remaining balance. */
   z.object({ type: z.literal('PAY_DEFAULTED_LOAN'), loanId: id, amount: rupees }).strict(),
+  // ---- Property insurance and crisis bills (Intermediate Mode; refused in a Classic game) ----
+  /**
+   * Insure one property I own. `expectedPremium` is the price on the confirmation the player saw; the
+   * server charges its own price and refuses if the two differ (the financial year moved on).
+   */
+  z.object({ type: z.literal('INSURE_PROPERTY'), propertyKey, expectedPremium: rupees }).strict(),
+  /**
+   * Insure several properties I own in one step ("insure all"): every one of them, or none.
+   * `expectedPremium` is the per-property price the player confirmed.
+   */
+  z.object({ type: z.literal('INSURE_PROPERTIES'), propertyKeys: z.array(propertyKey).min(1).max(26), expectedPremium: rupees }).strict(),
+  /** Pay a pending crisis bill of mine in full. */
+  z.object({ type: z.literal('PAY_CRISIS_BILL'), crisisId: id }).strict(),
+  /** Go bankrupt over a crisis bill I cannot pay — only once every way of raising money is used up. */
+  z.object({ type: z.literal('DECLARE_CRISIS_BANKRUPTCY'), crisisId: id }).strict(),
   z.object({ type: z.literal('PLACE_BID'), auctionId: id, amount: rupees }).strict(),
   z.object({ type: z.literal('PASS_AUCTION'), auctionId: id }).strict(),
   z.object({ type: z.literal('CLOSE_AUCTION'), auctionId: id }).strict(),
@@ -125,6 +145,8 @@ export const STALE_SENSITIVE_ACTIONS: ReadonlySet<GameActionType> = new Set<Game
   'PLACE_BID',
   'END_TURN',
   'DECLARE_BANKRUPTCY',
+  'PAY_CRISIS_BILL',
+  'DECLARE_CRISIS_BANKRUPTCY',
   'APPROVE_UNDO',
 ]);
 

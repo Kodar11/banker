@@ -4,6 +4,8 @@ export * from './cards.ts';
 export * from './errors.ts';
 export * from './format.ts';
 export * from './gameConfig.ts';
+export * from './insurance.ts';
+export * from './insuranceState.ts';
 export * from './intermediateConfig.ts';
 export * from './intermediateEngine.ts';
 export * from './intermediateFinance.ts';

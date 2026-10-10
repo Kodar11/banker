@@ -1,5 +1,5 @@
 import { getDeed, groupMembers, PROPERTY_KEYS, type ColorGroup, type PropertyKey } from './businessBoard.ts';
-import { economyOf, isPledged, loanLiability, type GameMode, type IntermediateState } from './intermediateState.ts';
+import { crisisOwed, economyOf, isPledged, loanLiability, pendingCrises, type GameMode, type IntermediateState } from './intermediateState.ts';
 import { BUSINESS_MVP_RULES as RULES } from './rules.ts';
 import type { GameState, LoanState, PlayerState, PropertyState, TradeOffer, UndoableRecord } from './types.ts';
 
@@ -171,12 +171,13 @@ export function unpaidLoanInterest(loans: LoanState[], playerId: string): number
  * cash + each property at its deed price (less its mortgage value while mortgaged)
  * + houses/hotels at what they cost to build − loan principal still owed
  * − loan interest already charged but not yet paid.
+ * Intermediate Mode: market values instead, less Intermediate loans and any crisis bill still owed.
  */
 export function netWorth(state: Pick<GameState, 'properties' | 'loans' | 'players'> & ModeAware, playerId: string): number {
   const player = state.players.find((p) => p.id === playerId);
   if (!player) return 0;
   const eco = economyOf(state);
-  if (eco) return intermediateNetAssets(state, eco, playerId) - intermediateDebt(eco, playerId);
+  if (eco) return intermediateNetAssets(state, eco, playerId) - intermediateDebt(eco, playerId) - crisisOwed(eco, playerId);
   const props = ownedBy(state, playerId).reduce((sum, k) => {
     const p = state.properties[k];
     return p ? sum + propertyValue(p) : sum;
@@ -291,6 +292,8 @@ export function tradeBlocker(
   trade: Pick<TradeOffer, 'fromPlayerId' | 'toPlayerId' | 'offeredPropertyKeys' | 'requestedPropertyKeys' | 'offeredMoney' | 'requestedMoney'>,
 ): string | null {
   if (state.status !== 'ACTIVE') return 'The game is not running.';
+  // Intermediate Mode: nothing changes hands while a crisis bill is unsettled.
+  if (pendingCrises(state).length) return 'A crisis bill must be settled first.';
   const from = state.players.find((p) => p.id === trade.fromPlayerId);
   const to = state.players.find((p) => p.id === trade.toPlayerId);
   if (!from || !to) return 'That player is not in this game.';
@@ -369,6 +372,12 @@ export function propertyActionBlocker(
   if (state.turn.phase === 'AUCTION') return 'Wait for the auction to finish.';
   const deed = getDeed(key);
   const isMyTurn = state.turn.playerId === playerId;
+  // Intermediate Mode: while a crisis bill is unsettled only the player who owes it may act, and only to raise money.
+  const crises = pendingCrises(state);
+  if (crises.length) {
+    if (!crises.some((c) => c.ownerId === playerId)) return 'A crisis bill must be settled before play continues.';
+    if (kind === 'BUILD_HOUSE' || kind === 'BUILD_HOTEL' || kind === 'UNMORTGAGE_PROPERTY') return 'Settle your crisis bill first.';
+  }
   // Intermediate Mode: a property securing a loan can't take a second claim, change or leave its owner.
   if (isPledged(state, key)) {
     if (kind === 'MORTGAGE_PROPERTY') return 'Pledged as loan collateral — it can’t also be mortgaged.';

@@ -1,4 +1,5 @@
 import type { PropertyKey } from './businessBoard.ts';
+import type { CrisisRecord, InsuranceState } from './insuranceState.ts';
 import { INTERMEDIATE_RULES as IR, type CreditEventType, type LoanProductKey } from './intermediateConfig.ts';
 
 /**
@@ -138,6 +139,11 @@ export interface IntermediateState {
   yearFlags: Record<string, { borrowed: boolean; late: boolean }>;
   /** What the last financial-year transition did (drives the announcement on every device). */
   lastReport: YearReport | null;
+  /**
+   * Property insurance and the crisis schedule. Absent in a game that started before insurance
+   * existed: such a game simply carries on without it (no premiums, no crises, no new restrictions).
+   */
+  insurance?: InsuranceState;
 }
 
 type ModeState = { mode?: GameMode; intermediate?: IntermediateState | null };
@@ -149,6 +155,23 @@ export function economyOf(state: ModeState): IntermediateState | null {
 
 export function isIntermediate(state: ModeState): boolean {
   return state.mode === 'intermediate';
+}
+
+/** Insurance and crises of an Intermediate game that has them, or null (Classic, not started, or started before insurance). */
+export function insuranceOf(state: ModeState): InsuranceState | null {
+  return economyOf(state)?.insurance ?? null;
+}
+
+/** Crisis bills that have not been settled yet, oldest first. While there is one, normal play waits. */
+export function pendingCrises(state: ModeState): CrisisRecord[] {
+  return insuranceOf(state)?.crises.filter((c) => c.status === 'PENDING') ?? [];
+}
+
+/** What a player still owes on crisis bills: pending ones, and any left unpaid when they stopped playing. */
+export function crisisOwed(eco: Pick<IntermediateState, 'insurance'>, playerId: string): number {
+  return (eco.insurance?.crises ?? [])
+    .filter((c) => c.ownerId === playerId && (c.status === 'PENDING' || c.status === 'UNPAID'))
+    .reduce((sum, c) => sum + (c.amount - c.paid), 0);
 }
 
 /** Total spaces moved by all starting players: the shared game clock every loan timeline runs on. */

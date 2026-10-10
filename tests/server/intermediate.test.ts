@@ -13,6 +13,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createSql, type Sql } from '../../supabase/functions/game-action/db.ts';
 import { handleRequest, type HandlerDeps } from '../../supabase/functions/game-action/handler.ts';
 import {
+  crisisCheckpointClock,
   gameClock,
   offeredRate,
   PROPERTY_KEYS,
@@ -131,7 +132,14 @@ describe.skipIf(!DATABASE_URL)('Intermediate Mode through the handler (Postgres)
     const snap = await g.snap();
     const ids = Object.keys(eco(snap).movement);
     const movement = Object.fromEntries(ids.map((id, i) => [id, i === 0 ? target - 2 : 0]));
-    await sql`update public.games set intermediate = jsonb_set(intermediate, '{movement}', ${sql.json(movement)}::jsonb) where id = ${g.gameId}`;
+    // The teleport is about loan dates. The crisis schedule moves along with it, so the checkpoints it
+    // jumps over do not all fire on this one roll (crises have their own tests in insurance.test.ts).
+    let nextCheckpoint = eco(snap).insurance!.nextCheckpoint;
+    while (crisisCheckpointClock(eco(snap), nextCheckpoint) <= target) nextCheckpoint += 1;
+    await sql`
+      update public.games
+      set intermediate = jsonb_set(jsonb_set(intermediate, '{movement}', ${sql.json(movement)}::jsonb), '{insurance,nextCheckpoint}', ${sql.json(nextCheckpoint)}::jsonb)
+      where id = ${g.gameId}`;
     ok(await tick(g));
     const after = await g.snap();
     expect(gameClock(eco(after))).toBe(target);

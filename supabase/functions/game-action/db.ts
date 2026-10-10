@@ -454,5 +454,73 @@ export async function persistResult(tx: Tx, prevVersion: number, result: EngineR
       where public.trade_offers.status is distinct from excluded.status`;
   }
 
+  await persistInsurance(tx, s);
+
   await insertLedger(tx, s.id, result);
+}
+
+/**
+ * Property insurance (Intermediate Mode). The economy document written above is the state the engine
+ * reads; these rows are its record, written from it in the same transaction, with the database's own
+ * guarantees on top: one crisis per checkpoint per game, one active policy per property and owner,
+ * and nothing final ever rewritten. If the two could ever disagree — a checkpoint resolved twice, a
+ * settled bill reopened — the write fails and the whole action rolls back.
+ * One statement per table, and only rows whose status moved are touched.
+ */
+async function persistInsurance(tx: Tx, s: GameState): Promise<void> {
+  const insurance = s.intermediate?.insurance;
+  if (!insurance) return;
+  if (insurance.policies.length) {
+    const rows = insurance.policies.map((p) => ({
+      id: p.id,
+      property_key: p.propertyKey,
+      owner_player_id: p.ownerId,
+      purchase_year: p.purchaseYear,
+      premium_paid: p.premiumPaid,
+      start_clock: p.startClock,
+      expiry_clock: p.expiryClock,
+      status: p.status,
+      claimed_crisis_id: p.claimedCrisisId,
+      created_at: p.createdAt,
+      closed_at: p.closedAt,
+    }));
+    await tx`
+      insert into public.insurance_policies (id, game_id, property_key, owner_player_id, purchase_year, premium_paid,
+        start_clock, expiry_clock, status, claimed_crisis_id, created_at, closed_at)
+      select x.id, ${s.id}::uuid, x.property_key, x.owner_player_id, x.purchase_year, x.premium_paid,
+        x.start_clock, x.expiry_clock, x.status, x.claimed_crisis_id, x.created_at, x.closed_at
+      from jsonb_to_recordset(${tx.json(rows as unknown as postgres.JSONValue)}) as x(
+        id uuid, property_key text, owner_player_id uuid, purchase_year int, premium_paid bigint,
+        start_clock int, expiry_clock int, status text, claimed_crisis_id uuid, created_at timestamptz, closed_at timestamptz)
+      on conflict (id) do update set status = excluded.status, claimed_crisis_id = excluded.claimed_crisis_id,
+        closed_at = excluded.closed_at
+      where public.insurance_policies.status is distinct from excluded.status`;
+  }
+  if (insurance.crises.length) {
+    const rows = insurance.crises.map((c) => ({
+      id: c.id,
+      checkpoint: c.checkpoint,
+      checkpoint_clock: c.checkpointClock,
+      financial_year: c.year,
+      property_key: c.propertyKey,
+      owner_player_id: c.ownerId,
+      mortgaged: c.mortgaged,
+      amount: c.amount,
+      paid: c.paid,
+      policy_id: c.policyId,
+      status: c.status,
+      created_at: c.createdAt,
+      settled_at: c.settledAt,
+    }));
+    await tx`
+      insert into public.crisis_events (id, game_id, checkpoint, checkpoint_clock, financial_year, property_key,
+        owner_player_id, mortgaged, amount, paid, policy_id, status, created_at, settled_at)
+      select x.id, ${s.id}::uuid, x.checkpoint, x.checkpoint_clock, x.financial_year, x.property_key,
+        x.owner_player_id, x.mortgaged, x.amount, x.paid, x.policy_id, x.status, x.created_at, x.settled_at
+      from jsonb_to_recordset(${tx.json(rows as unknown as postgres.JSONValue)}) as x(
+        id uuid, checkpoint int, checkpoint_clock int, financial_year int, property_key text, owner_player_id uuid,
+        mortgaged boolean, amount bigint, paid bigint, policy_id uuid, status text, created_at timestamptz, settled_at timestamptz)
+      on conflict (id) do update set status = excluded.status, paid = excluded.paid, settled_at = excluded.settled_at
+      where public.crisis_events.status is distinct from excluded.status`;
+  }
 }

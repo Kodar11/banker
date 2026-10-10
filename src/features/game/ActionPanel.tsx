@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { DECK_LABELS, getDeed, BUSINESS_MVP_RULES, type GameAction } from '@/engine/index.ts';
+import { DECK_LABELS, economyOf, getDeed, BUSINESS_MVP_RULES, INTERMEDIATE_RULES, premiumForYear, type GameAction } from '@/engine/index.ts';
 import { Button, Card, ConfirmDialog, Label, Pill, TextField } from '@/components/ui';
 import { useGameStore } from '@/store/gameStore';
 import { formatINR } from '@/utils/currency';
@@ -73,6 +73,9 @@ export function ActionPanel({ view, send, onOpenLoan }: ActionPanelProps) {
       const deed = getDeed(turn.pending.propertyKey);
       const price = turn.pending.price;
       const canAfford = me.balance >= price;
+      // Intermediate Mode with insurance only: buy and insure in one tap. Null in a Classic game.
+      const eco = economyOf(state);
+      const premium = eco?.insurance ? premiumForYear(eco.year) : null;
       return (
         <Card testID="buy-card">
           <Pill tone="good">Property available</Pill>
@@ -91,6 +94,23 @@ export function ActionPanel({ view, send, onOpenLoan }: ActionPanelProps) {
             />
             {!canAfford ? (
               <Text className="text-center text-sm font-semibold text-brick">Not enough money for this purchase.</Text>
+            ) : null}
+            {premium !== null ? (
+              <View className="gap-1">
+                <Button
+                  title={`BUY + INSURE ${formatINR(price + premium)}`}
+                  subtitle={`🛡️ ${formatINR(price)} + ${formatINR(premium)} premium`}
+                  testID="buy-insured-button"
+                  loading={busy('BUY_PROPERTY')}
+                  disabled={!!pending || me.balance < price + premium}
+                  onPress={() => send({ type: 'BUY_PROPERTY', insurePremium: premium })}
+                />
+                <Text className="text-center text-xs font-semibold text-stone-600" testID="buy-insured-note">
+                  {canAfford && me.balance < price + premium
+                    ? `Not enough money to insure it as well (${formatINR(premium)}).`
+                    : `Insurance waives one ${formatINR(INTERMEDIATE_RULES.insurance.crisisBill)} crisis bill within ${INTERMEDIATE_RULES.insurance.coverageSpaces} spaces of average movement. You can also insure it later from its deed.`}
+                </Text>
+              </View>
             ) : null}
             <Button
               title={BUSINESS_MVP_RULES.auction.enabled ? 'DECLINE → AUCTION' : 'DECLINE'}

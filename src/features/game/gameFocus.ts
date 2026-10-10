@@ -8,6 +8,7 @@ import {
   isPropertyKey,
   minimumNextBid,
   paymentsOwedNow,
+  pendingCrises,
   positionOfProperty,
   purchasePrice,
   spaceAt,
@@ -62,6 +63,8 @@ export function needsDecision(view: Pick<GameView, 'snapshot' | 'me' | 'isMyTurn
   const { turn } = view.snapshot.state;
   const me = view.me;
   if (!view.isMyTurn || !me || me.status !== 'ACTIVE') return false;
+  // Intermediate Mode: nothing is decided while a crisis bill is unsettled.
+  if (pendingCrises(view.snapshot.state).length) return false;
   switch (turn.phase) {
     case 'AWAITING_ROLL':
       return me.inJail;
@@ -100,6 +103,15 @@ export function turnStatus(view: Pick<GameView, 'snapshot' | 'me' | 'current' | 
   const current = view.current;
   const title = view.isMyTurn ? 'YOUR TURN' : `${current.name.toUpperCase()}'S TURN`;
   const rolled = rolledLine(view);
+
+  // Intermediate Mode: an unsettled crisis bill comes before the turn — everyone waits for it.
+  const crisis = pendingCrises(state)[0];
+  if (crisis) {
+    const mine = !!me && crisis.ownerId === me.id;
+    const where = crisis.propertyKey ? getDeed(crisis.propertyKey).name : 'a property';
+    const owes = `${mine ? 'you owe' : `${view.playerName(crisis.ownerId)} owes`} ${formatINR(crisis.amount - crisis.paid)}`;
+    return { title, detail: `${turnNo} · Crisis at ${where}: ${owes}`, primary: { kind: 'waiting', label: mine ? 'Pay bill' : 'Crisis…' } };
+  }
 
   const auction = state.auction?.status === 'OPEN' ? state.auction : null;
   if (turn.phase === 'AUCTION' && auction) {
@@ -200,6 +212,10 @@ const IMPORTANT_EVENTS: Readonly<Record<string, { icon: string; label: string }>
   AUCTION_WON: { icon: '🔨', label: 'Auction result' },
   AUCTION_UNSOLD: { icon: '🔨', label: 'Auction result' },
   REST_HOUSE: { icon: '🛏️', label: 'Rest House' },
+  CRISIS_STRUCK: { icon: '⚠️', label: 'Crisis' },
+  CRISIS_COVERED: { icon: '🛡️', label: 'Crisis · insured' },
+  CRISIS_SETTLED: { icon: '✅', label: 'Crisis settled' },
+  CRISIS_UNPAID: { icon: '⚠️', label: 'Crisis' },
   TRADE_ACCEPTED: { icon: '🤝', label: 'Trade done' },
   UNDO_APPLIED: { icon: '↩️', label: 'Undone' },
 };
@@ -270,6 +286,20 @@ export function pickContext(view: Pick<GameView, 'snapshot' | 'me' | 'current' |
   }
   if (state.status === 'PAUSED') {
     return { kind: 'paused', icon: '⏸️', label: 'Game paused', title: 'Everything is on hold', detail: 'No dice, purchases or payments until someone resumes.' };
+  }
+
+  // Intermediate Mode: an unsettled crisis bill is the one thing that matters until it is paid.
+  const crisis = pendingCrises(state)[0];
+  if (crisis && crisis.propertyKey) {
+    const mine = !!me && crisis.ownerId === me.id;
+    return {
+      kind: 'payment',
+      icon: '⚠️',
+      label: 'Crisis · payment required',
+      title: `${mine ? 'You owe' : `${view.playerName(crisis.ownerId)} owes`} ${formatINR(crisis.amount - crisis.paid)}`,
+      detail: `Crisis at ${getDeed(crisis.propertyKey).name}, not insured · the game waits until it is settled`,
+      cta: squareTarget(positionOfProperty(crisis.propertyKey), 'property'),
+    };
   }
 
   const auction = state.auction?.status === 'OPEN' ? state.auction : null;

@@ -103,6 +103,21 @@ The host picks the mode on **New game**; it is stored on the game (`games.game_m
 
 Deploying a version that adds or changes Intermediate behaviour: `npm run deploy:db` first (the migration is additive), then `npm run deploy:functions`, then ship the app.
 
+## Property insurance and crises (Intermediate only)
+
+Classic games have none of this: no state, no actions, no screens, no restrictions.
+
+* **The rules** (`INTERMEDIATE_RULES.insurance`, shown under House rules): a policy is bought per property — ₹500 in Year 1, +₹100 each financial year, capped at ₹900 — after an explicit confirmation of the exact price. It lasts 36 spaces of average movement from the purchase point and waives **one** crisis bill; then it is spent. No renewal, no refund. A crisis strikes one owned property (mortgaged ones included), picked by the server's RNG across all players still in the game, after the first 18 spaces of average movement and then every 36. Uninsured, its owner owes ₹3,000 at once; nothing else about the property changes.
+* **One clock.** Everything runs on the existing shared clock (`gameClock`: the sum of the starting players' dice movement), so "36 spaces of average movement" is `36 × playerCount` on it — the same convention as the financial year. There is no second counter.
+* **Engine** — `src/engine/insuranceState.ts` (shape: `IntermediateState.insurance`), `src/engine/insurance.ts` (premium, schedule, selectors, purchase, crisis resolution, settlement). `recordDiceMovement` resolves every checkpoint the clock has reached, in order; `nextCheckpoint` only grows, so each is resolved once. Cover is judged at the checkpoint's own clock point: a policy that expires at the checkpoint does not cover it, and one bought afterwards never does.
+* **A pending bill stops the game.** `crisisGate` runs first in `applyAction`: until the bill is settled only pause / resume / leave / end (host) and declining offers are open to everyone, plus — for the player who owes — paying (`PAY_CRISIS_BILL`), selling a building, selling or mortgaging a property and taking a bank loan. Bankruptcy over a bill (`DECLARE_CRISIS_BANKRUPTCY`) is the game's existing bankruptcy, and is refused while the player can afford the bill or any of those options is left. Leaving, or the game ending, collects what cash there is first; anything uncollected counts against net worth.
+* **A policy protects its buyer**, not the property: it is not in force while someone else owns the property, and does not pass to a new owner.
+* **Storage** — the engine's state is inside the economy document (`games.intermediate`), written under the game lock in the action's own transaction. Migration `20261013000000_property_insurance.sql` adds `insurance_policies` and `crisis_events`, written from that state in the same transaction: the durable record, plus guarantees the database enforces by itself — one crisis per `(game_id, checkpoint)`, one active policy per property and owner, settled rows final, Intermediate games only, RLS on with nothing granted to the app's roles.
+* **On the phone** (`src/features/insurance/`) — **More → Property Insurance** (`app/insurance.tsx`), an insurance section on every owned property's deed, a notice to the table when a crisis strikes, and — for the player who owes — a settlement view that replaces the board until the server says the bill is settled.
+* A game that started before this version has no `insurance` in its economy and plays on without it.
+
+Deploying this: `npm run deploy:db` (migration `20261013000000_property_insurance.sql`, additive), then `npm run deploy:functions`, then ship the app. A function deployed before the migration cannot store a policy or a crisis.
+
 ## Game settings and secret objectives
 
 The host can customise a small, fixed set of rules on **New game** and, until they press Start, from the lobby (**Change settings**). Everyone in the lobby sees the same summary; once the game starts the settings are locked and readable from **More → Game settings**.

@@ -3,6 +3,7 @@ import { DECK_LABELS, spaceAt, spaceName, type PlayerState } from '@/engine/inde
 import { Card, Label, PlayerBadge } from '@/components/ui';
 import { COLORS } from '@/constants/theme';
 import type { GameView } from '@/features/game/useGameView';
+import { PropertyInsurance } from '@/features/insurance/PropertyInsurance';
 import { PropertyDeed } from '@/features/player/PropertyDeed';
 import { PropertyManage } from '@/features/player/PropertyManage';
 import { SPECIAL_ICONS } from './BoardSquare';
@@ -55,7 +56,7 @@ interface SquareDetailsProps {
 
 /**
  * Details for any board square. Read-only, except that a property I own carries its
- * manage section (build / mortgage / sell) in the same card.
+ * insurance and manage sections (insure / build / mortgage / sell) in the same card.
  */
 export function SquareDetails({ view, index, onPlayerPress }: SquareDetailsProps) {
   const { state } = view.snapshot;
@@ -65,6 +66,7 @@ export function SquareDetails({ view, index, onPlayerPress }: SquareDetailsProps
     return (
       <View className="gap-4" testID={`square-details-${index}`}>
         <PropertyDeed state={state} propertyKey={space.propertyKey} playerName={view.playerName} onOwnerPress={onPlayerPress}>
+          <PropertyInsurance view={view} propertyKey={space.propertyKey} />
           <PropertyManage view={view} propertyKey={space.propertyKey} />
         </PropertyDeed>
         <PlayersHere view={view} index={index} onPlayerPress={onPlayerPress} />

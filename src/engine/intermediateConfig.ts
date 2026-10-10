@@ -92,6 +92,21 @@ const IntermediateRulesSchema = z
         products: z.object(Object.fromEntries(LOAN_PRODUCT_KEYS.map((k) => [k, LoanProductSchema])) as Record<LoanProductKey, typeof LoanProductSchema>).strict(),
       })
       .strict(),
+    insurance: z
+      .object({
+        /** Premium for one property bought in Year 1; it rises by `premiumStepPerYear` each financial year up to `premiumMax`. */
+        premiumYear1: rupees,
+        premiumStepPerYear: z.number().int().min(0),
+        premiumMax: rupees,
+        /** A policy lasts this many spaces of average movement from the moment it is bought. */
+        coverageSpaces: z.number().int().positive(),
+        /** The bill a crisis puts on the property it strikes. A policy in force waives it; nothing else is paid out. */
+        crisisBill: rupees,
+        /** The first crisis strikes after this many spaces of average movement, then one every `crisisIntervalSpaces`. */
+        firstCrisisSpaces: z.number().int().positive(),
+        crisisIntervalSpaces: z.number().int().positive(),
+      })
+      .strict(),
     notifications: z
       .object({
         introAutoCloseSeconds: z.number().int().positive(),
@@ -115,6 +130,7 @@ const IntermediateRulesSchema = z
     });
     if (cfg.rates.minPercent > cfg.rates.maxPercent) issue('rates.minPercent must not exceed maxPercent');
     if (cfg.loans.minAmount % cfg.loans.step !== 0) issue('loans.minAmount must be a multiple of loans.step');
+    if (cfg.insurance.premiumMax < cfg.insurance.premiumYear1) issue('insurance.premiumMax must not be below premiumYear1');
     for (const key of LOAN_PRODUCT_KEYS) {
       const p = cfg.loans.products[key];
       if (p.maxPrincipal < cfg.loans.minAmount) issue(`${key}: maxPrincipal is below the minimum loan`);
@@ -130,7 +146,7 @@ export function validateIntermediateRules(raw: unknown): IntermediateRules {
 
 export const INTERMEDIATE_RULES: IntermediateRules = validateIntermediateRules({
   /** Stored with every Intermediate game's economy. Bump when any value below changes. */
-  version: 'INTERMEDIATE-V1',
+  version: 'INTERMEDIATE-V2',
 
   year: {
     spacesPerYear: 36,
@@ -256,6 +272,17 @@ export const INTERMEDIATE_RULES: IntermediateRules = validateIntermediateRules({
         maxPrincipal: 10000,
       },
     },
+  },
+
+  /** Property insurance and the global crisis that makes it worth buying. */
+  insurance: {
+    premiumYear1: 500,
+    premiumStepPerYear: 100,
+    premiumMax: 900,
+    coverageSpaces: 36,
+    crisisBill: 3000,
+    firstCrisisSpaces: 18,
+    crisisIntervalSpaces: 36,
   },
 
   notifications: {

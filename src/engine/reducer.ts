@@ -16,6 +16,7 @@ import { Draft } from './draft.ts';
 import { fail, GameError } from './errors.ts';
 import { formatINR } from './format.ts';
 import { configOf, parseGameConfig } from './gameConfig.ts';
+import { assertCrisisBankruptcy, buyInsurance, buyInsuranceForAll, closeCrisesInBankruptcy, closePendingCrises, crisisGate, payCrisisBill } from './insurance.ts';
 import { initEconomy, payDefaultedLoan, payInstallment, prepayLoan, recordDiceMovement, takeLoan, writeOffLoans } from './intermediateEngine.ts';
 import { isIntermediate, normalizeGameMode, type GameMode } from './intermediateState.ts';
 import { assignObjectives, finalizeObjectives, forgetObjectiveTrade, recordObjectiveTrade } from './objectives.ts';
@@ -218,6 +219,11 @@ export function applyAction(state: GameState, actorId: string, rawAction: unknow
   if (state.status !== 'WAITING' && actor.status !== 'ACTIVE' && action.type !== 'END_GAME' && action.type !== 'LEAVE_GAME') {
     fail('FORBIDDEN', 'You are out of the game.');
   }
+  // Intermediate Mode: an unsettled crisis bill comes before everything else — whose turn it is included.
+  if (state.status === 'ACTIVE') {
+    const waiting = crisisGate(state, actorId, action);
+    if (waiting) fail('INVALID_PHASE', waiting);
+  }
   if (TURN_ACTIONS.has(action.type) && state.turn.playerId !== actorId) {
     fail('NOT_YOUR_TURN', "It's not your turn.");
   }
@@ -238,9 +244,12 @@ export function applyAction(state: GameState, actorId: string, rawAction: unknow
     case 'ROLL_DICE':
       rollDice(d, actor);
       break;
-    case 'BUY_PROPERTY':
-      buyProperty(d, actor);
+    case 'BUY_PROPERTY': {
+      const bought = buyProperty(d, actor);
+      // Intermediate Mode: "buy and insure" is one action — if the policy can't be bought, nothing is.
+      if (action.insurePremium !== undefined) buyInsurance(d, actor, bought, action.insurePremium);
       break;
+    }
     case 'DECLINE_PROPERTY':
     case 'START_AUCTION':
       declineProperty(d, actor);
@@ -299,6 +308,19 @@ export function applyAction(state: GameState, actorId: string, rawAction: unknow
       break;
     case 'PAY_DEFAULTED_LOAN':
       payDefaultedLoan(d, actor, action.loanId, action.amount);
+      break;
+    // Property insurance and crisis bills. Each of these refuses a game without insurance.
+    case 'INSURE_PROPERTY':
+      buyInsurance(d, actor, action.propertyKey, action.expectedPremium);
+      break;
+    case 'INSURE_PROPERTIES':
+      buyInsuranceForAll(d, actor, action.propertyKeys, action.expectedPremium);
+      break;
+    case 'PAY_CRISIS_BILL':
+      payCrisisBill(d, actor, action.crisisId);
+      break;
+    case 'DECLARE_CRISIS_BANKRUPTCY':
+      declareCrisisBankruptcy(d, actor, action.crisisId);
       break;
     case 'PLACE_BID':
       placeBid(d, actor, action.auctionId, action.amount);
@@ -919,7 +941,7 @@ function advanceTurn(d: Draft, fromPlayerId: string): void {
 // Buying, auctions
 // ---------------------------------------------------------------------------
 
-function buyProperty(d: Draft, actor: PlayerState): void {
+function buyProperty(d: Draft, actor: PlayerState): PropertyKey {
   const turn = d.state.turn;
   const pending = turn.pending;
   if (turn.phase !== 'AWAITING_DECISION' || pending?.kind !== 'BUY') {
@@ -948,6 +970,7 @@ function buyProperty(d: Draft, actor: PlayerState): void {
   });
   recordUndoable(d, { actionType: 'BUY_PROPERTY', actorId: actor.id, description: `${actor.name} bought ${deed.name}`, propertyKey: deed.key, before });
   d.setPhase('TURN_COMPLETE');
+  return deed.key;
 }
 
 function declineProperty(d: Draft, actor: PlayerState): void {
@@ -1206,13 +1229,31 @@ function declareBankruptcy(d: Draft, actor: PlayerState): void {
     fail('INVALID_PHASE', 'You can only declare bankruptcy when you owe money.');
   }
   if (actor.balance >= pending.amount) fail('INVALID_PHASE', 'You can afford this payment.');
+  liquidate(d, actor, pending.payeeIds?.length ? null : pending.toPlayerId, pending.label);
+  turn.pending = null;
+  turn.followUp = null;
+  d.setPhase('TURN_COMPLETE');
+  if (RULES.endGame.lastPlayerStandingWins && d.activePlayers().length <= 1) {
+    finishGame(d, 'LAST_PLAYER_STANDING');
+    return;
+  }
+  d.state.auction = null;
+  advanceTurn(d, actor.id);
+}
+
+/**
+ * THE bankruptcy: the player's cash goes to the creditor (null = the bank), every property returns
+ * to the bank cleared, their loans are closed and their offers expire, and they are out of the game.
+ * What happens to the turn afterwards is the caller's business.
+ */
+function liquidate(d: Draft, actor: PlayerState, creditorId: string | null, label: string): void {
   if (actor.balance > 0) {
     d.transfer({
       type: 'BANKRUPTCY_SETTLEMENT',
       from: actor.id,
-      to: pending.payeeIds?.length ? null : pending.toPlayerId,
+      to: creditorId,
       amount: actor.balance,
-      memo: `Bankruptcy settlement (${pending.label})`,
+      memo: `Bankruptcy settlement (${label})`,
     });
   }
   for (const key of PROPERTY_KEYS) {
@@ -1239,16 +1280,55 @@ function declareBankruptcy(d: Draft, actor: PlayerState): void {
   actor.skipTurns = 0;
   actor.inJail = false;
   actor.jailTurnsLeft = 0;
-  turn.pending = null;
-  turn.followUp = null;
   d.event('PLAYER_BANKRUPT', actor.id, `${actor.name} is bankrupt`);
-  d.setPhase('TURN_COMPLETE');
+}
+
+/**
+ * Bankruptcy over a crisis bill (Intermediate Mode). Unlike a debt met on a turn, the bill can fall
+ * on any player, so this is not a turn action — but it is the same bankruptcy, and it is refused
+ * while the player can still afford the bill or has any way left to raise money.
+ */
+function declareCrisisBankruptcy(d: Draft, actor: PlayerState, crisisId: string): void {
+  assertCrisisBankruptcy(d, actor, crisisId);
+  const cash = actor.balance;
+  liquidate(d, actor, null, 'Crisis bill');
+  closeCrisesInBankruptcy(d, actor.id, cash);
+  const turn = d.state.turn;
+  const wasTheirTurn = turn.playerId === actor.id;
+  if (wasTheirTurn) {
+    turn.pending = null;
+    turn.followUp = null;
+    if (turn.phase !== 'AWAITING_ROLL') d.setPhase('TURN_COMPLETE');
+  } else {
+    dropPayee(d, actor.id);
+  }
   if (RULES.endGame.lastPlayerStandingWins && d.activePlayers().length <= 1) {
     finishGame(d, 'LAST_PLAYER_STANDING');
     return;
   }
+  if (!wasTheirTurn) return;
   d.state.auction = null;
   advanceTurn(d, actor.id);
+}
+
+/** A player who is owed the current turn's payment went bankrupt: their part of it is no longer owed. */
+function dropPayee(d: Draft, playerId: string): void {
+  const turn = d.state.turn;
+  const pending = turn.pending;
+  if (turn.phase !== 'AWAITING_PAYMENT' || pending?.kind !== 'PAYMENT') return;
+  if (pending.payeeIds?.includes(playerId)) {
+    const share = Math.floor(pending.amount / pending.payeeIds.length);
+    pending.payeeIds = pending.payeeIds.filter((id) => id !== playerId);
+    pending.amount = share * pending.payeeIds.length;
+    if (pending.payeeIds.length > 0) return;
+  } else if (pending.toPlayerId !== playerId) {
+    return;
+  }
+  // Rent on a property that has just returned to the bank, or nobody left to pay: nothing is owed.
+  turn.pending = null;
+  turn.followUp = null;
+  d.event('PAYMENT_CANCELLED', turn.playerId, `${pending.label}: no longer owed — ${d.name(playerId)} is bankrupt`);
+  d.setPhase('TURN_COMPLETE');
 }
 
 /**
@@ -1270,6 +1350,8 @@ function leaveTable(d: Draft, actor: PlayerState): void {
   actor.inJail = false;
   actor.jailTurnsLeft = 0;
   d.event('PLAYER_LEFT', actor.id, `${actor.name} left the game`);
+  // Intermediate Mode: leaving does not dodge a crisis bill, and does not leave the table waiting on it.
+  closePendingCrises(d, actor.id);
 
   const remaining = d.activePlayers().sort((a, b) => a.seat - b.seat);
   const heir = remaining[0];
@@ -1331,6 +1413,8 @@ function finishGame(d: Draft, reason: 'HOST_ENDED' | 'LAST_PLAYER_STANDING' | 'P
   expireTrades(d, () => true);
   d.state.undoStack = [];
   d.state.undoRequest = null;
+  // Intermediate Mode: a crisis bill still open is collected first, so it is in the final balances.
+  closePendingCrises(d, null);
   // Secret-objective bonuses are checked and paid here, before the ranking: the winner below is decided
   // on the final balances, so the declared result and the money always agree. (Nothing to do in Classic.)
   finalizeObjectives(d);

@@ -1,5 +1,6 @@
 import { formatINR } from './format.ts';
 import { defaultGameConfig, MARKET_VOLATILITY_LABELS, type GameConfig } from './gameConfig.ts';
+import { premiumForYear } from './insurance.ts';
 import { INTERMEDIATE_RULES as IR, LOAN_PRODUCT_KEYS } from './intermediateConfig.ts';
 import { realValue } from './intermediateFinance.ts';
 import { objectiveTerms, OBJECTIVE_IDS, OBJECTIVES } from './objectives.ts';
@@ -14,6 +15,7 @@ import type { RuleEntry } from './rulebook.ts';
 const signed = (n: number) => (n > 0 ? `+${n}` : String(n));
 const L = IR.loans;
 const C = IR.credit.events;
+const I = IR.insurance;
 
 function secretObjectivesEntry(config: GameConfig): RuleEntry {
   return {
@@ -87,6 +89,17 @@ export function intermediateRuleEntries(config: GameConfig = defaultGameConfig('
         `A Secured Loan pledges a property you own outright (no mortgage, no buildings) for up to ${L.collateralAdvancePercent}% of its market value. It keeps earning rent.`,
         'A pledged property cannot be mortgaged, sold, traded or built on, and a mortgaged property cannot be pledged.',
       ],
+    },
+    {
+      title: 'Property insurance and crises',
+      lines: [
+        `After the first ${I.firstCrisisSpaces} spaces of average movement, and then every ${I.crisisIntervalSpaces}, a crisis strikes one owned property, picked at random across all players. Its owner owes the bank ${formatINR(I.crisisBill)} at once — whether or not the property is mortgaged.`,
+        `Insurance is bought per property: ${formatINR(premiumForYear(1))} in Year 1, ${formatINR(I.premiumStepPerYear)} more each financial year, never above ${formatINR(I.premiumMax)}. You are shown the price and must confirm it.`,
+        `A policy lasts ${I.coverageSpaces} spaces of average movement from the moment you buy it and waives one crisis bill on that property. Used or run out, it is over: no refund, no automatic renewal.`,
+        'Insurance pays nothing else — not rent, taxes, loans or mortgages. A crisis leaves the property, its buildings and its mortgage exactly as they were. A policy protects the player who bought it, not a later owner.',
+        'An unpaid crisis bill stops the game for everyone until it is settled. Raise the money the usual ways: sell a building, sell or mortgage a property, take a loan. Bankruptcy is possible only once none of those is left.',
+      ],
+      example: `Insuring three properties costs ${formatINR(3 * premiumForYear(1))} in Year 1 and ${formatINR(3 * premiumForYear(4))} in Year 4.`,
     },
     {
       title: 'Net worth',

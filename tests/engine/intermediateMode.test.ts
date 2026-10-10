@@ -9,6 +9,7 @@ import {
   buildSchedule,
   clockLabel,
   creditScoreOf,
+  crisisCheckpointClock,
   eligibleCollateral,
   financialOverview,
   gameClock,
@@ -66,6 +67,10 @@ function jumpTo(g: TestGame, target: number, randoms: number[] = []) {
   const ids = Object.keys(movement);
   for (const id of ids) movement[id] = 0;
   movement[ids[0]!] = target - 2;
+  // The teleport is about loan dates. The crisis schedule moves along with it, so the checkpoints it
+  // jumps over do not all fire on this one roll (crises have their own tests in insurance.test.ts).
+  const ins = eco(g).insurance!;
+  while (crisisCheckpointClock(eco(g), ins.nextCheckpoint) <= target) ins.nextCheckpoint += 1;
   const result = tick(g, 2, randoms);
   expect(gameClock(eco(g))).toBe(target);
   return result;
