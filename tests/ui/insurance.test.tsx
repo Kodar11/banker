@@ -111,7 +111,7 @@ beforeEach(async () => {
 // ---------------------------------------------------------------------------
 
 describe('More → Property Insurance', () => {
-  it('an Intermediate game lists it under More and opens the insurance screen', async () => {
+  it('a Capital game lists it under More and opens the insurance screen', async () => {
     const f = game();
     await renderTable(f, 'Asha');
     await fireEvent.press(screen.getByTestId('open-more'));
@@ -139,7 +139,7 @@ describe('More → Property Insurance', () => {
     await deed.unmount();
 
     await render(<InsuranceView view={viewFor(f, 'Asha')} />);
-    expect(screen.getByTestId('insurance-unavailable')).toHaveTextContent(/part of Intermediate Mode/);
+    expect(screen.getByTestId('insurance-unavailable')).toHaveTextContent(/part of Capital Mode/);
     expect(screen.queryByTestId('insurance-summary')).toBeNull();
     expect(api.action).not.toHaveBeenCalled();
   });

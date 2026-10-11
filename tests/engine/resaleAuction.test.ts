@@ -76,7 +76,7 @@ function pledge(g: TestGame, name: string, key: PropertyKey, amount = 2000) {
 }
 
 describe('listing a property for resale', () => {
-  it('an unmortgaged property I own can be listed in Intermediate Mode, on the existing auction', () => {
+  it('an unmortgaged property I own can be listed in Capital Mode, on the existing auction', () => {
     const { g, auction, result } = listed();
     expect(g.state.turn.phase).toBe('AUCTION');
     expect(auction).toMatchObject({
@@ -141,9 +141,9 @@ describe('listing a property for resale', () => {
     g.give('Asha', 'MUMBAI');
     expect(refusal(() => g.act('Asha', { type: 'START_RESALE_AUCTION', propertyKey: 'MUMBAI', reservePrice: RESERVE }))).toEqual({
       code: 'AUCTION_NOT_ALLOWED',
-      message: 'Property auctions are only available in Intermediate Mode.',
+      message: 'Property auctions are only available in Capital Mode.',
     });
-    expect(resaleBlocker(g.state, g.id('Asha'), 'MUMBAI')).toMatch(/Intermediate Mode/);
+    expect(resaleBlocker(g.state, g.id('Asha'), 'MUMBAI')).toMatch(/Capital Mode/);
     // The bank's auction: no resale terms, the decliner may bid, the leader may not raise, nobody can cancel.
     g.roll('Asha', 1, 2);
     g.act('Asha', { type: 'DECLINE_PROPERTY' });
@@ -638,7 +638,7 @@ describe('finalization is all or nothing', () => {
     ['the seller no longer owns it', (g) => void (g.state.properties.MUMBAI.ownerId = g.id('Chitra')), /seller no longer owns it/],
     ['it was mortgaged meanwhile', (g) => void (g.state.properties.MUMBAI.mortgaged = true), /it was mortgaged/],
     ['its buildings changed', (g) => void Object.assign(g.state.properties.MUMBAI, { hotel: false, houses: 1 }), /its buildings changed/],
-    ['the game is not Intermediate', (g) => void (g.state.mode = 'classic'), /cannot sell/],
+    ['the game is not Capital', (g) => void (g.state.mode = 'classic'), /cannot sell/],
   ];
   it.each(stale)('stale state — %s — prevents the sale', (_label, corrupt, reason) => {
     const g = aboutToSell();

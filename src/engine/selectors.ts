@@ -175,7 +175,7 @@ export function unpaidLoanInterest(loans: LoanState[], playerId: string): number
  * cash + each property at its deed price (less its mortgage value while mortgaged)
  * + houses/hotels at what they cost to build − loan principal still owed
  * − loan interest already charged but not yet paid.
- * Intermediate Mode: market values instead, less Intermediate loans and any crisis bill still owed.
+ * Capital Mode: market values instead, less Capital loans and any crisis bill still owed.
  */
 export function netWorth(state: Pick<GameState, 'properties' | 'loans' | 'players'> & ModeAware, playerId: string): number {
   const player = state.players.find((p) => p.id === playerId);
@@ -190,21 +190,21 @@ export function netWorth(state: Pick<GameState, 'properties' | 'loans' | 'player
 }
 
 // ---------------------------------------------------------------------------
-// Intermediate Mode valuation (never reached in a Classic game)
+// Capital Mode valuation (never reached in a Classic game)
 // ---------------------------------------------------------------------------
 
-/** What the bank charges for an unowned property: its market value in Intermediate Mode, the deed price in Classic. */
+/** What the bank charges for an unowned property: its market value in Capital Mode, the deed price in Classic. */
 export function purchasePrice(state: ModeAware, key: PropertyKey): number {
   return economyOf(state)?.market[key]?.value ?? getDeed(key).price;
 }
 
-/** Everything a player owes on Intermediate loans today (principal, interest already due, defaulted balances). */
+/** Everything a player owes on Capital loans today (principal, interest already due, defaulted balances). */
 export function intermediateDebt(eco: IntermediateState, playerId: string): number {
   return eco.loans.filter((l) => l.playerId === playerId).reduce((sum, l) => sum + loanLiability(l), 0);
 }
 
 /**
- * Intermediate net asset value: cash + every owned property at its current market value
+ * Capital net asset value: cash + every owned property at its current market value
  * + its buildings at what they cost to build − what it would cost to redeem each mortgage
  * (mortgage value + the redemption charge). Loans are not subtracted here.
  */
@@ -281,7 +281,7 @@ export function tradePropertyBlocker(state: StateLike & ModeAware & AuctionAware
   const prop = state.properties[key];
   const name = getDeed(key).name;
   if (!prop || prop.ownerId !== ownerId) return `${name} no longer belongs to that player.`;
-  // Intermediate Mode: a property its owner is auctioning goes to the auction's winner or stays put.
+  // Capital Mode: a property its owner is auctioning goes to the auction's winner or stays put.
   if (openResaleFor(state, key)) return `${name} is up for auction.`;
   if (RULES.trades.requireNoBuildings && (prop.hotel || prop.houses > 0)) return `Sell the buildings on ${name} before trading it.`;
   if (!RULES.trades.allowMortgaged && prop.mortgaged) return `${name} is mortgaged.`;
@@ -298,7 +298,7 @@ export function tradeBlocker(
   trade: Pick<TradeOffer, 'fromPlayerId' | 'toPlayerId' | 'offeredPropertyKeys' | 'requestedPropertyKeys' | 'offeredMoney' | 'requestedMoney'>,
 ): string | null {
   if (state.status !== 'ACTIVE') return 'The game is not running.';
-  // Intermediate Mode: nothing changes hands while a crisis bill is unsettled.
+  // Capital Mode: nothing changes hands while a crisis bill is unsettled.
   if (pendingCrises(state).length) return 'A crisis bill must be settled first.';
   const from = state.players.find((p) => p.id === trade.fromPlayerId);
   const to = state.players.find((p) => p.id === trade.toPlayerId);
@@ -380,13 +380,13 @@ export function propertyActionBlocker(
   if (state.turn.phase === 'AUCTION') return 'Wait for the auction to finish.';
   const deed = getDeed(key);
   const isMyTurn = state.turn.playerId === playerId;
-  // Intermediate Mode: while a crisis bill is unsettled only the player who owes it may act, and only to raise money.
+  // Capital Mode: while a crisis bill is unsettled only the player who owes it may act, and only to raise money.
   const crises = pendingCrises(state);
   if (crises.length) {
     if (!crises.some((c) => c.ownerId === playerId)) return 'A crisis bill must be settled before play continues.';
     if (kind === 'BUILD_HOUSE' || kind === 'BUILD_HOTEL' || kind === 'UNMORTGAGE_PROPERTY') return 'Settle your crisis bill first.';
   }
-  // Intermediate Mode: a property securing a loan can't take a second claim, change or leave its owner.
+  // Capital Mode: a property securing a loan can't take a second claim, change or leave its owner.
   if (isPledged(state, key)) {
     if (kind === 'MORTGAGE_PROPERTY') return 'Pledged as loan collateral — it can’t also be mortgaged.';
     if (kind === 'SELL_PROPERTY') return 'Pledged as loan collateral — repay that loan first.';
@@ -435,7 +435,7 @@ export function propertyActionBlocker(
 }
 
 // ---------------------------------------------------------------------------
-// Property resale auctions (Intermediate Mode)
+// Property resale auctions (Capital Mode)
 // ---------------------------------------------------------------------------
 
 /** The resale terms of an auction, or null for the bank's auction of an unowned property. */
@@ -473,7 +473,7 @@ export function reservePriceBlocker(amount: number): string | null {
  * The engine runs it when the auction is created; the screens show the same answer.
  */
 export function resaleBlocker(state: GameState, playerId: string, key: PropertyKey): string | null {
-  if (!isIntermediate(state)) return 'Property auctions are only available in Intermediate Mode.';
+  if (!isIntermediate(state)) return 'Property auctions are only available in Capital Mode.';
   const prop = state.properties[key];
   const player = state.players.find((p) => p.id === playerId);
   if (!prop || !player) return 'Unknown property.';

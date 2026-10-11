@@ -10,7 +10,7 @@ import type { GameStatus, TurnPhase } from './types.ts';
  *             | RESOLVING (loan interest paid at Start → now resolve the square landed on)
  * TURN_COMPLETE → AWAITING_ROLL (next player)
  *
- * Intermediate Mode: the turn player may put a property of theirs up for auction from
+ * Capital Mode: the turn player may put a property of theirs up for auction from
  * AWAITING_ROLL, AWAITING_PAYMENT or TURN_COMPLETE (→ AUCTION); when that auction ends the turn
  * returns to the phase it left, with everything else about the turn untouched.
  */

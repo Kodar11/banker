@@ -99,13 +99,13 @@ const startRewards = (r: { transactions: { type: string; toPlayerId: string | nu
 // ---------------------------------------------------------------------------
 
 describe('game mode', () => {
-  it('a game is Classic unless the host chose Intermediate, and carries no economy', () => {
+  it('a game is Classic unless the host chose Capital, and carries no economy', () => {
     const g = new TestGame(['Asha', 'Bilal']);
     expect(g.state.mode).toBe('classic');
     expect(g.state.intermediate).toBeNull();
   });
 
-  it('an Intermediate game gets its economy when it starts, not before', () => {
+  it('a Capital game gets its economy when it starts, not before', () => {
     const g = new TestGame(['Asha', 'Bilal', 'Chitra'], { mode: 'intermediate', start: false });
     expect(g.state.mode).toBe('intermediate');
     expect(g.state.intermediate).toBeNull();
@@ -138,7 +138,7 @@ describe('game mode', () => {
     expect(g.state.mode).toBe('intermediate');
   });
 
-  it('Classic games refuse every Intermediate banking action', () => {
+  it('Classic games refuse every Capital banking action', () => {
     const g = new TestGame(['Asha', 'Bilal']);
     const id = '00000000-0000-4000-8000-00000000abcd';
     expect(refusal(() => g.act('Asha', { type: 'TAKE_INTERMEDIATE_LOAN', product: 'PERSONAL', amount: 5000, expectedRatePercent: 11 }))).toMatchObject({ code: 'LOAN_NOT_ALLOWED' });
@@ -149,14 +149,14 @@ describe('game mode', () => {
     expect(g.balance('Asha')).toBe(START_CASH);
   });
 
-  it('Intermediate games do not hand out the Classic flat-interest loan', () => {
+  it('Capital games do not hand out the Classic flat-interest loan', () => {
     const g = newGame();
     expect(refusal(() => g.act('Asha', { type: 'REQUEST_LOAN', amount: 5000 })).code).toBe('LOAN_NOT_ALLOWED');
     expect(g.state.loans).toEqual([]);
   });
 });
 
-describe('Classic Mode is untouched by the Intermediate rules', () => {
+describe('Classic Mode is untouched by the Capital rules', () => {
   it('draws exactly the randomness it always did (turn order, then two dice a roll)', () => {
     const g = new TestGame(['Asha', 'Bilal', 'Chitra'], { start: false });
     let calls = 0;
@@ -923,7 +923,7 @@ describe('financial position', () => {
     expect(totalDebt(g.state, g.id('Asha'))).toBe(9000 + loanOf(g, loan.id).installments[0]!.interest);
   });
 
-  it('an early end ranks players by Intermediate net worth', () => {
+  it('an early end ranks players by Capital net worth', () => {
     const g = newGame();
     g.give('Bilal', 'MUMBAI');
     eco(g).market.MUMBAI.value = 100;

@@ -159,7 +159,7 @@ export function ResaleSheet({ view, propertyKey, onClose, onCreated }: ResaleShe
 }
 
 /**
- * "Auction Property" on a property card (Intermediate Mode, my own property — nothing otherwise).
+ * "Auction Property" on a property card (Capital Mode, my own property — nothing otherwise).
  * Enabled exactly when the server would accept the listing; when it would not, the reason is said
  * under the button. A property already up for auction shows that, and the way to it, instead.
  */

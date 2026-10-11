@@ -70,7 +70,7 @@ beforeEach(async () => {
   jest.clearAllMocks();
   useSessionStore.setState({ session: null, hydrated: true });
   useGameStore.getState().reset(null);
-  // The one-time Intermediate introduction has its own tests; here this phone has already seen it.
+  // The one-time Capital introduction has its own tests; here this phone has already seen it.
   await SecureStore.setItemAsync(INTRO_SEEN_KEY, '1');
   await SecureStore.deleteItemAsync(OBJECTIVE_SEEN_KEY);
 });
@@ -78,7 +78,7 @@ beforeEach(async () => {
 // ---------------------------------------------------------------------------
 
 describe('Create game: settings', () => {
-  it('opens on the standard rules, with nothing Intermediate offered for Classic', async () => {
+  it('opens on the standard rules, with nothing Capital offered for Classic', async () => {
     await render(<CreateGame />);
     expect(screen.getByTestId('config-startingCash-value')).toHaveTextContent('₹25,000');
     expect(screen.getByTestId('config-loanLimit-value')).toHaveTextContent('₹20,000');
@@ -112,13 +112,13 @@ describe('Create game: settings', () => {
     expect(screen.getByTestId('game-option-business')).toHaveTextContent(/start with ₹10,000/);
   });
 
-  it('Intermediate adds the market and objectives, Balanced and on by default', async () => {
+  it('Capital adds the market and objectives, Balanced and on by default', async () => {
     await render(<CreateGame />);
     await press('game-mode-intermediate');
     expect(screen.getByTestId('config-volatility-balanced').props.accessibilityState.selected).toBe(true);
     expect(screen.getByTestId('config-objectives-on').props.accessibilityState.selected).toBe(true);
     const review = screen.getByTestId('game-review');
-    expect(review).toHaveTextContent(/Mode\s*Intermediate/);
+    expect(review).toHaveTextContent(/Mode\s*Capital/);
     expect(review).toHaveTextContent(/Market volatility\s*Balanced/);
     expect(review).toHaveTextContent(/Secret objectives\s*Enabled/);
     await press('config-volatility-volatile');
@@ -143,7 +143,7 @@ describe('Create game: settings', () => {
     expect(screen.getByTestId('config-restore-defaults').props.accessibilityState.disabled).toBe(true);
   });
 
-  it('switching mode keeps the money settings and never carries Intermediate settings into Classic', async () => {
+  it('switching mode keeps the money settings and never carries Capital settings into Classic', async () => {
     await render(<CreateGame />);
     await press('config-startingCash-plus');
     await press('game-mode-intermediate');
@@ -186,7 +186,7 @@ describe('Create game: settings', () => {
     });
   });
 
-  it('a customised Intermediate game sends its mode and settings', async () => {
+  it('a customised Capital game sends its mode and settings', async () => {
     const config = { startingCash: 25000, loanLimit: 20000, marketVolatility: 'stable', secretObjectives: false } as const;
     const f = new Fixture(['Tanmay'], { start: false, mode: 'intermediate', config });
     api.create.mockResolvedValue(ok(f.snapshot()));
@@ -217,7 +217,7 @@ describe('Lobby: the rules every player will play by', () => {
     const f = new Fixture(['Asha', 'Bilal'], { start: false, mode: 'intermediate', config }).loadAs(name);
     await render(<LobbyView view={viewFor(f, name)} />);
     const rules = screen.getByTestId('lobby-rules');
-    expect(rules).toHaveTextContent(/Mode\s*Intermediate/);
+    expect(rules).toHaveTextContent(/Mode\s*Capital/);
     expect(rules).toHaveTextContent(/Starting cash\s*₹30,000/);
     expect(rules).toHaveTextContent(/Maximum outstanding loans\s*₹25,000/);
     expect(rules).toHaveTextContent(/Market volatility\s*Balanced/);
@@ -466,7 +466,7 @@ describe('Secret objective: the reveal when the game starts', () => {
     expect(screen.queryByTestId('objective-reveal')).toBeNull();
   });
 
-  it('waits behind the Intermediate introduction instead of covering it', async () => {
+  it('waits behind the Capital introduction instead of covering it', async () => {
     await SecureStore.deleteItemAsync(INTRO_SEEN_KEY);
     await renderGame(twoPlayers(), 'Asha', { revealed: false });
     await waitFor(() => expect(screen.getByTestId('intermediate-intro')).toBeTruthy());
@@ -492,7 +492,7 @@ describe('Secret objective: the reveal when the game starts', () => {
 
   it.each([
     ['a Classic game', {}],
-    ['an Intermediate game with objectives off', { mode: 'intermediate' as const, config: { secretObjectives: false } }],
+    ['a Capital game with objectives off', { mode: 'intermediate' as const, config: { secretObjectives: false } }],
   ])('%s has no reveal and keeps no note of one', async (_label, options) => {
     const f = new Fixture(['Asha', 'Bilal'], options);
     await renderGame(f, 'Asha', { revealed: false });
@@ -545,7 +545,7 @@ describe('End of the game: the reveal', () => {
 
   it.each([
     ['a Classic game', {}],
-    ['an Intermediate game with objectives off', { mode: 'intermediate' as const, config: { secretObjectives: false } }],
+    ['a Capital game with objectives off', { mode: 'intermediate' as const, config: { secretObjectives: false } }],
   ])('%s shows no objectives panel at all', async (_label, options) => {
     const f = new Fixture(['Asha', 'Bilal'], options);
     f.act('Asha', { type: 'END_GAME' });

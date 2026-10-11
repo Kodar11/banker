@@ -24,7 +24,7 @@ export const GameActionSchema = z.discriminatedUnion('type', [
   bare('START_GAME'),
   bare('ROLL_DICE'),
   /**
-   * Buy the property I landed on. Intermediate Mode only: `insurePremium` also insures it in the same
+   * Buy the property I landed on. Capital Mode only: `insurePremium` also insures it in the same
    * action — the premium the player was shown; the server charges its own and refuses the whole purchase
    * if the two differ. Without it this is the plain purchase it has always been.
    */
@@ -63,7 +63,7 @@ export const GameActionSchema = z.discriminatedUnion('type', [
     .strict(),
   z.object({ type: z.literal('REQUEST_LOAN'), amount: rupees }).strict(),
   z.object({ type: z.literal('REPAY_LOAN'), loanId: id, amount: rupees }).strict(),
-  // ---- Intermediate Mode banking (refused in a Classic game) ----
+  // ---- Capital Mode banking (refused in a Classic game) ----
   z
     .object({
       type: z.literal('TAKE_INTERMEDIATE_LOAN'),
@@ -81,7 +81,7 @@ export const GameActionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('PREPAY_INTERMEDIATE_LOAN'), loanId: id, amount: rupees }).strict(),
   /** Pay down a defaulted loan's remaining balance. */
   z.object({ type: z.literal('PAY_DEFAULTED_LOAN'), loanId: id, amount: rupees }).strict(),
-  // ---- Property insurance and crisis bills (Intermediate Mode; refused in a Classic game) ----
+  // ---- Property insurance and crisis bills (Capital Mode; refused in a Classic game) ----
   /**
    * Insure one property I own. `expectedPremium` is the price on the confirmation the player saw; the
    * server charges its own price and refuses if the two differ (the financial year moved on).
@@ -99,7 +99,7 @@ export const GameActionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('PLACE_BID'), auctionId: id, amount: rupees }).strict(),
   z.object({ type: z.literal('PASS_AUCTION'), auctionId: id }).strict(),
   z.object({ type: z.literal('CLOSE_AUCTION'), auctionId: id }).strict(),
-  // ---- Property resale auctions (Intermediate Mode; refused in a Classic game) ----
+  // ---- Property resale auctions (Capital Mode; refused in a Classic game) ----
   /** Put a property I own, with whatever is built on it, up for auction. It sells only to a bid of at least `reservePrice`. */
   z.object({ type: z.literal('START_RESALE_AUCTION'), propertyKey, reservePrice: rupees }).strict(),
   /** Withdraw my own resale auction. Only while nobody has bid. */

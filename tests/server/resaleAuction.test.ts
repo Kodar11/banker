@@ -398,7 +398,7 @@ describe.skipIf(!DATABASE_URL)('Property resale auctions through the handler (Po
     await give(g, 'Asha', 'MUMBAI');
     expect(refused(await g.act('Asha', { type: 'START_RESALE_AUCTION', propertyKey: 'MUMBAI', reservePrice: RESERVE }))).toEqual({
       code: 'AUCTION_NOT_ALLOWED',
-      message: 'Property auctions are only available in Intermediate Mode.',
+      message: 'Property auctions are only available in Capital Mode.',
     });
     expect(await sql`select 1 from public.auctions where game_id = ${g.gameId}`).toHaveLength(0);
 

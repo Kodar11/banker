@@ -79,7 +79,7 @@ export default function Home() {
       <ProfileEntry />
       <View className="flex-1 items-center justify-center gap-3">
         <Text className="text-7xl">🏦</Text>
-        <Text className="text-center text-5xl font-black text-cream">Business{'\n'}Banker</Text>
+        <Text className="text-center text-5xl font-black text-cream">Clash of{'\n'}Capitals</Text>
         <Text className="text-center text-lg font-semibold text-cream/80">The bank & referee for your Business board.{'\n'}Keep playing on the real board.</Text>
         {!isSupabaseConfigured ? (
           <Text className="mt-4 rounded-xl bg-amber-300 px-4 py-2 text-center font-bold text-ink" accessibilityRole="alert">

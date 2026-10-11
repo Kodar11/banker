@@ -3,9 +3,9 @@ import type { CrisisRecord, InsuranceState } from './insuranceState.ts';
 import { INTERMEDIATE_RULES as IR, type CreditEventType, type LoanProductKey } from './intermediateConfig.ts';
 
 /**
- * Intermediate Mode state. Lives in GameState.intermediate (one JSON document per game, written
+ * Capital Mode state. Lives in GameState.intermediate (one JSON document per game, written
  * in the same transaction as everything else) and is null for Classic games and before
- * an Intermediate game starts. Only the server writes it.
+ * a Capital game starts. Only the server writes it.
  */
 
 /** The ruleset of a game: chosen by the host at creation, never changed afterwards. */
@@ -148,7 +148,7 @@ export interface IntermediateState {
 
 type ModeState = { mode?: GameMode; intermediate?: IntermediateState | null };
 
-/** The live economy of an Intermediate game, or null (Classic game, or not started yet). */
+/** The live economy of a Capital game, or null (Classic game, or not started yet). */
 export function economyOf(state: ModeState): IntermediateState | null {
   return state.mode === 'intermediate' && state.intermediate ? state.intermediate : null;
 }
@@ -157,7 +157,7 @@ export function isIntermediate(state: ModeState): boolean {
   return state.mode === 'intermediate';
 }
 
-/** Insurance and crises of an Intermediate game that has them, or null (Classic, not started, or started before insurance). */
+/** Insurance and crises of a Capital game that has them, or null (Classic, not started, or started before insurance). */
 export function insuranceOf(state: ModeState): InsuranceState | null {
   return economyOf(state)?.insurance ?? null;
 }

@@ -90,16 +90,16 @@ export function GameScreen({ view }: { view: GameView }) {
   const tableFocused = useIsFocused();
   const { state, events } = view.snapshot;
   const me = view.me;
-  // Intermediate with secret objectives only, and only my own: this phone holds nobody else's.
+  // Capital with secret objectives only, and only my own: this phone holds nobody else's.
   const hasObjective = !!me && !!state.objectives?.assignments[me.id];
   const objectiveSeen = useObjectiveSeen(state.id, hasObjective && me ? me.id : null);
   /** "Later" on the reveal: not offered again until the game is next opened. */
   const [revealLater, setRevealLater] = useState(false);
-  /** The Intermediate introduction has finished (or was not needed): the reveal waits its turn behind it. */
+  /** The Capital introduction has finished (or was not needed): the reveal waits its turn behind it. */
   const [introSettled, setIntroSettled] = useState(false);
   const settleIntro = useCallback(() => setIntroSettled(true), []);
   const auctionId = state.auction?.status === 'OPEN' ? state.auction.id : null;
-  // Intermediate Mode: with no auction running, the Auction button is where a player puts a property of theirs up for sale.
+  // Capital Mode: with no auction running, the Auction button is where a player puts a property of theirs up for sale.
   const canListProperty = !auctionId && isIntermediate(state) && state.status === 'ACTIVE' && me?.status === 'ACTIVE';
   const openAuction = () => {
     if (auctionId) router.push(`/auction/${auctionId}`);
@@ -173,7 +173,7 @@ export function GameScreen({ view }: { view: GameView }) {
     else setPanel(target);
   };
 
-  // Intermediate Mode only (null in a Classic game): the economy behind the year indicator, the bank and its notices.
+  // Capital Mode only (null in a Classic game): the economy behind the year indicator, the bank and its notices.
   const eco = economyOf(state);
   // A crisis bill of mine that is not settled yet: until it is, the table shows that and nothing else.
   const myCrisis = playing && me ? pendingCrisisOf(state, me.id) : null;
@@ -241,7 +241,7 @@ export function GameScreen({ view }: { view: GameView }) {
       // Also here, for the screens too short to show it in the bar.
       { key: 'chat', icon: '💬', label: 'Chat / React', hint: 'Quick reactions and messages to everyone', testID: 'more-chat', onPress: () => openTool({ kind: 'chat' }) },
       { key: 'loan', icon: '🏦', label: 'Bank / Loan', hint: eco ? 'Loans, payments and credit score' : 'Borrow or repay', testID: 'more-loan', onPress: () => openTool({ kind: 'loan' }) },
-      // Intermediate Mode with insurance only: a Classic game never lists it.
+      // Capital Mode with insurance only: a Classic game never lists it.
       ...(eco?.insurance
         ? [
             {
@@ -488,12 +488,12 @@ export function GameScreen({ view }: { view: GameView }) {
               <Text
                 className="text-xs font-bold uppercase tracking-[2px] text-cream/80"
                 testID="year-indicator"
-                accessibilityLabel={`Intermediate Mode, financial year ${eco.year}, ${yearProgressPercent(eco)} percent through`}
+                accessibilityLabel={`Capital Mode, financial year ${eco.year}, ${yearProgressPercent(eco)} percent through`}
               >
-                Intermediate · Year {eco.year}
+                Capital · Year {eco.year}
               </Text>
             ) : (
-              <Text className="text-xs font-bold uppercase tracking-[2px] text-cream/60">{isIntermediate(state) ? 'Intermediate · India' : 'Classic · India'}</Text>
+              <Text className="text-xs font-bold uppercase tracking-[2px] text-cream/60">{isIntermediate(state) ? 'Capital · India' : 'Classic · India'}</Text>
             )}
           </View>
           <View>
@@ -554,7 +554,7 @@ export function GameScreen({ view }: { view: GameView }) {
         send={send}
       />
       <QuickChatSheet visible={tool?.kind === 'chat' && playing} onClose={() => setTool(null)} onSend={chat.send} cooling={chat.cooling} blocked={chat.blocked} />
-      {/* Classic keeps its loan sheet. Intermediate opens the bank from the same Bank / Loan button. */}
+      {/* Classic keeps its loan sheet. Capital opens the bank from the same Bank / Loan button. */}
       {eco ? (
         <FinanceHub visible={tool?.kind === 'loan'} initialTab={tool?.kind === 'loan' ? tool.tab : undefined} onClose={() => setTool(null)} view={view} send={send} />
       ) : (

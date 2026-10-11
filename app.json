@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Business Banker",
+    "name": "Clash of Capitals",
     "slug": "board-game-bank",
     "scheme": "businessbanker",
     "version": "1.0.0",
@@ -36,7 +36,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Scan a game QR code to join your friends' Business game.",
+          "cameraPermission": "Scan a game QR code to join your friends' Clash of Capitals game.",
           "microphonePermission": "Talk to the other players in a private game. Your microphone is only sent while you hold the talk button.",
           "recordAudioAndroid": true
         }

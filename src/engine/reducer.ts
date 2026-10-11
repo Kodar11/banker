@@ -244,7 +244,7 @@ export function applyAction(state: GameState, actorId: string, rawAction: unknow
   if (state.status !== 'WAITING' && actor.status !== 'ACTIVE' && action.type !== 'END_GAME' && action.type !== 'LEAVE_GAME') {
     fail('FORBIDDEN', 'You are out of the game.');
   }
-  // Intermediate Mode: an unsettled crisis bill comes before everything else — whose turn it is included.
+  // Capital Mode: an unsettled crisis bill comes before everything else — whose turn it is included.
   if (state.status === 'ACTIVE') {
     const waiting = crisisGate(state, actorId, action);
     if (waiting) fail('INVALID_PHASE', waiting);
@@ -290,7 +290,7 @@ export function applyAction(state: GameState, actorId: string, rawAction: unknow
       break;
     case 'BUY_PROPERTY': {
       const bought = buyProperty(d, actor);
-      // Intermediate Mode: "buy and insure" is one action — if the policy can't be bought, nothing is.
+      // Capital Mode: "buy and insure" is one action — if the policy can't be bought, nothing is.
       if (action.insurePremium !== undefined) buyInsurance(d, actor, bought, action.insurePremium);
       break;
     }
@@ -340,7 +340,7 @@ export function applyAction(state: GameState, actorId: string, rawAction: unknow
     case 'REPAY_LOAN':
       repayLoan(d, actor, action.loanId, action.amount);
       break;
-    // Intermediate Mode banking. Each of these refuses a Classic game.
+    // Capital Mode banking. Each of these refuses a Classic game.
     case 'TAKE_INTERMEDIATE_LOAN':
       takeLoan(d, actor, { product: action.product, amount: action.amount, collateralKey: action.collateralKey ?? null, expectedRatePercent: action.expectedRatePercent });
       break;
@@ -455,7 +455,7 @@ function startGame(d: Draft, actor: PlayerState): void {
   for (const p of ordered) {
     d.transfer({ type: 'STARTING_FUNDS', from: null, to: p.id, amount: config.startingCash, memo: 'Starting cash' });
   }
-  // Intermediate Mode only: the game's economy is generated here, once, after the turn-order draw.
+  // Capital Mode only: the game's economy is generated here, once, after the turn-order draw.
   if (isIntermediate(d.state)) {
     initEconomy(d, ordered);
     // Dealt last, so the draws above are exactly what they were before objectives existed.
@@ -530,7 +530,7 @@ function rollDice(d: Draft, actor: PlayerState): void {
     to: move.to,
     destination: spaceName(move.to),
   });
-  // Intermediate Mode only: the dice move feeds the shared financial calendar (years, market, loan due dates).
+  // Capital Mode only: the dice move feeds the shared financial calendar (years, market, loan due dates).
   if (isIntermediate(d.state)) recordDiceMovement(d, actor, total);
   d.setPhase('RESOLVING');
   if (!settleDueInterest(d, actor, { kind: 'RESOLVE_LANDING', rollTotal: total, depth: 0 })) return;
@@ -1020,7 +1020,7 @@ function buyProperty(d: Draft, actor: PlayerState): PropertyKey {
   const prop = d.state.properties[pending.propertyKey];
   if (prop.ownerId !== null) fail('ALREADY_OWNED', 'That property was already purchased.');
   const deed = getDeed(pending.propertyKey);
-  // Classic: the deed price. Intermediate: the bank sells at today's market value.
+  // Classic: the deed price. Capital: the bank sells at today's market value.
   const price = purchasePrice(d.state, deed.key);
   if (actor.balance < price) fail('INSUFFICIENT_FUNDS', 'Not enough money for this purchase.');
   const before = snapshotProps(d, [deed.key]);
@@ -1096,7 +1096,7 @@ function openNewAuction(d: Draft, key: PropertyKey, participantIds: string[], re
 }
 
 // ---------------------------------------------------------------------------
-// Property resale auctions (Intermediate Mode): a player sells a property they own, buildings included
+// Property resale auctions (Capital Mode): a player sells a property they own, buildings included
 // ---------------------------------------------------------------------------
 
 /**
@@ -1508,7 +1508,7 @@ function liquidate(d: Draft, actor: PlayerState, creditorId: string | null, labe
 }
 
 /**
- * Bankruptcy over a crisis bill (Intermediate Mode). Unlike a debt met on a turn, the bill can fall
+ * Bankruptcy over a crisis bill (Capital Mode). Unlike a debt met on a turn, the bill can fall
  * on any player, so this is not a turn action — but it is the same bankruptcy, and it is refused
  * while the player can still afford the bill or has any way left to raise money.
  */
@@ -1574,7 +1574,7 @@ function leaveTable(d: Draft, actor: PlayerState): void {
   actor.inJail = false;
   actor.jailTurnsLeft = 0;
   d.event('PLAYER_LEFT', actor.id, `${actor.name} left the game`);
-  // Intermediate Mode: leaving does not dodge a crisis bill, and does not leave the table waiting on it.
+  // Capital Mode: leaving does not dodge a crisis bill, and does not leave the table waiting on it.
   closePendingCrises(d, actor.id);
 
   const remaining = d.activePlayers().sort((a, b) => a.seat - b.seat);
@@ -1645,7 +1645,7 @@ function finishGame(d: Draft, reason: 'HOST_ENDED' | 'LAST_PLAYER_STANDING' | 'P
   expireTrades(d, () => true);
   d.state.undoStack = [];
   d.state.undoRequest = null;
-  // Intermediate Mode: a crisis bill still open is collected first, so it is in the final balances.
+  // Capital Mode: a crisis bill still open is collected first, so it is in the final balances.
   closePendingCrises(d, null);
   // Secret-objective bonuses are checked and paid here, before the ranking: the winner below is decided
   // on the final balances, so the declared result and the money always agree. (Nothing to do in Classic.)

@@ -73,7 +73,7 @@ export function cashAfter(start: number, movements: readonly number[]): { balanc
 }
 
 // ---------------------------------------------------------------------------
-// Business Banker rules the stories quote (read from the game's own rule set)
+// Clash of Capitals rules the stories quote (read from the game's own rule set)
 // ---------------------------------------------------------------------------
 
 /** Income Tax: a fixed amount per property owned, up to the cap. */

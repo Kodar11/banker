@@ -109,7 +109,7 @@ beforeEach(async () => {
 // ---------------------------------------------------------------------------
 
 describe('Entry point: the game table’s Auction button', () => {
-  it('Intermediate, no auction running: Auction is enabled and opens the auction screen to start one', async () => {
+  it('Capital, no auction running: Auction is enabled and opens the auction screen to start one', async () => {
     const f = game();
     await renderTable(f, 'Asha');
     expect(disabled('open-auction')).toBe(false);
@@ -535,7 +535,7 @@ describe('The auction screen during a resale', () => {
     expect(screen.queryByTestId('insure-MUMBAI')).toBeNull();
   });
 
-  it('a stale auction link in an Intermediate game offers the way to the running one, or to start one', async () => {
+  it('a stale auction link in a Capital game offers the way to the running one, or to start one', async () => {
     const { f, auctionId } = listed();
     await renderAuction(f, 'Bilal', '00000000-0000-4000-8000-00000000dead');
     expect(screen.getByText('An auction is running')).toBeTruthy();

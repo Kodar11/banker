@@ -17,7 +17,7 @@ interface FinanceNoticesProps {
 }
 
 /**
- * Intermediate Mode's two dismissible notices, one at a time:
+ * Capital Mode's two dismissible notices, one at a time:
  *   - to everyone, when a new financial year begins (read from the server's stored year report);
  *   - to the borrower only, while an installment of theirs is due or overdue.
  * Neither blocks the game — the turn carries on underneath — and dismissing a reminder changes

@@ -1,6 +1,6 @@
 /// <reference types="node" />
 /**
- * Intermediate Mode through the game-action handler, against a real Postgres with the
+ * Capital Mode through the game-action handler, against a real Postgres with the
  * production migrations applied: persistence, exactly-once behaviour and races.
  *
  *   npm run db:local
@@ -35,7 +35,7 @@ const WINDOW = 18;
 
 type Ok = Extract<ApiResponse, { ok: true }>;
 
-describe.skipIf(!DATABASE_URL)('Intermediate Mode through the handler (Postgres)', () => {
+describe.skipIf(!DATABASE_URL)('Capital Mode through the handler (Postgres)', () => {
   let sql: Sql;
   const broadcasts: { gameId: string; payload: StateBroadcast }[] = [];
   let queuedDice: number[] = [];
@@ -196,7 +196,7 @@ describe.skipIf(!DATABASE_URL)('Intermediate Mode through the handler (Postgres)
       expect((await c.snap()).state.mode).toBe('classic');
     });
 
-    it('a Classic game refuses Intermediate banking and keeps the Classic loan', async () => {
+    it('a Classic game refuses Capital banking and keeps the Classic loan', async () => {
       const c = await setupGame(undefined);
       expect(await c.act('Asha', { type: 'TAKE_INTERMEDIATE_LOAN', product: 'PERSONAL', amount: 5000, expectedRatePercent: 11 })).toMatchObject({ ok: false, error: { code: 'LOAN_NOT_ALLOWED' } });
       ok(await c.act('Asha', { type: 'REQUEST_LOAN', amount: 5000 }));
@@ -209,7 +209,7 @@ describe.skipIf(!DATABASE_URL)('Intermediate Mode through the handler (Postgres)
       await ledgerOk(c.gameId);
     });
 
-    it('an Intermediate game refuses the Classic loan action', async () => {
+    it('a Capital game refuses the Classic loan action', async () => {
       const g = await setupGame('intermediate');
       expect(await g.act('Asha', { type: 'REQUEST_LOAN', amount: 5000 })).toMatchObject({ ok: false, error: { code: 'LOAN_NOT_ALLOWED' } });
       expect((await sql`select 1 from public.loans where game_id = ${g.gameId}`).length).toBe(0);

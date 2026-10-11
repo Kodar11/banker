@@ -7,7 +7,7 @@ import { openProperty } from '@/utils/navigation';
 
 /** What stands on (or hangs over) a property, for the row's trailing tag. A mortgaged site keeps its buildings. */
 function propertyStatus(prop: PropertyState, pledged: boolean): { text: string; spoken: string; warn: boolean } | null {
-  // Intermediate Mode: securing a loan is a different claim from a mortgage, and is named as such.
+  // Capital Mode: securing a loan is a different claim from a mortgage, and is named as such.
   if (pledged) return { text: 'Loan collateral', spoken: 'pledged as loan collateral', warn: true };
   const built = prop.hotel
     ? { text: '🏨 Hotel', spoken: 'hotel' }
@@ -26,7 +26,7 @@ function propertyStatus(prop: PropertyState, pledged: boolean): { text: string; 
 export const PropertyRow = memo(function PropertyRow({ prop, onPress, state }: { prop: PropertyState; onPress?: () => void; state?: GameState }) {
   const deed = getDeed(prop.key);
   const status = propertyStatus(prop, !!state && isPledged(state, prop.key));
-  // Classic (and any list without the game state): the deed price. Intermediate: today's market value.
+  // Classic (and any list without the game state): the deed price. Capital: today's market value.
   const price = state ? purchasePrice(state, prop.key) : deed.price;
   return (
     <Pressable

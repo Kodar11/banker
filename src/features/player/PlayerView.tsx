@@ -29,7 +29,7 @@ export function PlayerView({ view, playerId }: { view: GameView; playerId: strin
   const { houses, hotels } = buildingCount(state, player.id);
   const loans = state.loans.filter((l) => l.playerId === player.id);
   const debt = totalDebt(state, player.id);
-  // Intermediate Mode: the wallet lists this game's loan contracts and opens the bank instead of the Classic loan sheet.
+  // Capital Mode: the wallet lists this game's loan contracts and opens the bank instead of the Classic loan sheet.
   const eco = economyOf(state);
   const contracts = eco ? loansOf(eco, player.id) : [];
 

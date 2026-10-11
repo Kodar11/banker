@@ -61,7 +61,7 @@ export function buildBoardSpaces(state: Pick<GameState, 'players' | 'properties'
       specialType: null,
       propertyKey: space.propertyKey,
       propertyGroup: deed.group,
-      // Classic: the deed price. Intermediate: today's market value.
+      // Classic: the deed price. Capital: today's market value.
       purchasePrice: purchasePrice(state, space.propertyKey),
       owner: owner ? { id: owner.id, name: owner.name, seat: owner.seat } : null,
       houses: prop?.hotel ? 0 : (prop?.houses ?? 0),

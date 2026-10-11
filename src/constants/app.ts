@@ -1,7 +1,11 @@
 /** The app's display name (app.json `name`), for text the player sends to other people. */
-export const APP_NAME = 'Business Banker';
+export const APP_NAME = 'Clash of Capitals';
 
-/** Deep link scheme from app.json — QR codes encode businessbanker://join-game?code=123456 */
+/**
+ * Deep link scheme from app.json — QR codes encode businessbanker://join-game?code=123456.
+ * It predates the app's current name and stays: it is in Supabase's redirect allow-list (Google
+ * sign-in returns to it) and in every join link and QR code already shared.
+ */
 export const APP_SCHEME = 'businessbanker';
 
 export function joinLink(code: string): string {

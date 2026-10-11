@@ -90,7 +90,7 @@ function Line({ label, value, testID }: { label: string; value: string; testID?:
 }
 
 /**
- * The deed's insurance section (Intermediate Mode with insurance only — renders nothing otherwise,
+ * The deed's insurance section (Capital Mode with insurance only — renders nothing otherwise,
  * and nothing for a property the bank still holds). Whether a property is insured is public, like a
  * mortgage; the term of a policy is shown to its owner, who can also buy one here.
  */

@@ -2,7 +2,7 @@
 import { goBack } from '@/utils/navigation';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
-import { configOf, intermediateRuleEntries, ruleSections, topRules, type RuleEntry } from '@/engine/index.ts';
+import { configOf, GAME_MODE_NAMES, intermediateRuleEntries, ruleSections, topRules, type RuleEntry } from '@/engine/index.ts';
 import { Button, Card, Screen } from '@/components/ui';
 import { LeaveGameDialog } from '@/features/game/LeaveGameDialog';
 import { useGameStore } from '@/store/gameStore';
@@ -69,7 +69,7 @@ function RuleSection({ testID, title, intro, rules }: RuleSectionProps) {
 export default function Settings() {
   const session = useSessionStore((state) => state.session);
   const [confirmLeave, setConfirmLeave] = useState(false);
-  // Only a game played in Intermediate Mode shows its extra rules; Classic games read exactly as before.
+  // Only a game played in Capital Mode shows its extra rules; Classic games read exactly as before.
   const intermediate = useGameStore((state) => state.snapshot?.state.mode === 'intermediate');
   // In a game the rules quote that game's own settings (starting cash, loan limit, market); outside one, the standard values.
   const game = useGameStore((state) => state.snapshot?.state);
@@ -103,7 +103,7 @@ export default function Settings() {
       {intermediate ? (
         <RuleSection
           testID="rules-intermediate"
-          title="Intermediate Mode"
+          title={GAME_MODE_NAMES.intermediate}
           intro="This game adds a financial layer. Every Classic rule above still applies."
           rules={intermediateRuleEntries(config)}
         />

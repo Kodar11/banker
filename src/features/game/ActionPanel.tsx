@@ -73,7 +73,7 @@ export function ActionPanel({ view, send, onOpenLoan }: ActionPanelProps) {
       const deed = getDeed(turn.pending.propertyKey);
       const price = turn.pending.price;
       const canAfford = me.balance >= price;
-      // Intermediate Mode with insurance only: buy and insure in one tap. Null in a Classic game.
+      // Capital Mode with insurance only: buy and insure in one tap. Null in a Classic game.
       const eco = economyOf(state);
       const premium = eco?.insurance ? premiumForYear(eco.year) : null;
       return (

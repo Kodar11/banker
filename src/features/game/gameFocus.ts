@@ -63,7 +63,7 @@ export function needsDecision(view: Pick<GameView, 'snapshot' | 'me' | 'isMyTurn
   const { turn } = view.snapshot.state;
   const me = view.me;
   if (!view.isMyTurn || !me || me.status !== 'ACTIVE') return false;
-  // Intermediate Mode: nothing is decided while a crisis bill is unsettled.
+  // Capital Mode: nothing is decided while a crisis bill is unsettled.
   if (pendingCrises(view.snapshot.state).length) return false;
   switch (turn.phase) {
     case 'AWAITING_ROLL':
@@ -104,7 +104,7 @@ export function turnStatus(view: Pick<GameView, 'snapshot' | 'me' | 'current' | 
   const title = view.isMyTurn ? 'YOUR TURN' : `${current.name.toUpperCase()}'S TURN`;
   const rolled = rolledLine(view);
 
-  // Intermediate Mode: an unsettled crisis bill comes before the turn — everyone waits for it.
+  // Capital Mode: an unsettled crisis bill comes before the turn — everyone waits for it.
   const crisis = pendingCrises(state)[0];
   if (crisis) {
     const mine = !!me && crisis.ownerId === me.id;
@@ -166,7 +166,7 @@ export type ContextTarget =
   | { kind: 'auction'; auctionId: string }
   | { kind: 'log' }
   | { kind: 'standings' }
-  /** Intermediate Mode: the bank, on My Loans. */
+  /** Capital Mode: the bank, on My Loans. */
   | { kind: 'bank' };
 
 export type ContextKind = 'offer' | 'undo' | 'auction' | 'decision' | 'payment' | 'event' | 'news' | 'position' | 'paused' | 'finished' | 'neutral';
@@ -291,7 +291,7 @@ export function pickContext(view: Pick<GameView, 'snapshot' | 'me' | 'current' |
     return { kind: 'paused', icon: '⏸️', label: 'Game paused', title: 'Everything is on hold', detail: 'No dice, purchases or payments until someone resumes.' };
   }
 
-  // Intermediate Mode: an unsettled crisis bill is the one thing that matters until it is paid.
+  // Capital Mode: an unsettled crisis bill is the one thing that matters until it is paid.
   const crisis = pendingCrises(state)[0];
   if (crisis && crisis.propertyKey) {
     const mine = !!me && crisis.ownerId === me.id;
@@ -306,7 +306,7 @@ export function pickContext(view: Pick<GameView, 'snapshot' | 'me' | 'current' |
   }
 
   const auction = state.auction?.status === 'OPEN' ? state.auction : null;
-  // A player's own auction (Intermediate Mode) names the seller and the reserve the bids must reach.
+  // A player's own auction (Capital Mode) names the seller and the reserve the bids must reach.
   const resale = auction?.resale ?? null;
   const auctionItem = (): ContextItem | null =>
     auction
@@ -406,7 +406,7 @@ export function pickContext(view: Pick<GameView, 'snapshot' | 'me' | 'current' |
       }
     }
 
-    // Intermediate Mode: a loan installment of mine that is due or overdue stays on the table until it is paid.
+    // Capital Mode: a loan installment of mine that is due or overdue stays on the table until it is paid.
     const eco = economyOf(state);
     const owed = eco ? paymentsOwedNow(eco, me.id)[0] : undefined;
     if (eco && owed) {

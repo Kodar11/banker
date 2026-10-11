@@ -1,7 +1,7 @@
 import { INTERMEDIATE_RULES as IR, type LoanProductKey, type MarketVolatility } from './intermediateConfig.ts';
 
 /**
- * Intermediate Mode's financial maths. Pure functions of their arguments: no game state, no
+ * Capital Mode's financial maths. Pure functions of their arguments: no game state, no
  * clock, no randomness of their own (a `random` source is passed in where one is needed).
  *
  * Money is whole rupees and every rate is a whole percent, so everything here is exact integer

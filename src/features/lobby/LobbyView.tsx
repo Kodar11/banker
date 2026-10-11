@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { Pressable, Share, Text, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import QRCode from 'react-native-qrcode-svg';
-import { BUSINESS_MVP_RULES, configOf, type GameConfig } from '@/engine/index.ts';
+import { BUSINESS_MVP_RULES, configOf, GAME_MODE_NAMES, type GameConfig } from '@/engine/index.ts';
 import { Button, Card, ConfirmDialog, ConnectionBanner, Label, Pill, PlayerBadge, Screen, Sheet } from '@/components/ui';
-import { joinLink } from '@/constants/app';
+import { APP_NAME, joinLink } from '@/constants/app';
 import { COLORS } from '@/constants/theme';
 import type { GameView } from '@/features/game/useGameView';
 import { LeaveGameDialog } from '@/features/game/LeaveGameDialog';
@@ -120,7 +120,7 @@ export function LobbyView({ view }: { view: GameView }) {
     >
       <ConnectionBanner />
       <Text className="mt-2 text-center text-sm font-bold uppercase tracking-[4px] text-cream/70" testID="lobby-title">
-        Business · {state.mode === 'intermediate' ? 'Intermediate Mode' : 'Lobby'}
+        {APP_NAME} · {state.mode === 'intermediate' ? GAME_MODE_NAMES.intermediate : 'Lobby'}
       </Text>
       <Card className="items-center">
         <Label>Game code</Label>
@@ -231,7 +231,7 @@ export function LobbyView({ view }: { view: GameView }) {
       </Card>
       <Text className="text-center text-sm text-cream/70">
         Everyone starts with {formatINR(config.startingCash)}. Keep your tokens on the real board — the phone is just the bank.
-        {state.mode === 'intermediate' ? ' This game uses Intermediate Mode: financial years, changing property values, loans and credit scores.' : ''}
+        {state.mode === 'intermediate' ? ` This game uses ${GAME_MODE_NAMES.intermediate}: financial years, changing property values, loans and credit scores.` : ''}
       </Text>
       {me ? <Button size="sm" variant="ghost" title="Leave game" testID="lobby-leave" className="self-center" onPress={() => setConfirmLeave(true)} /> : null}
       <LeaveGameDialog visible={confirmLeave} onClose={() => setConfirmLeave(false)} />

@@ -1320,7 +1320,7 @@ const L15 = (() => {
     alternatives: withAlternatives ? alternatives : undefined,
   });
   const model = note(
-    'In Business Banker each property’s value takes its own unpredictable step every financial year. This constant-growth line is an illustration, not that model, and no future value from any game is shown here.',
+    'In Clash of Capitals each property’s value takes its own unpredictable step every financial year. This constant-growth line is an illustration, not that model, and no future value from any game is shown here.',
   );
   const lesson: Lesson = {
     id: 'L15',

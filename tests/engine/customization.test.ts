@@ -57,13 +57,13 @@ function borrow(g: TestGame, name: string, product: LoanProductKey, amount: numb
 // ---------------------------------------------------------------------------
 
 describe('defaults reproduce the game as it was', () => {
-  it('Classic: ₹25,000 starting cash, ₹20,000 loan limit, nothing from Intermediate', () => {
+  it('Classic: ₹25,000 starting cash, ₹20,000 loan limit, nothing from Capital', () => {
     expect(defaultGameConfig('classic')).toEqual({ startingCash: 25000, loanLimit: 20000, marketVolatility: 'balanced', secretObjectives: false });
     expect(defaultGameConfig('classic').startingCash).toBe(R.startingCash);
     expect(defaultGameConfig('classic').loanLimit).toBe(R.loans.maxOutstandingPrincipal);
   });
 
-  it('Intermediate: the same money rules, the Balanced market, objectives on', () => {
+  it('Capital: the same money rules, the Balanced market, objectives on', () => {
     expect(defaultGameConfig('intermediate')).toEqual({ startingCash: 25000, loanLimit: 20000, marketVolatility: 'balanced', secretObjectives: true });
     expect(defaultGameConfig('intermediate').loanLimit).toBe(IR.loans.maxOutstandingPrincipal);
     expect(IR.market.defaultProfile).toBe('balanced');
@@ -99,7 +99,7 @@ describe('defaults reproduce the game as it was', () => {
     expect(refusal(() => g.act('Asha', { type: 'REQUEST_LOAN', amount: 1000 })).message).toMatch(/Loan limit is ₹20,000/);
   });
 
-  it('a stored config that is missing or unreadable falls back to the old rules — and an old Intermediate game has no objectives', () => {
+  it('a stored config that is missing or unreadable falls back to the old rules — and an old Capital game has no objectives', () => {
     expect(normalizeGameConfig('classic', null)).toEqual(legacyGameConfig('classic'));
     expect(normalizeGameConfig('intermediate', undefined)).toEqual({ startingCash: 25000, loanLimit: 20000, marketVolatility: 'balanced', secretObjectives: false });
     expect(normalizeGameConfig('intermediate', { startingCash: 'lots' })).toEqual(legacyGameConfig('intermediate'));
@@ -209,7 +209,7 @@ describe('loan limit — Classic', () => {
   });
 });
 
-describe('loan limit — Intermediate', () => {
+describe('loan limit — Capital', () => {
   const game = (loanLimit?: number) => new TestGame(['Asha', 'Bilal'], { mode: 'intermediate', config: loanLimit ? { loanLimit } : undefined });
   const max = (g: TestGame, product: LoanProductKey) => loanOffers(g.state, g.id('Asha')).find((o) => o.product === product)!.maxAmount;
 
@@ -261,8 +261,8 @@ describe('loan limit — Intermediate', () => {
   });
 });
 
-describe('Classic takes nothing from Intermediate', () => {
-  it('Intermediate-only settings sent for a Classic game are forced off', () => {
+describe('Classic takes nothing from Capital', () => {
+  it('Capital-only settings sent for a Classic game are forced off', () => {
     const g = new TestGame(['Asha', 'Bilal'], { config: { marketVolatility: 'volatile', secretObjectives: true } });
     expect(g.state.config).toEqual(defaultGameConfig('classic'));
     expect(g.state.objectives).toBeNull();
@@ -297,7 +297,7 @@ describe('Classic takes nothing from Intermediate', () => {
       { key: 'loanLimit', label: 'Maximum outstanding loans', value: '₹20,000' },
     ]);
     expect(gameConfigSummary('intermediate', { startingCash: 30000, loanLimit: 25000, marketVolatility: 'balanced', secretObjectives: true }).map((r) => `${r.label}: ${r.value}`)).toEqual([
-      'Mode: Intermediate',
+      'Mode: Capital',
       'Starting cash: ₹30,000',
       'Maximum outstanding loans: ₹25,000',
       'Market volatility: Balanced',
@@ -481,7 +481,7 @@ describe('the rulebook quotes the game being played', () => {
     expect(strip(text(ruleSections(config).flatMap((s) => s.rules)))).toBe(text(ruleSections().flatMap((s) => s.rules)));
   });
 
-  it('Intermediate rules name the game’s market, its loan limit, and objectives only when they are on', () => {
+  it('Capital rules name the game’s market, its loan limit, and objectives only when they are on', () => {
     const on = intermediateRuleEntries({ startingCash: 50000, loanLimit: 30000, marketVolatility: 'stable', secretObjectives: true });
     expect(text(on)).toContain('changes on its own: -10%, 0%, +10%, +20%');
     expect(text(on)).toContain('This game’s market is Stable.'.replace('’', "'"));

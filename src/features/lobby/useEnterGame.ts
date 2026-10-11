@@ -47,7 +47,7 @@ export function useEnterGame() {
       const enter = () => {
         if (mode.kind === 'join') return gameApi.join(actionId, token, mode.code, name.data);
         if (config) return gameApi.create(actionId, token, name.data, gameMode, config);
-        // A Classic game is created exactly as it always was; only Intermediate names its mode.
+        // A Classic game is created exactly as it always was; only Capital names its mode.
         return gameMode === 'intermediate' ? gameApi.create(actionId, token, name.data, 'intermediate') : gameApi.create(actionId, token, name.data);
       };
       let res = await enter();

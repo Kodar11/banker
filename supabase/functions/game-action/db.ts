@@ -328,7 +328,7 @@ export async function persistResult(tx: Tx, prevVersion: number, result: EngineR
 
   if (s.auction) {
     const a = s.auction;
-    // Resale terms (Intermediate Mode) are written with the listing and never updated; only the outcome is,
+    // Resale terms (Capital Mode) are written with the listing and never updated; only the outcome is,
     // once, when the auction closes. The database refuses anything else (guard_resale_auction).
     const r = a.resale ?? null;
     await tx`
@@ -479,7 +479,7 @@ export async function persistResult(tx: Tx, prevVersion: number, result: EngineR
 }
 
 /**
- * Property insurance (Intermediate Mode). The economy document written above is the state the engine
+ * Property insurance (Capital Mode). The economy document written above is the state the engine
  * reads; these rows are its record, written from it in the same transaction, with the database's own
  * guarantees on top: one crisis per checkpoint per game, one active policy per property and owner,
  * and nothing final ever rewritten. If the two could ever disagree — a checkpoint resolved twice, a

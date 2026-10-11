@@ -174,7 +174,7 @@ describe('dealing', () => {
     expect(deals.size).toBeGreaterThan(10);
   });
 
-  it('an Intermediate game deals one to every starting player at START_GAME, and to nobody before', () => {
+  it('a Capital game deals one to every starting player at START_GAME, and to nobody before', () => {
     const g = new TestGame(['Asha', 'Bilal', 'Chitra', 'Dev'], { mode: 'intermediate', start: false });
     expect(g.state.objectives).toBeNull();
     g.startWith(['Asha', 'Bilal', 'Chitra', 'Dev']);

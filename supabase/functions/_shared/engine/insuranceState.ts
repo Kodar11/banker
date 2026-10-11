@@ -1,7 +1,7 @@
 import type { PropertyKey } from './businessBoard.ts';
 
 /**
- * Property insurance and global crises (Intermediate Mode). Lives in IntermediateState.insurance,
+ * Property insurance and global crises (Capital Mode). Lives in IntermediateState.insurance,
  * so it is written by the server only, under the game lock, in the same transaction as the cash
  * movement, events and version of the action that changed it.
  *

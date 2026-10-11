@@ -191,9 +191,9 @@ describe('invitations', () => {
 
   it('share message: mode, code and the app’s own join link — nothing else', () => {
     expect(gameShareMessage('classic', '482193')).toBe(
-      'Join my Business Banker Classic game! Code: 482193. Open Business Banker and enter this code to join.\nbusinessbanker://join-game?code=482193',
+      'Join my Clash of Capitals Classic game! Code: 482193. Open Clash of Capitals and enter this code to join.\nbusinessbanker://join-game?code=482193',
     );
-    expect(gameShareMessage('intermediate', '000001')).toContain('Intermediate game! Code: 000001.');
+    expect(gameShareMessage('intermediate', '000001')).toContain('Capital game! Code: 000001.');
   });
 
   it('a lobby takes invitations only while it is waiting, unlocked, not full, and I am in it', () => {

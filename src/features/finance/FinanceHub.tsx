@@ -59,7 +59,7 @@ interface FinanceHubProps {
 }
 
 /**
- * Intermediate Mode's bank: the Bank / Loan destination, in four sections. Everything shown is
+ * Capital Mode's bank: the Bank / Loan destination, in four sections. Everything shown is
  * read from the server's economy; every button sends an action the server decides on.
  * Classic games never render this — they keep the Classic loan sheet.
  */

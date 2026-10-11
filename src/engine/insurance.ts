@@ -13,11 +13,11 @@ import type { GameState, PlayerState } from './types.ts';
 
 /**
  * Property insurance and global crises: the read-only views the screens show and the engine
- * validates against, and the state transitions. Like the rest of Intermediate Mode, every
+ * validates against, and the state transitions. Like the rest of Capital Mode, every
  * transition works on the action's Draft, so the premium, the policy, the crisis record, the bill
  * and the events of one action commit together or not at all.
  *
- * A Classic game — and an Intermediate game that started before insurance existed — has no
+ * A Classic game — and a Capital game that started before insurance existed — has no
  * insurance state, and nothing in this file does anything for it.
  */
 
@@ -115,7 +115,7 @@ export function propertyInsurance(state: InsuranceView, key: PropertyKey): Prope
 /** Why this player can't insure this property right now, or null. The engine runs it; the screens show the same answer. */
 export function insureBlocker(state: InsuranceView, playerId: string, key: PropertyKey): string | null {
   const eco = economyOf(state);
-  if (!eco) return 'Property insurance is only available in Intermediate Mode.';
+  if (!eco) return 'Property insurance is only available in Capital Mode.';
   if (!eco.insurance) return 'This game started before property insurance existed.';
   if (state.status !== 'ACTIVE') return state.status === 'PAUSED' ? 'Game is paused.' : 'Game is not running.';
   const player = state.players.find((p) => p.id === playerId);

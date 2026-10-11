@@ -1,7 +1,7 @@
 import { goBack } from '@/utils/navigation';
 import { useState } from 'react';
 import { Keyboard, Pressable, Text, View } from 'react-native';
-import { BUSINESS_MVP_RULES, defaultGameConfig, PROPERTY_KEYS, type GameConfig, type GameMode } from '@/engine/index.ts';
+import { BUSINESS_MVP_RULES, defaultGameConfig, GAME_MODE_NAMES, PROPERTY_KEYS, type GameConfig, type GameMode } from '@/engine/index.ts';
 import { Button, Card, Label, Pill, Screen, TextField } from '@/components/ui';
 import { GameConfigEditor, GameConfigSummary } from '@/features/lobby/GameConfigEditor';
 import { useEnterGame } from '@/features/lobby/useEnterGame';
@@ -9,10 +9,10 @@ import { useAccountStore } from '@/store/accountStore';
 import { formatINR } from '@/utils/currency';
 
 const MODES: { mode: GameMode; title: string; points: string[] }[] = [
-  { mode: 'classic', title: 'Classic Mode', points: ['Original rules', 'Original gameplay', 'No additional financial features'] },
+  { mode: 'classic', title: GAME_MODE_NAMES.classic, points: ['Original rules', 'Original gameplay', 'No additional financial features'] },
   {
     mode: 'intermediate',
-    title: 'Intermediate Mode',
+    title: GAME_MODE_NAMES.intermediate,
     points: ['Same board and core gameplay', 'Financial years and changing property values', 'Inflation, loans and credit scores', 'Automatic repayment schedules and financial notifications'],
   },
 ];

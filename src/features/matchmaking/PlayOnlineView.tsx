@@ -16,8 +16,8 @@ import { formatClock, phaseOf, resultMessage, searchHint, secondsLeft, secondsSi
 import type { Match, MatchmakingError, MatchmakingResult, MatchmakingState, Party } from './types';
 
 const MODES: { mode: GameMode; title: string; detail: string }[] = [
-  { mode: 'classic', title: 'Classic', detail: 'The original rules.' },
-  { mode: 'intermediate', title: 'Intermediate', detail: 'Financial years, loans, credit scores and insurance.' },
+  { mode: 'classic', title: GAME_MODE_LABELS.classic, detail: 'The original rules.' },
+  { mode: 'intermediate', title: GAME_MODE_LABELS.intermediate, detail: 'Financial years, loans, credit scores and insurance.' },
 ];
 
 /** Radio pair for the two rulesets. Read-only when `onChange` is absent (a party member sees the leader's choice). */

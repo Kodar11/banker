@@ -161,7 +161,7 @@ export function InsuranceView({ view }: { view: GameView }) {
         <Button size="sm" variant="ghost" title="‹ Back" onPress={back} className="self-start" />
         <Card testID="insurance-unavailable">
           <Text className="text-2xl font-black text-ink">Property Insurance</Text>
-          <Text className="mt-2 text-base text-stone-700">Property insurance is part of Intermediate Mode. This game is played without it.</Text>
+          <Text className="mt-2 text-base text-stone-700">Property insurance is part of Capital Mode. This game is played without it.</Text>
         </Card>
       </Screen>
     );

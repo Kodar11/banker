@@ -125,7 +125,7 @@ export function FinishedView({ view }: { view: GameView }) {
             : 'Net worth = cash + property at cost + buildings − loans owed'}
         </Text>
       </Card>
-      {/* Intermediate with secret objectives only: nothing is drawn when the game had none. */}
+      {/* Capital with secret objectives only: nothing is drawn when the game had none. */}
       <ObjectiveResults view={view} />
     </>
   );

@@ -11,7 +11,7 @@ interface PropertyListProps {
   /** One line under the heading, e.g. what tapping a row does. Hidden while the list is empty. */
   hint?: string;
   testID?: string;
-  /** The game, so a row can show Intermediate Mode's market value and collateral status. */
+  /** The game, so a row can show Capital Mode's market value and collateral status. */
   state?: GameState;
 }
 

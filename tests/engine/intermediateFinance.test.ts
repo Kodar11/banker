@@ -24,7 +24,7 @@ import {
 
 const IR = INTERMEDIATE_RULES;
 
-describe('Intermediate config', () => {
+describe('Capital config', () => {
   it('holds the agreed starting values', () => {
     expect(IR.year.spacesPerYear).toBe(36);
     expect(IR.inflation.ratePercent).toBe(5);

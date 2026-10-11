@@ -32,7 +32,7 @@ describe('startHostlessGame', () => {
     expect(ledgerViolations(byServer.state, byServer.transactions)).toEqual([]);
   });
 
-  it('an Intermediate table gets its economy and its secret objectives', () => {
+  it('a Capital table gets its economy and its secret objectives', () => {
     const g = new TestGame(['Asha', 'Bilal', 'Chitra'], { start: false, mode: 'intermediate' });
     const started = startHostlessGame(g.state, ctx());
     expect(started.state.intermediate).not.toBeNull();

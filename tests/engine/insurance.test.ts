@@ -778,7 +778,7 @@ describe('Classic Mode is untouched', () => {
     const cash = g.balance('Asha');
     expect(refusal(() => g.act('Asha', { type: 'INSURE_PROPERTY', propertyKey: 'MUMBAI', expectedPremium: 500 }))).toEqual({
       code: 'INSURANCE_NOT_ALLOWED',
-      message: 'Property insurance is only available in Intermediate Mode.',
+      message: 'Property insurance is only available in Capital Mode.',
     });
     expect(refusal(() => g.act('Asha', { type: 'PAY_CRISIS_BILL', crisisId: g.id('Asha') })).code).toBe('NOT_FOUND');
     expect(refusal(() => g.act('Asha', { type: 'DECLARE_CRISIS_BANKRUPTCY', crisisId: g.id('Asha') })).code).toBe('NOT_FOUND');

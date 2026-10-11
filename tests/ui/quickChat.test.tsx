@@ -493,7 +493,7 @@ describe('realtime and lifecycle', () => {
     serverAccepts(f);
     await render(<GameScreen view={viewFor(f, 'Asha')} />);
     await grid();
-    // Intermediate opens with its introduction; the bar underneath is the same.
+    // Capital opens with its introduction; the bar underneath is the same.
     const intro = screen.queryByTestId('intro-skip');
     if (intro) await fireEvent.press(intro);
     await fireEvent.press(screen.getByTestId('open-chat'));

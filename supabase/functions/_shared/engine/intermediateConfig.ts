@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /**
- * INTERMEDIATE_RULES — every number Intermediate Mode uses, in one place. The engine
+ * INTERMEDIATE_RULES — every number Capital Mode uses, in one place. The engine
  * (intermediateEngine.ts), the pure maths (intermediateFinance.ts) and the screens all read
  * from here; nothing else hard-codes a rate, limit or threshold. Classic Mode never reads it.
  *
@@ -76,7 +76,7 @@ const IntermediateRulesSchema = z
       .object({
         minAmount: rupees,
         step: rupees,
-        /** Max total outstanding principal across a player's Intermediate loans. */
+        /** Max total outstanding principal across a player's Capital loans. */
         maxOutstandingPrincipal: rupees,
         /** A secured loan can be at most this share of the collateral's market value, rounded down to `collateralRoundTo`. */
         collateralAdvancePercent: z.number().int().min(1).max(100),
@@ -153,7 +153,7 @@ export function validateIntermediateRules(raw: unknown): IntermediateRules {
 }
 
 export const INTERMEDIATE_RULES: IntermediateRules = validateIntermediateRules({
-  /** Stored with every Intermediate game's economy. Bump when any value below changes. */
+  /** Stored with every Capital game's economy. Bump when any value below changes. */
   version: 'INTERMEDIATE-V2',
 
   year: {
@@ -166,7 +166,7 @@ export const INTERMEDIATE_RULES: IntermediateRules = validateIntermediateRules({
   },
 
   market: {
-    /** Initial balancing values — tune here after playtesting. Balanced is the distribution Intermediate Mode has always used. */
+    /** Initial balancing values — tune here after playtesting. Balanced is the distribution Capital Mode has always used. */
     profiles: {
       stable: [
         { percent: -10, weight: 20 },

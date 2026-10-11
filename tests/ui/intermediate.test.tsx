@@ -100,7 +100,7 @@ beforeEach(async () => {
 // ---------------------------------------------------------------------------
 
 describe('Create game: mode', () => {
-  it('offers Classic and Intermediate, with Classic selected', async () => {
+  it('offers Classic and Capital, with Classic selected', async () => {
     await render(<CreateGame />);
     expect(screen.getByTestId('game-mode-classic').props.accessibilityState.selected).toBe(true);
     expect(screen.getByTestId('game-mode-intermediate').props.accessibilityState.selected).toBe(false);
@@ -118,7 +118,7 @@ describe('Create game: mode', () => {
     expect(api.create.mock.calls[0]).toHaveLength(3);
   });
 
-  it('choosing Intermediate creates an Intermediate game', async () => {
+  it('choosing Capital creates a Capital game', async () => {
     const f = new Fixture(['Tanmay'], { start: false, mode: 'intermediate' });
     api.create.mockResolvedValue(ok(f.snapshot()));
     await render(<CreateGame />);
@@ -133,15 +133,15 @@ describe('Create game: mode', () => {
   it('the lobby tells every player which mode the host picked', async () => {
     const f = new Fixture(['Asha', 'Bilal'], { start: false, mode: 'intermediate' }).loadAs('Bilal');
     const lobby = await render(<LobbyView view={viewFor(f, 'Bilal')} />);
-    expect(screen.getByTestId('lobby-title')).toHaveTextContent(/Intermediate Mode/);
+    expect(screen.getByTestId('lobby-title')).toHaveTextContent(/Capital Mode/);
     await lobby.unmount();
     const c = new Fixture(['Asha', 'Bilal'], { start: false }).loadAs('Bilal');
     await render(<LobbyView view={viewFor(c, 'Bilal')} />);
-    expect(screen.getByTestId('lobby-title')).toHaveTextContent('Business · Lobby');
+    expect(screen.getByTestId('lobby-title')).toHaveTextContent('Clash of Capitals · Lobby');
   });
 });
 
-describe('Classic games show nothing of Intermediate Mode', () => {
+describe('Classic games show nothing of Capital Mode', () => {
   it('no year indicator, no introduction, no notices; Bank / Loan is the Classic loan sheet', async () => {
     await introSeen(false);
     const f = new Fixture();
@@ -165,11 +165,11 @@ describe('Classic games show nothing of Intermediate Mode', () => {
   });
 });
 
-describe('Intermediate: the game table', () => {
+describe('Capital: the game table', () => {
   it('shows a compact Year indicator and keeps the board and all six actions', async () => {
     const f = intermediate();
     await renderGame(f, 'Asha');
-    expect(screen.getByTestId('year-indicator')).toHaveTextContent('Intermediate · Year 1');
+    expect(screen.getByTestId('year-indicator')).toHaveTextContent('Capital · Year 1');
     expect(screen.getByTestId('classic-board')).toBeTruthy();
     for (const id of ['open-properties', 'open-trade', 'open-chat', 'open-loan', 'open-auction', 'open-more']) expect(screen.getByTestId(id)).toBeTruthy();
   });
@@ -177,7 +177,7 @@ describe('Intermediate: the game table', () => {
   it('the year indicator follows the server’s year', async () => {
     const f = jumpTo(intermediate(), YEAR * 2 + 4);
     await renderGame(f, 'Asha');
-    expect(screen.getByTestId('year-indicator')).toHaveTextContent('Intermediate · Year 3');
+    expect(screen.getByTestId('year-indicator')).toHaveTextContent('Capital · Year 3');
   });
 
   it('board tiles and the buy decision use the current market price', async () => {
@@ -194,8 +194,8 @@ describe('Intermediate: the game table', () => {
   });
 });
 
-describe('Intermediate: introduction', () => {
-  it('appears once on a first Intermediate game, can be stepped through, and is remembered', async () => {
+describe('Capital: introduction', () => {
+  it('appears once on a first Capital game, can be stepped through, and is remembered', async () => {
     await introSeen(false);
     const f = intermediate();
     const first = await renderGame(f, 'Asha');
@@ -244,7 +244,7 @@ describe('Intermediate: introduction', () => {
   }, 40000);
 });
 
-describe('Intermediate: the bank', () => {
+describe('Capital: the bank', () => {
   it('Bank / Loan opens the four-section bank instead of the Classic loan sheet', async () => {
     const f = intermediate();
     await renderGame(f, 'Asha');
@@ -400,7 +400,7 @@ describe('Intermediate: the bank', () => {
     expect(screen.queryByTestId('offer-choose-PERSONAL')).toBeNull();
   });
 
-  it('the wallet lists Intermediate contracts and the credit score', async () => {
+  it('the wallet lists Capital contracts and the credit score', async () => {
     const f = borrowPersonal(intermediate()).loadAs('Asha');
     await render(<PlayerView view={viewFor(f, 'Asha')} playerId={f.ids.Asha!} />);
     expect(within(screen.getByTestId('wallet-contract')).getByText(/Personal Loan · ₹9,000/)).toBeTruthy();
@@ -409,7 +409,7 @@ describe('Intermediate: the bank', () => {
   });
 });
 
-describe('Intermediate: notices', () => {
+describe('Capital: notices', () => {
   it('announces a new financial year to a connected player, once, without blocking the table', async () => {
     const f = intermediate();
     give(f, 'Asha', 'MUMBAI');
@@ -422,7 +422,7 @@ describe('Intermediate: notices', () => {
     expect(within(notice).getByTestId('year-notice-summary')).toHaveTextContent(/26 went up · 0 went down/);
     expect(within(notice).getByTestId('year-mover-MUMBAI')).toHaveTextContent(/Mumbai \(yours\)/);
     expect(within(notice).getByText(/rose 5% again/)).toBeTruthy();
-    expect(screen.getByTestId('year-indicator')).toHaveTextContent('Intermediate · Year 2');
+    expect(screen.getByTestId('year-indicator')).toHaveTextContent('Capital · Year 2');
     await fireEvent.press(screen.getByTestId('year-notice-dismiss'));
     expect(screen.queryByTestId('year-notice')).toBeNull();
     // The same year arriving again (a refetch) is not announced twice.
@@ -434,7 +434,7 @@ describe('Intermediate: notices', () => {
     const f = jumpTo(intermediate(), YEAR + 6);
     await renderGame(f, 'Bilal');
     expect(screen.queryByTestId('year-notice')).toBeNull();
-    expect(screen.getByTestId('year-indicator')).toHaveTextContent('Intermediate · Year 2');
+    expect(screen.getByTestId('year-indicator')).toHaveTextContent('Capital · Year 2');
   });
 
   it('reminds only the borrower of a due payment; Later hides it but the obligation stays on the table', async () => {
@@ -483,7 +483,7 @@ describe('Intermediate: notices', () => {
   });
 });
 
-describe('Intermediate: property details', () => {
+describe('Capital: property details', () => {
   it('shows original price, market value, the year’s change, trend, a labelled projection and purchasing power', async () => {
     const f = jumpTo(intermediate(), YEAR * 2);
     f.loadAs('Asha');
@@ -519,7 +519,7 @@ describe('Intermediate: property details', () => {
 });
 
 describe('House rules', () => {
-  it('an Intermediate game adds its rules after the Classic ones; a Classic game does not', async () => {
+  it('a Capital game adds its rules after the Classic ones; a Classic game does not', async () => {
     intermediate().loadAs('Asha');
     const view = await render(<Settings />);
     expect(within(screen.getByTestId('rules-property-money')).getByText('Mortgages')).toBeTruthy();

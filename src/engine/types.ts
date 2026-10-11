@@ -101,7 +101,7 @@ export type ResaleResumePhase = 'AWAITING_ROLL' | 'AWAITING_PAYMENT' | 'TURN_COM
 export type ResaleOutcome = 'SOLD' | 'UNSOLD' | 'CANCELLED';
 
 /**
- * What makes an auction a resale (Intermediate Mode): a player selling a property they own, with
+ * What makes an auction a resale (Capital Mode): a player selling a property they own, with
  * whatever is built on it, to the highest bidder — provided the bid reaches their reserve price.
  */
 export interface ResaleTerms {
@@ -261,7 +261,7 @@ export interface GameState {
    * A device only ever holds its own assignment until the game has finished (see redactObjectives).
    */
   objectives: ObjectivesState | null;
-  /** Intermediate Mode's economy (financial year, market, loans, credit). Null in Classic games and before the game starts. */
+  /** Capital Mode's economy (financial year, market, loans, credit). Null in Classic games and before the game starts. */
   intermediate: IntermediateState | null;
   status: GameStatus;
   /**

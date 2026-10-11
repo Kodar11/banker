@@ -1,5 +1,5 @@
 import { APP_NAME, joinLink } from '@/constants/app';
-import { BUSINESS_MVP_RULES, type GameMode, type GameState } from '@/engine/index.ts';
+import { BUSINESS_MVP_RULES, GAME_MODE_LABELS, type GameMode, type GameState } from '@/engine/index.ts';
 import { PLAYER_ID_PATTERN } from '@/features/account/types';
 import type { FriendRequest, GameInvite, InviteState, PresenceStatus, Relationship, SeatProfile, SocialNotification, SocialState } from './types';
 
@@ -71,7 +71,7 @@ export function inviteTimeLeft(expiresAt: string, nowMs: number): string | null 
 // ---------------------------------------------------------------------------
 // Lobbies and sharing
 // ---------------------------------------------------------------------------
-export const MODE_LABEL: Record<GameMode, string> = { classic: 'Classic', intermediate: 'Intermediate' };
+export const MODE_LABEL: Record<GameMode, string> = GAME_MODE_LABELS;
 
 /**
  * What the share sheet sends: the mode, the code, and the app's own deep link (the scheme in

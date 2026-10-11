@@ -19,9 +19,9 @@ export type GameConfig = {
   startingCash: number;
   /** Most loan principal a player may owe the bank at once (mortgages are separate and unaffected). */
   loanLimit: number;
-  /** Intermediate Mode only: how far property values swing each financial year. Inert in Classic. */
+  /** Capital Mode only: how far property values swing each financial year. Inert in Classic. */
   marketVolatility: MarketVolatility;
-  /** Intermediate Mode only: each player gets a private objective with an end-of-game bonus. Always false in Classic. */
+  /** Capital Mode only: each player gets a private objective with an end-of-game bonus. Always false in Classic. */
   secretObjectives: boolean;
 };
 
@@ -46,7 +46,7 @@ export function defaultGameConfig(mode: GameMode): GameConfig {
 
 /**
  * The config of a game stored before configs existed: the rules exactly as they were then.
- * (Such an Intermediate game never dealt objectives, so it has none.)
+ * (Such a Capital game never dealt objectives, so it has none.)
  */
 export function legacyGameConfig(mode: GameMode): GameConfig {
   return { ...defaultGameConfig(mode), secretObjectives: false };
@@ -127,7 +127,11 @@ export function isDefaultGameConfig(mode: GameMode, config: GameConfig): boolean
   );
 }
 
-export const GAME_MODE_LABELS: Record<GameMode, string> = { classic: 'Classic', intermediate: 'Intermediate' };
+/** What players call each mode. The stored value stays `intermediate` (games.game_mode, saved games, the API); only its name is Capital. */
+export const GAME_MODE_LABELS: Record<GameMode, string> = { classic: 'Classic', intermediate: 'Capital' };
+
+/** The mode's full name, where it stands on its own: "Classic Mode", "Capital Mode". */
+export const GAME_MODE_NAMES: Record<GameMode, string> = { classic: `${GAME_MODE_LABELS.classic} Mode`, intermediate: `${GAME_MODE_LABELS.intermediate} Mode` };
 
 export const MARKET_VOLATILITY_LABELS: Record<MarketVolatility, { label: string; hint: string }> = {
   stable: { label: 'Stable', hint: 'Small yearly changes. Values never fall more than 10%.' },

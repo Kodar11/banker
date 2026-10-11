@@ -434,7 +434,7 @@ describe.skipIf(!DATABASE_URL)('random matchmaking (Postgres)', () => {
       expect((await sql`select count(*)::int as n from public.matchmaking_matches`)[0]!.n).toBe(0);
     });
 
-    it('Classic and Intermediate are separate queues', async () => {
+    it('Classic and Capital are separate queues', async () => {
       const classic = await queueSolos(2, 'classic');
       const intermediate = await queueSolos(2, 'intermediate');
       await tick();
@@ -594,7 +594,7 @@ describe.skipIf(!DATABASE_URL)('random matchmaking (Postgres)', () => {
       expect(await call({ op: 'join', actionId: randomUUID(), token: token(), code: game!.code, name: 'Late' })).toMatchObject({ ok: false });
     });
 
-    it('an Intermediate match starts an Intermediate game with that mode’s public settings', async () => {
+    it('a Capital match starts a Capital game with that mode’s public settings', async () => {
       const two = await players(2);
       const { gameId } = await playMatch(two, 'intermediate');
       const [game] = await sql`select * from public.games where id = ${gameId}`;

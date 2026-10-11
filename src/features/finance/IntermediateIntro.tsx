@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Modal, Pressable, Text, View } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
-import { INTERMEDIATE_RULES } from '@/engine/index.ts';
+import { GAME_MODE_NAMES, INTERMEDIATE_RULES } from '@/engine/index.ts';
 import { Button } from '@/components/ui';
 
 const IR = INTERMEDIATE_RULES;
@@ -37,7 +37,7 @@ const SLIDES: { icon: string; title: string; body: string }[] = [
 ];
 
 /**
- * The short Intermediate Mode introduction, shown once per device when its first Intermediate
+ * The short Capital Mode introduction, shown once per device when its first Capital
  * game starts. It can be skipped at any moment and closes by itself after about half a minute.
  * It is only this phone's overlay: the shared game never waits for it.
  */
@@ -84,7 +84,7 @@ export function IntermediateIntro({ onSettled }: { /** It is over, or was never 
       <View className="flex-1 items-center justify-center bg-black/60 px-5" testID="intermediate-intro">
         <View className="w-full max-w-[420px] gap-4 rounded-3xl bg-cream p-5">
           <View className="flex-row items-center justify-between">
-            <Text className="text-xs font-extrabold uppercase tracking-[3px] text-stone-500">Intermediate Mode</Text>
+            <Text className="text-xs font-extrabold uppercase tracking-[3px] text-stone-500">{GAME_MODE_NAMES.intermediate}</Text>
             <Pressable onPress={finish} accessibilityRole="button" accessibilityLabel="Skip introduction" testID="intro-skip" className="min-h-[44px] justify-center px-2">
               <Text className="text-sm font-extrabold text-stone-600">Skip</Text>
             </Pressable>

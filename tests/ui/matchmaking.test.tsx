@@ -205,7 +205,7 @@ describe('entering the queue', () => {
     // The server says this account is searching (it was, before the app was closed).
     await act(async () => answer(good(serverState({ ticket: ticket({ mode: 'intermediate' }) }))));
     expect(screen.getByTestId('search-status')).toBeTruthy();
-    expect(screen.getByTestId('play-online-screen')).toHaveTextContent(/Intermediate · Solo/);
+    expect(screen.getByTestId('play-online-screen')).toHaveTextContent(/Capital · Solo/);
   });
 
   it('a first load that fails says so and can be retried', async () => {
@@ -242,7 +242,7 @@ describe('entering the queue', () => {
     await render(<PlayOnline />);
     expect(screen.getByTestId('online-mode-classic').props.accessibilityState.selected).toBe(true);
     await press('online-mode-intermediate');
-    expect(screen.getByTestId('online-solo')).toHaveTextContent(/Play solo · Intermediate/);
+    expect(screen.getByTestId('online-solo')).toHaveTextContent(/Play solo · Capital/);
 
     let answer!: (value: unknown) => void;
     api.enqueue.mockReturnValue(new Promise((resolve) => (answer = resolve)) as never);
@@ -256,7 +256,7 @@ describe('entering the queue', () => {
     serverHas({ ticket: ticket({ mode: 'intermediate', queuedAt: soon(-65_000) }) });
     await act(async () => answer(DONE));
     expect(screen.getByTestId('search-status')).toBeTruthy();
-    expect(screen.getByTestId('play-online-screen')).toHaveTextContent(/Searching….*Intermediate · Solo/);
+    expect(screen.getByTestId('play-online-screen')).toHaveTextContent(/Searching….*Capital · Solo/);
     expect(screen.getByTestId('search-elapsed')).toHaveTextContent(/^1:0[4-6]$/);
     expect(screen.getByTestId('search-cancel')).toBeTruthy();
     // The worker is asked to look now rather than at its next run.
@@ -854,14 +854,14 @@ describe('parties', () => {
     expect(api.createParty).toHaveBeenCalledWith('intermediate');
     expect(api.enqueue).not.toHaveBeenCalled();
     expect(screen.getByTestId('online-mode-intermediate').props.accessibilityState.selected).toBe(true);
-    expect(screen.getByTestId('party-start')).toHaveTextContent(/FIND MATCH.*Intermediate · just you/);
+    expect(screen.getByTestId('party-start')).toHaveTextContent(/FIND MATCH.*Capital · just you/);
   });
 
   it('an invitation into a party is shown for what it is, and accepting it joins the party — nothing else', async () => {
     await loaded({ partyInvites: [{ id: 'pi-1', mode: 'intermediate', size: 3, inviter: { playerId: FARAH.playerId, nickname: 'Farah' }, expiresAt: soon(9 * 60_000) }] });
     await render(<PlayOnline />);
     const card = screen.getByTestId('party-invite-pi-1');
-    expect(card).toHaveTextContent(/Party invitation.*Farah invited you to their party.*Intermediate · 3 players so far.*expires in [89]:\d\d/);
+    expect(card).toHaveTextContent(/Party invitation.*Farah invited you to their party.*Capital · 3 players so far.*expires in [89]:\d\d/);
     expect(card).toHaveTextContent(/doesn’t start anything/);
     api.respondInvite.mockResolvedValueOnce(DONE);
     serverHas({ party: party({ isLeader: false, mode: 'intermediate', members: [member(FARAH.playerId, 'Farah', { isLeader: true, ready: true }), member(ME.playerId, 'Me', { isMe: true })] }) });

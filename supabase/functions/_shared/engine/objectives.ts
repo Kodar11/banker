@@ -9,7 +9,7 @@ import { buildingCount, ownedBy } from './selectors.ts';
 import type { GameState, PlayerState, TradeOffer } from './types.ts';
 
 /**
- * Secret objectives — Intermediate Mode only, and only when the host left them enabled.
+ * Secret objectives — Capital Mode only, and only when the host left them enabled.
  *
  * Each starting player is dealt one objective when the game starts. It is theirs alone until the
  * game ends: the server sends a device only its own (redactObjectives), and nothing about an
@@ -221,7 +221,7 @@ export function dealObjectives(players: number, random: () => number): Objective
   return dealt;
 }
 
-/** START_GAME, Intermediate with objectives enabled: one objective per starting player, once. No event names them. */
+/** START_GAME, Capital with objectives enabled: one objective per starting player, once. No event names them. */
 export function assignObjectives(d: Draft, starters: readonly PlayerState[]): void {
   if (d.state.objectives) return;
   const eligible = starters.filter(objectiveEligible);

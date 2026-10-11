@@ -82,7 +82,7 @@ interface EditorProps {
 }
 
 /**
- * The settings a host may change, grouped: money for every game, then the Intermediate extras.
+ * The settings a host may change, grouped: money for every game, then the Capital extras.
  * It only offers what the server accepts (same limits, same steps), and the server checks again.
  */
 export function GameConfigEditor({ mode, value, onChange }: EditorProps) {

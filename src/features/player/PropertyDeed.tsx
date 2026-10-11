@@ -63,7 +63,7 @@ export function PropertyDeed({ state, propertyKey, playerName, onOwnerPress, chi
           <Button size="sm" variant="secondary" title={`View ${owner.name}`} testID="property-view-owner" onPress={() => onOwnerPress(owner.id)} />
         ) : null}
         {prop.mortgaged ? <Pill tone="bad">Mortgaged — no rent</Pill> : null}
-        {/* Intermediate Mode: its owner is selling it, buildings included. Everyone sees that, like a mortgage. */}
+        {/* Capital Mode: its owner is selling it, buildings included. Everyone sees that, like a mortgage. */}
         {listing ? (
           <View testID="property-auction-status">
             <Pill tone="gold">Up for auction · reserve {formatINR(listing.resale!.reservePrice)}</Pill>

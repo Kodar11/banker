@@ -202,7 +202,7 @@ describe('messages', () => {
 
   it('summarises a ticket', () => {
     expect(ticketSummary('classic', 1)).toBe('Classic · Solo');
-    expect(ticketSummary('intermediate', 5)).toBe('Intermediate · 5 players');
+    expect(ticketSummary('intermediate', 5)).toBe('Capital · 5 players');
   });
 });
 

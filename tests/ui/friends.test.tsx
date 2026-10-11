@@ -636,7 +636,7 @@ describe('Game Invites tab', () => {
     await open([invite()]);
     expect(screen.getByTestId('friends-tab-invites-badge')).toHaveTextContent('1');
     expect(screen.getByTestId('invite-inv-1')).toHaveTextContent(/Farah.*RR-FFFFF2/);
-    expect(screen.getByTestId('invite-detail-inv-1')).toHaveTextContent('Intermediate game · Lobby open · 3/8 players');
+    expect(screen.getByTestId('invite-detail-inv-1')).toHaveTextContent('Capital game · Lobby open · 3/8 players');
     expect(screen.getByTestId('invite-expiry-inv-1')).toHaveTextContent(/Expires in 1[34]:\d\d/);
   });
 
@@ -734,7 +734,7 @@ describe('lobby: code, share, invite, lock, remove', () => {
       // Any participant can share — not only the host.
       await press('lobby-share');
       expect(share).toHaveBeenCalledWith({
-        message: `Join my Business Banker Classic game! Code: ${f.state.code}. Open Business Banker and enter this code to join.\nbusinessbanker://join-game?code=${f.state.code}`,
+        message: `Join my Clash of Capitals Classic game! Code: ${f.state.code}. Open Clash of Capitals and enter this code to join.\nbusinessbanker://join-game?code=${f.state.code}`,
       });
       // Sharing the code sends no friend request and no invitation.
       expect(api.sendRequest).not.toHaveBeenCalled();

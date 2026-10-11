@@ -17,7 +17,7 @@ function Line({ label, value, tone, testID }: { label: string; value: string; to
 const percent = (n: number) => `${n > 0 ? '+' : ''}${n}%`;
 
 /**
- * Intermediate Mode's valuation block on the title deed: what the property cost originally, what
+ * Capital Mode's valuation block on the title deed: what the property cost originally, what
  * the market says today, where its trend points, and what that is worth after inflation.
  * Renders nothing in a Classic game. All figures are the server's.
  */

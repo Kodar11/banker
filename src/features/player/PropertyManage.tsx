@@ -120,7 +120,7 @@ export function PropertyManage({ view, propertyKey }: { view: GameView; property
           </View>
         );
       })}
-      {/* Intermediate Mode: sell it, buildings and all, to the other players. Renders nothing in a Classic game. */}
+      {/* Capital Mode: sell it, buildings and all, to the other players. Renders nothing in a Classic game. */}
       <AuctionPropertyAction view={view} propertyKey={propertyKey} quietReason={shared} />
       {failure && failure.key === propertyKey ? (
         <Text className="text-center text-sm font-bold text-brick" accessibilityRole="alert" testID="property-manage-error">

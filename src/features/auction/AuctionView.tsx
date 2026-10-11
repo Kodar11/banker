@@ -13,7 +13,7 @@ import { useGameStore } from '@/store/gameStore';
 import { formatINR } from '@/utils/currency';
 import { bundleLabel, ResalePicker } from './ResaleAuction';
 
-/** The auction route opened with no auction in mind: the place a player starts one of their own (Intermediate Mode). */
+/** The auction route opened with no auction in mind: the place a player starts one of their own (Capital Mode). */
 export const NEW_AUCTION = 'new';
 
 /** Longest the countdown goes without re-reading the clock (picks up a corrected server-clock estimate). */
@@ -95,7 +95,7 @@ export function auctionResultHeading(auction: Pick<AuctionState, 'winnerId'> & P
 }
 
 /**
- * The auction screen with no auction on it: what is (not) happening, and — in Intermediate Mode —
+ * The auction screen with no auction on it: what is (not) happening, and — in Capital Mode —
  * the place a player puts one of their own properties up for sale. Laid out like the app's other
  * secondary screens: a quiet way back at the top, then cards.
  */

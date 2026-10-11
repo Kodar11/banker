@@ -7,9 +7,9 @@ import { objectiveTerms, OBJECTIVE_IDS, OBJECTIVES } from './objectives.ts';
 import type { RuleEntry } from './rulebook.ts';
 
 /**
- * The Intermediate Mode rules as players read them, written from INTERMEDIATE_RULES so the
+ * The Capital Mode rules as players read them, written from INTERMEDIATE_RULES so the
  * text can never drift from what the engine enforces — including the host's settings for the
- * game being played. Shown only in an Intermediate game, after the Classic rules (which all still apply).
+ * game being played. Shown only in a Capital game, after the Classic rules (which all still apply).
  */
 
 const signed = (n: number) => (n > 0 ? `+${n}` : String(n));
@@ -120,5 +120,5 @@ export function intermediateRuleEntries(config: GameConfig = defaultGameConfig('
   ];
 }
 
-/** The Intermediate rules at the standard settings. */
+/** The Capital rules at the standard settings. */
 export const INTERMEDIATE_RULE_ENTRIES: readonly RuleEntry[] = intermediateRuleEntries();

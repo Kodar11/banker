@@ -45,18 +45,18 @@ import {
 import type { PlayerState } from './types.ts';
 
 /**
- * Intermediate Mode's state transitions. Every function works on the action's Draft, so
+ * Capital Mode's state transitions. Every function works on the action's Draft, so
  * whatever it changes — economy, balances, ledger, events — commits with that action or
  * not at all, under the same game lock and the same exactly-once action id as any other move.
  *
- * The reducer calls in here only for Intermediate games; a Classic game never reaches this file.
+ * The reducer calls in here only for Capital games; a Classic game never reaches this file.
  */
 
 const LOANS = IR.loans;
 
 function economy(d: Draft): IntermediateState {
   const eco = economyOf(d.state);
-  if (!eco) fail('LOAN_NOT_ALLOWED', 'This is only available in Intermediate Mode.');
+  if (!eco) fail('LOAN_NOT_ALLOWED', 'This is only available in Capital Mode.');
   return eco;
 }
 
@@ -100,7 +100,7 @@ function applyCreditEvent(d: Draft, eco: IntermediateState, input: { id: string;
 // ---------------------------------------------------------------------------
 
 /**
- * Creates the game's economy when an Intermediate game starts: Year 1, every property at its
+ * Creates the game's economy when a Capital game starts: Year 1, every property at its
  * original price with a trend drawn once from the server's RNG, every starting player at the
  * starting credit score with no movement.
  */

@@ -34,7 +34,7 @@ import { buildingCost, intermediateDebt, intermediateNetAssets, openResaleFor, o
 import type { GameState } from './types.ts';
 
 /**
- * Read-only views of an Intermediate game: what the engine validates against and what the
+ * Read-only views of a Capital game: what the engine validates against and what the
  * screens display. Nothing here changes state, and every figure comes from the server's
  * persisted economy — a device never decides a rate, a due date or a value.
  */
@@ -110,7 +110,7 @@ export function creditScoreOf(eco: IntermediateState, playerId: string): number 
   return eco.credit[playerId] ?? IR.credit.start;
 }
 
-/** Outstanding principal across a player's Intermediate loans (what the aggregate limit counts). */
+/** Outstanding principal across a player's Capital loans (what the aggregate limit counts). */
 export function intermediatePrincipalOwed(eco: IntermediateState, playerId: string): number {
   return loansOf(eco, playerId).reduce((sum, l) => sum + loanOutstandingPrincipal(l), 0);
 }
@@ -233,7 +233,7 @@ export function loanOffers(state: OfferState, playerId: string): LoanOffer[] {
 /** Why this exact request would be refused, or null. The engine runs it; the Borrow screen shows the same answer. */
 export function loanRequestBlocker(state: OfferState, playerId: string, product: LoanProductKey, amount: number, collateralKey: PropertyKey | null): string | null {
   const offer = loanOffers(state, playerId).find((o) => o.product === product);
-  if (!offer) return 'Loans like this are only offered in Intermediate Mode.';
+  if (!offer) return 'Loans like this are only offered in Capital Mode.';
   if (offer.blocked) return offer.blocked;
   if (!Number.isInteger(amount) || amount < LOANS.minAmount) return `Minimum loan is ${formatINR(LOANS.minAmount)}.`;
   if (amount % LOANS.step !== 0) return `Loans come in steps of ${formatINR(LOANS.step)}.`;

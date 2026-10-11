@@ -1,4 +1,4 @@
-# Business Banker
+# Clash of Capitals
 
 The digital bank + referee for the physical Indian board game **Business**.
 The board stays the game — tokens, cards and table talk stay physical. The phone handles money, dice, rent, auctions, loans, turns and rules.
@@ -93,21 +93,23 @@ npx expo start            # scan with Expo Go (all native modules used are in Ex
 npx expo run:android      # or a development build (needed for Maestro: appId com.boardgamebank.businessbanker)
 ```
 
-## Game modes: Classic and Intermediate
+## Game modes: Classic and Capital
 
 The host picks the mode on **New game**; it is stored on the game (`games.game_mode`), every joiner gets it, and it never changes. A game with no stored mode is Classic.
 
-* **Classic** — the rule set above, unchanged. Classic games never read any Intermediate code path.
-* **Intermediate** — the same board and turn rules, plus a financial layer kept in one document on the game row (`games.intermediate`, shape `IntermediateState`), written only by the Edge Function in the same transaction as the action that changed it:
+Players see **Classic Mode** and **Capital Mode**. Capital Mode was first called Intermediate Mode, and that is still its name in everything stored or exchanged: the `game_mode` value `'intermediate'`, the `games.intermediate` column, the API, the `Intermediate*` types and file names, and the messages raised by the database guards in older migrations. Only the displayed name changed, so existing games read exactly as before. The displayed names live in one place: `GAME_MODE_LABELS` / `GAME_MODE_NAMES` in `src/engine/gameConfig.ts`.
+
+* **Classic** — the rule set above, unchanged. Classic games never read any Capital code path.
+* **Capital** — the same board and turn rules, plus a financial layer kept in one document on the game row (`games.intermediate`, shape `IntermediateState`), written only by the Edge Function in the same transaction as the action that changed it:
   * `src/engine/intermediateConfig.ts` — **`INTERMEDIATE_RULES`**: every rate, limit and threshold (36 spaces per financial year, 5% inflation, the market-change distribution, the five loan products, credit-score events and bands, grace period). Validated with Zod at load.
   * `src/engine/intermediateFinance.ts` — pure, exact integer maths: amortization, schedules, accrued interest, market rounding, projections, purchasing power, collateral limits and settlement.
   * `src/engine/intermediateEngine.ts` — the state transitions: economy creation at Start, the shared calendar driven by dice movement, yearly market changes, loan checkpoints (due → overdue → default), flexible-rate reviews, payments, early repayment, collateral seizure, and the one function that changes a credit score.
   * `src/engine/intermediateSelectors.ts` — read-only views the engine validates against and the screens display (offers, valuation, obligations, financial overview).
   * `src/features/finance/` — the bank (Overview · My Loans · Borrow · Credit), the deed's valuation block, the year / payment notices and the one-time introduction.
 
-Deploying a version that adds or changes Intermediate behaviour: `npm run deploy:db` first (the migration is additive), then `npm run deploy:functions`, then ship the app.
+Deploying a version that adds or changes Capital behaviour: `npm run deploy:db` first (the migration is additive), then `npm run deploy:functions`, then ship the app.
 
-## Property insurance and crises (Intermediate only)
+## Property insurance and crises (Capital only)
 
 Classic games have none of this: no state, no actions, no screens, no restrictions.
 
@@ -116,13 +118,13 @@ Classic games have none of this: no state, no actions, no screens, no restrictio
 * **Engine** — `src/engine/insuranceState.ts` (shape: `IntermediateState.insurance`), `src/engine/insurance.ts` (premium, schedule, selectors, purchase, crisis resolution, settlement). `recordDiceMovement` resolves every checkpoint the clock has reached, in order; `nextCheckpoint` only grows, so each is resolved once. Cover is judged at the checkpoint's own clock point: a policy that expires at the checkpoint does not cover it, and one bought afterwards never does.
 * **A pending bill stops the game.** `crisisGate` runs first in `applyAction`: until the bill is settled only pause / resume / leave / end (host) and declining offers are open to everyone, plus — for the player who owes — paying (`PAY_CRISIS_BILL`), selling a building, selling or mortgaging a property and taking a bank loan. Bankruptcy over a bill (`DECLARE_CRISIS_BANKRUPTCY`) is the game's existing bankruptcy, and is refused while the player can afford the bill or any of those options is left. Leaving, or the game ending, collects what cash there is first; anything uncollected counts against net worth.
 * **A policy protects its buyer**, not the property: it is not in force while someone else owns the property, and does not pass to a new owner.
-* **Storage** — the engine's state is inside the economy document (`games.intermediate`), written under the game lock in the action's own transaction. Migration `20261013000000_property_insurance.sql` adds `insurance_policies` and `crisis_events`, written from that state in the same transaction: the durable record, plus guarantees the database enforces by itself — one crisis per `(game_id, checkpoint)`, one active policy per property and owner, settled rows final, Intermediate games only, RLS on with nothing granted to the app's roles.
+* **Storage** — the engine's state is inside the economy document (`games.intermediate`), written under the game lock in the action's own transaction. Migration `20261013000000_property_insurance.sql` adds `insurance_policies` and `crisis_events`, written from that state in the same transaction: the durable record, plus guarantees the database enforces by itself — one crisis per `(game_id, checkpoint)`, one active policy per property and owner, settled rows final, Capital games only, RLS on with nothing granted to the app's roles.
 * **On the phone** (`src/features/insurance/`) — **More → Property Insurance** (`app/insurance.tsx`), an insurance section on every owned property's deed, a notice to the table when a crisis strikes, and — for the player who owes — a settlement view that replaces the board until the server says the bill is settled.
 * A game that started before this version has no `insurance` in its economy and plays on without it.
 
 Deploying this: `npm run deploy:db` (migration `20261013000000_property_insurance.sql`, additive), then `npm run deploy:functions`, then ship the app. A function deployed before the migration cannot store a policy or a crisis.
 
-## Property resale auctions (Intermediate only)
+## Property resale auctions (Capital only)
 
 A player can put a property they own — with every house or the hotel on it — up for auction to the other players. A Classic game never has the action, on the phone or on the server.
 
@@ -138,13 +140,13 @@ Deploying this: `npm run deploy:db` **first** (the migration is additive), then 
 
 The host can customise a small, fixed set of rules on **New game** and, until they press Start, from the lobby (**Change settings**). Everyone in the lobby sees the same summary; once the game starts the settings are locked and readable from **More → Game settings**.
 
-* `src/engine/gameConfig.ts` — **`GameConfig`**: starting cash (₹10,000–₹50,000), the loan limit (₹5,000–₹50,000), and for Intermediate the market volatility (Stable / Balanced / Volatile) and whether secret objectives are on. One validator (`parseGameConfig`) runs on the server for `create` and for the host's lobby-only `UPDATE_CONFIG` action. The defaults are the existing rule values, so an untouched game plays exactly as before; a game stored without a config reads as those old rules (`legacyGameConfig`).
+* `src/engine/gameConfig.ts` — **`GameConfig`**: starting cash (₹10,000–₹50,000), the loan limit (₹5,000–₹50,000), and for Capital the market volatility (Stable / Balanced / Volatile) and whether secret objectives are on. One validator (`parseGameConfig`) runs on the server for `create` and for the host's lobby-only `UPDATE_CONFIG` action. The defaults are the existing rule values, so an untouched game plays exactly as before; a game stored without a config reads as those old rules (`legacyGameConfig`).
 * Stored in `games.config`. A database trigger refuses any change once the game has left the lobby, on top of the engine refusing the action.
-* The loan limit caps total principal owed. It never lifts an Intermediate product's own maximum, its collateral requirement, or the overdue/default blocks, and it does not touch mortgages.
+* The loan limit caps total principal owed. It never lifts a Capital product's own maximum, its collateral requirement, or the overdue/default blocks, and it does not touch mortgages.
 * The volatility profiles live in `INTERMEDIATE_RULES.market.profiles`; a game's profile only selects which distribution its yearly market draw uses.
 * `src/engine/objectives.ts` — the typed objective registry (Property Mogul, The Builder, Cash Guardian, Deal Maker), dealing, scaling (`reward = base × startingCash / 25,000`, nearest ₹100; rupee targets scale the same way), end-of-game evaluation and the privacy boundary:
   * Assignments are stored in `player_objectives` (one row per player, immutable; RLS on, no client grants). The Edge Function sends each player only their own objective (`redactObjectives`, applied to every snapshot) until the game has finished. No event, transaction or broadcast mentions an objective before then.
-  * On the phone (`src/features/objectives/`): a private reveal once per player per game when the game starts — it opens covered, waits behind the Intermediate introduction, and is also shown the first time a phone opens a game already running. The objective stays under **More → My secret objective** (first in the list) and on the player's own sheet, with live "have / need" progress read from the synced game state. The phone only remembers *that* it showed the reveal (`OBJECTIVE_SEEN_KEY`), never the objective.
+  * On the phone (`src/features/objectives/`): a private reveal once per player per game when the game starts — it opens covered, waits behind the Capital introduction, and is also shown the first time a phone opens a game already running. The objective stays under **More → My secret objective** (first in the list) and on the player's own sheet, with live "have / need" progress read from the synced game state. The phone only remembers *that* it showed the reveal (`OBJECTIVE_SEEN_KEY`), never the objective.
   * When the game finishes, every objective is checked against the same final state, completed ones are paid by the bank as `OBJECTIVE_REWARD` ledger entries, and only then is the winner ranked — all in the one transaction that finishes the game. Only a player still in the game can earn the bonus.
 
 Deploying this: `npm run deploy:db` (migration `20261012000000_game_customization.sql`, additive), then `npm run deploy:functions`, then ship the app. An app that sends settings to a function deployed before this migration is refused.
@@ -165,7 +167,7 @@ Nobody signs in to play. On first launch the app creates a Supabase **anonymous*
 
 ### One-time setup (dashboards — not done by the code)
 
-Package / bundle id: `com.boardgamebank.businessbanker`. Scheme: `businessbanker`. Supabase project ref: `zlsimveghdbanvlupduz`.
+Package / bundle id: `com.boardgamebank.businessbanker`. Scheme: `businessbanker`. Supabase project ref: `zlsimveghdbanvlupduz`. These identifiers predate the name Clash of Capitals and are kept on purpose: the package id is the app's identity on a phone and in the stores, and the scheme is in the redirect allow-list below and in every join link and QR code already shared. The same goes for the Expo slug (`board-game-bank`, tied to the EAS project).
 
 1. **Supabase → Authentication → Sign In / Providers**: enable **Anonymous sign-ins**; enable **Manual linking**.
 2. **Google Cloud Console → APIs & Services → Credentials**: create an OAuth client of type **Web application**. Authorised redirect URI: `https://zlsimveghdbanvlupduz.supabase.co/auth/v1/callback`. Configure the OAuth consent screen (scopes: openid, email, profile) and publish it (or add test users).
@@ -244,7 +246,7 @@ Use four devices A–D on a development or preview build, each with its own gues
 
 1. **Solo, four players** — all four: Play Online → Classic → Find match. Expect *Match found* on all within a few seconds, a 20 s countdown that agrees across devices, then the same game on all four with four different seats; the first player rolls.
 2. **Two players** — A and B only: no match for 30 s, then a two-player match.
-3. **Modes apart** — A, B Classic; C, D Intermediate: two separate matches after 30 s, never a mixed one.
+3. **Modes apart** — A, B Classic; C, D Capital: two separate matches after 30 s, never a mixed one.
 4. **Cancel** — A searches and cancels; B, C, D search: A is never matched. Tap Cancel repeatedly: one result.
 5. **Missed ready-up** — four search; D does not confirm. After 20 s: D is told and paused; A, B, C are searching again with their elapsed time intact, and are matched after 30 s.
 6. **Decline** — as 5, D declines: the others are searching again immediately.
@@ -255,7 +257,7 @@ Use four devices A–D on a development or preview build, each with its own gues
 11. **Elsewhere in the app** — A searches, then opens Friends: when the match is found A is brought to the countdown.
 12. **Two devices, one account** — link A with Google, restore on a fifth device; search from both: one ticket. Confirm on one: the other says the game is on the other device.
 13. **Private games** — A sits in a private lobby: Play Online says to leave it first. A searches, then joins a game by code on the same device: the search has ended.
-14. **Regression** — create and join a private game by code and QR, friends and invitations, Classic and Intermediate play, reconnect in a running game, Financial Learning, account deletion while queued.
+14. **Regression** — create and join a private game by code and QR, friends and invitations, Classic and Capital play, reconnect in a running game, Financial Learning, account deletion while queued.
 
 Simulations without devices: `tests/matchmaking` (party sizes 1–8, thresholds, fairness, bounds), `tests/server/matchmaking.test.ts` (concurrent workers, cancel/reserve and ready/timeout races, failure injection around game creation, recovery).
 

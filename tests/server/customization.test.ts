@@ -136,7 +136,7 @@ describe.skipIf(!DATABASE_URL)('game customization and secret objectives (Postgr
       expect(await storedConfig(intermediate)).toEqual({ startingCash: 25000, loanLimit: 20000, marketVolatility: 'balanced', secretObjectives: true });
     });
 
-    it('normalises what it is sent: missing settings take defaults, Classic never keeps Intermediate ones', async () => {
+    it('normalises what it is sent: missing settings take defaults, Classic never keeps Capital ones', async () => {
       const g = await setupGame({ config: { startingCash: 40000, marketVolatility: 'volatile', secretObjectives: true }, start: false });
       expect(await storedConfig(g)).toEqual({ startingCash: 40000, loanLimit: 20000, marketVolatility: 'balanced', secretObjectives: false });
       expect((await g.view('Asha')).state.config).toEqual(await storedConfig(g));
@@ -310,7 +310,7 @@ describe.skipIf(!DATABASE_URL)('game customization and secret objectives (Postgr
   });
 
   describe('secret objectives: dealt once, stored privately', () => {
-    it('an Intermediate game deals one row per player at the start, all different for four players', async () => {
+    it('a Capital game deals one row per player at the start, all different for four players', async () => {
       const g = await setupGame({ mode: 'intermediate', names: ['Asha', 'Bilal', 'Chitra', 'Dev'], start: false });
       expect(await objectiveRows(g)).toHaveLength(0);
       ok(await g.act('Asha', { type: 'START_GAME' }));
