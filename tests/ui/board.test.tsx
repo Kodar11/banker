@@ -207,9 +207,57 @@ describe('player tokens', () => {
         const d = Math.max(Math.abs(jailed[i]!.x - jailed[j]!.x), Math.abs(jailed[i]!.y - jailed[j]!.y));
         expect(d).toBeGreaterThan(tokenSize(geo) * 0.9);
       }
-    // The current player gets a ring; others don't.
-    expect(screen.getByTestId(`board-token-current-${f.state.turn.playerId}`)).toBeTruthy();
-    expect(screen.queryByTestId(`board-token-current-${f.ids.Aman}`)).toBeNull();
+    // Nobody's token is ringed or outlined — not the player to move, not the host.
+    expect(screen.queryAllByTestId(/^board-token-current-/)).toHaveLength(0);
+  });
+
+  it('all eight are the same piece — host, player to move and everyone else — and differ only in colour; on one square none overlap', async () => {
+    const names = ['Asha', 'Bilal', 'Chitra', 'Dev', 'Esha', 'Farah', 'Gopal', 'Hari'];
+    const f = new Fixture(names);
+    expect(player(f, 'Asha').isHost).toBe(true);
+    expect(f.state.turn.playerId).toBe(f.ids.Asha); // the host moves first: the token that used to be ringed
+    await render(<ClassicBoard state={f.state} size={360} onTokenPress={jest.fn()} />);
+    const geo = boardGeometry(360 - 2 * (BOARD_FRAME + BOARD_BORDER));
+    const t = tokenSize(geo);
+    /** Everything a token is drawn with, minus what says whose it is and where it stands. */
+    const look = (name: string) => {
+      const id = f.ids[name]!;
+      const { transform: _at, zIndex: _z, ...box } = StyleSheet.flatten(screen.getByTestId(`board-token-${id}`).props.style);
+      const { transform: _lift, backgroundColor: _colour, ...piece } = StyleSheet.flatten(screen.getByTestId(`board-token-lift-${id}`).props.style);
+      const parts = screen.getByTestId(`board-token-${id}`).children.length;
+      return { box, piece, parts };
+    };
+    for (const name of names) {
+      expect(look(name)).toEqual(look('Asha'));
+      expect(look(name).box).toMatchObject({ width: t, height: t });
+      expect(look(name).piece).toMatchObject({ width: t, height: t, borderRadius: t / 2 });
+    }
+    expect(new Set(names.map((n) => StyleSheet.flatten(screen.getByTestId(`board-token-lift-${f.ids[n]}`).props.style).backgroundColor)).size).toBe(8);
+    // All on Start: eight whole tokens, each inside the square.
+    const start = geo.slots[0]!;
+    const at = names.map((n) => tokenXY(f.ids[n]!));
+    for (const p of at) {
+      expect(p.x).toBeGreaterThanOrEqual(start.x);
+      expect(p.y).toBeGreaterThanOrEqual(start.y);
+      expect(p.x + t).toBeLessThanOrEqual(start.x + start.width);
+      expect(p.y + t).toBeLessThanOrEqual(start.y + start.height);
+    }
+    for (let i = 0; i < at.length; i++) for (let j = i + 1; j < at.length; j++) expect(Math.hypot(at[i]!.x - at[j]!.x, at[i]!.y - at[j]!.y)).toBeGreaterThanOrEqual(t);
+  });
+
+  it('the board looks the same whoever is host and whoever’s phone it is', async () => {
+    const f = new Fixture(['Asha', 'Bilal', 'Chitra']);
+    for (const name of ['Asha', 'Bilal', 'Chitra']) player(f, name).position = positionOfSpecial('JAIL');
+    const places = () => ['Asha', 'Bilal', 'Chitra'].map((n) => tokenXY(f.ids[n]!));
+    const first = await render(<ClassicBoard state={f.state} size={360} />);
+    const asHostAsha = places();
+    await first.unmount();
+    // Same positions, a different host and a different player to move.
+    player(f, 'Asha').isHost = false;
+    player(f, 'Chitra').isHost = true;
+    f.state.turn.playerId = f.ids.Bilal!;
+    await render(<ClassicBoard state={f.state} size={360} />);
+    expect(places()).toEqual(asHostAsha);
   });
 
   it('are plain coloured pieces: the player colour, no initial, no name, no text at all', async () => {

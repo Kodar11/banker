@@ -528,7 +528,7 @@ describe('Entry points and isolation from the game', () => {
     const f = new Fixture().act('Asha', { type: 'END_GAME' }).loadAs('Asha');
     await render(<GameScreen view={viewFor(f, 'Asha')} />);
     // The game-over actions are there without touching the suggestion.
-    expect(screen.getByTestId('new-game-button')).toBeTruthy();
+    expect(screen.getByTestId('return-home-button')).toBeTruthy();
     expect(screen.queryByTestId('lesson-suggestion')).toBeNull();
     await press('context-cta');
     expect(screen.getByTestId('finished-card')).toBeTruthy();

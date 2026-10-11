@@ -255,20 +255,28 @@ export function tokenAnchor(geo: BoardGeometry, index: number): { x: number; y: 
 
 /**
  * Offsets (from the token anchor) for `count` tokens sharing a square whose
- * token lane is `laneWidth` wide. Up to four stand in one row, spread as far as
- * the lane allows; more form a second row above. Tokens may overlap when the
- * lane is crowded, but never completely.
+ * token lane is `laneWidth` wide: a fixed grid, the same on every phone. The
+ * first row stands in the lane, as many side by side as fit it without touching
+ * (four at most); the rest form further rows towards `rowDirection` (the side of
+ * the lane the square's text is on). Tokens keep their size and never overlap.
  */
-export function clusterOffsets(count: number, token: number, laneWidth: number): { x: number; y: number }[] {
+export function clusterOffsets(count: number, token: number, laneWidth: number, rowDirection: 1 | -1 = -1): { x: number; y: number }[] {
   if (count <= 0) return [];
-  const perRow = count <= 4 ? count : Math.ceil(count / 2);
-  const stepX = perRow > 1 ? Math.min(token * 1.1, Math.max(token * 0.4, (laneWidth - token - 2) / (perRow - 1))) : 0;
-  const stepY = token * 0.6;
+  const pitch = token * 1.1;
+  const fit = Math.min(4, Math.max(1, Math.floor((laneWidth - token) / pitch) + 1));
+  const rows = Math.ceil(count / fit);
+  const perRow = Math.ceil(count / rows);
   return Array.from({ length: count }, (_, i) => {
     const row = Math.floor(i / perRow);
     const inRow = Math.min(perRow, count - row * perRow);
-    return { x: ((i % perRow) - (inRow - 1) / 2) * stepX, y: row === 0 ? 0 : -row * stepY };
+    // Rows sit a little closer than columns: three of them must fit the short side of the smallest board's squares.
+    return { x: ((i % perRow) - (inRow - 1) / 2) * pitch, y: row === 0 ? 0 : row * token * 1.05 * rowDirection };
   });
+}
+
+/** Which way a square's extra token rows go: away from its building strip, over the square itself. */
+export function clusterRowDirection(slot: Pick<SquareSlot, 'side' | 'isCorner'>): 1 | -1 {
+  return slot.side === 'bottom' && !slot.isCorner ? 1 : -1;
 }
 
 /** Forward squares from `from` to `to` (0 = same square). */

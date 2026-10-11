@@ -1,5 +1,6 @@
 /// <reference types="jest" />
 import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react-native';
+import { useState } from 'react';
 import { router, usePathname } from 'expo-router';
 import Home from '../../app/index';
 import CreateGame from '../../app/create-game';
@@ -45,14 +46,19 @@ beforeEach(() => {
 });
 
 describe('Game Over is not a dead end', () => {
-  it.each(['Asha', 'Bilal'])('%s (host or not) sees the result and a way to create or join another game', async (name) => {
+  it.each(['Asha', 'Bilal'])('%s (host or not) sees the result and Return to Home — no Create or Join here', async (name) => {
     finishedGame(name);
     await render(<Table />);
     expect(screen.getByTestId('turn-title')).toHaveTextContent('GAME OVER');
     expect(screen.getByTestId('context-card')).toHaveTextContent(/wins!/);
-    expect(screen.getByTestId('new-game-button')).toHaveTextContent('Create New Game');
-    expect(screen.getByTestId('join-another-button')).toHaveTextContent('Join Game');
+    expect(screen.getByTestId('return-home-button')).toHaveTextContent('Return to Home');
+    expect(screen.queryByTestId('new-game-button')).toBeNull();
+    expect(screen.queryByTestId('join-another-button')).toBeNull();
+    expect(screen.queryByText(/Create (New )?Game|Join Game/i)).toBeNull();
     expect(screen.getByTestId('open-more')).toBeTruthy(); // log and rules stay reachable
+    // The standings are still one tap away.
+    await fireEvent.press(screen.getByTestId('context-cta'));
+    expect(screen.getByTestId('finished-card')).toHaveTextContent(/wins!/);
   });
 
   it('the exit is offered only once the game is over', async () => {
@@ -64,25 +70,34 @@ describe('Game Over is not a dead end', () => {
     expect(screen.queryByTestId('game-over-actions')).toBeNull();
   });
 
-  it('Create New Game: the finished game leaves the stack, the phone lets go of it, and Create opens over Home', async () => {
-    finishedGame('Asha');
+  it.each(['Asha', 'Bilal'])('Return to Home (%s, host or not): the finished game leaves the stack, the phone lets go of it, and the server is not told anything', async (name) => {
+    finishedGame(name);
     await render(<Table />);
-    await fireEvent.press(screen.getByTestId('new-game-button'));
-    expect(router.dismissAll).toHaveBeenCalled();
+    await fireEvent.press(screen.getByTestId('return-home-button'));
+    expect(router.dismissAll).toHaveBeenCalledTimes(1);
     expect((router.replace as jest.Mock).mock.calls).toEqual([['/']]);
-    expect((router.push as jest.Mock).mock.calls).toEqual([['/create-game']]);
+    expect(router.push).not.toHaveBeenCalled();
     expect(useSessionStore.getState().session).toBeNull();
     expect(useGameStore.getState()).toMatchObject({ gameId: null, snapshot: null, pendingAction: null, onlinePlayerIds: [], loadError: null, notice: null });
+    // Local only: the game, its history and the other players are untouched.
+    expect(api.action).not.toHaveBeenCalled();
   });
 
-  it('Join Game does the same and opens Join', async () => {
+  it('tapping Return to Home again and again navigates once', async () => {
     finishedGame('Bilal');
-    await render(<Table />);
-    await fireEvent.press(screen.getByTestId('join-another-button'));
+    // The screen as it stays mounted while the navigation is under way: it keeps the view it had.
+    function Frozen() {
+      const live = useGameView();
+      const [view] = useState(live);
+      return view ? <GameScreen view={view} /> : null;
+    }
+    await render(<Frozen />);
+    await fireEvent.press(screen.getByTestId('return-home-button'));
+    await fireEvent.press(screen.getByTestId('return-home-button'));
+    await fireEvent.press(screen.getByTestId('return-home-button'));
+    expect(router.dismissAll).toHaveBeenCalledTimes(1);
     expect((router.replace as jest.Mock).mock.calls).toEqual([['/']]);
-    expect((router.push as jest.Mock).mock.calls).toEqual([['/join-game']]);
     expect(useSessionStore.getState().session).toBeNull();
-    expect(useGameStore.getState().snapshot).toBeNull();
   });
 
   it('reaching Home with a finished game (Android back, or reopening the app) lets go of it; Create and Join are there', async () => {

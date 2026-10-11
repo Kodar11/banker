@@ -7,7 +7,7 @@ import { PROPERTY_GROUP_THEME } from '@/constants/theme';
 import { BOARD_BORDER, BOARD_FRAME, ClassicBoard } from '@/features/board/ClassicBoard';
 import { fitName, HOUSE_ICON, SPECIAL_ICONS, textEms } from '@/features/board/BoardSquare';
 import { tokenSize } from '@/features/board/BoardTokens';
-import { calculateBoardLayout, clusterOffsets, DEPTH_RATIO, GRID, gridCellOf, tokenAnchor, type BoardSide, type Rect } from '@/features/board/boardModel';
+import { calculateBoardLayout, clusterOffsets, clusterRowDirection, DEPTH_RATIO, GRID, gridCellOf, tokenAnchor, type BoardSide, type Rect } from '@/features/board/boardModel';
 import { screenGutter } from '@/features/game/layout';
 import { Fixture } from './fixtures';
 
@@ -147,7 +147,7 @@ describe('calculateBoardLayout (pure)', () => {
     }
   });
 
-  it.each(SIZES)('at %ipx: tokens stand in their square’s token lane; up to four sharing a square stay inside it, eight stay on the board', (size) => {
+  it.each(SIZES)('at %ipx: tokens stand in their square’s token lane; up to eight sharing a square keep their size, never overlap, and stay inside that square, off its building strip', (size) => {
     const geo = calculateBoardLayout(size);
     const token = tokenSize(geo);
     for (const s of geo.slots) {
@@ -155,24 +155,42 @@ describe('calculateBoardLayout (pure)', () => {
       const c = tokenAnchor(geo, s.index);
       expect(c).toEqual({ x: s.x + lane.left + lane.width / 2, y: s.y + lane.top + lane.height / 2 });
       for (let n = 1; n <= 8; n++) {
-        const offsets = clusterOffsets(n, token, lane.width);
+        const offsets = clusterOffsets(n, token, lane.width, clusterRowDirection(s));
         expect(offsets).toHaveLength(n);
         for (const o of offsets) {
-          expect(c.x + o.x - token / 2).toBeGreaterThanOrEqual(0);
-          expect(c.y + o.y - token / 2).toBeGreaterThanOrEqual(0);
-          expect(c.x + o.x + token / 2).toBeLessThanOrEqual(size + 1e-9);
-          expect(c.y + o.y + token / 2).toBeLessThanOrEqual(size + 1e-9);
-          if (n <= 4) {
-            // Fully inside the lane: never on the building strip, the name or the price.
-            expect(Math.abs(o.x) + token / 2).toBeLessThanOrEqual(lane.width / 2 + 1e-9);
-            expect(Math.abs(o.y) + token / 2).toBeLessThanOrEqual(lane.height / 2 + 1e-9);
-          }
+          const box: Rect = { left: c.x + o.x - token / 2 - s.x, top: c.y + o.y - token / 2 - s.y, width: token, height: token };
+          // Inside its own square: never spilling onto a neighbour or the board's centre.
+          expect(box.left).toBeGreaterThanOrEqual(-1e-9);
+          expect(box.top).toBeGreaterThanOrEqual(-1e-9);
+          expect(box.left + token).toBeLessThanOrEqual(s.width + 1e-9);
+          expect(box.top + token).toBeLessThanOrEqual(s.height + 1e-9);
+          // Never on the buildings.
+          if (s.parts.band) expect(overlap(box, s.parts.band)).toBe(false);
         }
-        // Never completely on top of each other.
+        // The first row is the lane: a lone token, or two, never touch the name or the price.
+        if (n <= 2) for (const o of offsets) expect(Math.abs(o.y) + token / 2).toBeLessThanOrEqual(lane.height / 2 + 1e-9);
+        // Whole tokens: no two overlap at all.
         for (let i = 0; i < n; i++)
-          for (let j = i + 1; j < n; j++) expect(Math.hypot(offsets[i]!.x - offsets[j]!.x, offsets[i]!.y - offsets[j]!.y)).toBeGreaterThanOrEqual(token * 0.4 - 1e-9);
+          for (let j = i + 1; j < n; j++) expect(Math.hypot(offsets[i]!.x - offsets[j]!.x, offsets[i]!.y - offsets[j]!.y)).toBeGreaterThanOrEqual(token);
       }
     }
+  });
+
+  it('the same game state gives the same token places on every phone: a cluster is the same shape at every board size', () => {
+    const shape = (size: number, index: number, n: number) => {
+      const geo = calculateBoardLayout(size);
+      const token = tokenSize(geo);
+      const s = geo.slots[index]!;
+      // In token widths, so the board's scale drops out.
+      return clusterOffsets(n, token, s.parts.tokens.width, clusterRowDirection(s)).map((o) => `${(o.x / token).toFixed(6)},${(o.y / token).toFixed(6)}`);
+    };
+    // Sizes where a token is the same share of a square (between the smallest and largest token).
+    const scaled = SIZES.filter((size) => {
+      const geo = calculateBoardLayout(size);
+      return Math.abs(tokenSize(geo) - geo.cell * 0.3) < 1e-9;
+    });
+    expect(scaled.length).toBeGreaterThan(3);
+    for (const index of [0, 1, 9, 10, 19, 28]) for (let n = 1; n <= 8; n++) for (const size of scaled) expect(shape(size, index, n)).toEqual(shape(scaled[0]!, index, n));
   });
 });
 

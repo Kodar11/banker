@@ -1,8 +1,8 @@
 import { memo, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, Easing, Platform, Pressable, View } from 'react-native';
 import type { PlayerState } from '@/engine/index.ts';
-import { COLORS, playerColor } from '@/constants/theme';
-import { clusterOffsets, forwardSteps, tokenAnchor, type BoardGeometry } from './boardModel';
+import { playerColor } from '@/constants/theme';
+import { clusterOffsets, clusterRowDirection, forwardSteps, tokenAnchor, type BoardGeometry } from './boardModel';
 
 /** Longest move animated square-by-square (a dice roll). Longer/backward jumps (cards, Jail) glide directly. */
 export const MAX_HOP_STEPS = 12;
@@ -123,8 +123,8 @@ const Token = memo(function Token({ player, position, offset, geo, size, isCurre
     [],
   );
 
+  // Every token is drawn the same: only the player's colour tells them apart (whose turn it is shows in the turn bar, not here).
   const c = playerColor(player);
-  const ring = isCurrent ? Math.max(1.5, size * 0.13) : 0;
   return (
     <Animated.View
       testID={`board-token-${player.id}`}
@@ -160,22 +160,6 @@ const Token = memo(function Token({ player, position, offset, geo, size, isCurre
         {/* A playing piece, not a badge: colour only — a soft highlight, never a letter. */}
         <View style={{ position: 'absolute', left: '18%', top: '14%', width: '34%', height: '34%', borderRadius: size, backgroundColor: '#FFFFFF', opacity: 0.4 }} />
       </Animated.View>
-      {isCurrent ? (
-        <View
-          testID={`board-token-current-${player.id}`}
-          style={{
-            position: 'absolute',
-            left: -ring,
-            top: -ring,
-            width: size + 2 * ring,
-            height: size + 2 * ring,
-            borderRadius: size,
-            borderWidth: ring,
-            borderColor: COLORS.ink,
-            opacity: 0.85,
-          }}
-        />
-      ) : null}
       {onPress ? (
         <Pressable
           testID={`board-token-press-${player.id}`}
@@ -216,8 +200,8 @@ export const BoardTokens = memo(function BoardTokens({
     <View pointerEvents={onTokenPress ? 'box-none' : 'none'} style={{ position: 'absolute', left: 0, top: 0, width: geo.size, height: geo.size }} testID="board-tokens">
       {active.map((p) => {
         const here = bySquare.get(p.position)!;
-        const lane = geo.slots[p.position]?.parts.tokens.width ?? geo.cell;
-        const offset = clusterOffsets(here.length, size, lane)[here.indexOf(p.id)]!;
+        const slot = geo.slots[p.position];
+        const offset = clusterOffsets(here.length, size, slot?.parts.tokens.width ?? geo.cell, slot ? clusterRowDirection(slot) : -1)[here.indexOf(p.id)]!;
         return (
           <Token
             key={p.id}

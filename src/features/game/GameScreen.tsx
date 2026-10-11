@@ -117,6 +117,14 @@ export function GameScreen({ view }: { view: GameView }) {
     wasMyTurn.current = view.isMyTurn;
   }, [view.isMyTurn]);
 
+  // Game over → Home, once: a second tap must not navigate again.
+  const leaving = useRef(false);
+  const returnHome = () => {
+    if (leaving.current) return;
+    leaving.current = true;
+    leaveGame();
+  };
+
   // Take everyone to the auction when one opens.
   useEffect(() => {
     if (auctionId && openedAuctionId !== auctionId && me && state.auction?.participantIds.includes(me.id)) {
@@ -480,10 +488,9 @@ export function GameScreen({ view }: { view: GameView }) {
             {/* Any height the sections could not use sits here, so the actions stay at the bottom of the screen. */}
             <View testID="action-area" style={{ flexGrow: 1, justifyContent: 'flex-end' }}>
               {state.status === 'FINISHED' ? (
-                // The game is over: the way out is the normal Create / Join flow, with nothing of this game kept.
+                // The game is over: the way out is Home (which has Create and Join), with nothing of this game kept on this phone.
                 <View testID="game-over-actions" style={{ flexDirection: 'row', gap: 6, minHeight: plan.actionButtonHeight }}>
-                  <Button className="flex-1 px-2" size="sm" title="Create New Game" testID="new-game-button" onPress={() => leaveGame('/create-game')} />
-                  <Button className="flex-1 px-2" size="sm" variant="secondary" title="Join Game" testID="join-another-button" onPress={() => leaveGame('/join-game')} />
+                  <Button className="flex-1 px-2" size="sm" title="Return to Home" testID="return-home-button" onPress={returnHome} />
                   <Button className="px-3" size="sm" variant="ghost" title="More" testID="open-more" onPress={() => setPanel({ kind: 'more' })} />
                 </View>
               ) : (
