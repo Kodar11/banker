@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Text, View, type TextStyle, type ViewStyle } from 'react-native';
-import { getDeed, positionOfProperty, spaceAt, type BoardSpace, type CityDeed, type PropertyKey } from '@/engine/index.ts';
+import { BUSINESS_MVP_RULES, GAME_MODE_NAMES, getDeed, positionOfProperty, spaceAt, type BoardSpace, type CityDeed, type PropertyKey } from '@/engine/index.ts';
 import { COLORS, playerColor, PROPERTY_GROUP_THEME, type PlayerColor } from '@/constants/theme';
 import { HOUSE_ICON, SPECIAL_ICONS } from '@/features/board/BoardSquare';
 import { formatINR } from '@/utils/currency';
@@ -58,6 +58,22 @@ export const RIVAL_INDEX = STRIP.findIndex((tile, i) => tile.deed !== null && i 
 export const OFFERED = cityAt(RIVAL_INDEX);
 /** Rent on the bare site with no colour set: what a visitor pays in the scene. */
 export const RENT = BOUGHT.rent[0];
+
+// --- The finale: the same properties, later in the game. Every figure is read from the deeds and the rules. ---
+
+/** Rent on the bought property as it is developed: one, two and three houses, then a hotel. */
+export const RENT_LADDER = [BOUGHT.rent[1], BOUGHT.rent[2], BOUGHT.rent[3], BOUGHT.hotelRent] as const;
+export const MAX_HOUSES = BUSINESS_MVP_RULES.building.maxHouses;
+/** What the bank lends against the mortgaged deed. */
+export const MORTGAGE_CASH = OFFERED.mortgageValue;
+/** The square nobody owns yet, which goes to auction: the one next to the bought property. */
+export const AUCTION_INDEX = DESTINATION_INDEX - 1;
+export const AUCTIONED = cityAt(AUCTION_INDEX);
+const { minimumOpeningBid, minimumIncrement } = BUSINESS_MVP_RULES.auction;
+/** Three bids the rules would accept: each a whole number of increments, each above the last. */
+export const AUCTION_BIDS = [0.5, 0.7, 0.9].map((share) => Math.max(minimumOpeningBid, Math.round((AUCTIONED.price * share) / minimumIncrement) * minimumIncrement)) as [number, number, number];
+/** Insurance exists only in this mode, and the scene says so wherever it shows it. */
+export const INSURANCE_MODE = GAME_MODE_NAMES.intermediate;
 
 /** Seats 0–3: the owner, the rival, and the two players who join later. */
 export const SEATS = [0, 1, 2, 3].map((seat) => playerColor({ seat })) as [PlayerColor, PlayerColor, PlayerColor, PlayerColor];
@@ -213,7 +229,7 @@ export function Amount({ value }: { value: number }) {
 }
 
 /** A title deed in a player's hand: the property's colour and name, and whose card it is. */
-export function DeedCard({ deed, seat }: { deed: CityDeed; seat: PlayerColor }) {
+export function DeedCard({ deed, seat }: { deed: CityDeed; /** Whose card it is; none while the bank still holds it. */ seat?: PlayerColor }) {
   const theme = PROPERTY_GROUP_THEME[deed.group];
   return (
     <View style={[SHADOW, { width: CARD.width, height: CARD.height, borderRadius: 7, borderWidth: 1, borderColor: COLORS.boardLine, backgroundColor: '#FFFFFF', overflow: 'hidden' }]}>
@@ -227,18 +243,65 @@ export function DeedCard({ deed, seat }: { deed: CityDeed; seat: PlayerColor }) 
           <View key={width} style={{ width, height: 3, borderRadius: 2, backgroundColor: COLORS.boardLine }} />
         ))}
       </View>
-      <View style={{ position: 'absolute', right: 5, bottom: 5, width: 13, height: 13, borderRadius: 7, borderWidth: 1.5, borderColor: '#FFFFFF', backgroundColor: seat.color, shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 1, shadowOffset: { width: 0, height: 0 }, elevation: 1 }} />
+      {seat ? <View style={{ position: 'absolute', right: 5, bottom: 5, width: 13, height: 13, borderRadius: 7, borderWidth: 1.5, borderColor: '#FFFFFF', backgroundColor: seat.color, shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 1, shadowOffset: { width: 0, height: 0 }, elevation: 1 }} /> : null}
+    </View>
+  );
+}
+
+export const MARK = 28;
+
+/** A round marker carrying one of the app's own pictograms. */
+function Mark({ icon }: { icon: string }) {
+  return (
+    <View style={[SHADOW, { width: MARK, height: MARK, borderRadius: MARK / 2, borderWidth: 1.5, borderColor: COLORS.boardEdge, backgroundColor: COLORS.cream, alignItems: 'center', justifyContent: 'center' }]}>
+      <Text {...DRAWN} style={[FLAT, { fontSize: 14, lineHeight: 19 }]}>
+        {icon}
+      </Text>
     </View>
   );
 }
 
 /** The moment a deal is struck. */
-export function DealMark() {
+export const DealMark = () => <Mark icon="🤝" />;
+/** The bank, as the app draws it everywhere. */
+export const BankMark = () => <Mark icon="🏦" />;
+/** Sold at auction. */
+export const GavelMark = () => <Mark icon="🔨" />;
+
+/** A hotel on a colour band: one piece in place of the houses. */
+export function HotelPiece() {
   return (
-    <View style={[SHADOW, { width: 28, height: 28, borderRadius: 14, borderWidth: 1.5, borderColor: COLORS.boardEdge, backgroundColor: COLORS.cream, alignItems: 'center', justifyContent: 'center' }]}>
-      <Text {...DRAWN} style={[FLAT, { fontSize: 14, lineHeight: 19 }]}>
-        🤝
+    <View style={{ width: HOUSE + 2, height: HOUSE, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+      <Text {...DRAWN} style={[FLAT, { fontSize: HOUSE * 0.78, lineHeight: HOUSE }]}>
+        🏨
       </Text>
     </View>
+  );
+}
+
+/** The board's mortgage mark: a dark disc on the colour band. The property is pledged, not sold. */
+export function MortgageMark() {
+  return <View style={{ width: 12, height: 12, borderRadius: 6, borderWidth: 1, borderColor: '#FFFFFF', backgroundColor: COLORS.ink }} />;
+}
+
+/** A mortgaged square is drawn faded, as on the board: it earns nothing until it is redeemed. */
+export function MortgageVeil({ deed }: { deed: CityDeed }) {
+  return <View style={{ width: TILE.width, height: TILE.height - TILE.band - TILE.owner, backgroundColor: PROPERTY_GROUP_THEME[deed.group].tint }} />;
+}
+
+export const TAG = { height: 18 };
+
+/** A small label by the board. `children` are drawn centred in it, on top of one another. */
+export function Tag({ width, children }: { width: number; children: ReactNode }) {
+  return (
+    <View style={[SHADOW, { width, height: TAG.height, borderRadius: TAG.height / 2, borderWidth: 1, borderColor: COLORS.boardLine, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' }]}>{children}</View>
+  );
+}
+
+export function TagText({ children }: { children: string }) {
+  return (
+    <Text {...DRAWN} style={[FLAT, { fontSize: 9, lineHeight: 12, fontWeight: '900', color: COLORS.ink }]}>
+      {children}
+    </Text>
   );
 }

@@ -1,5 +1,5 @@
 /// <reference types="jest" />
-import { AccessibilityInfo } from 'react-native';
+import { AccessibilityInfo, AppState, StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import * as SecureStore from 'expo-secure-store';
 import { router, useLocalSearchParams, usePathname } from 'expo-router';
@@ -7,22 +7,24 @@ import Home from '../../app/index';
 import JoinGame from '../../app/join-game';
 import Onboarding from '../../app/onboarding';
 import Settings from '../../app/settings';
-import { computeRent, getDeed, positionOfProperty, spaceName } from '@/engine/index.ts';
+import { BUSINESS_MVP_RULES, computeRent, GAME_MODE_NAMES, getDeed, mortgagePayout, positionOfProperty, spaceName } from '@/engine/index.ts';
 import { ONBOARDING_PAGES } from '@/features/onboarding/content';
 import { OnboardingFlow } from '@/features/onboarding/OnboardingFlow';
-import { BOUGHT, DESTINATION_INDEX, OFFERED, RENT, ROLL, STRIP } from '@/features/onboarding/pieces';
+import { AUCTION_BIDS, AUCTIONED, BOUGHT, DESTINATION_INDEX, INSURANCE_MODE, MAX_HOUSES, MORTGAGE_CASH, OFFERED, RENT, RENT_LADDER, ROLL, STRIP } from '@/features/onboarding/pieces';
 import { ease, onboardingMotion, track } from '@/features/onboarding/timeline';
 import { gameApi } from '@/lib/gameApi';
 import { useGameStore } from '@/store/gameStore';
 import { ONBOARDING_STORAGE_KEY, onboardingDecision, useOnboardingStore } from '@/store/onboardingStore';
 import { useSessionStore } from '@/store/sessionStore';
+import { formatINR } from '@/utils/currency';
 import { startupRouting } from '@/utils/startupRouting';
 import { Fixture } from './fixtures';
 
 const api = gameApi as jest.Mocked<typeof gameApi>;
 const storage = SecureStore as jest.Mocked<typeof SecureStore>;
 const pathname = usePathname as jest.Mock;
-const [FIRST, SECOND, THIRD] = ONBOARDING_PAGES as [(typeof ONBOARDING_PAGES)[number], (typeof ONBOARDING_PAGES)[number], (typeof ONBOARDING_PAGES)[number]];
+type Page = (typeof ONBOARDING_PAGES)[number];
+const [FIRST, SECOND, THIRD, FOURTH] = ONBOARDING_PAGES as [Page, Page, Page, Page];
 
 const press = (testID: string) => fireEvent.press(screen.getByTestId(testID));
 const headline = () => screen.getByTestId('onboarding-headline');
@@ -94,6 +96,7 @@ describe('First launch and returning launches', () => {
   it("Let's Play on the last page remembers it and lands on Home, where the player chooses how to play", async () => {
     await firstLaunch();
     await render(<Home />);
+    await press('onboarding-next');
     await press('onboarding-next');
     await press('onboarding-next');
     expect(screen.getByTestId('onboarding-next')).toHaveTextContent("Let's Play");
@@ -212,10 +215,16 @@ describe('The three pages', () => {
     await press('onboarding-next');
     expect(headline()).toHaveTextContent('Every game tells a new story.');
     expect(screen.getByTestId('onboarding-description')).toHaveTextContent('Trade, negotiate, take risks, and challenge your friends. Choose your style and make your move.');
+    expect(screen.getByTestId('onboarding-next')).toHaveTextContent('Continue');
+    await press('onboarding-next');
+    expect(headline()).toHaveTextContent('More than just a roll of the dice.');
+    expect(screen.getByTestId('onboarding-description')).toHaveTextContent(
+      'Build your empire, make bold deals, protect your assets, and outsmart your rivals. Every decision can change your fortune.',
+    );
     expect(screen.getByTestId('onboarding-next')).toHaveTextContent("Let's Play");
   });
 
-  it('Skip is offered on the first two pages, Back on the last two', async () => {
+  it('Skip is offered on every page but the last, Back on every page but the first', async () => {
     await open();
     expect(screen.getByTestId('onboarding-skip')).toBeTruthy();
     expect(screen.queryByTestId('onboarding-back')).toBeNull();
@@ -223,8 +232,36 @@ describe('The three pages', () => {
     expect(screen.getByTestId('onboarding-skip')).toBeTruthy();
     expect(screen.getByTestId('onboarding-back')).toBeTruthy();
     await press('onboarding-next');
+    expect(screen.getByTestId('onboarding-skip')).toBeTruthy();
+    expect(screen.getByTestId('onboarding-back')).toBeTruthy();
+    await press('onboarding-next');
     expect(screen.queryByTestId('onboarding-skip')).toBeNull();
     expect(screen.getByTestId('onboarding-back')).toBeTruthy();
+  });
+
+  it('the last page is reached from the third and left again with Back, with nothing finished on the way', async () => {
+    const onFinish = await open();
+    await press('onboarding-next');
+    await press('onboarding-next');
+    await press('onboarding-next');
+    expect(headline()).toHaveTextContent(FOURTH.headline);
+    expect(screen.getByTestId('onboarding-page-4')).toBeTruthy();
+    await press('onboarding-back');
+    expect(headline()).toHaveTextContent(THIRD.headline);
+    await press('onboarding-next');
+    expect(headline()).toHaveTextContent(FOURTH.headline);
+    expect(onFinish).not.toHaveBeenCalled();
+    await press('onboarding-next');
+    expect(onFinish).toHaveBeenCalledTimes(1);
+  });
+
+  it('Skip from the third page finishes without showing the last one', async () => {
+    const onFinish = await open();
+    await press('onboarding-next');
+    await press('onboarding-next');
+    await press('onboarding-skip');
+    expect(onFinish).toHaveBeenCalledTimes(1);
+    expect(headline()).toHaveTextContent(THIRD.headline);
   });
 
   it('Back returns to the previous page and nothing is finished', async () => {
@@ -266,7 +303,7 @@ describe('The three pages', () => {
     await layOut();
     expect(screen.getByLabelText('Skip onboarding')).toBeTruthy();
     expect(screen.getByLabelText('Continue')).toBeTruthy();
-    expect(screen.getByLabelText('Step 1 of 3')).toBeTruthy();
+    expect(screen.getByLabelText('Step 1 of 4')).toBeTruthy();
     expect(screen.getByLabelText(FIRST.sceneLabel)).toBeTruthy();
     expect(screen.getByRole('header')).toHaveTextContent(FIRST.headline);
     // The pieces themselves are decoration: none of them is read out.
@@ -275,12 +312,45 @@ describe('The three pages', () => {
     const announce = AccessibilityInfo.announceForAccessibility as jest.Mock;
     await press('onboarding-next');
     expect(screen.getByLabelText('Go back')).toBeTruthy();
-    expect(screen.getByLabelText('Step 2 of 3')).toBeTruthy();
-    expect(announce).toHaveBeenCalledWith(`Step 2 of 3. ${SECOND.headline}`);
+    expect(screen.getByLabelText('Step 2 of 4')).toBeTruthy();
+    expect(announce).toHaveBeenCalledWith(`Step 2 of 4. ${SECOND.headline}`);
     await press('onboarding-next');
+    await press('onboarding-next');
+    expect(screen.getByLabelText('Step 4 of 4')).toBeTruthy();
+    expect(screen.getByLabelText(FOURTH.sceneLabel)).toBeTruthy();
     expect(screen.getByLabelText("Let's Play")).toBeTruthy();
   });
 });
+
+/** How visible a drawn label is: the opacities of every layer around it, multiplied. */
+function opacityOf(text: string): number {
+  let node: ReturnType<typeof screen.getByText> | null = screen.getByText(text, { includeHiddenElements: true });
+  let visible = 1;
+  while (node) {
+    const opacity = (StyleSheet.flatten(node.props.style) as { opacity?: number } | undefined)?.opacity;
+    if (typeof opacity === 'number') visible *= opacity;
+    node = node.parent;
+  }
+  return visible;
+}
+const rentLabel = (rent: number) => `Rent ${formatINR(rent)}`;
+/** The finale at rest: the hotel's rent, the mortgage and insurance marks, the auctioned deed won — and nothing left mid-air. */
+function expectFinalePicture() {
+  expect(opacityOf(rentLabel(RENT_LADDER[3]))).toBe(1);
+  for (const earlier of RENT_LADDER.slice(0, 3)) expect(opacityOf(rentLabel(earlier))).toBe(0);
+  expect(opacityOf('🏨')).toBe(1);
+  expect(screen.getAllByText('🏠', { includeHiddenElements: true })).toHaveLength(MAX_HOUSES);
+  expect(opacityOf('🏦')).toBe(1);
+  expect(opacityOf('🔨')).toBe(1);
+  expect(opacityOf(`🛡️ ${INSURANCE_MODE}`)).toBe(1);
+  // Its square on the board and its deed, in both cases: the one at the bank, the one just won.
+  expect(screen.getAllByText(OFFERED.name, { includeHiddenElements: true })).toHaveLength(2);
+  expect(screen.getAllByText(AUCTIONED.name, { includeHiddenElements: true })).toHaveLength(2);
+  // Money that moved is not left on screen: the loan and the winning bid have both faded.
+  expect(opacityOf(`+${formatINR(MORTGAGE_CASH)}`)).toBe(0);
+  expect(opacityOf(`−${formatINR(AUCTION_BIDS[2])}`)).toBe(0);
+  for (const bid of AUCTION_BIDS) expect(opacityOf(formatINR(bid))).toBe(0);
+}
 
 describe('The scenes', () => {
   const shown = (name: string) => screen.queryByText(name, { includeHiddenElements: true });
@@ -295,9 +365,13 @@ describe('The scenes', () => {
     expect(screen.getByTestId('onboarding-scene-turn', { includeHiddenElements: true })).toBeTruthy();
     await press('onboarding-next');
     expect(screen.getByTestId('onboarding-scene-trade', { includeHiddenElements: true })).toBeTruthy();
+    await press('onboarding-next');
+    expect(screen.queryByTestId('onboarding-scene-trade', { includeHiddenElements: true })).toBeNull();
+    expect(screen.getByTestId('onboarding-scene-tycoon', { includeHiddenElements: true })).toBeTruthy();
     // Back to a page: its scene is there again (mounted afresh, so it plays again).
     await press('onboarding-back');
-    expect(screen.getByTestId('onboarding-scene-turn', { includeHiddenElements: true })).toBeTruthy();
+    expect(screen.queryByTestId('onboarding-scene-tycoon', { includeHiddenElements: true })).toBeNull();
+    expect(screen.getByTestId('onboarding-scene-trade', { includeHiddenElements: true })).toBeTruthy();
   });
 
   it('keeps its proportions on a small phone, a typical phone and a tablet: scaled, never stretched', async () => {
@@ -317,6 +391,7 @@ describe('The scenes', () => {
 
   it('the buttons work while a scene is still playing', async () => {
     onboardingMotion.enabled = true;
+    onboardingMotion.useNativeDriver = true; // the mocked driver: the scene is "playing" without Jest stepping every frame
     const onFinish = jest.fn();
     await render(<OnboardingFlow onFinish={onFinish} />);
     await layOut();
@@ -341,6 +416,8 @@ describe('The scenes', () => {
     // Its square on the board, and its title deed in the trade.
     expect(screen.getAllByText(OFFERED.name, { includeHiddenElements: true })).toHaveLength(2);
     await press('onboarding-next');
+    expectFinalePicture();
+    await press('onboarding-next');
     expect(onFinish).toHaveBeenCalledTimes(1);
     reduce.mockResolvedValue(false);
   });
@@ -361,6 +438,85 @@ describe('The scenes', () => {
     expect(RENT).toBe(computeRent(state, BOUGHT.key, ROLL[0] + ROLL[1]));
     expect(RENT).toBeGreaterThan(0);
   });
+});
+
+describe('The finale', () => {
+  const openFinale = async () => {
+    const view = await render(<OnboardingFlow onFinish={jest.fn()} />);
+    await layOut();
+    for (let i = 0; i < 3; i++) await press('onboarding-next');
+    expect(headline()).toHaveTextContent(FOURTH.headline);
+    return view;
+  };
+
+  it('with motion off it is the finished picture at once, and the same picture every time', async () => {
+    const first = await openFinale();
+    expectFinalePicture();
+    const picture = JSON.stringify(first.toJSON());
+    await first.unmount();
+    const second = await openFinale();
+    expect(JSON.stringify(second.toJSON())).toBe(picture);
+  });
+
+  it('its rents are the deed’s own: one, two and three houses, then a hotel', () => {
+    const f = new Fixture();
+    const owner = f.state.players[0]!.id;
+    const built = (houses: number, hotel: boolean) => ({ ...f.state, properties: { ...f.state.properties, [BOUGHT.key]: { ...f.state.properties[BOUGHT.key], ownerId: owner, houses, hotel } } });
+    expect(RENT_LADDER).toHaveLength(MAX_HOUSES + 1);
+    for (let houses = 1; houses <= MAX_HOUSES; houses++) expect(RENT_LADDER[houses - 1]).toBe(computeRent(built(houses, false), BOUGHT.key, 7));
+    expect(RENT_LADDER[MAX_HOUSES]).toBe(computeRent(built(0, true), BOUGHT.key, 7));
+    for (let i = 1; i < RENT_LADDER.length; i++) expect(RENT_LADDER[i]!).toBeGreaterThan(RENT_LADDER[i - 1]!);
+  });
+
+  it('the mortgage pays what the rules pay, and the bids are bids the rules would accept', () => {
+    expect(MORTGAGE_CASH).toBe(mortgagePayout(OFFERED.key));
+    const { minimumOpeningBid, minimumIncrement } = BUSINESS_MVP_RULES.auction;
+    expect(AUCTION_BIDS[0]).toBeGreaterThanOrEqual(minimumOpeningBid);
+    for (let i = 1; i < AUCTION_BIDS.length; i++) expect(AUCTION_BIDS[i]! - AUCTION_BIDS[i - 1]!).toBeGreaterThanOrEqual(minimumIncrement);
+    // Three different squares: the one built on, the one mortgaged, the one auctioned.
+    expect(new Set([BOUGHT.key, OFFERED.key, AUCTIONED.key]).size).toBe(3);
+  });
+
+  it('insurance is shown under the name of the only mode that has it, never the retired name', () => {
+    expect(INSURANCE_MODE).toBe(GAME_MODE_NAMES.intermediate);
+    expect(INSURANCE_MODE).toBe('Capital Mode');
+    for (const page of ONBOARDING_PAGES) expect(`${page.headline} ${page.description} ${page.sceneLabel}`).not.toMatch(/intermediate/i);
+    expect(FOURTH.sceneLabel).toMatch(/Capital Mode/);
+  });
+
+  it('while it plays it listens for the app going to the background, and lets go of that listener when the page is left', async () => {
+    // React Native's Jest setup already mocks AppState: each listener gets its own mocked subscription.
+    const listen = AppState.addEventListener as jest.Mock;
+    await render(<OnboardingFlow onFinish={jest.fn()} />);
+    await layOut();
+    await press('onboarding-next');
+    await press('onboarding-next');
+    // Only the finale plays: the pages before it were shown finished.
+    onboardingMotion.enabled = true;
+    onboardingMotion.useNativeDriver = true;
+    listen.mockClear();
+    await press('onboarding-next');
+    expect(headline()).toHaveTextContent(FOURTH.headline);
+    const scene = listen.mock.calls.findIndex(([event]) => event === 'change');
+    const onChange = listen.mock.calls[scene]![1] as (state: string) => void;
+    const subscription = listen.mock.results[scene]!.value as { remove: jest.Mock };
+    await act(async () => onChange('background'));
+    expect(subscription.remove).not.toHaveBeenCalled();
+    await press('onboarding-back');
+    expect(subscription.remove).toHaveBeenCalledTimes(1);
+  }, 30_000);
+
+  it("Let's Play works while the finale is still playing, and finishing is the button's doing, not the animation's", async () => {
+    onboardingMotion.enabled = true;
+    onboardingMotion.useNativeDriver = true;
+    const onFinish = jest.fn();
+    await render(<OnboardingFlow onFinish={onFinish} />);
+    await layOut();
+    for (let i = 0; i < 3; i++) await press('onboarding-next');
+    expect(onFinish).not.toHaveBeenCalled();
+    await press('onboarding-next');
+    expect(onFinish).toHaveBeenCalledTimes(1);
+  }, 30_000);
 });
 
 describe('Scene timing', () => {
@@ -393,6 +549,7 @@ describe('Replay from House rules', () => {
     const f = new Fixture().loadAs('Asha');
     const before = { snapshot: useGameStore.getState().snapshot, session: useSessionStore.getState().session };
     await render(<Onboarding />);
+    await press('onboarding-next');
     await press('onboarding-next');
     await press('onboarding-next');
     await press('onboarding-next');

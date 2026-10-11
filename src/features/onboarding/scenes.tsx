@@ -1,9 +1,14 @@
 import { memo, useMemo, type ComponentType, type ReactNode } from 'react';
 import { Animated, View } from 'react-native';
 import { COLORS, PROPERTY_GROUP_THEME, type PlayerColor } from '@/constants/theme';
-import type { OnboardingSceneId } from './content';
+import { formatINR } from '@/utils/currency';
+import { ONBOARDING_LABELS, type OnboardingSceneId } from './content';
 import {
   Amount,
+  AUCTION_BIDS,
+  AUCTION_INDEX,
+  AUCTIONED,
+  BankMark,
   BoardCrop,
   BOUGHT,
   CARD,
@@ -15,20 +20,32 @@ import {
   DIE,
   DieBody,
   DieFace,
+  GavelMark,
+  HotelPiece,
   HOUSE,
   HousePiece,
+  INSURANCE_MODE,
+  MARK,
+  MAX_HOUSES,
+  MORTGAGE_CASH,
+  MortgageMark,
+  MortgageVeil,
   OFFERED,
   OwnerBadge,
   OwnerEdge,
   PURSE,
   Purse,
   RENT,
+  RENT_LADDER,
   RIVAL_INDEX,
   ROLL,
   SEATS,
   SHARE,
   STAGE,
   STRIP,
+  TAG,
+  Tag,
+  TagText,
   TILE,
   Tile,
   TileGlow,
@@ -199,14 +216,35 @@ function Ownership({ scene, index, seat, at }: { scene: Scene; index: number; se
   );
 }
 
-/** A house set down on a square's colour band. `at: null` = already built. */
-function House({ scene, index, at }: { scene: Scene; index: number; at: number | null }) {
+/** A square's glow on its own: a property catching the eye for a moment. */
+function Glow({ scene, index, at }: { scene: Scene; index: number; at: number }) {
+  return (
+    <At x={tileX(index) - 3} y={TILE.top - 3} opacity={scene.num(0, [[at, at + 220, 1], [at + 520, at + 950, 0, ease.in]])}>
+      <TileGlow />
+    </At>
+  );
+}
+
+interface HouseProps {
+  scene: Scene;
+  index: number;
+  /** When it is built; null = already there. */
+  at: number | null;
+  /** Sideways from the middle of the band, when a square holds more than one. */
+  shift?: number;
+  /** When it is taken off again (a hotel replaces the houses). */
+  gone?: number;
+}
+
+/** A house set down on a square's colour band. */
+function House({ scene, index, at, shift = 0, gone }: HouseProps) {
   const top = TILE.top + (TILE.band - HOUSE) / 2;
+  const leaves: Move[] = gone === undefined ? [] : [[gone, gone + 150, 0, ease.linear]];
   return (
     <At
-      x={tileX(index) + (TILE.width - HOUSE) / 2}
+      x={tileX(index) + (TILE.width - HOUSE) / 2 + shift}
       y={at === null ? top : scene.num(top - 12, [[at, at + 300, top]])}
-      opacity={at === null ? 1 : scene.num(0, [[at, at + 120, 1, ease.linear]])}
+      opacity={at === null ? (leaves.length ? scene.num(1, leaves) : 1) : scene.num(0, [[at, at + 120, 1, ease.linear], ...leaves])}
       scale={at === null ? 1 : scene.num(0.4, [[at, at + 400, 1, ease.pop]])}
     >
       <HousePiece />
@@ -326,6 +364,7 @@ const NEWCOMERS = [
   { seat: SEATS[3], spot: tokenSpot(DESTINATION_INDEX - 1), at: 460 },
 ];
 const CONFETTI_FROM = { x: STAGE.width / 2 - 3, y: 56 };
+const CONFETTI_MS = 1000;
 /** A small, fixed burst: where each piece lands relative to the middle, and how far it spins. */
 const CONFETTI: readonly { dx: number; dy: number; spin: number; color: string }[] = [
   { dx: -92, dy: -30, spin: 200, color: COLORS.saffron },
@@ -337,6 +376,25 @@ const CONFETTI: readonly { dx: number; dy: number; spin: number; color: string }
   { dx: 60, dy: -36, spin: 240, color: PROPERTY_GROUP_THEME.GREEN.color },
   { dx: 90, dy: 12, spin: -200, color: PROPERTY_GROUP_THEME.PINK.color },
 ];
+
+/** The burst itself: every piece flies out, tumbles, and is gone within a second. */
+function Confetti({ scene, at }: { scene: Scene; at: number }) {
+  return (
+    <>
+      {CONFETTI.map(({ dx, dy, spin, color }, i) => (
+        <At
+          key={i}
+          x={scene.num(CONFETTI_FROM.x, [[at, at + 700, CONFETTI_FROM.x + dx]])}
+          y={scene.num(CONFETTI_FROM.y, [[at, at + 450, CONFETTI_FROM.y + dy], [at + 450, at + CONFETTI_MS, CONFETTI_FROM.y + dy + 14, ease.in]])}
+          opacity={scene.num(0, [[at, at + 80, 1, ease.linear], [at + 600, at + CONFETTI_MS, 0, ease.linear]])}
+          rotate={scene.deg(0, [[at, at + CONFETTI_MS, spin]])}
+        >
+          <View style={{ width: 6, height: 9, borderRadius: 1.5, backgroundColor: color }} />
+        </At>
+      ))}
+    </>
+  );
+}
 
 const TradeScene = memo(function TradeScene() {
   const scene = useScene(TRADE_MS);
@@ -403,17 +461,240 @@ const TradeScene = memo(function TradeScene() {
       <At x={STAGE.width / 2 - 14} y={CARD_TOP + CARD.height / 2 - 14} opacity={scene.num(0, [[dealAt, dealAt + 100, 1, ease.linear]])} scale={scene.num(0.3, [[dealAt, dealAt + 380, 1, ease.pop]])}>
         <DealMark />
       </At>
-      {CONFETTI.map(({ dx, dy, spin, color }, i) => (
-        <At
-          key={i}
-          x={scene.num(CONFETTI_FROM.x, [[cheerAt, cheerAt + 700, CONFETTI_FROM.x + dx]])}
-          y={scene.num(CONFETTI_FROM.y, [[cheerAt, cheerAt + 450, CONFETTI_FROM.y + dy], [cheerAt + 450, cheerAt + 1000, CONFETTI_FROM.y + dy + 14, ease.in]])}
-          opacity={scene.num(0, [[cheerAt, cheerAt + 80, 1, ease.linear], [cheerAt + 600, cheerAt + 1000, 0, ease.linear]])}
-          rotate={scene.deg(0, [[cheerAt, cheerAt + 1000, spin]])}
-        >
-          <View style={{ width: 6, height: 9, borderRadius: 1.5, backgroundColor: color }} />
+      <Confetti scene={scene} at={cheerAt} />
+    </Stage>
+  );
+});
+
+// ---------------------------------------------------------------------------
+// 4 — More than just a roll of the dice: the same board, later in the game. One owner builds up
+// to a hotel, borrows against a deed, insures, and wins an auction.
+// ---------------------------------------------------------------------------
+
+const TYCOON_MS = 9800;
+const THIRD = SEATS[2];
+/** The owner's coins pile up beside their purse, each a little higher than the last. */
+const STACK = { x: OWNER_PURSE + PURSE.width + 6, y: PURSE_TOP + PURSE.height - COIN, rise: 4 };
+const stackY = (n: number) => STACK.y - n * STACK.rise;
+const BANK = { x: STAGE.width - MARK - 10, y: 9 };
+const BANK_COIN = { x: BANK.x + (MARK - COIN) / 2, y: BANK.y + (MARK - COIN) / 2 };
+const COIN_TRIP_MS = 600;
+/** Where houses stand on a band, in the order they are built. */
+const HOUSE_SHIFTS = [0, -18, 18].slice(0, MAX_HOUSES);
+/** The mortgaged deed rises from its square, then rests — half size — beside the bank that holds it. */
+const PLEDGE_FROM = { x: tileX(RIVAL_INDEX) + 19, y: 40 };
+const PLEDGE_AT = { x: BANK.x - 58, y: -11, scale: 0.5 };
+/** The deed under the hammer, in the middle of the table. */
+const LOT = { x: 146, y: 8 };
+const RENT_TAG = { width: 66, x: tileX(DESTINATION_INDEX) + TILE.width - 66, y: TILE.top - TAG.height - 8 };
+const INSURED_TAG = { width: 84, x: tileX(DESTINATION_INDEX) + TILE.width - 84, y: RENT_TAG.y - TAG.height - 3 };
+
+/** A coin dropping onto a pile: it falls, and settles with one small bounce. */
+function land(at: number, y: number): Move[] {
+  return [
+    [at, at + 260, y, ease.in],
+    [at + 260, at + 340, y - 4, ease.out],
+    [at + 340, at + 430, y, ease.in],
+  ];
+}
+
+/** A quick swell and back, for a figure that has just changed. */
+function swell(times: readonly number[]): Move[] {
+  return times.flatMap((at): Move[] => [
+    [at, at + 120, 1.12],
+    [at + 120, at + 300, 1, ease.inOut],
+  ]);
+}
+
+/** A label whose wording changes at given moments: each cross-fades into the next, and the last one stays. */
+function Ticker({ scene, labels, times }: { scene: Scene; labels: readonly string[]; times: readonly number[] }) {
+  return (
+    <>
+      {labels.map((label, i) => {
+        const moves: Move[] = [];
+        if (i > 0) moves.push([times[i - 1]!, times[i - 1]! + 120, 1, ease.linear]);
+        if (i < labels.length - 1) moves.push([times[i]!, times[i]! + 120, 0, ease.linear]);
+        return (
+          <Animated.View key={label} style={{ position: 'absolute', opacity: scene.num(i === 0 ? 1 : 0, moves) }}>
+            <TagText>{label}</TagText>
+          </Animated.View>
+        );
+      })}
+    </>
+  );
+}
+
+/** Money moving into or out of the purse, shown for a moment and then gone. */
+function Passing({ scene, value, at }: { scene: Scene; value: number; at: number }) {
+  return (
+    <Animated.View style={{ position: 'absolute', opacity: scene.num(0, [[at, at + 250, 1], [at + 900, at + 1150, 0, ease.linear]]) }}>
+      <Amount value={value} />
+    </Animated.View>
+  );
+}
+
+const TycoonScene = memo(function TycoonScene() {
+  const scene = useScene(TYCOON_MS);
+
+  // B — houses, then a hotel; the rent on the deed climbs with each.
+  const builds = [1500, 1750];
+  const hotelAt = 2250;
+  const rentSteps = [...builds.map((at) => at + 100), hotelAt + 100];
+  // C — a deed goes to the bank and cash comes back; the developed property is insured.
+  const pledgeAt = 3050;
+  const pledged = pledgeAt + 1050;
+  const borrowed = [pledged + 50, pledged + 200];
+  const insuredAt = 4500;
+  // D — two rivals close in on the last free square; it is auctioned and the owner outbids them.
+  const thirdMove = walk(5000, tokenSpot(RIVAL_INDEX), tokenSpot(AUCTION_INDEX, SHARE), AUCTION_INDEX - RIVAL_INDEX);
+  const rivalMove = walk(5100, tokenSpot(0), tokenSpot(AUCTION_INDEX, -SHARE), AUCTION_INDEX);
+  const lotAt = 5200;
+  const raises = [5950, 6400];
+  const soldAt = 6900;
+  const paid = [soldAt + 100, soldAt + 250];
+  // E — everything settles: one last coin, a cheer, and the picture holds.
+  const cheerAt = 7950;
+
+  const rivalTo = tokenSpot(AUCTION_INDEX, -SHARE);
+  const thirdTo = tokenSpot(AUCTION_INDEX, SHARE);
+  const ownerAt = tokenSpot(DESTINATION_INDEX);
+  /** A coin on its way between the bank and the pile: up and over, never straight through the table. */
+  const trip = (at: number, from: { x: number; y: number }, to: { x: number; y: number }) => {
+    const peak = Math.min(from.y, to.y) - 6;
+    return {
+      x: [[at, at + COIN_TRIP_MS, to.x, ease.inOut]] satisfies Move[],
+      y: [[at, at + COIN_TRIP_MS / 2, peak], [at + COIN_TRIP_MS / 2, at + COIN_TRIP_MS, to.y, ease.in]] satisfies Move[],
+    };
+  };
+
+  return (
+    <Stage scene={scene}>
+      <At x={tileX(RIVAL_INDEX)} y={TILE.top + TILE.band} opacity={scene.num(0, [[pledged, pledged + 300, 0.6]])}>
+        <MortgageVeil deed={OFFERED} />
+      </At>
+      <Ownership scene={scene} index={RIVAL_INDEX} seat={OWNER} at={null} />
+      <Ownership scene={scene} index={DESTINATION_INDEX} seat={OWNER} at={null} />
+      <Ownership scene={scene} index={AUCTION_INDEX} seat={OWNER} at={soldAt + 50} />
+      <Glow scene={scene} index={RIVAL_INDEX} at={450} />
+      <Glow scene={scene} index={DESTINATION_INDEX} at={600} />
+      <Glow scene={scene} index={DESTINATION_INDEX} at={hotelAt + 100} />
+      <Glow scene={scene} index={DESTINATION_INDEX} at={cheerAt} />
+
+      {HOUSE_SHIFTS.map((shift, i) => (
+        <House key={shift} scene={scene} index={DESTINATION_INDEX} shift={shift} at={i === 0 ? null : builds[i - 1]!} gone={hotelAt} />
+      ))}
+      <At
+        x={tileX(DESTINATION_INDEX) + (TILE.width - HOUSE - 2) / 2}
+        y={TILE.top + (TILE.band - HOUSE) / 2}
+        opacity={scene.num(0, [[hotelAt + 50, hotelAt + 170, 1, ease.linear]])}
+        scale={scene.num(0.3, [[hotelAt + 50, hotelAt + 450, 1, ease.pop]])}
+      >
+        <HotelPiece />
+      </At>
+      <At x={tileX(RIVAL_INDEX) + (TILE.width - 12) / 2} y={TILE.top + (TILE.band - 12) / 2} scale={scene.num(0, [[pledged, pledged + 350, 1, ease.pop]])}>
+        <MortgageMark />
+      </At>
+
+      <At x={scene.num(tokenSpot(RIVAL_INDEX).x, thirdMove.x)} y={scene.num(tokenSpot(RIVAL_INDEX).y, [...thirdMove.y, ...bounce(cheerAt + 270, thirdTo.y, 6)])}>
+        <TokenPiece seat={THIRD} />
+      </At>
+      <At
+        x={scene.num(tokenSpot(0).x, [
+          ...rivalMove.x,
+          // Outbid: a shake of the head.
+          [soldAt + 100, soldAt + 180, rivalTo.x - 3, ease.inOut],
+          [soldAt + 180, soldAt + 260, rivalTo.x + 3, ease.inOut],
+          [soldAt + 260, soldAt + 340, rivalTo.x - 2, ease.inOut],
+          [soldAt + 340, soldAt + 420, rivalTo.x, ease.inOut],
+        ])}
+        y={scene.num(tokenSpot(0).y, [...rivalMove.y, ...bounce(cheerAt + 160, rivalTo.y, 6)])}
+      >
+        <TokenPiece seat={RIVAL} />
+      </At>
+      <At x={ownerAt.x} y={scene.num(ownerAt.y, bounce(cheerAt + 50, ownerAt.y, 12))}>
+        <TokenPiece seat={OWNER} />
+      </At>
+
+      <At x={OWNER_PURSE} y={PURSE_TOP} scale={scene.num(1, swell([borrowed[1]! + COIN_TRIP_MS, cheerAt + 400]))}>
+        <Purse seat={OWNER}>
+          <Passing scene={scene} value={MORTGAGE_CASH} at={borrowed[1]! + COIN_TRIP_MS - 150} />
+          <Passing scene={scene} value={-AUCTION_BIDS[2]} at={paid[0]!} />
+        </Purse>
+      </At>
+      {[700, 950, hotelAt + 400, cheerAt - 50].map((at, n) => (
+        <At key={at} x={STACK.x} y={scene.num(stackY(n) - 34, land(at, stackY(n)))} opacity={scene.num(0, [[at, at + 100, 1, ease.linear]])}>
+          <Coin />
         </At>
       ))}
+
+      <At x={BANK.x} y={BANK.y} opacity={scene.num(0, [[pledgeAt - 50, pledgeAt + 70, 1, ease.linear]])} scale={scene.num(0.3, [[pledgeAt - 50, pledgeAt + 350, 1, ease.pop]])}>
+        <BankMark />
+      </At>
+      <At
+        x={scene.num(PLEDGE_FROM.x, [[pledgeAt + 450, pledged, PLEDGE_AT.x, ease.inOut]])}
+        y={scene.num(PLEDGE_FROM.y + 22, [[pledgeAt, pledgeAt + 300, PLEDGE_FROM.y], [pledgeAt + 450, pledged, PLEDGE_AT.y, ease.inOut]])}
+        opacity={scene.num(0, [[pledgeAt, pledgeAt + 120, 1, ease.linear]])}
+        scale={scene.num(0.3, [[pledgeAt, pledgeAt + 380, 1, ease.pop], [pledgeAt + 450, pledged, PLEDGE_AT.scale, ease.inOut]])}
+        rotate={scene.deg(0, [[pledgeAt + 450, pledged, 8, ease.inOut]])}
+      >
+        <DeedCard deed={OFFERED} seat={OWNER} />
+      </At>
+      {/* The loan: two coins from the bank to the pile — and, later, the top two go back to pay for the auction. */}
+      {borrowed.map((arrives, i) => {
+        const rest = { x: STACK.x, y: stackY(3 + i) };
+        const leaves = paid[borrowed.length - 1 - i]!;
+        const out = trip(arrives, BANK_COIN, rest);
+        const back = trip(leaves, rest, BANK_COIN);
+        return (
+          <At
+            key={arrives}
+            x={scene.num(BANK_COIN.x, [...out.x, ...back.x])}
+            y={scene.num(BANK_COIN.y, [...out.y, ...back.y])}
+            opacity={scene.num(0, [[arrives, arrives + 80, 1, ease.linear], [leaves + COIN_TRIP_MS - 80, leaves + COIN_TRIP_MS, 0, ease.linear]])}
+          >
+            <Coin />
+          </At>
+        );
+      })}
+
+      <At
+        x={LOT.x}
+        y={scene.num(LOT.y + 22, [[lotAt, lotAt + 300, LOT.y]])}
+        opacity={scene.num(0, [[lotAt, lotAt + 120, 1, ease.linear]])}
+        scale={scene.num(0.3, [[lotAt, lotAt + 380, 1, ease.pop], ...swell([soldAt])])}
+        rotate={scene.deg(0, [[soldAt, soldAt + 300, -5]])}
+      >
+        <DeedCard deed={AUCTIONED} />
+      </At>
+      <At
+        x={LOT.x}
+        y={LOT.y + CARD.height - 6}
+        opacity={scene.num(0, [[lotAt + 300, lotAt + 420, 1, ease.linear], [soldAt + 200, soldAt + 400, 0, ease.linear]])}
+        scale={scene.num(1, swell(raises))}
+      >
+        <Tag width={CARD.width}>
+          <Ticker scene={scene} labels={AUCTION_BIDS.map(formatINR)} times={raises} />
+        </Tag>
+      </At>
+      <At x={LOT.x - 12} y={LOT.y - 6} opacity={scene.num(0, [[soldAt, soldAt + 100, 1, ease.linear]])} scale={scene.num(0.3, [[soldAt, soldAt + 380, 1, ease.pop]])}>
+        <GavelMark />
+      </At>
+      <At x={LOT.x + CARD.width - 10} y={LOT.y - 4} scale={scene.num(0, [[soldAt + 130, soldAt + 480, 1, ease.pop]])}>
+        <OwnerBadge seat={OWNER} />
+      </At>
+
+      <At x={RENT_TAG.x} y={RENT_TAG.y} opacity={scene.num(0, [[500, 750, 1]])} scale={scene.num(1, swell(rentSteps))}>
+        <Tag width={RENT_TAG.width}>
+          <Ticker scene={scene} labels={RENT_LADDER.map((rent) => `${ONBOARDING_LABELS.rent} ${formatINR(rent)}`)} times={rentSteps} />
+        </Tag>
+      </At>
+      <At x={INSURED_TAG.x} y={INSURED_TAG.y} opacity={scene.num(0, [[insuredAt, insuredAt + 100, 1, ease.linear]])} scale={scene.num(0.3, [[insuredAt, insuredAt + 380, 1, ease.pop]])}>
+        <Tag width={INSURED_TAG.width}>
+          <TagText>{`🛡️ ${INSURANCE_MODE}`}</TagText>
+        </Tag>
+      </At>
+
+      <Confetti scene={scene} at={cheerAt + 100} />
     </Stage>
   );
 });
@@ -421,7 +702,7 @@ const TradeScene = memo(function TradeScene() {
 /** Past this the pieces would look blown up (tablets): the scene stays a board on the table. */
 const MAX_SCALE = 1.7;
 
-const SCENES: Record<OnboardingSceneId, ComponentType> = { rivalry: RivalryScene, turn: TurnScene, trade: TradeScene };
+const SCENES: Record<OnboardingSceneId, ComponentType> = { rivalry: RivalryScene, turn: TurnScene, trade: TradeScene, tycoon: TycoonScene };
 
 /**
  * One of the introduction's scenes, scaled to fit a `width` × `height` area without ever being

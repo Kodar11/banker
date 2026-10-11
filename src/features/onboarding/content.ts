@@ -1,4 +1,4 @@
-export type OnboardingSceneId = 'rivalry' | 'turn' | 'trade';
+export type OnboardingSceneId = 'rivalry' | 'turn' | 'trade' | 'tycoon';
 
 export interface OnboardingPage {
   scene: OnboardingSceneId;
@@ -30,8 +30,16 @@ export const ONBOARDING_PAGES: readonly OnboardingPage[] = [
     scene: 'trade',
     headline: 'Every game tells a new story.',
     description: 'Trade, negotiate, take risks, and challenge your friends. Choose your style and make your move.',
-    action: "Let's Play",
+    action: 'Continue',
     sceneLabel: 'Four players around the board. Two of them swap property cards and a coin to make a deal.',
+  },
+  {
+    scene: 'tycoon',
+    headline: 'More than just a roll of the dice.',
+    description: 'Build your empire, make bold deals, protect your assets, and outsmart your rivals. Every decision can change your fortune.',
+    action: "Let's Play",
+    sceneLabel:
+      'An owner builds houses up to a hotel and the rent rises, mortgages another property to the bank for cash, insures a property in Capital Mode, and then outbids a rival at an auction.',
   },
 ];
 
@@ -40,5 +48,7 @@ export const ONBOARDING_LABELS = {
   skipHint: 'Skip onboarding',
   back: 'Back',
   backHint: 'Go back',
+  /** Drawn in the finale, in front of an amount from the deed. */
+  rent: 'Rent',
   step: (n: number, of: number) => `Step ${n} of ${of}`,
 };
