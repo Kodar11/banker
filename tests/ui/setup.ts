@@ -31,7 +31,7 @@ jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn(async () => true) }
 
 jest.mock('expo-web-browser', () => ({ openAuthSessionAsync: jest.fn(async () => ({ type: 'cancel' })) }));
 
-jest.mock('expo-linking', () => ({ createURL: (path: string) => `businessbanker://${path}` }));
+jest.mock('expo-linking', () => ({ createURL: (path: string, options?: { scheme?: string }) => `${options?.scheme ?? 'clashofcapitals'}://${path}` }));
 
 jest.mock('expo-camera', () => ({
   CameraView: () => null,

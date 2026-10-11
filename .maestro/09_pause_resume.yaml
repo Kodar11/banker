@@ -1,5 +1,5 @@
 # 9. Pause/resume: no gameplay while paused; resume restores the turn.
-appId: com.boardgamebank.businessbanker
+appId: com.clashofcapitals.app
 ---
 - runFlow: subflows/host_game_with_bot.yaml
 - tapOn:

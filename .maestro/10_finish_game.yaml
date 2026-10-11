@@ -1,5 +1,5 @@
 # 10. Finish game: host ends the game; winner by net worth is shown.
-appId: com.boardgamebank.businessbanker
+appId: com.clashofcapitals.app
 ---
 - runFlow: subflows/host_game_with_bot.yaml
 - tapOn:

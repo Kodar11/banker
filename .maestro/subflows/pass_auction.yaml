@@ -1,4 +1,4 @@
-appId: com.boardgamebank.businessbanker
+appId: com.clashofcapitals.app
 ---
 - extendedWaitUntil:
     visible:

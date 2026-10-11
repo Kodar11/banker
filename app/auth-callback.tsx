@@ -3,7 +3,7 @@ import { LoadingState } from '@/components/ui';
 import { goBack } from '@/utils/navigation';
 
 /**
- * Where Google sign-in returns to (businessbanker://auth-callback?code=…). The code itself is
+ * Where Google sign-in returns to (clashofcapitals://auth-callback?code=…). The code itself is
  * read by the flow that opened the browser (src/lib/accountApi.ts); on Android the same link also
  * reaches the router, so this route exists only to hand straight back to the screen underneath.
  */

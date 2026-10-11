@@ -1,5 +1,5 @@
 # 3. Start game: bot joins the app's game; host starts; everyone gets starting cash.
-appId: com.boardgamebank.businessbanker
+appId: com.clashofcapitals.app
 ---
 - runFlow: subflows/host_game_with_bot.yaml
 - assertVisible: YOUR TURN

@@ -33,7 +33,7 @@ app/                     Routes only (Expo Router)
   index.tsx              Home (a first launch shows the introduction here instead)
   onboarding.tsx         The introduction again, from House rules → "Replay intro"
   create-game.tsx        Create (select Business, host name)
-  join-game.tsx          Join by 6-digit code or QR (deep link businessbanker://join-game?code=…)
+  join-game.tsx          Join by 6-digit code or QR (deep link clashofcapitals://join-game?code=…)
   lobby/[gameId].tsx     Code, QR, players, ready, start
   game/[gameId].tsx      Main game screen
   auction/[auctionId].tsx
@@ -41,7 +41,7 @@ app/                     Routes only (Expo Router)
   property/[key].tsx     Title deed + allowed actions
   settings.tsx           House rules (the rulebook), leave game
   account.tsx            Settings: player profile, Google link / restore, delete account
-  auth-callback.tsx      Where Google sign-in returns to (businessbanker://auth-callback)
+  auth-callback.tsx      Where Google sign-in returns to (clashofcapitals://auth-callback)
 src/
   components/ui/         Button, Card, Screen, Sheet, TextField, toasts/banners
   features/              game, lobby, auction, loan, trade, player, transactions
@@ -93,7 +93,7 @@ The function uses the platform-provided `SUPABASE_DB_URL`, `SUPABASE_URL` and `S
 
 ```bash
 npx expo start            # scan with Expo Go (all native modules used are in Expo Go)
-npx expo run:android      # or a development build (needed for Maestro: appId com.boardgamebank.businessbanker)
+npx expo run:android      # or a development build (needed for Maestro: appId com.clashofcapitals.app)
 ```
 
 ## Game modes: Classic and Capital
@@ -170,16 +170,17 @@ Nobody signs in to play. On first launch the app creates a Supabase **anonymous*
 
 ### One-time setup (dashboards — not done by the code)
 
-Package / bundle id: `com.boardgamebank.businessbanker`. Scheme: `businessbanker`. Supabase project ref: `zlsimveghdbanvlupduz`. These identifiers predate the name Clash of Capitals and are kept on purpose: the package id is the app's identity on a phone and in the stores, and the scheme is in the redirect allow-list below and in every join link and QR code already shared. The same goes for the Expo slug (`board-game-bank`, tied to the EAS project).
+Name: `Clash of Capitals`. Android package and iOS bundle id: `com.clashofcapitals.app` (app.json; the id the EAS builds carry). Expo slug: `clash-of-capitals`. Supabase project ref: `zlsimveghdbanvlupduz`. The package id and the bundle id are the app's identity on a phone and in the stores: changing either makes a different app that cannot update this one.
+
+URL scheme (app.json `scheme`, the same on Android and iOS): `clashofcapitals` — `src/utils/links.ts` is the only place a link is built or read. It is a custom URI scheme, not a web link: a phone opens it only if the app is installed, and many chat apps do not make it tappable — the 6-digit code and the in-app scanner are the way in that always works.
 
 1. **Supabase → Authentication → Sign In / Providers**: enable **Anonymous sign-ins**; enable **Manual linking**.
 2. **Google Cloud Console → APIs & Services → Credentials**: create an OAuth client of type **Web application**. Authorised redirect URI: `https://zlsimveghdbanvlupduz.supabase.co/auth/v1/callback`. Configure the OAuth consent screen (scopes: openid, email, profile) and publish it (or add test users).
 3. **Supabase → Authentication → Providers → Google**: enable, paste that client's **Client ID** and **Client secret** (the secret stays in Supabase; it is never in the app).
-4. **Supabase → Authentication → URL Configuration → Redirect URLs**: add `businessbanker://auth-callback` (and, only for trying it in Expo Go, the `exp://…/--/auth-callback` URL Expo prints).
-5. `npm run deploy:db`, then `npm run deploy:functions`.
+4. **Supabase → Authentication → URL Configuration → Redirect URLs**: add `clashofcapitals://auth-callback` (and, only for trying it in Expo Go, the `exp://…/--/auth-callback` URL Expo prints). `supabase/config.toml` lists the same address but configures the local stack only — the hosted project's list is this dashboard page.5. `npm run deploy:db`, then `npm run deploy:functions`.
 6. Recommended before release: turn on CAPTCHA for anonymous sign-ins (abuse protection) and schedule a clean-up of old, never-linked anonymous users.
 
-No Android OAuth client or SHA-1 fingerprint is needed: sign-in runs in the browser against the Web client. They become necessary only if this is later replaced by the native Google Sign-In SDK (then: an Android client for `com.boardgamebank.businessbanker` with the SHA-1 of the EAS build keystore — `eas credentials` — and of Play App Signing).
+No Android OAuth client or SHA-1 fingerprint is needed: sign-in runs in the browser against the Web client. They become necessary only if this is later replaced by the native Google Sign-In SDK (then: an Android client for `com.clashofcapitals.app` with the SHA-1 of the EAS build keystore — `eas credentials` — and of Play App Signing).
 
 `expo-web-browser` and `expo-clipboard` are included in Expo Go; a development or release build needs to be rebuilt once because they are native modules.
 
@@ -194,7 +195,7 @@ Players find each other by Player ID, become friends, and invite friends into a 
 * **Blocking** — `block_player` / `unblock_player`. A block ends the friendship, withdraws open requests and invitations between the two, and refuses new ones in both directions. The blocked player is never told (they get the neutral `UNAVAILABLE`). It does not remove anyone from a game they are both in.
 * **Seats and accounts** — a seat is still a device token. `players.user_id` (nullable, `ON DELETE SET NULL`) records which account sits there once the app calls `claim_seat(game, seat, token)`, which proves the seat with the token's SHA-256 exactly as the referee does. Only the social functions read it: `game_player_profiles(game)` (for *Add Friend* in a lobby or a running game) and the invitation checks.
 * **Invitations** — `send_game_invite(game, player_id)`: the caller must sit in that game, the invitee must be a friend, and the lobby must be able to take them (waiting, not locked, not full). 15 minutes, one live invitation per (game, inviter, recipient), so a retry creates nothing. `open_game_invite(id)` re-checks everything and returns the game code; joining is then the **normal join** through `game-action`, which checks status, lock and capacity again under the game row lock. An invitation is never a way in by itself. `decline_game_invite`, `revoke_game_invite` (inviter or host).
-* **Friends of friends** — the game code is independent of friendship. Anyone in the lobby can copy it or share it (system share sheet: mode, code and the app's own `businessbanker://join-game?code=…` link), and whoever has it joins through *Join game* — no friendship with the host, no friend request sent.
+* **Friends of friends** — the game code is independent of friendship. Anyone in the lobby can copy it or share it (system share sheet: mode, code and the app's own `clashofcapitals://join-game?code=…` link), and whoever has it joins through *Join game* — no friendship with the host, no friend request sent.
 * **Host controls** (engine actions, lobby only, host only) — `SET_LOBBY_LOCK` (stored in `games.lobby_locked`; a locked lobby refuses every join with `LOBBY_LOCKED`) and `REMOVE_PLAYER`.
 * **Realtime** — `social_sync` holds one change counter per player, bumped by triggers whenever anything they can see changes (including when another account is deleted). The app listens to Postgres changes of its own row and refetches `social_state()` when the announced version is ahead; older answers never replace newer ones. It also refetches on sign-in, reconnect and return to the foreground, and polls every 30 s only while Realtime is down.
 * **Presence** — Supabase Realtime Presence on `presence:<presence_key>`. The key is a random value on the profile, given only to the player and their current friends and replaced when a friendship ends or a block is made. A player is tracked on their own topic while the app is in front (keyed by a per-run session id); the Friends screen listens to its friends' topics (at most 50) while it is open. Shown as Online / Offline / Unknown: my own connection dropping reads Unknown, and a friend's drop reads Offline only after 12 s. Presence authorises nothing.

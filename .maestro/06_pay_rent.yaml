@@ -1,6 +1,6 @@
 # 6. Pay rent: the bot buys everything it lands on; play until the app owes rent, then pay it
 #    with the turn bar's primary action (the contextual card says who and why).
-appId: com.boardgamebank.businessbanker
+appId: com.clashofcapitals.app
 ---
 - runFlow: subflows/host_game_with_bot.yaml
 - repeat:

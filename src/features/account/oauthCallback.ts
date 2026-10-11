@@ -1,6 +1,6 @@
 import { fail, ok, type Result } from './types';
 
-/** Path the Google sign-in returns to: businessbanker://auth-callback (see app/auth-callback.tsx). */
+/** Path the Google sign-in returns to: clashofcapitals://auth-callback (see app/auth-callback.tsx). */
 export const AUTH_CALLBACK_PATH = 'auth-callback';
 
 function parsePairs(part: string | undefined, into: Record<string, string>): void {

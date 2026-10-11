@@ -1,5 +1,5 @@
 # 1. Create game: host picks Business, enters a name, gets a 6-digit code + QR.
-appId: com.boardgamebank.businessbanker
+appId: com.clashofcapitals.app
 ---
 - launchApp:
     clearState: true

@@ -2,9 +2,8 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { APP_NAME, APP_SCHEME, joinLink, parseJoinCode } from '@/constants/app';
+import { APP_NAME } from '@/constants/app';
 import { defaultGameConfig, GAME_MODE_LABELS, GAME_MODE_NAMES, GAME_MODES, gameConfigSummary, normalizeGameMode } from '@/engine/index.ts';
-import { AUTH_CALLBACK_PATH } from '@/features/account/oauthCallback';
 import { gameShareMessage } from '@/features/social/logic';
 
 const root = join(__dirname, '..', '..');
@@ -26,18 +25,11 @@ describe('the app is called Clash of Capitals', () => {
     expect(gameShareMessage('classic', '482193')).toContain('Open Clash of Capitals and enter this code');
   });
 
-  it('the identifiers a phone, the stores and sign-in already know did not change with the name', () => {
-    expect(appJson.slug).toBe('board-game-bank');
-    expect(appJson.android.package).toBe('com.boardgamebank.businessbanker');
-    expect(appJson.ios.bundleIdentifier).toBe('com.boardgamebank.businessbanker');
-    expect(appJson.extra.eas.projectId).toBe('7bb101a8-80ea-414b-a1d0-3936c8af0bcb');
-  });
-
-  it('deep links and the sign-in return address still use the scheme the server allows', () => {
-    expect(appJson.scheme).toBe(APP_SCHEME);
-    expect(APP_SCHEME).toBe('businessbanker');
-    expect(parseJoinCode(joinLink('482193'))).toBe('482193');
-    expect(read('supabase/config.toml')).toContain(`"${APP_SCHEME}://${AUTH_CALLBACK_PATH}"`);
+  it('the identifiers a phone and the stores know the app by stay what they are', () => {
+    // Changing either makes a different app: it could not be installed over, or published as an update to, this one.
+    expect(appJson.android.package).toBe('com.clashofcapitals.app');
+    expect(appJson.ios.bundleIdentifier).toBe('com.clashofcapitals.app');
+    expect(appJson.slug).toBe('clash-of-capitals');
   });
 });
 

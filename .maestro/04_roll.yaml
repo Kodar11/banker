@@ -1,5 +1,5 @@
 # 4. Roll: server rolls, the turn bar shows dice total and destination.
-appId: com.boardgamebank.businessbanker
+appId: com.clashofcapitals.app
 ---
 - runFlow: subflows/host_game_with_bot.yaml
 - tapOn:

@@ -1,5 +1,5 @@
 # 2. Join game: a bot hosts; the app joins with the 6-digit code.
-appId: com.boardgamebank.businessbanker
+appId: com.clashofcapitals.app
 ---
 - runScript:
     file: scripts/bot.js

@@ -1,5 +1,5 @@
 # 7. Auction: app declines a property, bot bids, app passes, bot wins and pays.
-appId: com.boardgamebank.businessbanker
+appId: com.clashofcapitals.app
 ---
 - runFlow: subflows/host_game_with_bot.yaml
 - repeat:

@@ -1,5 +1,5 @@
 # Resolves whatever the app player's roll produced, ends the turn, then the bot plays.
-appId: com.boardgamebank.businessbanker
+appId: com.clashofcapitals.app
 ---
 # Affordable payments are the turn bar's primary action.
 - runFlow:

@@ -3,6 +3,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { FunctionsHttpError, isAuthApiError, isAuthRetryableFetchError, isAuthSessionMissingError, type Session } from '@supabase/supabase-js';
 import { AUTH_CALLBACK_PATH, readAuthCallback } from '@/features/account/oauthCallback';
 import { fail, ok, toProfile, type AccountError, type AccountErrorCode, type Profile, type Result } from '@/features/account/types';
+import { APP_SCHEME } from '@/utils/links';
 import { getSupabase, isSupabaseConfigured } from './supabase';
 
 /**
@@ -75,7 +76,8 @@ async function rpc(name: 'init_profile' | 'update_nickname', args?: Record<strin
 async function googleFlow(start: (redirectTo: string) => Promise<{ data: { url?: string | null } | null; error: unknown }>): Promise<Result<SessionInfo>> {
   if (!isSupabaseConfigured) return NOT_CONFIGURED;
   try {
-    const redirectTo = Linking.createURL(AUTH_CALLBACK_PATH);
+    // Expo Go ignores the scheme and uses its own exp:// address.
+    const redirectTo = Linking.createURL(AUTH_CALLBACK_PATH, { scheme: APP_SCHEME });
     const { data, error } = await start(redirectTo);
     if (error) return { ok: false, error: authError(error) };
     if (!data?.url) return fail('OAUTH', 'Google sign-in could not be started. Please try again.');

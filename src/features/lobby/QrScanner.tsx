@@ -2,7 +2,7 @@ import { useRef } from 'react';
 import { Text, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Button, Sheet } from '@/components/ui';
-import { parseJoinCode } from '@/constants/app';
+import { parseJoinCode } from '@/utils/links';
 
 /** Scans the lobby QR code and returns the 6-digit game code. */
 export function QrScanner({ visible, onClose, onCode }: { visible: boolean; onClose: () => void; onCode: (code: string) => void }) {

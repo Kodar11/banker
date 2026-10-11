@@ -1,7 +1,8 @@
 import { useEffect } from 'react';
-import { Text, View } from 'react-native';
+import { Image, Text, useWindowDimensions, View } from 'react-native';
 import { router, usePathname } from 'expo-router';
 import { Button, Screen } from '@/components/ui';
+import { APP_NAME } from '@/constants/app';
 import { ProfileEntry } from '@/features/account/ProfileEntry';
 import { detachFromGame } from '@/features/game/leaveGame';
 import { PlayOnlineEntry } from '@/features/matchmaking/PlayOnlineView';
@@ -26,6 +27,9 @@ export default function Home() {
   const onboarding = onboardingDecision({ status: useOnboardingStore((s) => s.status), sessionHydrated: hydrated, hasSession: !!session, pathname });
   const completeOnboarding = useOnboardingStore((s) => s.complete);
   const deferOnboarding = useOnboardingStore((s) => s.defer);
+  // Sized to the screen, within limits: never tiny on a small phone, never a poster on a tablet.
+  const { width, height } = useWindowDimensions();
+  const logoSize = Math.round(Math.min(260, Math.max(128, Math.min(width * 0.6, height * 0.28))));
 
   // Startup restoration: an active lobby/game opens directly; a game that is gone is forgotten.
   useEffect(() => {
@@ -94,9 +98,17 @@ export default function Home() {
     >
       <ProfileEntry />
       <View className="flex-1 items-center justify-center gap-3">
-        <Text className="text-7xl">🏦</Text>
-        <Text className="text-center text-5xl font-black text-cream">Clash of{'\n'}Capitals</Text>
-        <Text className="text-center text-lg font-semibold text-cream/80">The bank & referee for your Business board.{'\n'}Keep playing on the real board.</Text>
+        {/* The app icon's transparent variant, so the table shows through it. It carries the app's name, so it is the screen's heading; it gives way first on a short screen. */}
+        <Image
+          source={require('../assets/splash-icon.png')}
+          style={{ width: logoSize, height: logoSize, flexShrink: 1 }}
+          resizeMode="contain"
+          testID="home-logo"
+          accessible
+          accessibilityRole="header"
+          accessibilityLabel={APP_NAME}
+        />
+        <Text className="text-center text-lg font-semibold text-cream/80">Roll, buy, build and outbid your rivals.</Text>
         {!isSupabaseConfigured ? (
           <Text className="mt-4 rounded-xl bg-amber-300 px-4 py-2 text-center font-bold text-ink" accessibilityRole="alert">
             Server not configured — set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_KEY.

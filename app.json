@@ -49,7 +49,8 @@
           "backgroundColor": "#064E3B"
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      "./plugins/withoutAgoraScreenSharing"
     ],
     "experiments": {
       "typedRoutes": false
@@ -57,9 +58,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "c4ab112a-5a81-4177-bf0a-90f748045a9e"
+        "projectId": "8d5e343d-188c-4089-99c3-3a32448d73c2"
       }
     },
-    "owner": "yuvan11"
+    "owner": "kodar2"
   }
 }

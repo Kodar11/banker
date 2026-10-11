@@ -1,6 +1,7 @@
-import { APP_NAME, joinLink } from '@/constants/app';
+import { APP_NAME } from '@/constants/app';
 import { BUSINESS_MVP_RULES, GAME_MODE_LABELS, type GameMode, type GameState } from '@/engine/index.ts';
 import { PLAYER_ID_PATTERN } from '@/features/account/types';
+import { joinLink } from '@/utils/links';
 import type { FriendRequest, GameInvite, InviteState, PresenceStatus, Relationship, SeatProfile, SocialNotification, SocialState } from './types';
 
 /**

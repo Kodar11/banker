@@ -734,7 +734,7 @@ describe('lobby: code, share, invite, lock, remove', () => {
       // Any participant can share — not only the host.
       await press('lobby-share');
       expect(share).toHaveBeenCalledWith({
-        message: `Join my Clash of Capitals Classic game! Code: ${f.state.code}. Open Clash of Capitals and enter this code to join.\nbusinessbanker://join-game?code=${f.state.code}`,
+        message: `Join my Clash of Capitals Classic game! Code: ${f.state.code}. Open Clash of Capitals and enter this code to join.\nclashofcapitals://join-game?code=${f.state.code}`,
       });
       // Sharing the code sends no friend request and no invitation.
       expect(api.sendRequest).not.toHaveBeenCalled();
