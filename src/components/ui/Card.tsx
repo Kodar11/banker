@@ -22,10 +22,11 @@ const PILL_TONES = {
   gold: { box: 'bg-saffron', text: 'text-ink' },
 } as const;
 
-export function Pill({ children, tone = 'neutral' }: { children: ReactNode; tone?: keyof typeof PILL_TONES }) {
+/** Hugs its text at the start of a column by default. Inside a row, pass `className="self-center"` to sit on the row's centre line. */
+export function Pill({ children, tone = 'neutral', className = 'self-start' }: { children: ReactNode; tone?: keyof typeof PILL_TONES; className?: string }) {
   const t = PILL_TONES[tone];
   return (
-    <View className={`self-start rounded-full px-3 py-1 ${t.box}`}>
+    <View className={`rounded-full px-3 py-1 ${t.box} ${className}`}>
       <Text className={`text-xs font-extrabold uppercase tracking-wider ${t.text}`}>{children}</Text>
     </View>
   );

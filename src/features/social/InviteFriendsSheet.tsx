@@ -90,17 +90,23 @@ export function InviteFriendsSheet({ visible, onClose, gameId, closedReason, onS
             return (
               <View key={friend.playerId} className="gap-1 rounded-xl bg-white px-4 py-3" testID={`invite-row-${friend.playerId}`}>
                 <View className="flex-row items-center justify-between gap-3">
-                  <View className="flex-1">
+                  <View className="min-w-0 flex-1">
                     <Text className="text-base font-bold text-ink" numberOfLines={1}>
                       {friend.nickname}
                     </Text>
-                    <Text className="text-xs font-semibold tracking-wider text-stone-500">{friend.playerId}</Text>
+                    <Text className="text-xs font-semibold tracking-wider text-stone-500" numberOfLines={1}>
+                      {friend.playerId}
+                    </Text>
                   </View>
                   {seated.has(friend.playerId) ? (
-                    <Pill tone="good">In lobby</Pill>
+                    <Pill tone="good" className="self-center">
+                      In lobby
+                    </Pill>
                   ) : inviteId ? (
                     <View className="flex-row items-center gap-2">
-                      <Pill tone="gold">Invited</Pill>
+                      <Pill tone="gold" className="self-center">
+                        Invited
+                      </Pill>
                       <Button title="Cancel" size="sm" variant="secondary" testID={`invite-revoke-${friend.playerId}`} loading={busy} onPress={() => void revoke(friend.playerId, inviteId)} />
                     </View>
                   ) : (

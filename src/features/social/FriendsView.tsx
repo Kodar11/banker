@@ -197,9 +197,15 @@ function TabButton({ id, label, count = 0, active, onPress }: { id: Tab; label: 
       accessibilityState={{ selected }}
       accessibilityLabel={count ? `${label}, ${count} waiting` : label}
       testID={`friends-tab-${id}`}
-      className={`min-h-[44px] flex-1 flex-row items-center justify-center gap-1.5 rounded-xl px-2 py-2 active:opacity-80 ${selected ? 'bg-cream' : 'border border-white/30 bg-white/10'}`}
+      className={`min-h-[44px] min-w-0 flex-1 flex-row items-center justify-center gap-1.5 rounded-xl px-2 py-2 active:opacity-80 ${selected ? 'bg-cream' : 'border border-white/30 bg-white/10'}`}
     >
-      <Text className={`text-sm font-extrabold ${selected ? 'text-ink' : 'text-cream'}`} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+      {/* `shrink` gives the label only the room the badge leaves. A two-word label then wraps at its space; a single word scales down instead of breaking. */}
+      <Text
+        className={`shrink text-center text-sm font-extrabold ${selected ? 'text-ink' : 'text-cream'}`}
+        numberOfLines={label.includes(' ') ? 2 : 1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.7}
+      >
         {label}
       </Text>
       {count > 0 ? (
