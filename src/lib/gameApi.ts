@@ -8,13 +8,17 @@ const TIMEOUT_MS = 12_000;
 
 export type ApiError = Extract<ApiResponse, { ok: false }>['error'];
 
-type TransportFailure = { ok: false; error: { code: 'SERVER_ERROR' | 'NETWORK' | 'TIMEOUT'; message: string } };
+export type TransportFailure = { ok: false; error: { code: 'SERVER_ERROR' | 'NETWORK' | 'TIMEOUT'; message: string } };
 
-/** One POST to the Edge Function. Never throws: a transport problem comes back as a failure of the same shape the server uses. */
-async function invoke<T extends { ok: boolean }>(body: object, onResponse?: (data: T, sentAt: number, receivedAt: number) => void): Promise<T | TransportFailure> {
+/** One POST to an Edge Function (the referee unless another is named). Never throws: a transport problem comes back as a failure of the same shape the server uses. */
+export async function invoke<T extends { ok: boolean }>(
+  body: object,
+  onResponse?: (data: T, sentAt: number, receivedAt: number) => void,
+  functionName: string = FUNCTION_NAME,
+): Promise<T | TransportFailure> {
   try {
     const sentAt = Date.now();
-    const { data, error } = await getSupabase().functions.invoke<T>(FUNCTION_NAME, {
+    const { data, error } = await getSupabase().functions.invoke<T>(functionName, {
       body,
       timeout: TIMEOUT_MS,
     });

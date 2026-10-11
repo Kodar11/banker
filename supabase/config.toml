@@ -443,3 +443,10 @@ verify_jwt = false
 enabled = true
 verify_jwt = false
 import_map = "./functions/matchmaking/deno.json"
+
+# Voice chat tokens. Like game-action, the caller is a seat proved by its per-device token (the
+# handler checks it against the database), so gateway JWT verification is disabled.
+[functions.voice-token]
+enabled = true
+verify_jwt = false
+import_map = "./functions/voice-token/deno.json"

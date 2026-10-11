@@ -3,6 +3,7 @@ import { AppState, type AppStateStatus } from 'react-native';
 import { POLL_MS_DEGRADED } from '@/constants/app';
 import type { StateBroadcast } from '@/engine/index.ts';
 import { clearQuickChat, receiveQuickChat } from '@/features/quickChat/quickChatStore';
+import { voice } from '@/features/voice/voice';
 import { gameApi, type Credentials } from '@/lib/gameApi';
 import { subscribeToGame, type ChannelHealth, type GameChannelHandlers } from '@/lib/realtime';
 import { syncLog, syncStats } from '@/lib/syncStats';
@@ -43,6 +44,8 @@ export interface SyncDeps {
   setOnline: (ids: string[]) => void;
   /** Quick reactions and messages ride the same channel; they never touch the snapshot or trigger a refetch. */
   onChat?: (payload: unknown) => void;
+  /** The room's voice setting changed (same channel, nothing to do with the snapshot). */
+  onVoice?: () => void;
   appState: {
     current: () => AppStateStatus;
     onChange: (cb: (next: AppStateStatus) => void) => { remove: () => void };
@@ -120,6 +123,9 @@ export function startGameSync(deps: SyncDeps): () => void {
     onChat: (payload) => {
       if (!stopped) deps.onChat?.(payload);
     },
+    onVoice: () => {
+      if (!stopped) deps.onVoice?.();
+    },
     onHealth: (health) => {
       deps.setHealth(health);
       if (health === 'live') {
@@ -173,6 +179,7 @@ export function useGameSync(credentials: Credentials | null): void {
       },
       setOnline: (ids) => useGameStore.getState().setOnline(ids),
       onChat: (payload) => receiveQuickChat(gameId, payload),
+      onVoice: () => void voice.refreshRoom(),
       appState: {
         current: () => AppState.currentState,
         onChange: (cb) => AppState.addEventListener('change', cb),

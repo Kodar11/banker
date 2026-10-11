@@ -2,7 +2,7 @@ import { memo } from 'react';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { COLORS } from '@/constants/theme';
 
-export type ActionIconName = 'properties' | 'transfer' | 'chat' | 'bank' | 'auction' | 'more';
+export type ActionIconName = 'properties' | 'transfer' | 'chat' | 'bank' | 'auction' | 'more' | 'mic' | 'mic-off';
 
 /**
  * Line icons for the action area, drawn on a 24 × 24 grid. Vector on purpose:
@@ -45,6 +45,14 @@ export const ActionIcon = memo(function ActionIcon({ name, size = 20, color = CO
           <Path {...line} d="M9.5 7.5 L13.5 3.5 L19.5 9.5 L15.5 13.5 Z" />
           <Path {...line} d="M12.5 10.5 L4.5 18.5" />
           <Path {...line} d="M13 20.5 H21" />
+        </>
+      ) : null}
+      {name === 'mic' || name === 'mic-off' ? (
+        <>
+          <Path {...line} d="M12 3.5 A3 3 0 0 1 15 6.5 V11.5 A3 3 0 0 1 9 11.5 V6.5 A3 3 0 0 1 12 3.5 Z" />
+          <Path {...line} d="M6 11.5 A6 6 0 0 0 18 11.5" />
+          <Path {...line} d="M12 17.5 V20.5 M8.5 20.5 H15.5" />
+          {name === 'mic-off' ? <Path {...line} d="M4.5 4 L19.5 20" /> : null}
         </>
       ) : null}
       {name === 'more' ? (

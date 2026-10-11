@@ -22,3 +22,4 @@ export * from './stateMachine.ts';
 export * from './types.ts';
 export * from './protocol.ts';
 export * from './quickChat.ts';
+export * from './voice.ts';

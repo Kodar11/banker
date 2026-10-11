@@ -1,10 +1,11 @@
 import { memo } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import type { GameAction } from '@/engine/index.ts';
+import type { GameAction, PlayerState } from '@/engine/index.ts';
 import { Button, Card, Label, PlayerBadge } from '@/components/ui';
 import { ObjectiveResults } from '@/features/objectives/ObjectiveCard';
 import { ChipReaction } from '@/features/quickChat/QuickChatOverlays';
+import { useVoicePresence, VoiceIndicator, voicePresenceLabel } from '@/features/voice/VoiceIndicator';
 import { useGameStore } from '@/store/gameStore';
 import { formatINR } from '@/utils/currency';
 import type { GameView } from './useGameView';
@@ -29,38 +30,45 @@ export const PlayersStrip = memo(function PlayersStrip({ view, onSelect }: { vie
         const isTurn = p.id === state.turn.playerId && state.status === 'ACTIVE';
         const isMe = p.id === view.me?.id;
         const isOnline = online.includes(p.id) || isMe;
-        const out = p.status === 'BANKRUPT' ? 'Bankrupt' : p.status === 'LEFT' ? 'Left' : null;
-        const status = out ? null : p.inJail ? `In Jail · ${p.jailTurnsLeft} left` : p.skipTurns > 0 ? 'Resting' : null;
-        const tag = out ? null : p.inJail ? '🔒 Jail' : p.skipTurns > 0 ? '🛏️ Rest' : null;
-        return (
-          <Pressable
-            key={p.id}
-            onPress={() => (onSelect ? onSelect(p.id) : router.push(`/player/${p.id}`))}
-            accessibilityRole="button"
-            accessibilityLabel={`${p.name}${isMe ? ' (you)' : ''}, ${out ? out.toLowerCase() : formatINR(p.balance)}${status ? `, ${status}` : ''}${isTurn ? ', current turn' : ''}${isOnline ? '' : ', offline'}`}
-            testID={`player-chip-${p.id}`}
-            style={fit ? { flex: 1, flexBasis: 0, minWidth: 0 } : { minWidth: 96, flexGrow: 1 }}
-            className={`min-h-[44px] justify-center rounded-xl px-2.5 py-1 ${isTurn ? 'border-2 border-saffron bg-felt-light' : 'border-2 border-transparent bg-felt-dark'} ${out ? 'opacity-40' : ''}`}
-          >
-            <View className="flex-row items-center gap-1.5">
-              <PlayerBadge player={p} size={16} testID={`player-badge-${p.name}`} />
-              <Text numberOfLines={1} maxFontSizeMultiplier={1.3} className="shrink text-xs font-bold text-cream">
-                {/* On my own phone my chip just says "You" — unmistakable, and it never truncates. */}
-                {isMe ? 'You' : p.name}
-              </Text>
-              {isOnline ? null : <View className="h-1.5 w-1.5 rounded-full bg-stone-500" />}
-            </View>
-            <Text numberOfLines={1} maxFontSizeMultiplier={1.3} className="text-[13px] font-extrabold text-cream">
-              {out ?? formatINR(p.balance)}
-              {tag ? <Text className="text-[10px] font-bold text-amber-300"> {tag}</Text> : null}
-            </Text>
-            <ChipReaction playerId={p.id} />
-          </Pressable>
-        );
+        return <PlayerChip key={p.id} player={p} isTurn={isTurn} isMe={isMe} isOnline={isOnline} fit={fit} onSelect={onSelect} />;
       })}
     </Strip>
   );
 });
+
+/** One player's chip. Its own component so that it alone redraws when that player starts or stops talking. */
+function PlayerChip({ player: p, isTurn, isMe, isOnline, fit, onSelect }: { player: PlayerState; isTurn: boolean; isMe: boolean; isOnline: boolean; fit: boolean; onSelect?: (playerId: string) => void }) {
+  // Empty for everyone in a game without voice.
+  const voice = voicePresenceLabel(useVoicePresence(p.seat, isMe));
+  const out = p.status === 'BANKRUPT' ? 'Bankrupt' : p.status === 'LEFT' ? 'Left' : null;
+  const status = out ? null : p.inJail ? `In Jail · ${p.jailTurnsLeft} left` : p.skipTurns > 0 ? 'Resting' : null;
+  const tag = out ? null : p.inJail ? '🔒 Jail' : p.skipTurns > 0 ? '🛏️ Rest' : null;
+  return (
+    <Pressable
+      onPress={() => (onSelect ? onSelect(p.id) : router.push(`/player/${p.id}`))}
+      accessibilityRole="button"
+      accessibilityLabel={`${p.name}${isMe ? ' (you)' : ''}, ${out ? out.toLowerCase() : formatINR(p.balance)}${status ? `, ${status}` : ''}${isTurn ? ', current turn' : ''}${isOnline ? '' : ', offline'}${voice ? `, ${voice}` : ''}`}
+      testID={`player-chip-${p.id}`}
+      style={fit ? { flex: 1, flexBasis: 0, minWidth: 0 } : { minWidth: 96, flexGrow: 1 }}
+      className={`min-h-[44px] justify-center rounded-xl px-2.5 py-1 ${isTurn ? 'border-2 border-saffron bg-felt-light' : 'border-2 border-transparent bg-felt-dark'} ${out ? 'opacity-40' : ''}`}
+    >
+      <View className="flex-row items-center gap-1.5">
+        <PlayerBadge player={p} size={16} testID={`player-badge-${p.name}`} />
+        <Text numberOfLines={1} maxFontSizeMultiplier={1.3} className="shrink text-xs font-bold text-cream">
+          {/* On my own phone my chip just says "You" — unmistakable, and it never truncates. */}
+          {isMe ? 'You' : p.name}
+        </Text>
+        {isOnline ? null : <View className="h-1.5 w-1.5 rounded-full bg-stone-500" />}
+        <VoiceIndicator playerId={p.id} seat={p.seat} isMe={isMe} />
+      </View>
+      <Text numberOfLines={1} maxFontSizeMultiplier={1.3} className="text-[13px] font-extrabold text-cream">
+        {out ?? formatINR(p.balance)}
+        {tag ? <Text className="text-[10px] font-bold text-amber-300"> {tag}</Text> : null}
+      </Text>
+      <ChipReaction playerId={p.id} />
+    </Pressable>
+  );
+}
 
 /** Undo approval flow: compensating transactions only, never history rewrites. */
 export function UndoBanner({ view, send }: { view: GameView; send: (a: GameAction) => Promise<unknown> }) {

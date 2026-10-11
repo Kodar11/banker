@@ -12,6 +12,7 @@ import { sendFailure, useGameAction } from '@/features/game/useGameAction';
 import { InviteFriendsSheet } from '@/features/social/InviteFriendsSheet';
 import { gameShareMessage, lobbyClosedReason } from '@/features/social/logic';
 import { PlayerFriendAction } from '@/features/social/PlayerFriendAction';
+import { useVoice, voice } from '@/features/voice/voice';
 import { haptics } from '@/utils/haptics';
 import { GameConfigEditor, GameConfigSummary } from './GameConfigEditor';
 import { useGameStore } from '@/store/gameStore';
@@ -42,6 +43,10 @@ export function LobbyView({ view }: { view: GameView }) {
   const code = state.code;
   const locked = state.lobbyLocked === true;
   const closedReason = lobbyClosedReason(state, me?.id ?? null);
+
+  // Voice chat for this room: the server's flag, and whether this player (the host of a private room) may change it.
+  const voiceRoom = useVoice((s) => s.room);
+  const voiceBusy = useVoice((s) => s.configuring);
 
   const [copied, setCopied] = useState(false);
   const [inviting, setInviting] = useState(false);
@@ -148,6 +153,25 @@ export function LobbyView({ view }: { view: GameView }) {
             loading={pending === 'SET_LOBBY_LOCK'}
             disabled={!!pending}
             onPress={() => send({ type: 'SET_LOBBY_LOCK', locked: !locked }, { successMessage: locked ? 'Lobby unlocked' : 'Lobby locked — nobody new can join' })}
+          />
+        ) : null}
+        {voiceRoom?.enabled ? (
+          <View className="mt-3 items-center gap-1" testID="lobby-voice-on">
+            <Pill tone="good">🎙️ Voice chat on</Pill>
+            <Text className="text-center text-xs text-stone-600">Optional. In the game, tap the mic to join and hold it to talk.</Text>
+          </View>
+        ) : null}
+        {view.isHost && voiceRoom?.canConfigure ? (
+          <Button
+            className="mt-3 self-stretch"
+            size="sm"
+            variant="secondary"
+            title={voiceRoom.enabled ? 'Turn off voice chat' : 'Turn on voice chat'}
+            testID="lobby-voice-toggle"
+            accessibilityHint={voiceRoom.enabled ? 'Nobody in this game will be able to use voice chat' : 'Lets everyone in this game talk with push-to-talk'}
+            loading={voiceBusy}
+            disabled={voiceBusy}
+            onPress={() => void voice.setRoomEnabled(!voiceRoom.enabled)}
           />
         ) : null}
       </Card>

@@ -1,9 +1,9 @@
-import { memo } from 'react';
+import { memo, type ReactNode } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { ActionIcon, type ActionIconName } from './ActionIcon';
 import { ACTION_BUTTON_HEIGHT, ACTION_GAP, FIXED_HEIGHT_FONT_SCALE, type ActionLayout } from './layout';
 
-export type BarActionKey = 'properties' | 'trade' | 'chat' | 'loan' | 'auction' | 'more';
+export type BarActionKey = 'properties' | 'trade' | 'chat' | 'loan' | 'auction' | 'voice' | 'more';
 
 export interface BarAction {
   key: BarActionKey;
@@ -13,10 +13,15 @@ export interface BarAction {
   onPress: () => void;
   disabled?: boolean;
   hint?: string;
+  /**
+   * Draws the button itself, in this slot and at this size, instead of the standard tap button.
+   * Push-to-talk uses it: a hold is not a tap.
+   */
+  render?: (slot: { layout: ActionLayout; height: number }) => ReactNode;
 }
 
 /** Shown directly when space is tight; everything else lives in More. */
-export const COMPACT_ACTIONS: readonly BarActionKey[] = ['trade', 'loan', 'more'];
+export const COMPACT_ACTIONS: readonly BarActionKey[] = ['trade', 'loan', 'voice', 'more'];
 
 /**
  * Secondary gameplay utilities — not app navigation. A 2×3 grid when there is
@@ -40,9 +45,9 @@ export const AdaptiveActionBar = memo(function AdaptiveActionBar({
       <View testID={`action-bar-${layout}`} style={{ gap: ACTION_GAP }}>
         {rows.map((row, i) => (
           <View key={i} style={{ flexDirection: 'row', gap: ACTION_GAP }}>
-            {row.map((a) => (
-              <ActionButton key={a.key} action={a} layout={layout} height={buttonHeight} />
-            ))}
+            {row.map((a) =>
+              a.render ? <View key={a.key} style={{ flex: 1 }}>{a.render({ layout, height: buttonHeight })}</View> : <ActionButton key={a.key} action={a} layout={layout} height={buttonHeight} />,
+            )}
           </View>
         ))}
       </View>

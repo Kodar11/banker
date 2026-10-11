@@ -33,6 +33,10 @@ jest.mock('expo-linking', () => ({ createURL: (path: string) => `businessbanker:
 
 jest.mock('expo-camera', () => ({
   CameraView: () => null,
+  Camera: {
+    getMicrophonePermissionsAsync: jest.fn(async () => ({ granted: true, canAskAgain: true })),
+    requestMicrophonePermissionsAsync: jest.fn(async () => ({ granted: true, canAskAgain: true })),
+  },
   useCameraPermissions: () => [{ granted: false }, jest.fn()],
 }));
 
@@ -45,6 +49,7 @@ jest.mock('expo-router', () => {
     useRouter: () => router,
     useLocalSearchParams: jest.fn(() => ({})),
     usePathname: jest.fn(() => '/'),
+    useIsFocused: jest.fn(() => true),
     Stack: Object.assign(() => null, { Screen: () => null }),
   };
 });
@@ -52,6 +57,23 @@ jest.mock('expo-router', () => {
 jest.mock('@/lib/realtime', () => ({
   subscribeToGame: jest.fn(() => () => undefined),
 }));
+
+// Voice never reaches Supabase (or a microphone) in UI tests. By default the server says the room
+// has no voice, which is every existing test's game; tests/ui/voice.test.tsx sets what it needs.
+jest.mock('@/lib/voiceApi', () => {
+  const offline = { ok: false, error: { code: 'NETWORK', message: 'Connection lost.' } };
+  return {
+    VOICE_FUNCTION_NAME: 'voice-token',
+    voiceApi: {
+      status: jest.fn(async () => ({ ok: true, room: { enabled: false, available: false, reason: 'ROOM_VOICE_OFF', canConfigure: false } })),
+      enable: jest.fn(async () => offline),
+      join: jest.fn(async () => offline),
+      renew: jest.fn(async () => offline),
+      heartbeat: jest.fn(async () => offline),
+      leave: jest.fn(async () => ({ ok: true })),
+    },
+  };
+});
 
 jest.mock('@/lib/gameApi', () => ({
   gameApi: { create: jest.fn(), join: jest.fn(), state: jest.fn(), action: jest.fn(), chat: jest.fn() },

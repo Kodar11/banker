@@ -255,6 +255,55 @@ Simulations without devices: `tests/matchmaking` (party sizes 1–8, thresholds,
 * A player leaving at the very instant their ticket is reserved can make Postgres fail one of the two requests (deadlock detection); it is retried by the phone or the next run. Not observed in the concurrency tests.
 * The public tick endpoint is unauthenticated by design; it costs an invocation per call. Put a rate limit in front of it if that is abused.
 
+## Voice chat (push-to-talk, private rooms, experimental)
+
+Optional live voice over Agora RTC, audio only, in private rooms whose host turned it on. Public
+(matchmade) games never have it: a check constraint on `games` says so. Nothing is recorded.
+
+- **Where**: in a voice room the bottom-centre grid button is the microphone (Auction is in More,
+  and still opens by itself when an auction starts). Tap to join muted; hold (120 ms) to talk;
+  release, slide off, lose focus or background the app to mute. More → Voice has per-player mute
+  and volume, mute everyone, voice volume and Leave voice: all local to the phone.
+- **Who decides**: the `voice-token` Edge Function. It proves the seat with the device token (as
+  `game-action` does), re-checks kill switch, private room, the room's flag, the host's
+  entitlement, game in play and the caps, and only then signs a short-lived token for that game's
+  channel (`rr-<game id>`) and that seat's uid (seat + 1). A renewal runs every check again.
+- **Code**: `src/engine/voice.ts` (wire format), `supabase/functions/voice-token/`,
+  `src/features/voice/` (`voiceController.ts` is the state machine; `agoraEngine.ts` is the only
+  file that touches the SDK), migration `20261018000000_voice_chat.sql`.
+
+### Setup and deploy
+
+```bash
+npx supabase secrets set AGORA_APP_ID=<app id> AGORA_APP_CERTIFICATE=<primary certificate>
+npm run deploy:db          # the migration first
+npm run deploy:functions   # includes voice-token
+```
+
+`EXPO_PUBLIC_AGORA_APP_ID` goes in `.env` (and in the EAS environment for cloud builds). The
+certificate is a function secret only. `react-native-agora` is native: voice needs a development
+build (`eas build --profile development`, or `npx expo run:android|ios`), not Expo Go, where the
+mic button reports that voice is not in this version of the app.
+
+### Switches, entitlement and limits (SQL editor, no release needed)
+
+```sql
+update public.voice_settings set value = 0 where key = 'voice_chat_enabled';   -- kill switch
+update public.voice_settings set value = 20 where key = 'monthly_game_limit';
+update public.voice_settings set value = 3000 where key = 'monthly_participant_minutes';
+update public.voice_settings set value = 0 where key = 'require_entitlement';  -- any host (testing)
+select public.voice_grant('RR-ABC234');        -- let this player host voice rooms (optionally: , 30 days)
+select public.voice_revoke('RR-ABC234');
+select * from public.voice_usage_monthly;      -- games, participant-minutes, reconnects, estimated cost
+```
+
+There is no subscription system yet: `voice_entitlements` is the entitlement source, written only
+by the server side. A game counts toward the monthly limit when its first token is issued, once.
+When a cap is reached, new joins and renewals are refused at once and a connected phone runs out
+its current token (at most `token_ttl_seconds`); the kill switch reaches connected phones at their
+next heartbeat (`heartbeat_seconds`). `voice_usage_monthly` is the app's own estimate of connected
+time, not Agora's bill.
+
 ## Checks & tests
 
 ```bash
@@ -264,6 +313,7 @@ npm run test:engine       # Vitest: engine + exact Business data + drift checks
 npm run test:account      # Vitest: nickname rules, secure session storage, deletion handler
 npm run test:social       # Vitest: Player ID input, relationship/expiry/presence/notification rules
 npm run test:matchmaking  # Vitest: grouping algorithm, seat names, Play Online rules
+npm run test:voice        # Vitest: the push-to-talk state machine
 npm run test:ui           # Jest + RNTL
 npm run db:local          # throwaway local Postgres (no Docker) with the migrations
 DATABASE_URL=postgres://postgres@127.0.0.1:54329/banker npm run test:server

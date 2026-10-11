@@ -1,7 +1,7 @@
 import { useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { ScrollView, Text, useWindowDimensions, View, type LayoutChangeEvent } from 'react-native';
 import { SafeAreaInsetsContext, SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useIsFocused } from 'expo-router';
 import { configOf, economyOf, isIntermediate, isPropertyKey, pendingCrisisOf, positionOfProperty, spaceAt, spaceName, topUndoable, yearProgressPercent, type UndoableRecord } from '@/engine/index.ts';
 import { Button, ConfirmDialog, ConnectionBanner, Sheet } from '@/components/ui';
 import { ClassicBoard } from '@/features/board/ClassicBoard';
@@ -23,6 +23,9 @@ import { PropertyDeed } from '@/features/player/PropertyDeed';
 import { TradeOffers } from '@/features/trade/TradeOffers';
 import { TradeSheet } from '@/features/trade/TradeSheet';
 import { PayPlayerSheet } from '@/features/transactions/PayPlayerSheet';
+import { PushToTalkButton } from '@/features/voice/PushToTalkButton';
+import { useVoice } from '@/features/voice/voice';
+import { VoiceSection } from '@/features/voice/VoiceSection';
 import { useGameStore } from '@/store/gameStore';
 import { haptics } from '@/utils/haptics';
 import { ActionPanel } from './ActionPanel';
@@ -80,6 +83,10 @@ export function GameScreen({ view }: { view: GameView }) {
   /** The action the player is being asked to confirm an undo request for (asked from the More sheet). */
   const [undoAsk, setUndoAsk] = useState<{ record: UndoableRecord; busy: boolean; error: string | null } | null>(null);
   const ending = useGameStore((s) => s.pendingAction === 'END_GAME');
+  // The host turned voice on for this private room (the server's flag; a matchmade game never has it).
+  const voiceRoom = useVoice((s) => s.room?.enabled === true);
+  /** False while another screen (auction, wallet, settings) covers the table: a held mic button is released. */
+  const tableFocused = useIsFocused();
   const { state, events } = view.snapshot;
   const me = view.me;
   // Intermediate with secret objectives only, and only my own: this phone holds nobody else's.
@@ -188,16 +195,26 @@ export function GameScreen({ view }: { view: GameView }) {
     // Opens the sheet only: nothing is sent until a reaction or message is tapped. (Pay Money is in More, and on every player's sheet.)
     { key: 'chat', icon: 'chat', label: 'Chat / React', testID: 'open-chat', hint: 'Send a quick reaction or message to everyone', onPress: () => openTool({ kind: 'chat' }) },
     { key: 'loan', icon: 'bank', label: 'Bank / Loan', testID: 'open-loan', onPress: () => openTool({ kind: 'loan' }) },
-    {
-      key: 'auction',
-      icon: 'auction',
-      label: 'Auction',
-      testID: 'open-auction',
-      disabled: !auctionId,
-      hint: auctionId ? 'Open the live auction' : 'Starts when a player declines a property',
-      onPress: () => auctionId && router.push(`/auction/${auctionId}`),
-    },
-    { key: 'more', icon: 'more', label: 'More', testID: 'open-more', hint: hasObjective ? 'Your secret objective, mortgage, undo, pause, log and rules' : 'Mortgage, undo, pause, log and rules', onPress: () => setPanel({ kind: 'more' }) },
+    // A voice room has push-to-talk here; Auction is then in More (and still opens by itself when one starts).
+    voiceRoom
+      ? {
+          key: 'voice',
+          icon: 'mic',
+          label: 'Push to talk',
+          testID: 'push-to-talk',
+          onPress: () => undefined,
+          render: ({ layout, height }) => <PushToTalkButton layout={layout} height={height} focused={tableFocused} />,
+        }
+      : {
+          key: 'auction',
+          icon: 'auction',
+          label: 'Auction',
+          testID: 'open-auction',
+          disabled: !auctionId,
+          hint: auctionId ? 'Open the live auction' : 'Starts when a player declines a property',
+          onPress: () => auctionId && router.push(`/auction/${auctionId}`),
+        },
+    { key: 'more', icon: 'more', label: 'More', testID: 'open-more', hint: `${hasObjective ? 'Your secret objective, ' : ''}${voiceRoom ? 'auction, voice settings, ' : ''}mortgage, undo, pause, log and rules`.replace(/^./, (c) => c.toUpperCase()), onPress: () => setPanel({ kind: 'more' }) },
   ];
 
   const openObjective = () => {
@@ -376,6 +393,8 @@ export function GameScreen({ view }: { view: GameView }) {
         panelTitle = 'More';
         panelBody = (
           <>
+            {/* Only in a voice room, and only at the table: collapsed to one row until opened. */}
+            {playing ? <VoiceSection players={state.players} meId={me?.id ?? null} /> : null}
             <MoreActions items={moreItems} />
             {/* Inside the sheet, so it opens above it and Cancel returns to the same More list. */}
             <ConfirmDialog
