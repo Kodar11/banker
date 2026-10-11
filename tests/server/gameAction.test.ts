@@ -533,6 +533,271 @@ describe.skipIf(!DATABASE_URL)('game-action handler (Postgres)', () => {
     await ledgerOk(g.gameId);
   });
 
+  describe('idempotency policy: one action id is one request', () => {
+    const actionRows = (actionId: string) => sql`select game_id, player_id, type, payload, state_version_after from public.game_actions where action_id = ${actionId}`;
+    const versionOf = async (gameId: string) => (await sql`select state_version from public.games where id = ${gameId}`)[0]!.state_version as number;
+    const balances = async (gameId: string) =>
+      Object.fromEntries((await sql`select name, balance from public.players where game_id = ${gameId}`).map((r) => [r.name as string, Number(r.balance)]));
+
+    async function started(names = ['Asha', 'Bilal', 'Chitra']) {
+      const g = await setupGame(names);
+      ok(await g.act(names[0]!, { type: 'START_GAME' }));
+      return g;
+    }
+
+    it('the same id with a different payload or a different action is refused, and changes nothing', async () => {
+      const g = await started();
+      const id = randomUUID();
+      const to = g.seats.Bilal!.playerId;
+      ok(await g.act('Asha', { type: 'TRANSFER_MONEY', toPlayerId: to, amount: 700 }, { actionId: id }));
+      const before = { version: await versionOf(g.gameId), balances: await balances(g.gameId) };
+
+      // Another amount, another payee, an extra field, another kind of action: none of them is "the same request".
+      const others: GameAction[] = [
+        { type: 'TRANSFER_MONEY', toPlayerId: to, amount: 900 },
+        { type: 'TRANSFER_MONEY', toPlayerId: g.seats.Chitra!.playerId, amount: 700 },
+        { type: 'TRANSFER_MONEY', toPlayerId: to, amount: 700, memo: 'again' },
+        { type: 'REQUEST_LOAN', amount: 5000 },
+        { type: 'LEAVE_GAME' },
+      ];
+      for (const action of others) {
+        const res = await g.act('Asha', action, { actionId: id });
+        expect(res).toMatchObject({ ok: false, error: { code: 'VALIDATION' } });
+      }
+      expect({ version: await versionOf(g.gameId), balances: await balances(g.gameId) }).toEqual(before);
+      // The record of the original is untouched, and the original request is still recognised as itself.
+      expect(await actionRows(id)).toHaveLength(1);
+      expect((await actionRows(id))[0]).toMatchObject({ type: 'TRANSFER_MONEY', payload: { amount: 700 } });
+      const again = ok(await g.act('Asha', { amount: 700, toPlayerId: to, type: 'TRANSFER_MONEY' } as GameAction, { actionId: id }));
+      expect(again.duplicate).toBe(true);
+      expect(await balances(g.gameId)).toEqual(before.balances);
+      await ledgerOk(g.gameId);
+    });
+
+    it('an id belongs to one player in one game: nobody else can reuse it, in that game or another', async () => {
+      const g = await started();
+      const other = await started(['Dev', 'Esha']);
+      const id = randomUUID();
+      const action: GameAction = { type: 'REQUEST_LOAN', amount: 5000 };
+      ok(await g.act('Asha', action, { actionId: id }));
+
+      // Another player of the same game, with the same payload.
+      expect(await g.act('Bilal', action, { actionId: id })).toMatchObject({ ok: false, error: { code: 'VALIDATION' } });
+      // A player of another game.
+      expect(await other.act('Dev', action, { actionId: id })).toMatchObject({ ok: false, error: { code: 'VALIDATION' } });
+      // Creating or joining a game with an id that named an action (and the other way round).
+      expect(await call({ op: 'create', actionId: id, token: g.seats.Asha!.token, name: 'Asha' })).toMatchObject({ ok: false, error: { code: 'VALIDATION' } });
+      const lobby = await setupGame(['Host']);
+      expect(await call({ op: 'join', actionId: id, token: g.seats.Asha!.token, code: lobby.code, name: 'Asha' })).toMatchObject({ ok: false, error: { code: 'VALIDATION' } });
+      const createId = randomUUID();
+      const t = token();
+      const made = ok(await call({ op: 'create', actionId: createId, token: t, name: 'Maker' }));
+      expect(await call({ op: 'action', gameId: made.gameId, playerId: made.playerId, token: t, actionId: createId, expectedVersion: 1, action: { type: 'SET_READY', ready: true } })).toMatchObject({
+        ok: false,
+        error: { code: 'VALIDATION' },
+      });
+      // A join id is not a way into a different game: the same device, the same id, another code.
+      const joinId = randomUUID();
+      const jt = token();
+      ok(await call({ op: 'join', actionId: joinId, token: jt, code: lobby.code, name: 'Joiner' }));
+      const second = await setupGame(['Other']);
+      expect(await call({ op: 'join', actionId: joinId, token: jt, code: second.code, name: 'Joiner' })).toMatchObject({ ok: false, error: { code: 'VALIDATION' } });
+      expect((await state(second.gameId, second.seats.Other!)).state.players).toHaveLength(1);
+
+      // One loan, one borrower, and nothing in the other games.
+      expect((await sql`select count(*)::int as n from public.loans where game_id = ${g.gameId}`)[0]!.n).toBe(1);
+      expect((await sql`select count(*)::int as n from public.loans where game_id = ${other.gameId}`)[0]!.n).toBe(0);
+      expect((await actionRows(id))[0]).toMatchObject({ game_id: g.gameId, player_id: g.seats.Asha!.playerId });
+    });
+
+    it('twenty simultaneous requests with one id are one action', async () => {
+      const g = await started();
+      const id = randomUUID();
+      const v = g.version;
+      const action: GameAction = { type: 'TRANSFER_MONEY', toPlayerId: g.seats.Chitra!.playerId, amount: 1234 };
+      const results = await Promise.all(Array.from({ length: 20 }, () => g.act('Bilal', action, { actionId: id, expectedVersion: v })));
+      expect(results.every((r) => r.ok)).toBe(true);
+      expect(results.filter((r) => r.ok && !r.duplicate)).toHaveLength(1);
+      expect(await balances(g.gameId)).toEqual({ Asha: 25000, Bilal: 25000 - 1234, Chitra: 25000 + 1234 });
+      expect(await sql`select 1 from public.transactions where game_id = ${g.gameId} and type = 'PLAYER_TRANSFER'`).toHaveLength(1);
+      expect(await versionOf(g.gameId)).toBe(v + 1);
+      await ledgerOk(g.gameId);
+    });
+
+    it('one id sent to two different games at the same instant: one of them, never both, and never a server error', async () => {
+      for (let round = 0; round < 5; round += 1) {
+        const a = await started(['Asha', 'Bilal']);
+        const b = await started(['Dev', 'Esha']);
+        const id = randomUUID();
+        const [ra, rb] = await Promise.all([
+          handleRequest({ op: 'action', gameId: a.gameId, playerId: a.seats.Asha!.playerId, token: a.seats.Asha!.token, actionId: id, expectedVersion: a.version, action: { type: 'REQUEST_LOAN', amount: 5000 } }, deps),
+          handleRequest({ op: 'action', gameId: b.gameId, playerId: b.seats.Dev!.playerId, token: b.seats.Dev!.token, actionId: id, expectedVersion: b.version, action: { type: 'REQUEST_LOAN', amount: 5000 } }, deps),
+        ]);
+        expect([ra.status, rb.status]).toEqual([200, 200]);
+        expect([ra.body.ok, rb.body.ok].filter(Boolean)).toHaveLength(1);
+        const refused = ra.body.ok ? rb.body : ra.body;
+        expect(refused).toMatchObject({ ok: false, error: { code: 'VALIDATION' } });
+        const loans = (await sql`select count(*)::int as n from public.loans where game_id in (${a.gameId}, ${b.gameId})`)[0]!.n;
+        expect(loans).toBe(1);
+        expect(await actionRows(id)).toHaveLength(1);
+        await ledgerOk(a.gameId);
+        await ledgerOk(b.gameId);
+      }
+    });
+
+    it('a response that never arrived: the retry gets the committed result, not a second execution', async () => {
+      const g = await started();
+      queuedDice = [1, 2]; // Railway
+      ok(await g.act('Asha', { type: 'ROLL_DICE' }));
+      const id = randomUUID();
+      const seen = g.version;
+      // The purchase commits; its response is lost on the way to the phone.
+      const lost = await handleRequest(
+        { op: 'action', gameId: g.gameId, playerId: g.seats.Asha!.playerId, token: g.seats.Asha!.token, actionId: id, expectedVersion: seen, action: { type: 'BUY_PROPERTY' } },
+        deps,
+      );
+      expect(lost.body.ok).toBe(true);
+      // The phone, still showing the old screen, sends the very same request again.
+      const retry = ok(await g.act('Asha', { type: 'BUY_PROPERTY' }, { actionId: id, expectedVersion: seen }));
+      expect(retry.duplicate).toBe(true);
+      expect(retry.snapshot.state.version).toBe(seen + 1);
+      expect(retry.snapshot.state.properties.RAILWAY.ownerId).toBe(g.seats.Asha!.playerId);
+      expect(retry.snapshot.state.turn.phase).toBe('TURN_COMPLETE');
+      expect(await sql`select 1 from public.transactions where game_id = ${g.gameId} and type = 'PROPERTY_PURCHASE'`).toHaveLength(1);
+      expect((await balances(g.gameId)).Asha).toBe(25000 - 9500);
+    });
+
+    it('a retry that arrives after the game has moved on is still answered as done, with the game as it now stands', async () => {
+      const g = await started();
+      queuedDice = [1, 2];
+      ok(await g.act('Asha', { type: 'ROLL_DICE' }));
+      const id = randomUUID();
+      const seen = g.version;
+      ok(await g.act('Asha', { type: 'BUY_PROPERTY' }, { actionId: id, expectedVersion: seen }));
+      ok(await g.act('Asha', { type: 'END_TURN' }));
+      queuedDice = [2, 3];
+      ok(await g.act('Bilal', { type: 'ROLL_DICE' }));
+      const now = await versionOf(g.gameId);
+      // Not STALE_STATE (it is not a new decision), not INVALID_PHASE (it is not carried out again).
+      const late = ok(await g.act('Asha', { type: 'BUY_PROPERTY' }, { actionId: id, expectedVersion: seen }));
+      expect(late.duplicate).toBe(true);
+      expect(late.snapshot.state.version).toBe(now);
+      expect(late.snapshot.state.turn.playerId).toBe(g.seats.Bilal!.playerId);
+      expect(await versionOf(g.gameId)).toBe(now);
+      expect(await sql`select 1 from public.transactions where game_id = ${g.gameId} and type = 'PROPERTY_PURCHASE'`).toHaveLength(1);
+      // A NEW request made from that old screen is a different matter: it is stale.
+      expect(await g.act('Bilal', { type: 'END_TURN' }, { expectedVersion: seen })).toMatchObject({ ok: false, error: { code: 'STALE_STATE' } });
+    });
+
+    it('an action that fails halfway through its transaction leaves no trace and no false "done"; the retry carries it out once', async () => {
+      const g = await started();
+      const id = randomUUID();
+      const before = { version: await versionOf(g.gameId), balances: await balances(g.gameId) };
+      const action: GameAction = { type: 'REQUEST_LOAN', amount: 5000 };
+      // The loan row and the game row are written, then the ledger insert fails (an id that already exists).
+      const [taken] = await sql`select id from public.transactions where game_id = ${g.gameId} limit 1`;
+      const realNewId = deps.newId;
+      let calls = 0;
+      deps.newId = () => {
+        calls += 1;
+        return calls === 2 ? (taken!.id as string) : randomUUID();
+      };
+      const errors: unknown[] = [];
+      const original = console.error;
+      console.error = (...args: unknown[]) => void errors.push(args);
+      let failed;
+      try {
+        failed = await handleRequest({ op: 'action', gameId: g.gameId, playerId: g.seats.Bilal!.playerId, token: g.seats.Bilal!.token, actionId: id, expectedVersion: before.version, action }, deps);
+      } finally {
+        console.error = original;
+        if (realNewId) deps.newId = realNewId;
+        else delete deps.newId;
+      }
+      expect(failed.status).toBe(500);
+      expect(failed.body).toEqual({ ok: false, error: { code: 'SERVER_ERROR', message: 'Something went wrong. Please try again.' } });
+      expect(errors.length).toBe(1);
+      // Rolled back whole: no action record, no loan, no money, no version bump.
+      expect(await actionRows(id)).toHaveLength(0);
+      expect((await sql`select count(*)::int as n from public.loans where game_id = ${g.gameId}`)[0]!.n).toBe(0);
+      expect({ version: await versionOf(g.gameId), balances: await balances(g.gameId) }).toEqual(before);
+      // The phone retries with the same id: now it happens, once.
+      const retry = ok(await g.act('Bilal', action, { actionId: id, expectedVersion: before.version }));
+      expect(retry.duplicate).toBeUndefined();
+      expect(ok(await g.act('Bilal', action, { actionId: id, expectedVersion: before.version })).duplicate).toBe(true);
+      expect((await sql`select count(*)::int as n from public.loans where game_id = ${g.gameId}`)[0]!.n).toBe(1);
+      expect((await balances(g.gameId)).Bilal).toBe(30000);
+      await ledgerOk(g.gameId);
+    });
+
+    it('a request that is not allowed mutates nothing and does not use up its id', async () => {
+      const g = await started();
+      const id = randomUUID();
+      const before = { version: await versionOf(g.gameId), balances: await balances(g.gameId) };
+      const send = (playerId: string, playerToken: string, action: GameAction) =>
+        call({ op: 'action', gameId: g.gameId, playerId, token: playerToken, actionId: id, expectedVersion: before.version, action });
+      const transfer: GameAction = { type: 'TRANSFER_MONEY', toPlayerId: g.seats.Chitra!.playerId, amount: 5000 };
+      // Somebody else's seat with one's own token; a made-up token; a player of another game.
+      expect(await send(g.seats.Asha!.playerId, g.seats.Bilal!.token, transfer)).toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } });
+      expect(await send(g.seats.Asha!.playerId, token(), transfer)).toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } });
+      const elsewhere = await started(['Dev', 'Esha']);
+      expect(await send(elsewhere.seats.Dev!.playerId, elsewhere.seats.Dev!.token, transfer)).toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } });
+      // An action the engine refuses.
+      expect(await send(g.seats.Bilal!.playerId, g.seats.Bilal!.token, { type: 'ROLL_DICE' })).toMatchObject({ ok: false, error: { code: 'NOT_YOUR_TURN' } });
+      expect(await actionRows(id)).toHaveLength(0);
+      expect({ version: await versionOf(g.gameId), balances: await balances(g.gameId) }).toEqual(before);
+      // The id was never spent: its rightful owner can still use it.
+      ok(await send(g.seats.Asha!.playerId, g.seats.Asha!.token, transfer));
+      expect((await balances(g.gameId)).Asha).toBe(20000);
+      // And once it is theirs, a forged retry learns nothing and changes nothing.
+      const forged = await send(g.seats.Asha!.playerId, g.seats.Bilal!.token, transfer);
+      expect(forged).toEqual({ ok: false, error: { code: 'FORBIDDEN', message: 'You are not a player in this game.' } });
+      expect((await balances(g.gameId)).Asha).toBe(20000);
+    });
+
+    it('the expected version must be a real one: missing or malformed is refused before anything is read', async () => {
+      const g = await started();
+      const seat = g.seats.Asha!;
+      const base = { op: 'action', gameId: g.gameId, playerId: seat.playerId, token: seat.token, action: { type: 'ROLL_DICE' } };
+      const before = await versionOf(g.gameId);
+      const { expectedVersion: _none, ...missing } = { ...base, actionId: randomUUID(), expectedVersion: 0 };
+      expect(await handleRequest(missing, deps)).toMatchObject({ status: 400, body: { ok: false, error: { code: 'VALIDATION' } } });
+      for (const expectedVersion of [0, -1, 1.5, '4', null, Number.NaN, Number.POSITIVE_INFINITY, {}, [4]]) {
+        const res = await handleRequest({ ...base, actionId: randomUUID(), expectedVersion }, deps);
+        expect(res).toMatchObject({ status: 400, body: { ok: false, error: { code: 'VALIDATION' } } });
+      }
+      // A version the game has not reached is as stale as one it has passed.
+      for (const expectedVersion of [before - 1, before + 1, before + 1000]) {
+        expect(await g.act('Asha', { type: 'ROLL_DICE' }, { expectedVersion })).toMatchObject({ ok: false, error: { code: 'STALE_STATE' } });
+      }
+      expect(await versionOf(g.gameId)).toBe(before);
+      expect((await sql`select count(*)::int as n from public.game_actions where game_id = ${g.gameId}`)[0]!.n).toBe(before);
+      // Reading the game is never refused for a version: it carries none.
+      expect((await state(g.gameId, seat)).state.version).toBe(before);
+    });
+
+    it('two different decisions made on the same screen: exactly one commits', async () => {
+      for (let round = 0; round < 5; round += 1) {
+        const g = await started();
+        queuedDice = [1, 2];
+        ok(await g.act('Asha', { type: 'ROLL_DICE' }));
+        const v = g.version;
+        const results = await Promise.all([
+          g.act('Asha', { type: 'BUY_PROPERTY' }, { expectedVersion: v }),
+          g.act('Asha', { type: 'DECLINE_PROPERTY' }, { expectedVersion: v }),
+          g.act('Asha', { type: 'START_AUCTION' }, { expectedVersion: v }),
+        ]);
+        expect(results.filter((r) => r.ok)).toHaveLength(1);
+        for (const r of results.filter((x) => !x.ok)) expect(r).toMatchObject({ ok: false, error: { code: 'STALE_STATE' } });
+        const snap = await state(g.gameId, g.seats.Asha!);
+        expect(snap.state.version).toBe(v + 1);
+        const bought = snap.state.properties.RAILWAY.ownerId !== null;
+        expect(bought ? snap.state.auction : snap.state.properties.RAILWAY.ownerId).toBeNull();
+        expect(snap.transactions.filter((t) => t.type === 'PROPERTY_PURCHASE')).toHaveLength(bought ? 1 : 0);
+        await ledgerOk(g.gameId);
+      }
+    });
+  });
+
   describe('auction deadline: hidden grace second, server-owned closure', () => {
     /** Moves the server's clock forward without waiting. */
     let skewMs = 0;
@@ -705,6 +970,182 @@ describe.skipIf(!DATABASE_URL)('game-action handler (Postgres)', () => {
       expect(Date.parse(resumed.endsAt)).toBeGreaterThan(endsAt + 25_000);
       expect(deferred).toHaveLength(3);
     });
+    describe('recovery: the close does not depend on a timer in memory or on a phone on the auction screen', () => {
+      const closeRows = (gameId: string) => sql`select action_id, player_id, payload from public.game_actions where game_id = ${gameId} and type = 'CLOSE_AUCTION'`;
+      const auctionRow = async (auctionId: string) => (await sql`select status, winner_player_id, high_bid, closed_at from public.auctions where id = ${auctionId}`)[0]!;
+      /** Work the function was asked to do after its response (EdgeRuntime.waitUntil in production). */
+      const runDeferred = () => Promise.all(deferred.splice(0).map((d) => d.task()));
+      /** A phone reads the game; the server then does whatever that read made it schedule; the phone hears of it and reads again. */
+      const readAndSettle = async (gameId: string, seat: Seat) => {
+        await state(gameId, seat);
+        await runDeferred();
+        return state(gameId, seat);
+      };
+
+      it('the server restarts while an auction runs: the next phone to read the game closes it, exactly once', async () => {
+        const { g, auctionId, endsAt } = await auctionWithBid();
+        // The instance that armed the close timers is gone, and nobody has the auction screen open.
+        deferred = [];
+        // Inside the countdown, and inside the hidden grace second, reading the game changes nothing.
+        for (const ms of [-2000, 0, 500]) {
+          jumpTo(endsAt, ms);
+          expect((await state(g.gameId, g.seats.Chitra!)).state.auction).toMatchObject({ status: 'OPEN', highBid: 1000 });
+        }
+        expect(deferred).toHaveLength(0);
+        expect(await payments(g.gameId)).toHaveLength(0);
+
+        // A phone comes back to the game after the deadline (reconnect, foreground, poll): it reads the state.
+        jumpTo(endsAt, 60_000);
+        broadcasts.length = 0;
+        // The read is still only a read: it answers with what it found and changes nothing itself...
+        const found = await state(g.gameId, g.seats.Chitra!);
+        expect(found.state.auction).toMatchObject({ status: 'OPEN' });
+        expect(await payments(g.gameId)).toHaveLength(0);
+        // ...and it has re-armed the close, due at once.
+        expect(deferred.map((d) => d.delayMs)).toEqual([0]);
+        await runDeferred();
+        const snap = await state(g.gameId, g.seats.Chitra!);
+        expect(deferred).toHaveLength(0);
+        expect(snap.state.auction).toMatchObject({ id: auctionId, status: 'CLOSED', winnerId: g.seats.Bilal!.playerId, highBid: 1000 });
+        expect(snap.state.properties.RAILWAY.ownerId).toBe(g.seats.Bilal!.playerId);
+        expect(snap.state.turn.phase).toBe('TURN_COMPLETE');
+        expect(snap.state.players.find((p) => p.name === 'Bilal')!.balance).toBe(24000);
+        // Everyone else is told, as for any committed action.
+        expect(broadcasts.filter((b) => b.gameId === g.gameId).map((b) => b.payload.version)).toEqual([snap.state.version]);
+
+        // More reads, a phone asking for the close, and a late timer, all at once: still one settlement.
+        const results = await Promise.all([
+          ...['Asha', 'Bilal', 'Chitra', 'Asha', 'Bilal'].map((n) => state(g.gameId, g.seats[n]!)),
+          g.act('Asha', { type: 'CLOSE_AUCTION', auctionId }, { expectedVersion: snap.state.version }),
+          closeAuctionIfDue(g.gameId, auctionId, deps),
+        ]);
+        expect(results[5]).toMatchObject({ ok: false, error: { code: 'AUCTION_CLOSED' } });
+        expect(results[6]).toBe(false);
+        expect(await payments(g.gameId)).toHaveLength(1);
+        const closes = await closeRows(g.gameId);
+        expect(closes).toHaveLength(1);
+        expect(closes[0]).toMatchObject({ player_id: null, payload: { by: 'SERVER_TIMER' } });
+        expect((await state(g.gameId, g.seats.Asha!)).state.version).toBe(snap.state.version);
+        await ledgerOk(g.gameId);
+        // The game goes on.
+        ok(await g.act('Asha', { type: 'END_TURN' }, { expectedVersion: snap.state.version }));
+      });
+
+      it('nobody bid and the timer is lost: the read closes it unsold, charging nobody', async () => {
+        const g = await setupGame();
+        ok(await g.act('Asha', { type: 'START_GAME' }));
+        queuedDice = [1, 2];
+        ok(await g.act('Asha', { type: 'ROLL_DICE' }));
+        const opened = ok(await g.act('Asha', { type: 'DECLINE_PROPERTY' })).snapshot.state.auction!;
+        deferred = [];
+        jumpTo(Date.parse(opened.endsAt), 60_000);
+        const snap = await readAndSettle(g.gameId, g.seats.Bilal!);
+        expect(snap.state.auction).toMatchObject({ status: 'CLOSED', winnerId: null, highBid: null });
+        expect(snap.state.properties.RAILWAY.ownerId).toBeNull();
+        expect(snap.events.some((e) => e.type === 'AUCTION_UNSOLD')).toBe(true);
+        expect(await payments(g.gameId)).toHaveLength(0);
+        expect(snap.state.players.every((p) => p.balance === 25000)).toBe(true);
+      });
+
+      it('reading a paused game never closes its auction; after resuming, the moved deadline is the one that counts', async () => {
+        const { g, auctionId, endsAt } = await auctionWithBid();
+        deferred = [];
+        const paused = ok(await g.act('Asha', { type: 'PAUSE_GAME' }));
+        jumpTo(endsAt, 120_000);
+        expect((await state(g.gameId, g.seats.Chitra!)).state.auction).toMatchObject({ status: 'OPEN' });
+        expect((await readAndSettle(g.gameId, g.seats.Chitra!)).state.version).toBe(paused.snapshot.state.version);
+        const resumed = ok(await g.act('Asha', { type: 'RESUME_GAME' }));
+        const moved = Date.parse(resumed.snapshot.state.auction!.endsAt);
+        expect(moved).toBeGreaterThan(endsAt + 100_000);
+        deferred = [];
+        expect((await readAndSettle(g.gameId, g.seats.Chitra!)).state.auction).toMatchObject({ status: 'OPEN' });
+        jumpTo(moved, 60_000);
+        expect((await readAndSettle(g.gameId, g.seats.Chitra!)).state.auction).toMatchObject({ status: 'CLOSED', winnerId: g.seats.Bilal!.playerId });
+        expect(await payments(g.gameId)).toHaveLength(1);
+        expect((await auctionRow(auctionId)).status).toBe('CLOSED');
+      });
+
+      it('a timer armed for a deadline that a later bid moved does nothing when it fires', async () => {
+        const { g, auctionId, endsAt } = await auctionWithBid();
+        const first = deferred.at(-1)!;
+        // Three seconds on, Chitra outbids: the deadline moves and a new timer is armed.
+        jumpTo(endsAt, -2000);
+        const outbid = ok(await g.act('Chitra', { type: 'PLACE_BID', auctionId, amount: 1500 })).snapshot.state.auction!;
+        const second = deferred.at(-1)!;
+        expect(second).not.toBe(first);
+        expect(Date.parse(outbid.endsAt)).toBeGreaterThan(endsAt);
+        // The old timer fires at ITS deadline: the auction is still running and nobody is charged.
+        jumpTo(endsAt, 1500);
+        await first.task();
+        expect((await auctionRow(auctionId)).status).toBe('OPEN');
+        expect(await payments(g.gameId)).toHaveLength(0);
+        // The new one closes it, for the higher bid.
+        jumpTo(Date.parse(outbid.endsAt), 1500);
+        await second.task();
+        await first.task();
+        expect(await auctionRow(auctionId)).toMatchObject({ status: 'CLOSED', winner_player_id: g.seats.Chitra!.playerId });
+        const paid = await payments(g.gameId);
+        expect(paid.map((p) => Number(p.amount))).toEqual([1500]);
+      });
+
+      it('a close whose response was lost: the retry is answered as done, a new request finds it closed, and nothing reopens it', async () => {
+        const { g, auctionId, endsAt } = await auctionWithBid();
+        deferred = [];
+        jumpTo(endsAt, 5000);
+        const id = randomUUID();
+        const v = g.version;
+        const lost = await handleRequest(
+          { op: 'action', gameId: g.gameId, playerId: g.seats.Chitra!.playerId, token: g.seats.Chitra!.token, actionId: id, expectedVersion: v, action: { type: 'CLOSE_AUCTION', auctionId } },
+          deps,
+        );
+        expect(lost.body.ok).toBe(true);
+        const retry = ok(await g.act('Chitra', { type: 'CLOSE_AUCTION', auctionId }, { actionId: id, expectedVersion: v }));
+        expect(retry.duplicate).toBe(true);
+        expect(retry.snapshot.state.auction).toMatchObject({ status: 'CLOSED', winnerId: g.seats.Bilal!.playerId });
+        const closedAt = (await auctionRow(auctionId)).closed_at;
+        // Late requests of every kind, from a phone still showing the running auction.
+        expect(await g.act('Asha', { type: 'CLOSE_AUCTION', auctionId }, { expectedVersion: v })).toMatchObject({ ok: false, error: { code: 'AUCTION_CLOSED' } });
+        expect(await g.act('Chitra', { type: 'PLACE_BID', auctionId, amount: 5000 }, { expectedVersion: v })).toMatchObject({ ok: false, error: { code: 'STALE_STATE' } });
+        expect(await g.act('Chitra', { type: 'PLACE_BID', auctionId, amount: 5000 })).toMatchObject({ ok: false, error: { code: 'AUCTION_CLOSED' } });
+        expect(await g.act('Chitra', { type: 'PASS_AUCTION', auctionId })).toMatchObject({ ok: false, error: { code: 'AUCTION_CLOSED' } });
+        expect(await closeAuctionIfDue(g.gameId, auctionId, deps)).toBe(false);
+        expect(await auctionRow(auctionId)).toMatchObject({ status: 'CLOSED', winner_player_id: g.seats.Bilal!.playerId, closed_at: closedAt });
+        expect(Number((await auctionRow(auctionId)).high_bid)).toBe(1000);
+        expect(await payments(g.gameId)).toHaveLength(1);
+        expect(await sql`select 1 from public.auction_bids where auction_id = ${auctionId}`).toHaveLength(1);
+        await ledgerOk(g.gameId);
+      });
+
+      it('a high bidder who can no longer pay, or who has left, wins nothing: no payment, no property', async () => {
+        // Spent the money after bidding.
+        const a = await auctionWithBid();
+        ok(await a.g.act('Bilal', { type: 'TRANSFER_MONEY', toPlayerId: a.g.seats.Chitra!.playerId, amount: 24500 }));
+        deferred = [];
+        jumpTo(a.endsAt, 60_000);
+        const broke = await readAndSettle(a.g.gameId, a.g.seats.Asha!);
+        expect(broke.state.auction).toMatchObject({ status: 'CLOSED', winnerId: null });
+        expect(broke.state.properties.RAILWAY.ownerId).toBeNull();
+        expect(await payments(a.g.gameId)).toHaveLength(0);
+        expect(broke.state.players.find((p) => p.name === 'Bilal')!.balance).toBe(500);
+        await ledgerOk(a.g.gameId);
+
+        // Walked away while holding the high bid: the auction ends at once, unsold.
+        skewMs = 0;
+        const b = await auctionWithBid(['Asha', 'Bilal', 'Chitra', 'Dev']);
+        const left = ok(await b.g.act('Bilal', { type: 'LEAVE_GAME' }));
+        expect(left.snapshot.state.auction).toMatchObject({ status: 'CLOSED', winnerId: null });
+        expect(left.snapshot.state.properties.RAILWAY.ownerId).toBeNull();
+        expect(await payments(b.g.gameId)).toHaveLength(0);
+        // Nothing is left for a late timer or a late read to settle.
+        jumpTo(b.endsAt, 60_000);
+        expect(await closeAuctionIfDue(b.g.gameId, b.auctionId, deps)).toBe(false);
+        deferred = [];
+        expect((await readAndSettle(b.g.gameId, b.g.seats.Dev!)).state.version).toBe(left.snapshot.state.version);
+        expect(deferred).toHaveLength(0);
+        await ledgerOk(b.g.gameId);
+      });
+    });
+
   });
 
   it('host can end a paused game (persists without violating constraints)', async () => {

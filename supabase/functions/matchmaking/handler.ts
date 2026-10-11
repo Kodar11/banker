@@ -9,8 +9,17 @@
 //
 // Nothing here trusts a client, and nothing depends on a tick finishing: every step re-reads the
 // rows it locked, any number of ticks may run at once, and a tick that dies leaves either a
-// committed step or nothing. Who calls it: pg_cron (through pg_net) and searching phones; the
-// database decides how often it actually runs (matchmaking_candidates' throttle).
+// committed step or nothing.
+//
+// Who may make it run (handleMatchmakingRequest, the only way in from outside):
+//   - the scheduler (pg_cron through pg_net), which proves itself with the server-only worker
+//     secret in the `x-matchmaking-secret` header;
+//   - a searching phone, as the signed-in player it is: its access token is verified with Supabase
+//     Auth and the database decides whether that player's request counts (in the queue or a
+//     countdown, not too often).
+// Anybody else is refused before a single statement of a tick runs. And whoever asks, the database
+// lets a whole tick through at most once per interval (matchmaking_tick_claim), on top of the
+// per-mode throttle of the matching runs (matchmaking_candidates).
 //
 // Runtime-agnostic so it can be integration-tested in Node against real Postgres.
 import {
@@ -24,6 +33,7 @@ import {
 } from '../_shared/engine/index.ts';
 import { planMatches, sanitizePolicy, type QueueEntry } from '../_shared/matchmaking/grouping.ts';
 import { seatNames } from '../_shared/matchmaking/seatNames.ts';
+import { bearerToken } from '../delete-account/handler.ts';
 import { insertNewGame, insertPlayer, persistResult, type Sql, type Tx } from '../game-action/db.ts';
 import { isUniqueViolation, randomCode, secureRandom } from '../game-action/handler.ts';
 
@@ -41,7 +51,28 @@ export interface MatchmakingDeps {
   log?: (entry: Record<string, unknown>) => void;
   /** Failure injection for tests: throw to simulate a crash at that point. */
   fault?: (point: FaultPoint, context: { mode?: GameMode; matchId?: string }) => void;
+  /**
+   * The server-only secret the scheduler sends (function secret MATCHMAKING_WORKER_SECRET). Absent
+   * or shorter than MIN_WORKER_SECRET_LENGTH: no internal request is accepted at all.
+   */
+  workerSecret?: string | null;
+  /**
+   * The player an access token belongs to; null when Supabase Auth rejects it. Throws when Auth
+   * cannot be reached. Absent: no player's request is accepted.
+   */
+  verifyUser?: (accessToken: string) => Promise<{ id: string } | null>;
 }
+
+/** What the request itself presented. Nothing in the body is ever taken as proof of who is asking. */
+export interface MatchmakingCaller {
+  /** The `Authorization` header. */
+  authorization?: string | null;
+  /** The `x-matchmaking-secret` header. Present (even empty) means: this claims to be the scheduler. */
+  workerSecret?: string | null;
+}
+
+export const WORKER_SECRET_HEADER = 'x-matchmaking-secret';
+export const MIN_WORKER_SECRET_LENGTH = 32;
 
 export interface ModeReport {
   mode: GameMode;
@@ -247,19 +278,99 @@ export async function runTick(deps: MatchmakingDeps, options: { force?: boolean 
   return report;
 }
 
+export type MatchmakingErrorCode = 'VALIDATION' | 'UNAUTHORIZED' | 'FORBIDDEN' | 'RATE_LIMITED' | 'SERVER_ERROR';
+
 export interface HandlerResult {
   status: number;
-  body: { ok: true; report: TickReport } | { ok: false; error: { code: string; message: string } };
+  headers?: Record<string, string>;
+  body:
+    | { ok: true; ran: boolean; skipped?: string; report?: TickReport }
+    | { ok: false; error: { code: MatchmakingErrorCode; message: string } };
 }
 
-/** Body of a POST to the `matchmaking` Edge Function. The only operation is "run a tick". */
-export async function handleMatchmakingRequest(rawBody: unknown, deps: MatchmakingDeps): Promise<HandlerResult> {
+const MESSAGES: Record<MatchmakingErrorCode, string> = {
+  VALIDATION: 'That request is not valid.',
+  UNAUTHORIZED: 'Sign in to use matchmaking.',
+  FORBIDDEN: 'That request is not allowed.',
+  RATE_LIMITED: 'Too many requests. Try again in a moment.',
+  SERVER_ERROR: 'Matchmaking is temporarily unavailable.',
+};
+
+function refuse(status: number, code: MatchmakingErrorCode, headers?: Record<string, string>): HandlerResult {
+  return { status, ...(headers ? { headers } : {}), body: { ok: false, error: { code, message: MESSAGES[code] } } };
+}
+
+/** Compares two secrets without stopping at the first difference, and without their lengths showing in the timing. */
+export async function secretsEqual(a: string, b: string): Promise<boolean> {
+  const digest = async (text: string) => new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)));
+  const [x, y] = await Promise.all([digest(a), digest(b)]);
+  let diff = 0;
+  for (let i = 0; i < x.length; i += 1) diff |= x[i]! ^ y[i]!;
+  return diff === 0;
+}
+
+/** Shaped like an access token (three base64url parts): junk is refused before Supabase Auth is asked about it. */
+function looksLikeJwt(token: string): boolean {
+  const parts = token.split('.');
+  return token.length <= 4096 && parts.length === 3 && parts.every((part) => /^[A-Za-z0-9_-]+$/.test(part));
+}
+
+type Claim = { run: true } | { run: false; reason: string; retry_after_ms?: number };
+
+async function claimTick(deps: MatchmakingDeps, userId: string | null): Promise<Claim> {
+  const [row] = await deps.sql`select public.matchmaking_tick_claim(${userId}::uuid) as r`;
+  return row!.r as Claim;
+}
+
+/**
+ * Body of a POST to the `matchmaking` Edge Function. Two callers are accepted and nobody else:
+ *
+ *   the scheduler   header x-matchmaking-secret = the worker secret, body { op: 'tick' }
+ *   a player        Authorization: Bearer <their access token>, body { op: 'nudge' } (or 'tick',
+ *                   which is what the app sends and what apps released before this check send)
+ *
+ * A request that presents the secret header is judged on it alone: a wrong secret is refused, it
+ * never falls back to being a player's request. A player's request can make the worker look; it
+ * cannot name a ticket, a match or another player, and it is told nothing about what the tick did.
+ * Not one statement of a tick runs until matchmaking_tick_claim() has let it through.
+ */
+export async function handleMatchmakingRequest(rawBody: unknown, deps: MatchmakingDeps, caller: MatchmakingCaller = {}): Promise<HandlerResult> {
   const op = (rawBody as { op?: unknown } | null)?.op;
-  if (op !== 'tick') return { status: 400, body: { ok: false, error: { code: 'VALIDATION', message: 'That request is not valid.' } } };
+  const internal = caller.workerSecret !== null && caller.workerSecret !== undefined;
   try {
-    return { status: 200, body: { ok: true, report: await runTick(deps) } };
+    let userId: string | null = null;
+    if (internal) {
+      const expected = deps.workerSecret ?? '';
+      const configured = expected.length >= MIN_WORKER_SECRET_LENGTH;
+      if (!configured || !(await secretsEqual(caller.workerSecret!, expected))) {
+        logger(deps)({ at: 'matchmaking.auth', denied: configured ? 'BAD_WORKER_SECRET' : 'WORKER_SECRET_NOT_CONFIGURED' });
+        return refuse(403, 'FORBIDDEN');
+      }
+      if (op !== 'tick') return refuse(400, 'VALIDATION');
+    } else {
+      const token = bearerToken(caller.authorization);
+      if (!token || !looksLikeJwt(token) || !deps.verifyUser) return refuse(401, 'UNAUTHORIZED');
+      if (op !== 'nudge' && op !== 'tick') return refuse(400, 'VALIDATION');
+      const user = await deps.verifyUser(token);
+      if (!user) return refuse(401, 'UNAUTHORIZED');
+      userId = user.id;
+    }
+
+    const claim = await claimTick(deps, userId);
+    if (!claim.run) {
+      if (claim.reason === 'RATE_LIMITED') {
+        return refuse(429, 'RATE_LIMITED', { 'Retry-After': String(Math.max(1, Math.ceil((claim.retry_after_ms ?? 1000) / 1000))) });
+      }
+      // Another tick ran a moment ago: whatever this caller is waiting for is seen by it or by the next one.
+      if (claim.reason === 'THROTTLED') return { status: 200, body: { ok: true, ran: false, skipped: 'THROTTLED' } };
+      // A player who is not searching, or nudges are switched off: nothing runs on their word.
+      return refuse(403, 'FORBIDDEN');
+    }
+    const report = await runTick(deps);
+    // The report is counts only, and still only the scheduler is told: a player reads their own state.
+    return { status: 200, body: internal ? { ok: true, ran: true, report } : { ok: true, ran: true } };
   } catch (error) {
-    logger(deps)({ at: 'matchmaking.tick', error: errorCategory(error) });
-    return { status: 500, body: { ok: false, error: { code: 'SERVER_ERROR', message: 'Matchmaking is temporarily unavailable.' } } };
+    logger(deps)({ at: 'matchmaking.request', error: errorCategory(error) });
+    return refuse(500, 'SERVER_ERROR');
   }
 }

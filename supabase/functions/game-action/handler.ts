@@ -95,6 +95,9 @@ export async function handleRequest(rawBody: unknown, deps: HandlerDeps): Promis
     }
   } catch (error) {
     if (isGameError(error)) return errorResult(error.code, error.message);
+    // The same action id committed by another request at the same instant, in a game this request does
+    // not hold the lock of. That transaction won; this one was rolled back whole and changed nothing.
+    if (isUniqueViolation(error, 'game_actions_pkey')) return errorResult('VALIDATION', reusedId().message);
     if (error instanceof Error && error.message === 'STALE_WRITE') {
       return errorResult('STALE_STATE', 'The game changed while you were acting. Try again.');
     }
@@ -117,10 +120,38 @@ async function authenticate(tx: Tx, gameId: string, playerId: string, token: str
   }
 }
 
-/** Returns the stored outcome of an already-processed action id, if any. */
+interface PriorAction {
+  game_id: string;
+  player_id: string | null;
+  type: string;
+  payload: unknown;
+}
+
+/** Returns the stored record of an already-processed action id, if any. */
 async function priorAction(tx: Tx, actionId: string) {
-  const [row] = await tx`select game_id, player_id from public.game_actions where action_id = ${actionId}`;
-  return row as { game_id: string; player_id: string } | undefined;
+  const [row] = await tx`select game_id, player_id, type, payload from public.game_actions where action_id = ${actionId}`;
+  return row as PriorAction | undefined;
+}
+
+/** JSON with object keys in one order, so two payloads compare equal exactly when they mean the same request. */
+function canonical(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
+  if (value && typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>).filter(([, v]) => v !== undefined);
+    return `{${entries.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([k, v]) => `${JSON.stringify(k)}:${canonical(v)}`).join(',')}}`;
+  }
+  return JSON.stringify(value) ?? 'null';
+}
+
+/**
+ * The idempotency policy, in one place. An action id names ONE request: the same player, in the
+ * same game, asking for the same thing. Sent again it is answered with the game as it now stands
+ * and nothing is carried out twice. Used for anything else - another player, another game, another
+ * kind of request, another payload - it is refused: an id is never an alias for someone else's
+ * action, and a different request is never silently swallowed as "already done".
+ */
+function reusedId(): GameError {
+  return new GameError('VALIDATION', 'That action id was already used for a different request.');
 }
 
 async function createOp(
@@ -131,7 +162,7 @@ async function createOp(
   newId: () => string,
 ): Promise<HandlerResult> {
   const prior = await deps.sql.begin((tx) => priorAction(tx, req.actionId));
-  if (prior) return duplicateOf(deps, prior, req.token);
+  if (prior) return duplicateOf(deps, prior, req.token, 'CREATE_GAME');
 
   const tokenHash = await sha256Hex(req.token);
   for (let attempt = 0; attempt < 8; attempt += 1) {
@@ -153,7 +184,7 @@ async function createOp(
       if (isUniqueViolation(error, 'games_live_code_idx')) continue; // code collision — pick another
       if (isUniqueViolation(error, 'game_actions_pkey')) {
         const again = await deps.sql.begin((tx) => priorAction(tx, req.actionId));
-        if (again) return duplicateOf(deps, again, req.token);
+        if (again) return duplicateOf(deps, again, req.token, 'CREATE_GAME');
       }
       throw error;
     }
@@ -161,14 +192,17 @@ async function createOp(
   return errorResult('SERVER_ERROR', 'Could not create a game code. Please try again.', 500);
 }
 
-async function duplicateOf(deps: HandlerDeps, prior: { game_id: string; player_id: string }, token: string): Promise<HandlerResult> {
+/** Answers a repeated create or join with the seat it made, to the device that holds that seat's token and to nobody else. */
+async function duplicateOf(deps: HandlerDeps, prior: PriorAction, token: string, type: 'CREATE_GAME' | 'JOIN_GAME', gameId?: string): Promise<HandlerResult> {
+  const playerId = prior.player_id;
+  if (prior.type !== type || !playerId || (gameId !== undefined && prior.game_id !== gameId)) throw reusedId();
   const snapshot = await deps.sql.begin(async (tx) => {
-    await authenticate(tx, prior.game_id, prior.player_id, token);
+    await authenticate(tx, prior.game_id, playerId, token);
     const [game] = await tx`select * from public.games where id = ${prior.game_id}`;
     if (!game) throw new GameError('NOT_FOUND', 'Game not found.');
-    return loadSnapshot(tx, game, prior.player_id);
+    return loadSnapshot(tx, game, playerId);
   });
-  return { status: 200, body: { ok: true, gameId: prior.game_id, playerId: prior.player_id, snapshot, duplicate: true } };
+  return { status: 200, body: { ok: true, gameId: prior.game_id, playerId, snapshot, duplicate: true } };
 }
 
 async function joinOp(
@@ -202,7 +236,7 @@ async function joinOp(
     return { playerId, snapshot: await loadSnapshot(tx, fresh!, playerId), result };
   });
 
-  if ('duplicate' in outcome && outcome.duplicate) return duplicateOf(deps, outcome.duplicate, req.token);
+  if ('duplicate' in outcome && outcome.duplicate) return duplicateOf(deps, outcome.duplicate, req.token, 'JOIN_GAME', gameId);
   const { playerId, snapshot, result } = outcome as Exclude<typeof outcome, { duplicate: unknown }>;
   await notify(deps, gameId, result.state.version, result.events);
   return { status: 200, body: { ok: true, gameId, playerId, snapshot } };
@@ -210,14 +244,38 @@ async function joinOp(
 
 async function stateOp(req: Extract<ApiRequest, { op: 'state' }>, deps: HandlerDeps): Promise<HandlerResult> {
   // Read-only snapshot in one transaction so all tables are mutually consistent.
-  const snapshot = await deps.sql.begin(async (tx) => {
-    await tx`set transaction isolation level repeatable read read only`;
-    await authenticate(tx, req.gameId, req.playerId, req.token);
-    const [game] = await tx`select * from public.games where id = ${req.gameId}`;
-    if (!game) throw new GameError('NOT_FOUND', 'Game not found.');
-    assertCurrentRules(game);
-    return loadSnapshot(tx, game, req.playerId);
-  });
+  const read = () =>
+    deps.sql.begin(async (tx) => {
+      await tx`set transaction isolation level repeatable read read only`;
+      await authenticate(tx, req.gameId, req.playerId, req.token);
+      const [game] = await tx`select * from public.games where id = ${req.gameId}`;
+      if (!game) throw new GameError('NOT_FOUND', 'Game not found.');
+      assertCurrentRules(game);
+      return loadSnapshot(tx, game, req.playerId);
+    });
+  const snapshot = await read();
+
+  // Durable recovery of the auction close. The close timer (scheduleAuctionClose) lives in the memory
+  // of one function instance: a restart, a deploy or a crash loses it, and the only other trigger is a
+  // phone that has the auction screen open. Every phone reads the state when it reconnects, comes to
+  // the foreground or polls - so a read that finds an auction past its deadline arms the close again,
+  // through the one settlement path (closeAuctionIfDue: same lock, same engine rule, exactly once).
+  // The read itself stays a read: it answers with what it found, and the close reaches every phone
+  // the way any committed action does. Reading a game whose auction is still running arms nothing.
+  const auction = snapshot.state.auction;
+  if (deps.defer && auction && auction.status === 'OPEN' && snapshot.state.status === 'ACTIVE') {
+    const nowMs = (deps.now ? deps.now() : new Date()).getTime();
+    if (nowMs >= auctionAcceptUntil(auction)) {
+      deps.defer(0, async () => {
+        try {
+          await closeAuctionIfDue(req.gameId, auction.id, deps);
+        } catch (error) {
+          // The next read, or any phone on the auction screen, tries again.
+          console.error('auction recovery on read failed', error);
+        }
+      });
+    }
+  }
   return { status: 200, body: { ok: true, gameId: req.gameId, playerId: req.playerId, snapshot } };
 }
 
@@ -236,12 +294,13 @@ async function actionOp(
     if (!game) throw new GameError('NOT_FOUND', 'Game not found.');
     await authenticate(tx, req.gameId, req.playerId, req.token);
 
-    // Idempotency: a retried/double-tapped action returns the current state, no re-execution.
+    // Idempotency: a retried/double-tapped action returns the current state, no re-execution - whatever
+    // has happened in the game since, and whatever version the retry says it saw. Only the very same
+    // request counts as a retry (see reusedId).
     const prior = await priorAction(tx, req.actionId);
     if (prior) {
-      if (prior.game_id !== req.gameId || prior.player_id !== req.playerId) {
-        throw new GameError('VALIDATION', 'Duplicate action id.');
-      }
+      if (prior.game_id !== req.gameId || prior.player_id !== req.playerId) throw reusedId();
+      if (prior.type !== String(actionType) || canonical(prior.payload) !== canonical(req.action)) throw reusedId();
       return { duplicate: true as const, snapshot: await loadSnapshot(tx, game, req.playerId) };
     }
 

@@ -298,6 +298,42 @@ describe.skipIf(!DATABASE_URL)('Property resale auctions through the handler (Po
     await ledgerOk(g.gameId);
   });
 
+  it('the close timer is lost (a restart): the next phone to read the game gets the resale settled, exactly once', async () => {
+    const { g, auctionId } = await listed({ houses: 2 });
+    ok(await g.act('Bilal', { type: 'PLACE_BID', auctionId, amount: 7000 }));
+    const before = balances(await g.snap());
+    // The instance that armed the timers is gone, and no phone has the auction screen open.
+    deferred = [];
+    // While the auction runs, reading the game arms nothing.
+    expect((await g.snap('Chitra')).state.auction!.status).toBe('OPEN');
+    expect(deferred).toHaveLength(0);
+    await pastDeadline(g);
+    expect(deferred).toHaveLength(0);
+
+    // A phone comes back after the deadline and reads the state: still a read, and the close is armed again.
+    const found = await g.snap('Chitra');
+    expect(found.state.auction!.status).toBe('OPEN');
+    expect(await payments(g.gameId)).toHaveLength(0);
+    expect(deferred.map((d) => d.delayMs)).toEqual([0]);
+    // Several phones read before it has run: every one arms it, and together they settle it once.
+    await Promise.all(g.names.map((n) => g.snap(n)));
+    expect(deferred.length).toBeGreaterThan(1);
+    const ran = deferred.splice(0);
+    await Promise.all(ran.map((d) => d.task()));
+
+    const snap = await g.snap('Chitra');
+    expect(deferred).toHaveLength(0);
+    expect(snap.state.auction).toMatchObject({ status: 'CLOSED', winnerId: g.id('Bilal'), resale: { outcome: 'SOLD' } });
+    expect(snap.state.properties.MUMBAI).toMatchObject({ ownerId: g.id('Bilal'), houses: 2, hotel: false });
+    expect(balances(snap)).toEqual({ Asha: before.Asha! + 7000, Bilal: before.Bilal! - 7000, Chitra: before.Chitra });
+    // The seller's turn is back where it was.
+    expect(snap.state.turn).toMatchObject({ playerId: g.id('Asha'), phase: 'AWAITING_ROLL' });
+    expect(await payments(g.gameId)).toHaveLength(1);
+    expect(await sql`select 1 from public.game_actions where game_id = ${g.gameId} and type = 'CLOSE_AUCTION'`).toHaveLength(1);
+    expect(await auctionRow(auctionId)).toMatchObject({ status: 'CLOSED', resale_outcome: 'SOLD' });
+    await ledgerOk(g.gameId);
+  });
+
   it('the server timer ends an auction nobody bid in: nothing sold, nothing charged, and it can be listed again', async () => {
     const { g, auctionId } = await listed({ houses: 1 });
     const before = balances(await g.snap());

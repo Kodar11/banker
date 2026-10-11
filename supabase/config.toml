@@ -437,8 +437,10 @@ enabled = true
 verify_jwt = false
 
 # Matchmaking worker: groups queued tickets, creates the games of ready reservations, recovers
-# stuck ones. The gateway check is off because a tick takes no input and acts for no particular
-# caller (see functions/matchmaking/index.ts); the database throttles how often it really runs.
+# stuck ones. The gateway check is off because one of its two callers, the scheduler, has no user
+# token: the handler tells the callers apart itself (functions/matchmaking/handler.ts) - the
+# scheduler by the server-only MATCHMAKING_WORKER_SECRET, a searching player by their own access
+# token, verified with Supabase Auth. It is NOT unauthenticated: everybody else is refused.
 [functions.matchmaking]
 enabled = true
 verify_jwt = false

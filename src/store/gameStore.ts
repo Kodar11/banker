@@ -17,6 +17,12 @@ interface GameStoreState {
   onlinePlayerIds: string[];
   /** Action type currently being sent (drives button spinners, blocks double taps). */
   pendingAction: string | null;
+  /**
+   * An action was sent and its outcome is NOT known (every attempt ended in a timeout or a lost
+   * connection): the server may or may not have carried it out. Until the server's state has been
+   * read again, what is on screen cannot be trusted as the basis for another action.
+   */
+  outcomeUnknown: boolean;
   loadError: ApiError | null;
   notice: Notice | null;
 
@@ -26,6 +32,7 @@ interface GameStoreState {
   setConnection: (c: ConnectionStatus) => void;
   setOnline: (ids: string[]) => void;
   setPending: (action: string | null) => void;
+  setOutcomeUnknown: (unknown: boolean) => void;
   setLoadError: (e: ApiError | null) => void;
   notify: (kind: Notice['kind'], message: string) => void;
   dismissNotice: () => void;
@@ -39,11 +46,12 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   connection: 'connecting',
   onlinePlayerIds: [],
   pendingAction: null,
+  outcomeUnknown: false,
   loadError: null,
   notice: null,
 
   reset: (gameId) =>
-    set({ gameId, snapshot: null, connection: 'connecting', onlinePlayerIds: [], pendingAction: null, loadError: null, notice: null }),
+    set({ gameId, snapshot: null, connection: 'connecting', onlinePlayerIds: [], pendingAction: null, outcomeUnknown: false, loadError: null, notice: null }),
   applySnapshot: (snapshot) => {
     const current = get().snapshot;
     // Only the game this phone is attached to: a late response from a game it left must never land here.
@@ -68,6 +76,9 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     set({ onlinePlayerIds: next });
   },
   setPending: (pendingAction) => set({ pendingAction }),
+  setOutcomeUnknown: (outcomeUnknown) => {
+    if (get().outcomeUnknown !== outcomeUnknown) set({ outcomeUnknown });
+  },
   setLoadError: (loadError) => set({ loadError }),
   notify: (kind, message) => set({ notice: { id: ++noticeId, kind, message } }),
   dismissNotice: () => set({ notice: null }),

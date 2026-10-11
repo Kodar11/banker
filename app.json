@@ -1,18 +1,18 @@
 {
   "expo": {
     "name": "Clash of Capitals",
-    "slug": "board-game-bank",
-    "scheme": "businessbanker",
+    "slug": "clash-of-capitals",
+    "scheme": "clashofcapitals",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.boardgamebank.businessbanker"
+      "bundleIdentifier": "com.clashofcapitals.app"
     },
     "android": {
-      "package": "com.boardgamebank.businessbanker",
+      "package": "com.clashofcapitals.app",
       "adaptiveIcon": {
         "backgroundColor": "#064E3B",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -36,7 +36,7 @@
         "expo-camera",
         {
           "cameraPermission": "Scan a game QR code to join your friends' Clash of Capitals game.",
-          "microphonePermission": "Talk to the other players in a private game. Your microphone is only sent while you hold the talk button.",
+          "microphonePermission": "Talk to other players in a private game. Your microphone transmits audio only while you hold the talk button.",
           "recordAudioAndroid": true
         }
       ],
@@ -57,8 +57,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "7bb101a8-80ea-414b-a1d0-3936c8af0bcb"
+        "projectId": "c4ab112a-5a81-4177-bf0a-90f748045a9e"
       }
-    }
+    },
+    "owner": "yuvan11"
   }
 }

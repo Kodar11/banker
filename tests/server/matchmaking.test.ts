@@ -67,6 +67,8 @@ describe.skipIf(!DATABASE_URL)('random matchmaking (Postgres)', () => {
     await sql`delete from public.parties`;
     await sql`delete from public.matchmaking_cooldowns`;
     await sql`update public.matchmaking_runs set last_run_at = null`;
+    await sql`update public.matchmaking_tick_gate set last_tick_at = null`;
+    await sql`delete from public.matchmaking_nudges`;
     for (const d of defaults) await sql`update public.matchmaking_settings set value = ${d.value} where key = ${d.key}`;
   });
 
@@ -102,6 +104,44 @@ describe.skipIf(!DATABASE_URL)('random matchmaking (Postgres)', () => {
   const token = () => randomBytes(32).toString('hex');
   const setting = (key: string, value: number) => sql`update public.matchmaking_settings set value = ${value} where key = ${key}`;
   const tick = () => runTick(worker, { force: true });
+
+  // ---- the function's front door (handleMatchmakingRequest) -----------------------------------
+  /** What the scheduler holds. Server-only: it exists in Vault and in the function's secrets, never in the app. */
+  const WORKER_SECRET = randomBytes(32).toString('hex');
+  /** Access tokens Supabase Auth would accept, by player (Auth itself is stood in for; everything behind it is real). */
+  const sessions = new Map<string, string>();
+  let authCalls = 0;
+  let authDown = false;
+  /** The worker as deployed: it knows the worker secret and asks Auth who a token belongs to. */
+  const secured: MatchmakingDeps = {
+    get sql() {
+      return sql;
+    },
+    log: (entry) => void logs.push(entry),
+    workerSecret: WORKER_SECRET,
+    verifyUser: async (accessToken) => {
+      authCalls += 1;
+      if (authDown) throw new Error('auth user 503: upstream connect error at 10.0.0.7');
+      const userId = sessions.get(accessToken);
+      return userId ? { id: userId } : null;
+    },
+  };
+  const accessToken = (who: Player): string => {
+    const jwt = `eyJhbGciOiJFUzI1NiJ9.${Buffer.from(JSON.stringify({ sub: who.userId })).toString('base64url')}.${randomBytes(16).toString('base64url')}`;
+    sessions.set(jwt, who.userId);
+    return jwt;
+  };
+  const asScheduler = (body: unknown = { op: 'tick', source: 'cron' }) => handleMatchmakingRequest(body, secured, { workerSecret: WORKER_SECRET });
+  const asPlayer = (who: Player, body: unknown = { op: 'tick' }) => handleMatchmakingRequest(body, secured, { authorization: `Bearer ${accessToken(who)}` });
+  /** Lets the next tick through as if the interval had passed (only time can do that). */
+  const passTickInterval = () => sql`update public.matchmaking_tick_gate set last_tick_at = last_tick_at - interval '10 seconds'`;
+  const passNudgeInterval = () => sql`update public.matchmaking_nudges set last_nudge_at = last_nudge_at - interval '10 seconds'`;
+  /** How much matchmaking work the database has been asked to do: whole ticks let through, and matching runs. */
+  const workDone = async () => {
+    const [gate] = await sql`select ticks::int as ticks from public.matchmaking_tick_gate`;
+    const [runs] = await sql`select coalesce(sum(runs), 0)::int as runs from public.matchmaking_runs`;
+    return { ticks: gate!.ticks as number, runs: runs!.runs as number };
+  };
 
   /** Changes a row's own timestamps the way only time can. Triggers are off for this one statement block. */
   async function timeTravel(fn: (tx: Tx) => Promise<unknown>): Promise<void> {
@@ -1527,6 +1567,255 @@ describe.skipIf(!DATABASE_URL)('random matchmaking (Postgres)', () => {
   });
 
   // =========================================================================================
+  describe('who may make the worker run', () => {
+    const queuedCount = async () => (await sql`select count(*)::int as n from public.matchmaking_tickets where status = 'QUEUED'`)[0]!.n as number;
+
+    it('a request with no credential is refused, and not one statement of a tick runs', async () => {
+      await queueSolos(4);
+      const before = await workDone();
+      for (const caller of [{}, { authorization: null }, { authorization: '' }, { authorization: 'Basic abc' }, { authorization: 'Bearer ' }]) {
+        const res = await handleMatchmakingRequest({ op: 'tick' }, secured, caller);
+        expect(res.status).toBe(401);
+        expect(res.body).toMatchObject({ ok: false, error: { code: 'UNAUTHORIZED' } });
+      }
+      // The project's publishable key, which every copy of the app carries, is not a player.
+      expect((await handleMatchmakingRequest({ op: 'tick' }, secured, { authorization: 'Bearer sb_publishable_0123456789abcdef' })).status).toBe(401);
+      // A token Supabase Auth does not know.
+      expect((await handleMatchmakingRequest({ op: 'tick' }, secured, { authorization: 'Bearer aaaa.bbbb.cccc' })).status).toBe(401);
+      expect(await workDone()).toEqual(before);
+      expect(await queuedCount()).toBe(4);
+    });
+
+    it('a wrong worker secret is refused, never falls back to a player, and nothing runs', async () => {
+      const [a] = await queueSolos(4);
+      const before = await workDone();
+      const wrong = [WORKER_SECRET.slice(0, -1) + (WORKER_SECRET.endsWith('0') ? '1' : '0'), WORKER_SECRET.slice(0, 32), `${WORKER_SECRET}0`, '', ' ', 'null'];
+      for (const workerSecret of wrong) {
+        const res = await handleMatchmakingRequest({ op: 'tick' }, secured, { workerSecret });
+        expect(res.status).toBe(403);
+        expect(res.body).toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } });
+        expect(JSON.stringify(res)).not.toContain(WORKER_SECRET);
+      }
+      // A searching player who also presents a wrong secret is judged on the secret alone.
+      authCalls = 0;
+      expect((await handleMatchmakingRequest({ op: 'tick' }, secured, { workerSecret: 'guess', authorization: `Bearer ${accessToken(a!)}` })).status).toBe(403);
+      expect(authCalls).toBe(0);
+      // A server that has no secret configured (or a uselessly short one) accepts no internal request at all.
+      for (const workerSecret of [undefined, null, '', 'short']) {
+        const unconfigured: MatchmakingDeps = { ...secured, sql, workerSecret };
+        expect((await handleMatchmakingRequest({ op: 'tick' }, unconfigured, { workerSecret: workerSecret ?? '' })).status).toBe(403);
+      }
+      expect(await workDone()).toEqual(before);
+      expect(await queuedCount()).toBe(4);
+      expect(JSON.stringify(logs)).not.toContain(WORKER_SECRET);
+    });
+
+    it('the scheduler, with the worker secret, runs a tick and is told what it did', async () => {
+      const four = await queueSolos(4);
+      const res = await asScheduler();
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({ ok: true, ran: true, report: { ok: true, modes: [{ mode: 'classic', reserved: 1 }, { mode: 'intermediate' }] } });
+      for (const p of four) expect((await state(p)).match).toMatchObject({ status: 'READY_UP' });
+    });
+
+    it('guests queue and are matched through the app’s own path: one of them asks the worker to look', async () => {
+      const four = await queueSolos(4);
+      const [guest] = await sql`select is_anonymous from auth.users where id = ${four[0]!.userId}`;
+      expect(guest!.is_anonymous).toBe(true);
+      // What the app sends today (and what apps already installed send): { op: 'tick' } with the player's token.
+      const res = await asPlayer(four[0]!);
+      expect(res).toEqual({ status: 200, body: { ok: true, ran: true } });
+      const seated = new Set<string>();
+      for (const p of four) {
+        const match = (await state(p)).match as Json;
+        expect(match).toMatchObject({ status: 'READY_UP' });
+        seated.add(match.id);
+      }
+      expect(seated.size).toBe(1);
+      // The same request under its new name is the same thing.
+      await passTickInterval();
+      await passNudgeInterval();
+      expect((await asPlayer(four[1]!, { op: 'nudge' })).body).toEqual({ ok: true, ran: true });
+    });
+
+    it('the last ready-up confirmation completes: a player’s request starts the game', async () => {
+      const four = await queueSolos(4);
+      expect((await asPlayer(four[0]!)).body).toMatchObject({ ran: true });
+      const matchId = (await matchIdOf(four[0]!))!;
+      await readyAll(four, matchId);
+      expect((await rpc(four[3]!, 'matchmaking_heartbeat')).tick_due).toBe(true);
+      await passTickInterval();
+      expect((await asPlayer(four[3]!)).body).toEqual({ ok: true, ran: true });
+      expect(await matchRow(matchId)).toMatchObject({ status: 'STARTED' });
+      const games = new Set<string>();
+      for (const p of four) games.add(((await state(p)).game as Json).game_id);
+      expect(games.size).toBe(1);
+    });
+
+    it('expiry and recovery still run: from the scheduler’s tick, from a player’s, and from pg_cron’s own sweep', async () => {
+      // A countdown that ran out, handled by the scheduled tick.
+      const four = await queueSolos(4);
+      await asScheduler();
+      const first = (await matchIdOf(four[0]!))!;
+      await passReadyDeadline(first);
+      await passTickInterval();
+      const swept = await asScheduler();
+      expect(swept.body).toMatchObject({ ok: true, ran: true, report: { sweep: { ready_timeouts: 1 } } });
+      expect(await matchRow(first)).toMatchObject({ status: 'CANCELLED' });
+
+      // A reservation whose game was never created, released by a waiting player's request.
+      await sql`delete from public.matchmaking_tickets`;
+      await sql`delete from public.matchmaking_cooldowns`;
+      const two = await queueSolos(2);
+      await waitInQueue(120);
+      await tick();
+      const second = (await matchIdOf(two[0]!))!;
+      await readyAll(two, second);
+      await passStartDeadline(second);
+      await passTickInterval();
+      expect((await asPlayer(two[0]!)).body).toEqual({ ok: true, ran: true });
+      expect(await matchRow(second)).toMatchObject({ status: 'FAILED' });
+      for (const p of two) expect((await ticketOf(p))!).toMatchObject({ status: 'QUEUED' });
+
+      // pg_cron runs the sweep as plain SQL: it needs neither the function nor a secret.
+      await sql`delete from public.matchmaking_tickets`;
+      const more = await queueSolos(4);
+      await tick();
+      const third = (await matchIdOf(more[0]!))!;
+      await passReadyDeadline(third);
+      expect((await sql`select public.matchmaking_sweep() as r`)[0]!.r).toMatchObject({ ready_timeouts: 1 });
+      expect(await matchRow(third)).toMatchObject({ status: 'CANCELLED' });
+    });
+
+    it('repeated triggers cannot get past the throttle: fifty at once are one tick', async () => {
+      const four = await queueSolos(4);
+      const before = await workDone();
+      const results = await Promise.all([
+        ...Array.from({ length: 30 }, () => asScheduler()),
+        ...Array.from({ length: 20 }, (_, i) => asPlayer(four[i % 4]!)),
+      ]);
+      expect(results.filter((r) => r.body.ok && r.body.ran).length).toBe(1);
+      for (const r of results) expect([200, 429]).toContain(r.status);
+      const after = await workDone();
+      expect(after.ticks - before.ticks).toBe(1);
+      // One matching run per mode at most, however many asked.
+      expect(after.runs - before.runs).toBeLessThanOrEqual(2);
+      expect((await sql`select count(*)::int as n from public.matchmaking_matches`)[0]!.n).toBe(1);
+
+      // Sequentially, inside the interval: still nothing more.
+      for (let i = 0; i < 10; i += 1) expect((await asScheduler()).body).toEqual({ ok: true, ran: false, skipped: 'THROTTLED' });
+      expect(await workDone()).toEqual(after);
+      // Once the interval has passed the next one runs.
+      await passTickInterval();
+      expect((await asScheduler()).body).toMatchObject({ ran: true });
+    });
+
+    it('one player hammering the worker is told to wait, and costs no ticks', async () => {
+      const [a, b] = await queueSolos(2);
+      expect((await asPlayer(a!)).body).toEqual({ ok: true, ran: true });
+      const before = await workDone();
+      for (let i = 0; i < 25; i += 1) {
+        await passTickInterval();
+        const res = await asPlayer(a!);
+        expect(res.status).toBe(429);
+        expect(res.body).toMatchObject({ ok: false, error: { code: 'RATE_LIMITED' } });
+        expect(Number(res.headers?.['Retry-After'])).toBeGreaterThanOrEqual(1);
+      }
+      expect(await workDone()).toEqual(before);
+      // That limit is this player's alone: another searching player is served at once.
+      await passTickInterval();
+      expect(await asPlayer(b!)).toEqual({ status: 200, body: { ok: true, ran: true } });
+      // And it is a pause, not a ban.
+      await passTickInterval();
+      await passNudgeInterval();
+      expect((await asPlayer(a!)).body).toEqual({ ok: true, ran: true });
+    });
+
+    it('independent players are never rate-limited by each other', async () => {
+      const eight = await queueSolos(8);
+      const statuses: number[] = [];
+      for (const p of eight) {
+        await passTickInterval();
+        statuses.push((await asPlayer(p)).status);
+      }
+      expect(statuses).toEqual(Array(8).fill(200));
+      // Without the interval passing, the others are not refused either: a tick has just run for all of them.
+      const [x, y] = await queueSolos(2, 'intermediate');
+      await passTickInterval();
+      expect((await asPlayer(x!)).body).toEqual({ ok: true, ran: true });
+      expect(await asPlayer(y!)).toEqual({ status: 200, body: { ok: true, ran: false, skipped: 'THROTTLED' } });
+    });
+
+    it('a player cannot pass for the scheduler, name a target, or run the worker when they are not searching', async () => {
+      const [a] = await queueSolos(4);
+      // Whatever the body claims, it is a player's request: no report, and the player's own limits apply.
+      const forged = await asPlayer(a!, { op: 'tick', source: 'cron', internal: true, workerSecret: WORKER_SECRET, force: true, userId: randomUUID() });
+      expect(forged).toEqual({ status: 200, body: { ok: true, ran: true } });
+      expect((await asPlayer(a!, { op: 'tick', source: 'cron' })).status).toBe(429);
+      // The worker's own operations are not on offer to anyone through this door.
+      await passNudgeInterval();
+      for (const op of ['reserve', 'start', 'sweep', 'force', '']) expect((await asPlayer(a!, { op })).status).toBe(400);
+
+      // A signed-in player with nothing in the queue: nothing runs on their word.
+      const [idle] = await players(1);
+      await passTickInterval();
+      const before = await workDone();
+      const res = await asPlayer(idle!);
+      expect(res.status).toBe(403);
+      expect(res.body).toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } });
+      // Nor for a player who only sits in a party.
+      const [leader] = await party(2);
+      expect((await asPlayer(leader!)).status).toBe(403);
+      expect(await workDone()).toEqual(before);
+
+      // Nudges switched off (settings.client_tick = 0): players are refused, the scheduler is not.
+      await setting('client_tick', 0);
+      await passNudgeInterval();
+      expect((await asPlayer(a!)).status).toBe(403);
+      expect((await asScheduler()).body).toMatchObject({ ok: true, ran: true });
+      // And no player can reach the gate itself.
+      await expect(rpc(a!, 'matchmaking_tick_claim', null)).rejects.toThrow(/permission denied/);
+      await expect(as(a!.userId, (tx) => tx`select * from public.matchmaking_tick_gate`)).rejects.toThrow(/permission denied/);
+      await expect(as(a!.userId, (tx) => tx`update public.matchmaking_nudges set last_nudge_at = now() - interval '1 hour'`)).rejects.toThrow(/permission denied/);
+    });
+
+    it('failures answer safely and leave nothing stuck', async () => {
+      const four = await queueSolos(4);
+      // Supabase Auth unreachable: a generic error, nothing about the cause, nothing run.
+      authDown = true;
+      const before = await workDone();
+      const down = await asPlayer(four[0]!);
+      authDown = false;
+      expect(down).toEqual({ status: 500, body: { ok: false, error: { code: 'SERVER_ERROR', message: 'Matchmaking is temporarily unavailable.' } } });
+      expect(await workDone()).toEqual(before);
+
+      // The database unreachable: the same answer, and no detail of it.
+      const dead: MatchmakingDeps = { ...secured, sql: (() => Promise.reject(new Error('connect ECONNREFUSED 10.1.2.3:5432 password authentication failed'))) as never, log: () => undefined };
+      const broken = await handleMatchmakingRequest({ op: 'tick' }, dead, { workerSecret: WORKER_SECRET });
+      expect(broken.status).toBe(500);
+      expect(JSON.stringify(broken)).not.toMatch(/ECONNREFUSED|password|10\.1\.2\.3/);
+
+      // A tick that dies in the middle of reserving: reported, rolled back, and the next one succeeds.
+      const faulty: MatchmakingDeps = {
+        ...secured,
+        sql,
+        fault: (at) => {
+          if (at === 'after-reserve') throw new Error('injected failure after-reserve');
+        },
+      };
+      const failed = await handleMatchmakingRequest({ op: 'tick' }, faulty, { workerSecret: WORKER_SECRET });
+      expect(failed.status).toBe(200);
+      expect(failed.body).toMatchObject({ ok: true, ran: true, report: { ok: false } });
+      expect(await queuedCount()).toBe(4);
+      expect((await sql`select count(*)::int as n from public.matchmaking_matches`)[0]!.n).toBe(0);
+      await passTickInterval();
+      await sql`update public.matchmaking_runs set last_run_at = null`;
+      expect((await asScheduler()).body).toMatchObject({ ran: true, report: { ok: true } });
+      for (const p of four) expect((await state(p)).match).toMatchObject({ status: 'READY_UP' });
+    });
+  });
+
+  // =========================================================================================
   describe('worker failures and recovery', () => {
     const failing = (point: FaultPoint, times = Infinity): MatchmakingDeps => {
       let left = times;
@@ -1672,11 +1961,12 @@ describe.skipIf(!DATABASE_URL)('random matchmaking (Postgres)', () => {
 
     it('a tick never throws, reports what it did, and logs counts — never a player', async () => {
       const four = await queueSolos(4);
-      const res = await handleMatchmakingRequest({ op: 'tick' }, worker);
+      const scheduler = { workerSecret: WORKER_SECRET };
+      const res = await handleMatchmakingRequest({ op: 'tick' }, secured, scheduler);
       expect(res.status).toBe(200);
       expect(res.body).toMatchObject({ ok: true, report: { ok: true, modes: [{ mode: 'classic', reserved: 1 }, { mode: 'intermediate' }] } });
-      expect(await handleMatchmakingRequest({ op: 'reserve', tickets: [] }, worker)).toMatchObject({ status: 400 });
-      expect(await handleMatchmakingRequest(null, worker)).toMatchObject({ status: 400 });
+      expect(await handleMatchmakingRequest({ op: 'reserve', tickets: [] }, secured, scheduler)).toMatchObject({ status: 400 });
+      expect(await handleMatchmakingRequest(null, secured, scheduler)).toMatchObject({ status: 400 });
       const text = JSON.stringify(logs);
       for (const p of four) {
         expect(text).not.toContain(p.userId);

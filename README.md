@@ -17,7 +17,9 @@ App (Expo Router)  ──POST action──▶  Edge Function `game-action`  ─�
 * **The server is the referee.** The client sends intents (`ROLL_DICE`, `BUY_PROPERTY`, `PLACE_BID`, …). The Edge Function locks the game row, runs the shared engine, and commits every change for that action atomically. Clients never write balances, ownership, loans, auctions or turns.
 * **One engine, two places.** `src/engine` is pure TypeScript. The app uses it read-only (to show only valid actions); the Edge Function runs it authoritatively from an exact copy in `supabase/functions/_shared/engine` (`npm run sync:engine`; a test fails if they drift).
 * **Money integrity.** Balances change only through `Draft.transfer`, which always appends a transaction. The ledger is append-only (DB triggers). Undo = compensating transactions.
-* **Idempotency.** Every tap has an `action_id`; retries reuse it; the server applies it once (`game_actions` primary key).
+* **Idempotency.** Every tap has an `action_id`; retries reuse it; the server applies it once (`game_actions` primary key). An id names one request: the same player, game, action and payload. Sent again it is answered with the game as it now stands (whatever version the retry says it saw); used for anything else it is refused (`VALIDATION`), never answered as "already done". The action record commits or rolls back with the game state, and records are only removed with the whole expired game.
+* **Unknown outcomes.** If every attempt of an action is lost on the way (timeout, no connection) the phone does not treat it as failed: it reads the game again and sends nothing else until that read has succeeded (`gameStore.outcomeUnknown`), so a second tap can never be a second execution.
+* **Auction close.** The server closes an auction when its deadline passes (a timer armed with each new deadline) and any phone on the auction screen may ask too; all of them go through one settlement path that closes exactly once. That timer lives in one function instance's memory, so a read of the game (`op: "state"`, which every phone does on reconnect, foreground and poll) that finds an auction past its deadline arms the close again.
 * **Auction timing.** One deadline, on the server's clock: `auctions.ends_at`, set when the auction opens and again by each accepted bid. Every phone counts down to it using an estimate of the server clock taken from request/response timing (`src/lib/serverClock.ts`) — never from when an update happened to arrive or a screen mounted. A bid is on time if the server *received* it less than `auction.bidGraceSeconds` (1 s, never shown) after that deadline; client timestamps are not used. From that instant the auction can be closed, exactly once: by a timer the Edge Function arms for each deadline, with phones on the auction screen asking too as a backstop.
 * **Stale actions.** Decision actions carry the `state_version` the player saw; if the game moved on, the server rejects with “The game just changed”.
 * **Realtime.** Broadcast pings carry only the new version; a client refetches only when the ping is *ahead* of its snapshot. It also reconciles once after a reconnect and once when the app returns from the background. Polling (every 5 s) runs **only while realtime is down** — a healthy idle connection does no work (`src/features/game/sync.ts`, dev counters in `src/lib/syncStats.ts`).
@@ -232,14 +234,30 @@ Solo players and parties of friends queue for a public table. The server groups 
    select cron.schedule('matchmaking-sweep', '10 seconds', 'select public.matchmaking_sweep()');
    select cron.schedule('matchmaking-tick', '5 seconds', 'select public.matchmaking_cron_tick()');
    ```
-2. `npm run deploy:functions` — deploys `game-action` (unchanged behaviour), `delete-account` and the new `matchmaking` function (`verify_jwt = false`: a tick takes no input and acts for no caller; the database throttles it).
-3. Once, in the SQL editor, so the scheduled tick can reach the function (without these the tick job does nothing and searching phones nudge the worker instead):
+2. `npm run deploy:functions` deploys `game-action`, `delete-account` and the `matchmaking` function. `verify_jwt = false` for `matchmaking` does **not** mean it is open: the handler accepts exactly two callers (see "Who may run the worker" below) and refuses everybody else before any matchmaking work is done.
+3. Once: the worker secret. Generate a random value of at least 32 characters (for example `openssl rand -hex 32`) and store the **same** value in two server-only places. It must never appear in the app, in `.env`, or in any `EXPO_PUBLIC_*` variable.
+   ```bash
+   npx supabase secrets set MATCHMAKING_WORKER_SECRET=<the value>
+   ```
    ```sql
    select vault.create_secret('https://zlsimveghdbanvlupduz.supabase.co/functions/v1/matchmaking', 'matchmaking_tick_url');
-   select vault.create_secret('<publishable key>', 'matchmaking_tick_key');
+   select vault.create_secret('<the value>', 'matchmaking_tick_secret');
+   select vault.create_secret('<publishable key>', 'matchmaking_tick_key');  -- optional, sent as before
    ```
+   A project that already has `matchmaking_tick_url` only needs `matchmaking_tick_secret` (and the function secret). To rotate: set the new value in both places; in between, scheduled ticks are refused and searching phones carry the matching.
 4. Check: `select jobname, schedule, active from cron.job;` and, after a test match, `select public.matchmaking_metrics();` (`stale` should be all zeros).
 5. Ship the app. An older app has no Play Online and is otherwise unaffected.
+
+### Who may run the worker
+
+The `matchmaking` function does privileged work (it connects as the database owner), so it only runs for:
+
+* **The scheduler** (`pg_cron` through `pg_net`, `matchmaking_cron_tick()`): it sends the worker secret in the `x-matchmaking-secret` header. The function compares it, in constant time, with its own `MATCHMAKING_WORKER_SECRET`. A wrong, empty or unconfigured secret is `403`, and such a request is never treated as a player's.
+* **A searching player** (the app's nudge after *Find match*, after the last *I'm ready*, and when the heartbeat says something is due): it sends the player's own access token, which the function verifies with Supabase Auth, as `delete-account` does. The database then decides whether that player's request counts (`matchmaking_tick_claim`): only while they are in the queue or in a countdown, only while `client_tick` is on, and at most once per `client_nudge_interval_ms` (1 s) per player (`429` otherwise). A player's request carries nothing but "look now": it cannot name a ticket, a match or another player, and it is not told what the tick did.
+
+Everything else (no token, the publishable key, an unknown token) is `401`. And whoever asks, a whole tick is let through at most once per `min_tick_interval_ms` (250 ms): fifty simultaneous requests are one tick, the rest answer `200 { ran: false, skipped: "THROTTLED" }`. Both intervals are rows in `public.matchmaking_settings`.
+
+Deploy order for this check: `npm run deploy:db` first (migration `20261021000000_matchmaking_worker_auth.sql`: additive; the scheduled request gains a header an older function ignores), then set the secret (step 3), then `npm run deploy:functions`. If the function is deployed before the secret exists, scheduled ticks are refused until it does; players keep matching through their own nudges and `matchmaking_sweep()` keeps running from pg_cron. Apps already installed are unaffected: they already send the player's token with the request.
 
 ### Manual test plan (four Android devices)
 
@@ -265,7 +283,7 @@ Simulations without devices: `tests/matchmaking` (party sizes 1–8, thresholds,
 ### Limits and known risks
 
 * Not load-tested. Matching is one transaction per mode per run (64 tickets, 16 matches by default) at most once a second, on one database. Raise `batch_size` / `max_matches_per_run` or the tick frequency before expecting more, and measure.
-* Without the Vault secrets (step 3) matching depends on a searching phone nudging the worker; the sweep still runs from pg_cron.
+* Without the worker secret in Vault and in the function (step 3) the scheduled tick does nothing and matching depends on a searching phone nudging the worker; the sweep still runs from pg_cron.
 * A game created by an app that predates friends never ties its seats to accounts, so the server cannot see that such a player is "in a game".
 * A player leaving at the very instant their ticket is reserved can make Postgres fail one of the two requests (deadlock detection); it is retried by the phone or the next run. Not observed in the concurrency tests.
 * The public tick endpoint is unauthenticated by design; it costs an invocation per call. Put a rate limit in front of it if that is abused.

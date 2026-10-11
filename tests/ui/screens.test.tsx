@@ -533,6 +533,8 @@ describe('Errors and reconnection', () => {
   it('network failure retries the same action id, then shows reconnecting', async () => {
     const f = new Fixture().loadAs('Asha');
     api.action.mockResolvedValue({ ok: false, error: { code: 'NETWORK', message: 'Connection lost. Reconnecting…' } });
+    // No network means the state read fails too (the previous test leaves a successful one mocked).
+    api.state.mockResolvedValue({ ok: false, error: { code: 'NETWORK', message: 'Connection lost. Reconnecting…' } });
     await render(
       <>
         <ConnectionBanner />
