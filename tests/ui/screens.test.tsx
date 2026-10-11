@@ -1,5 +1,6 @@
 /// <reference types="jest" />
 import { act, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react-native';
+import { Keyboard } from 'react-native';
 import { router, useLocalSearchParams, usePathname } from 'expo-router';
 import Home from '../../app/index';
 import * as rootLayout from '../../app/_layout';
@@ -14,6 +15,7 @@ import { GameSyncHost } from '@/features/game/sync';
 import { useGameAction } from '@/features/game/useGameAction';
 import type { GameView } from '@/features/game/useGameView';
 import { LobbyView } from '@/features/lobby/LobbyView';
+import { useEnterGame } from '@/features/lobby/useEnterGame';
 import { LoanSheet } from '@/features/loan/LoanSheet';
 import { PlayerView } from '@/features/player/PlayerView';
 import { gameApi } from '@/lib/gameApi';
@@ -158,6 +160,71 @@ describe('Create game', () => {
     await waitFor(() => expect(api.create).toHaveBeenCalledTimes(2));
     expect(api.create.mock.calls[0]![0]).toBe(api.create.mock.calls[1]![0]);
     expect(api.create.mock.calls[0]![1]).toBe(api.create.mock.calls[1]![1]);
+  });
+
+  it('the keyboard’s Done key puts the keyboard away and creates nothing', async () => {
+    const dismiss = jest.spyOn(Keyboard, 'dismiss').mockImplementation(() => {});
+    await render(<CreateGame />);
+    const input = screen.getByTestId('host-name');
+    expect(input.props).toMatchObject({ returnKeyType: 'done', submitBehavior: 'blurAndSubmit' });
+    // Valid name: the key must not create the game…
+    await fireEvent.changeText(input, 'Tanmay');
+    await fireEvent(input, 'submitEditing', { nativeEvent: { text: 'Tanmay' } });
+    expect(dismiss).toHaveBeenCalledTimes(1);
+    expect(api.create).not.toHaveBeenCalled();
+    // …and with no name it does not even validate: nothing was submitted.
+    await fireEvent.changeText(input, '');
+    await fireEvent(input, 'submitEditing', { nativeEvent: { text: '' } });
+    expect(screen.queryByText('Enter a name')).toBeNull();
+    expect(api.create).not.toHaveBeenCalled();
+    expect(router.replace).not.toHaveBeenCalled();
+    // The button is still there, and still the way to create.
+    expect(screen.getByTestId('create-confirm').props.accessibilityState).toMatchObject({ disabled: false, busy: false });
+    dismiss.mockRestore();
+  });
+
+  it('repeated taps on CREATE GAME create one game; the button is busy meanwhile', async () => {
+    const f = new Fixture(['Tanmay'], { start: false });
+    let finish!: () => void;
+    api.create.mockImplementation(() => new Promise((resolve) => (finish = () => resolve(ok(f.snapshot())))));
+    await render(<CreateGame />);
+    await fireEvent.changeText(screen.getByTestId('host-name'), 'Tanmay');
+    // Not awaited: the press resolves only once the game has been created.
+    const first = fireEvent.press(screen.getByTestId('create-confirm'));
+    await waitFor(() => expect(screen.getByTestId('create-confirm').props.accessibilityState).toMatchObject({ disabled: true, busy: true }));
+    await fireEvent.press(screen.getByTestId('create-confirm'));
+    await fireEvent.press(screen.getByTestId('create-confirm'));
+    expect(api.create).toHaveBeenCalledTimes(1);
+    await act(async () => finish());
+    await first;
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith(`/lobby/${f.state.id}`));
+    expect(api.create).toHaveBeenCalledTimes(1);
+    expect(router.replace).toHaveBeenCalledTimes(1);
+  });
+
+  it('two taps landing before the button is disabled still send one request', async () => {
+    const f = new Fixture(['Tanmay'], { start: false });
+    api.create.mockImplementation(() => new Promise((r) => setTimeout(() => r(ok(f.snapshot())), 20)));
+    const { result } = await renderHook(() => useEnterGame());
+    await act(async () => {
+      await Promise.all([result.current.submit({ kind: 'create' }, 'Tanmay'), result.current.submit({ kind: 'create' }, 'Tanmay')]);
+    });
+    expect(api.create).toHaveBeenCalledTimes(1);
+    expect(router.replace).toHaveBeenCalledTimes(1);
+  });
+
+  it('a failed create shows the server error and can be tried again', async () => {
+    const f = new Fixture(['Tanmay'], { start: false });
+    api.create.mockResolvedValueOnce({ ok: false, error: { code: 'SERVER_ERROR', message: 'Could not create the game.' } }).mockResolvedValueOnce(ok(f.snapshot()));
+    await render(<CreateGame />);
+    await fireEvent.changeText(screen.getByTestId('host-name'), 'Tanmay');
+    await fireEvent.press(screen.getByTestId('create-confirm'));
+    expect(await screen.findByText('Could not create the game.')).toBeTruthy();
+    expect(router.replace).not.toHaveBeenCalled();
+    expect(screen.getByTestId('create-confirm').props.accessibilityState).toMatchObject({ disabled: false, busy: false });
+    await fireEvent.press(screen.getByTestId('create-confirm'));
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith(`/lobby/${f.state.id}`));
+    expect(api.create).toHaveBeenCalledTimes(2);
   });
 });
 

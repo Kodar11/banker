@@ -1,6 +1,6 @@
 import { goBack } from '@/utils/navigation';
 import { useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Keyboard, Pressable, Text, View } from 'react-native';
 import { BUSINESS_MVP_RULES, defaultGameConfig, PROPERTY_KEYS, type GameConfig, type GameMode } from '@/engine/index.ts';
 import { Button, Card, Label, Pill, Screen, TextField } from '@/components/ui';
 import { GameConfigEditor, GameConfigSummary } from '@/features/lobby/GameConfigEditor';
@@ -46,8 +46,10 @@ export default function CreateGame() {
         placeholder="e.g. Tanmay"
         autoFocus
         maxLength={20}
-        returnKeyType="go"
-        onSubmitEditing={create}
+        // The keyboard's key only puts the keyboard away: the game is created from the button alone.
+        returnKeyType="done"
+        submitBehavior="blurAndSubmit"
+        onSubmitEditing={Keyboard.dismiss}
         error={error}
         testID="host-name"
       />

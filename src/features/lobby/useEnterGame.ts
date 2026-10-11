@@ -19,8 +19,10 @@ export function useEnterGame() {
   const [error, setError] = useState<string | null>(null);
   const attempt = useRef<{ key: string; actionId: string; token: string } | null>(null);
   const setSession = useSessionStore((s) => s.setSession);
+  // `busy` only disables the button on the next render; this also stops a second tap that lands before it.
+  const inFlight = useRef(false);
 
-  const submit = useCallback(
+  const enterGame = useCallback(
     async (mode: Mode, rawName: string) => {
       const name = PlayerNameSchema.safeParse(rawName);
       if (!name.success) {
@@ -68,6 +70,19 @@ export function useEnterGame() {
       router.replace(`/lobby/${res.gameId}`);
     },
     [setSession],
+  );
+
+  const submit = useCallback(
+    async (mode: Mode, rawName: string) => {
+      if (inFlight.current) return;
+      inFlight.current = true;
+      try {
+        await enterGame(mode, rawName);
+      } finally {
+        inFlight.current = false;
+      }
+    },
+    [enterGame],
   );
 
   return { submit, busy, error, setError };
