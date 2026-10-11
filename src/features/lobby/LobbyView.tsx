@@ -119,9 +119,15 @@ export function LobbyView({ view }: { view: GameView }) {
       }
     >
       <ConnectionBanner />
-      <Text className="mt-2 text-center text-sm font-bold uppercase tracking-[4px] text-cream/70" testID="lobby-title">
-        {APP_NAME} · {state.mode === 'intermediate' ? GAME_MODE_NAMES.intermediate : 'Lobby'}
-      </Text>
+      {/* Two lines on purpose: the game, then the mode. Each keeps to its own line and shrinks a little on a narrow phone instead of wrapping. */}
+      <View className="mt-2 gap-1 px-2" testID="lobby-title" accessible accessibilityRole="header" accessibilityLabel={`${APP_NAME}, ${GAME_MODE_NAMES[state.mode]}`}>
+        <Text className="text-center text-lg font-black uppercase tracking-[4px] text-cream" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+          {APP_NAME}
+        </Text>
+        <Text className="text-center text-xs font-bold uppercase tracking-[5px] text-cream/70" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} testID="lobby-mode">
+          {GAME_MODE_NAMES[state.mode]}
+        </Text>
+      </View>
       <Card className="items-center">
         <Label>Game code</Label>
         <Text className="text-6xl font-black tracking-[10px] text-ink" testID="game-code" accessibilityLabel={`Game code ${code.split('').join(' ')}`}>

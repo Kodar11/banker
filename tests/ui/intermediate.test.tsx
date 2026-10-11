@@ -133,11 +133,13 @@ describe('Create game: mode', () => {
   it('the lobby tells every player which mode the host picked', async () => {
     const f = new Fixture(['Asha', 'Bilal'], { start: false, mode: 'intermediate' }).loadAs('Bilal');
     const lobby = await render(<LobbyView view={viewFor(f, 'Bilal')} />);
-    expect(screen.getByTestId('lobby-title')).toHaveTextContent(/Capital Mode/);
+    expect(screen.getByTestId('lobby-title')).toHaveTextContent(/^Clash of Capitals/);
+    expect(screen.getByTestId('lobby-mode')).toHaveTextContent('Capital Mode');
     await lobby.unmount();
     const c = new Fixture(['Asha', 'Bilal'], { start: false }).loadAs('Bilal');
     await render(<LobbyView view={viewFor(c, 'Bilal')} />);
-    expect(screen.getByTestId('lobby-title')).toHaveTextContent('Clash of Capitals · Lobby');
+    expect(screen.getByTestId('lobby-title')).toHaveTextContent(/^Clash of Capitals/);
+    expect(screen.getByTestId('lobby-mode')).toHaveTextContent('Classic Mode');
   });
 });
 
