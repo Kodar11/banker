@@ -32,6 +32,12 @@ export type MicPermission = 'unknown' | 'granted' | 'denied' | 'blocked';
 export const HOLD_TO_TALK_MS = 120;
 /** A join that has not connected after this long is a failure. */
 export const JOIN_TIMEOUT_MS = 15_000;
+/**
+ * The only automatic retry there is: rejoining when the app comes back to the foreground. This many
+ * in a row without once connecting, and it stops (the player can still tap). A safety cap, so that
+ * nothing which keeps sending the app "to the background" can restart the join for ever.
+ */
+export const MAX_AUTO_RESUMES = 3;
 export const DEFAULT_VOLUME = 100;
 
 export interface VoiceEngineEvents {
@@ -134,6 +140,8 @@ export class VoiceController {
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   private renewing: Promise<void> | null = null;
   private statusSeq = 0;
+  /** Foreground rejoins in a row that have not connected yet (see MAX_AUTO_RESUMES). */
+  private autoResumes = 0;
 
   constructor(private readonly deps: VoiceDeps) {}
 
@@ -239,6 +247,12 @@ export class VoiceController {
 
   /** The player opts in: ask for the microphone (first use), get a token, join muted. */
   async join(): Promise<void> {
+    // A join the player asked for starts the count of automatic resumes afresh.
+    this.autoResumes = 0;
+    await this.start();
+  }
+
+  private async start(): Promise<void> {
     const creds = this.creds;
     const phase = this.state.phase;
     if (!creds || this.joined || (phase !== 'idle_muted' && phase !== 'error')) return;
@@ -350,6 +364,7 @@ export class VoiceController {
         const engine = this.engine!;
         engine.setTransmitting(false);
         engine.setMasterVolume(this.state.masterVolume);
+        this.autoResumes = 0;
         this.set({ phase: 'ready_muted', problem: this.micProblem() });
         if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
         this.heartbeatTimer = setInterval(() => void this.heartbeat(epoch), Math.max(10, heartbeatSeconds) * 1000);
@@ -513,7 +528,14 @@ export class VoiceController {
   appForeground(): void {
     if (!this.resumeOnForeground) return;
     this.resumeOnForeground = false;
-    if (this.wantJoined && this.state.phase === 'idle_muted') void this.join();
+    if (!this.wantJoined || this.state.phase !== 'idle_muted') return;
+    if (this.autoResumes >= MAX_AUTO_RESUMES) {
+      // This many resumes in a row never connected. Stop; a tap starts again.
+      this.wantJoined = false;
+      return;
+    }
+    this.autoResumes += 1;
+    void this.start();
   }
 
   // ---------------------------------------------------------------- listening preferences (this phone only)

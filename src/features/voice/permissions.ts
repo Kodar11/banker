@@ -20,14 +20,26 @@ export async function requestMicPermission(): Promise<Exclude<MicPermission, 'un
   }
 }
 
+/** The Bluetooth permission has been asked for in this run of the app. */
+let bluetoothAsked = false;
+
 /**
  * Android 12+: routing voice to a Bluetooth headset needs BLUETOOTH_CONNECT. Asked after the
  * microphone; a "no" only means voice stays on the phone's speaker or a wired headset.
+ *
+ * Asked at most ONCE per run of the app, and not at all when already granted. Every request for a
+ * permission that is not granted takes the activity through pause/resume — even when Android
+ * shows no dialog (denied for good, or not in this build's manifest) — and the app reads that as
+ * going to the background and coming back, which restarts the join. Asking on every join made
+ * that a loop.
  */
 async function requestBluetoothRoute(): Promise<void> {
   if (Platform.OS !== 'android' || Number(Platform.Version) < 31) return;
+  const permission = 'android.permission.BLUETOOTH_CONNECT';
   try {
-    await PermissionsAndroid.request('android.permission.BLUETOOTH_CONNECT');
+    if (bluetoothAsked || (await PermissionsAndroid.check(permission))) return;
+    bluetoothAsked = true;
+    await PermissionsAndroid.request(permission);
   } catch {
     // optional
   }
