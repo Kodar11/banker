@@ -58,7 +58,7 @@ export function secureRandom(): number {
   return crypto.getRandomValues(new Uint32Array(1))[0]! / 2 ** 32;
 }
 
-function randomCode(random: () => number): string {
+export function randomCode(random: () => number): string {
   return String(Math.floor(random() * 1_000_000)).padStart(6, '0');
 }
 
@@ -66,7 +66,7 @@ function errorResult(code: string, message: string, status = 200): HandlerResult
   return { status, body: { ok: false, error: { code: code as never, message } } };
 }
 
-function isUniqueViolation(error: unknown, constraint?: string): boolean {
+export function isUniqueViolation(error: unknown, constraint?: string): boolean {
   const e = error as { code?: string; constraint_name?: string };
   return e?.code === '23505' && (!constraint || e.constraint_name === constraint);
 }

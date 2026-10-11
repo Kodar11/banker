@@ -188,6 +188,73 @@ Players find each other by Player ID, become friends, and invite friends into a 
 
 Deploying this: `npm run deploy:db` **first** (migration `20261015000000_social.sql`, additive; it also adds `social_sync` to the `supabase_realtime` publication), then `npm run deploy:functions` (the referee now reads and writes `games.lobby_locked`), then ship the app. No new Edge Function, secret or dashboard setting is needed; Realtime must be enabled for the project (it already is for the game channels).
 
+## Random matchmaking (Play Online)
+
+Solo players and parties of friends queue for a public table. The server groups them, runs a ready-up countdown, creates the game and starts it — there is no human host. Nothing here is skill ranking, bots, regions, voice or push.
+
+* **Where it lives** — `supabase/migrations/20261016000000_matchmaking.sql` (tables, guards, RLS, every function), `supabase/functions/_shared/matchmaking/` (`grouping.ts`: the pure grouping algorithm; `seatNames.ts`), `supabase/functions/matchmaking/` (the worker), `src/lib/matchmakingApi.ts`, `src/store/matchmakingStore.ts`, `src/features/matchmaking/` (`MatchmakingHost` lifecycle, `PlayOnlineView`, `logic.ts`). Route: `app/play-online.tsx`. Home has a **PLAY ONLINE** button.
+* **Who owns which fact** — `party_members` (who is in a party, who confirmed), `matchmaking_tickets` + `matchmaking_ticket_members` (one queue entry: a solo player or one whole party), `matchmaking_matches` + `matchmaking_match_players` (one reservation: its tickets, the ready-up deadline, each player's confirmation and seat-token hash, the game it became), `games` / `players` (the game, written by the engine as for a hosted game). `games.matchmaking_match_id` is the only new column on an existing table.
+* **State machines** (guard triggers refuse every other change, whoever writes):
+  * ticket `QUEUED → RESERVED → MATCHED`; `QUEUED → CANCELLED | EXPIRED | FAILED`; `RESERVED → QUEUED` (the reservation fell through and this ticket was not at fault) `| CANCELLED | FAILED`. Terminal tickets are never reused.
+  * match `READY_UP → STARTING → STARTED`; `READY_UP → CANCELLED`; `STARTING → FAILED | CANCELLED`.
+  * A ticket is `RESERVED` exactly while its match is `READY_UP` or `STARTING`: reserving the players and opening the countdown are one commit, so "reserved" and "ready-up" are one step here and there is nothing in between to get stuck in.
+* **Guarantees held by the database** — one live ticket per player, alone or inside a party (`matchmaking_ticket_members_active_idx`); one live ticket per party; one live reservation per player; unique seats per reservation and per game; 2–8 players per reservation (check constraint); one game per reservation (`games_matchmaking_match_idx` + `matchmaking_matches.game_id` unique); mode, size and deadline of a reservation immutable.
+* **Grouping** (`grouping.ts`, deterministic, unit-tested) — per mode, oldest first. By the wait of the oldest entry of a group: under 30 s only the preferred size (4; a group holding a party of 4+ aims for 8); from 30 s any valid size made of two or more entries; from 60 s a party of 4+ may start alone; a party of 8 starts at once. Between valid plans it picks, in order: fewest waited-30 s players left behind, fewest players above the preferred size, most waiting time matched, most even tables (so 5 waiting solos are 3+2, 6 are 3+3, 7 are 4+3). Parties are whole entries and can never be split; tickets with a block between any two of their players are never grouped. Cost: exact search over a window of 10 entries (at most 2^10 states), windows slide over a batch of 64 tickets, so a run is bounded whatever the queue's length.
+* **The worker** (`matchmaking` Edge Function, one "tick") — `matchmaking_sweep()` → per mode, one transaction: `matchmaking_candidates()` (advisory lock per mode, throttle, `FOR UPDATE SKIP LOCKED` batch, drops ineligible tickets) → `planMatches()` → `matchmaking_reserve()` per group (re-checks everything; a proposal is never trusted) → per all-ready reservation, one transaction: `matchmaking_begin_start()` (the claim) → engine `createGame` / `joinGame` / `startHostlessGame` through the referee's own persistence (`game-action/db.ts`) → `matchmaking_finish_start()`. A tick can die anywhere: each step is committed whole or not at all, and any number of ticks may run at once.
+* **Hostless games** — `startHostlessGame` (engine) is the host's `START_GAME` followed by removing the host role, so nobody at a public table can end the game for the others. Public tables use each mode's default `GameConfig`; the canonical copy is `games.config` as always.
+* **Seats** — a seat is still a device token. The phone generates it, stores it, and sends it with **I'm ready** (`matchmaking_ready`); the server keeps its SHA-256 and the worker writes it into `players.token_hash`. Until everyone is ready the last phone to confirm holds the seat; a second device of the same account is told the game is on the other one.
+* **Ready-up policy** — 20 s, the server's deadline. Not confirming, declining, or leaving the party during the countdown: that player's whole ticket (their party stays together) leaves the queue, the player gets a cooldown (30 s, doubling to 5 min, forgotten after 15 min), and every other ticket goes back into the queue with the waiting time it had. A game that cannot be created (3 tries or 30 s): everyone is queued again, nobody is penalised.
+* **Parties** — `party_create`, `party_invite` (friends only, 15 min, rate-limited through `social_limits`), `party_respond_invite`, `party_set_mode` (leader), `party_set_ready` (each member, for themselves), `party_leave`, `party_kick`. A party invitation joins a group and queues nobody; it is separate from game invitations and from `notifications` (so older apps are unaffected). Queueing locks the party. A member leaving while queued shrinks the ticket, which keeps its place; the leader leaving hands leadership on.
+* **Liveness** — `matchmaking_heartbeat()` every 10 s while searching, in a countdown or in a party (foreground only; exponential backoff with jitter on failure). A searching phone silent for 30 s loses its ticket (`EXPIRED / DISCONNECTED`, no cooldown). The phone remembers nothing about a queue between runs: `matchmaking_state()` is fetched at sign-in, on foreground, on a Realtime ping (`matchmaking_sync`, one channel per player) and on reconnect.
+* **Private games** — an account at a table cannot queue; `claim_seat` on a private table cancels that account's search (`JOINED_GAME`). Seats an account never claimed (older apps) are caught on the phone only.
+* **Settings** — `public.matchmaking_settings` (thresholds, countdown, grace periods, batch sizes, `enabled`, `client_tick`). Change a row; no deploy, no app release.
+* **Observability** — `public.matchmaking_events` (every ticket and match transition with its reason, one row per worker run; no nicknames, tokens or emails), `select public.matchmaking_metrics();` (queue by mode, wait percentiles, match sizes, timeout rate, requeues, duplicate requests, creation latency, stale counts, worker duration and failures), and one JSON log line per working tick in the function logs.
+
+### Deploying matchmaking
+
+1. `npm run deploy:db` — migration `20261016000000_matchmaking.sql` (additive). It adds `matchmaking_sync` to the `supabase_realtime` publication and, where `pg_cron` is available, schedules `matchmaking-sweep` (every 10 s, plain SQL) and `matchmaking-tick` (every 5 s). Sub-minute schedules need Postgres 15.1.1.61 or later; if the scheduling block could not run it says so in a notice — then enable **Database → Extensions → pg_cron and pg_net** and run:
+   ```sql
+   select cron.schedule('matchmaking-sweep', '10 seconds', 'select public.matchmaking_sweep()');
+   select cron.schedule('matchmaking-tick', '5 seconds', 'select public.matchmaking_cron_tick()');
+   ```
+2. `npm run deploy:functions` — deploys `game-action` (unchanged behaviour), `delete-account` and the new `matchmaking` function (`verify_jwt = false`: a tick takes no input and acts for no caller; the database throttles it).
+3. Once, in the SQL editor, so the scheduled tick can reach the function (without these the tick job does nothing and searching phones nudge the worker instead):
+   ```sql
+   select vault.create_secret('https://zlsimveghdbanvlupduz.supabase.co/functions/v1/matchmaking', 'matchmaking_tick_url');
+   select vault.create_secret('<publishable key>', 'matchmaking_tick_key');
+   ```
+4. Check: `select jobname, schedule, active from cron.job;` and, after a test match, `select public.matchmaking_metrics();` (`stale` should be all zeros).
+5. Ship the app. An older app has no Play Online and is otherwise unaffected.
+
+### Manual test plan (four Android devices)
+
+Use four devices A–D on a development or preview build, each with its own guest account; make A–B and C–D friends.
+
+1. **Solo, four players** — all four: Play Online → Classic → Find match. Expect *Match found* on all within a few seconds, a 20 s countdown that agrees across devices, then the same game on all four with four different seats; the first player rolls.
+2. **Two players** — A and B only: no match for 30 s, then a two-player match.
+3. **Modes apart** — A, B Classic; C, D Intermediate: two separate matches after 30 s, never a mixed one.
+4. **Cancel** — A searches and cancels; B, C, D search: A is never matched. Tap Cancel repeatedly: one result.
+5. **Missed ready-up** — four search; D does not confirm. After 20 s: D is told and paused; A, B, C are searching again with their elapsed time intact, and are matched after 30 s.
+6. **Decline** — as 5, D declines: the others are searching again immediately.
+7. **Party** — A invites B (Play with friends → Invite); B joins and confirms; A starts. C and D search solo: one match of four with A and B shown as a party. Repeat with B not ready: A cannot start. Change the mode as A: B must confirm again.
+8. **Party leaves** — A+B queued; B leaves the party: A keeps searching. A (leader) leaves instead: B becomes leader and the search continues.
+9. **Disconnect while searching** — A searches, then airplane mode for 15 s: *Reconnecting…*, same ticket. Again for 60 s: the search has ended, with the reason shown.
+10. **Restart** — force-close A during the countdown after confirming; reopen: A lands in the countdown or in the game, in the same seat. Force-close while searching and reopen within 30 s: still searching.
+11. **Elsewhere in the app** — A searches, then opens Friends: when the match is found A is brought to the countdown.
+12. **Two devices, one account** — link A with Google, restore on a fifth device; search from both: one ticket. Confirm on one: the other says the game is on the other device.
+13. **Private games** — A sits in a private lobby: Play Online says to leave it first. A searches, then joins a game by code on the same device: the search has ended.
+14. **Regression** — create and join a private game by code and QR, friends and invitations, Classic and Intermediate play, reconnect in a running game, Financial Learning, account deletion while queued.
+
+Simulations without devices: `tests/matchmaking` (party sizes 1–8, thresholds, fairness, bounds), `tests/server/matchmaking.test.ts` (concurrent workers, cancel/reserve and ready/timeout races, failure injection around game creation, recovery).
+
+### Limits and known risks
+
+* Not load-tested. Matching is one transaction per mode per run (64 tickets, 16 matches by default) at most once a second, on one database. Raise `batch_size` / `max_matches_per_run` or the tick frequency before expecting more, and measure.
+* Without the Vault secrets (step 3) matching depends on a searching phone nudging the worker; the sweep still runs from pg_cron.
+* A game created by an app that predates friends never ties its seats to accounts, so the server cannot see that such a player is "in a game".
+* A player leaving at the very instant their ticket is reserved can make Postgres fail one of the two requests (deadlock detection); it is retried by the phone or the next run. Not observed in the concurrency tests.
+* The public tick endpoint is unauthenticated by design; it costs an invocation per call. Put a rate limit in front of it if that is abused.
+
 ## Checks & tests
 
 ```bash
@@ -196,6 +263,7 @@ npx expo lint             # lint
 npm run test:engine       # Vitest: engine + exact Business data + drift checks
 npm run test:account      # Vitest: nickname rules, secure session storage, deletion handler
 npm run test:social       # Vitest: Player ID input, relationship/expiry/presence/notification rules
+npm run test:matchmaking  # Vitest: grouping algorithm, seat names, Play Online rules
 npm run test:ui           # Jest + RNTL
 npm run db:local          # throwaway local Postgres (no Docker) with the migrations
 DATABASE_URL=postgres://postgres@127.0.0.1:54329/banker npm run test:server

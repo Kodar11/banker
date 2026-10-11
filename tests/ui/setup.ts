@@ -111,6 +111,35 @@ jest.mock('@/lib/socialApi', () => {
 
 jest.mock('@/lib/socialRealtime', () => ({
   subscribeToSocialSync: jest.fn(() => () => undefined),
+  subscribeToMatchmakingSync: jest.fn(() => () => undefined),
   trackOwnPresence: jest.fn(() => () => undefined),
   watchPresence: jest.fn(() => () => undefined),
 }));
+
+// Random matchmaking never reaches Supabase in UI tests. Defaults describe a phone with no network;
+// tests/ui/matchmaking.test.tsx sets what each scenario needs.
+jest.mock('@/lib/matchmakingApi', () => {
+  const offline = { ok: false, error: { code: 'NETWORK', message: 'No connection. Check your internet and try again.' } };
+  const call = () => jest.fn(async () => offline);
+  return {
+    MATCHMAKING_FUNCTION_NAME: 'matchmaking',
+    matchmakingError: (code: string) => ({ code, message: code === 'NOT_READY' ? 'Your profile isn’t loaded yet. Check your connection and try again.' : code }),
+    matchmakingApi: {
+      state: call(),
+      heartbeat: call(),
+      enqueue: call(),
+      cancel: call(),
+      ready: call(),
+      decline: call(),
+      createParty: call(),
+      invite: call(),
+      respondInvite: call(),
+      revokeInvite: call(),
+      setMode: call(),
+      setReady: call(),
+      leaveParty: call(),
+      kick: call(),
+      nudge: jest.fn(async () => undefined),
+    },
+  };
+});

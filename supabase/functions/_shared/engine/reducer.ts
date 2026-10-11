@@ -444,6 +444,25 @@ function startGame(d: Draft, actor: PlayerState): void {
   });
 }
 
+/**
+ * Starts a game the server assembled (public matchmaking). It is the host's START_GAME — the same
+ * turn-order draw, starting cash, economy and objectives, in the same order — run by the server once
+ * every player has confirmed, and it leaves the table without a host: nobody at a table of strangers
+ * may end the game for everyone else. Nothing else about the game differs from a hosted one.
+ */
+export function startHostlessGame(state: GameState, ctx: EngineContext): EngineResult {
+  assertLoadable(state, ctx);
+  if (state.status !== 'WAITING') fail('INVALID_PHASE', 'The game has already started.');
+  const d = new Draft(state, ctx);
+  const host = d.state.players.find((p) => p.isHost && p.status === 'ACTIVE');
+  if (!host) fail('NOT_FOUND', 'This game has nobody to start it.');
+  startGame(d, host);
+  host.isHost = false;
+  d.state.hostPlayerId = null;
+  bumpVersion(d);
+  return d.result();
+}
+
 /** Fisher–Yates shuffle driven by the injected RNG (every ordering equally likely). */
 function shuffled<T>(items: readonly T[], random: () => number): T[] {
   const out = [...items];

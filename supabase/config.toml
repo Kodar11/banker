@@ -435,3 +435,11 @@ import_map = "./functions/game-action/deno.json"
 [functions.delete-account]
 enabled = true
 verify_jwt = false
+
+# Matchmaking worker: groups queued tickets, creates the games of ready reservations, recovers
+# stuck ones. The gateway check is off because a tick takes no input and acts for no particular
+# caller (see functions/matchmaking/index.ts); the database throttles how often it really runs.
+[functions.matchmaking]
+enabled = true
+verify_jwt = false
+import_map = "./functions/matchmaking/deno.json"

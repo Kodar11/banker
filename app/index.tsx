@@ -4,6 +4,7 @@ import { router, usePathname } from 'expo-router';
 import { Button, Screen } from '@/components/ui';
 import { ProfileEntry } from '@/features/account/ProfileEntry';
 import { detachFromGame } from '@/features/game/leaveGame';
+import { PlayOnlineEntry } from '@/features/matchmaking/PlayOnlineView';
 import { FriendsEntry } from '@/features/social/FriendsEntry';
 import { activeGameRoute } from '@/utils/navigation';
 import { startupRouting } from '@/utils/startupRouting';
@@ -66,6 +67,7 @@ export default function Home() {
           ) : null}
           <Button title="CREATE GAME" subtitle="You're the host" testID="create-game" onPress={() => router.push('/create-game')} />
           <Button title="JOIN GAME" subtitle="Scan QR or enter code" testID="join-game" variant="secondary" onPress={() => router.push('/join-game')} />
+          <PlayOnlineEntry />
           <View className="flex-row gap-3">
             <FriendsEntry className="flex-1" />
             <Button className="flex-1" title="Financial Learning" size="sm" variant="ghost" testID="open-learning" onPress={() => router.push('/learning')} />

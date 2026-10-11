@@ -100,6 +100,34 @@ export function subscribeToSocialSync(userId: string, handlers: SocialSyncHandle
   return managed.close;
 }
 
+export interface MatchmakingSyncHandlers {
+  /** The server's matchmaking change counter moved to `version` (NaN when the event did not carry one). */
+  onVersion: (version: number) => void;
+  onHealth: (health: ChannelHealth) => void;
+}
+
+/**
+ * "Something about your party, your search or your match changed" pings for the signed-in player:
+ * Postgres changes of their own `matchmaking_sync` row (RLS lets them read no other). ONE channel
+ * per player, whatever they are in — never one per ticket, party or match. An event carries only a
+ * version number; the app refetches when it is behind, so a duplicate, late or missed event can
+ * never show anything wrong.
+ */
+export function subscribeToMatchmakingSync(userId: string, handlers: MatchmakingSyncHandlers): () => void {
+  if (!isSupabaseConfigured) return () => undefined;
+  const managed = manage(
+    `matchmaking:${userId}`,
+    (ch, isCurrent) => {
+      ch.on('postgres_changes', { event: '*', schema: 'public', table: 'matchmaking_sync', filter: `user_id=eq.${userId}` }, (payload) => {
+        if (!isCurrent()) return;
+        handlers.onVersion(Number((payload.new as { version?: unknown } | null)?.version));
+      });
+    },
+    handlers.onHealth,
+  );
+  return managed.close;
+}
+
 const presenceTopic = (presenceKey: string) => `presence:${presenceKey}`;
 
 /**
