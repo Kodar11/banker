@@ -3,7 +3,7 @@ import { Pressable, Text, View } from 'react-native';
 import { ActionIcon, type ActionIconName } from './ActionIcon';
 import { ACTION_BUTTON_HEIGHT, ACTION_GAP, FIXED_HEIGHT_FONT_SCALE, type ActionLayout } from './layout';
 
-export type BarActionKey = 'properties' | 'trade' | 'pay' | 'loan' | 'auction' | 'more';
+export type BarActionKey = 'properties' | 'trade' | 'chat' | 'loan' | 'auction' | 'more';
 
 export interface BarAction {
   key: BarActionKey;

@@ -1,5 +1,5 @@
 import type { RealtimeChannel } from '@supabase/supabase-js';
-import { realtimeTopic, type StateBroadcast } from '@/engine/index.ts';
+import { QUICK_CHAT_EVENT, realtimeTopic, type StateBroadcast } from '@/engine/index.ts';
 import { syncLog, syncStats } from './syncStats';
 import { getSupabase } from './supabase';
 
@@ -9,6 +9,8 @@ export interface GameChannelHandlers {
   onState: (payload: StateBroadcast) => void;
   onPresence: (onlinePlayerIds: string[]) => void;
   onHealth: (health: ChannelHealth) => void;
+  /** A quick reaction or preset message, exactly as it arrived: the receiver validates it. */
+  onChat?: (payload: unknown) => void;
 }
 
 /**
@@ -45,6 +47,10 @@ export function subscribeToGame(gameId: string, playerId: string, handlers: Game
       syncStats.realtimeEvents += 1;
       handlers.onState(payload as StateBroadcast);
     })
+      .on('broadcast', { event: QUICK_CHAT_EVENT }, ({ payload }) => {
+        if (closed || channel !== ch) return;
+        handlers.onChat?.(payload);
+      })
       .on('presence', { event: 'sync' }, () => {
         if (closed || channel !== ch) return;
         handlers.onPresence(Object.keys(ch.presenceState()));

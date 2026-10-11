@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
 import { POLL_MS_DEGRADED } from '@/constants/app';
 import type { StateBroadcast } from '@/engine/index.ts';
+import { clearQuickChat, receiveQuickChat } from '@/features/quickChat/quickChatStore';
 import { gameApi, type Credentials } from '@/lib/gameApi';
 import { subscribeToGame, type ChannelHealth, type GameChannelHandlers } from '@/lib/realtime';
 import { syncLog, syncStats } from '@/lib/syncStats';
@@ -40,6 +41,8 @@ export interface SyncDeps {
   subscribe: (handlers: GameChannelHandlers) => () => void;
   setHealth: (health: ChannelHealth) => void;
   setOnline: (ids: string[]) => void;
+  /** Quick reactions and messages ride the same channel; they never touch the snapshot or trigger a refetch. */
+  onChat?: (payload: unknown) => void;
   appState: {
     current: () => AppStateStatus;
     onChange: (cb: (next: AppStateStatus) => void) => { remove: () => void };
@@ -114,6 +117,9 @@ export function startGameSync(deps: SyncDeps): () => void {
       void catchUp();
     },
     onPresence: deps.setOnline,
+    onChat: (payload) => {
+      if (!stopped) deps.onChat?.(payload);
+    },
     onHealth: (health) => {
       deps.setHealth(health);
       if (health === 'live') {
@@ -155,7 +161,7 @@ export function useGameSync(credentials: Credentials | null): void {
     const creds = { gameId, playerId, token };
     const store = useGameStore.getState();
     if (store.gameId !== gameId) store.reset(gameId);
-    return startGameSync({
+    const stop = startGameSync({
       refresh: () => refreshGame(creds),
       localVersion: () => useGameStore.getState().snapshot?.state.version ?? 0,
       subscribe: (handlers) => subscribeToGame(gameId, playerId, handlers),
@@ -166,11 +172,17 @@ export function useGameSync(credentials: Credentials | null): void {
         else s.setConnection('reconnecting');
       },
       setOnline: (ids) => useGameStore.getState().setOnline(ids),
+      onChat: (payload) => receiveQuickChat(gameId, payload),
       appState: {
         current: () => AppState.currentState,
         onChange: (cb) => AppState.addEventListener('change', cb),
       },
     });
+    return () => {
+      stop();
+      // Nothing of this game's chatter may show up in the next one.
+      clearQuickChat();
+    };
   }, [gameId, playerId, token]);
 }
 

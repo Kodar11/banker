@@ -609,7 +609,7 @@ describe('responsive layout (measured, not device presets)', () => {
     expect(area.height).toBe(tall.board);
     expect(area.flexGrow).toBeUndefined();
     expect(StyleSheet.flatten(screen.getByTestId('context-card').props.style).height).toBe(tall.contextHeight);
-    expect(StyleSheet.flatten(screen.getByTestId('open-pay').props.style).height).toBe(tall.actionButtonHeight);
+    expect(StyleSheet.flatten(screen.getByTestId('open-chat').props.style).height).toBe(tall.actionButtonHeight);
     // Whatever is still left sits above the actions, which stay at the bottom of the screen.
     expect(StyleSheet.flatten(screen.getByTestId('action-area').props.style)).toMatchObject({ flexGrow: 1, justifyContent: 'flex-end' });
   });
@@ -640,13 +640,14 @@ describe('responsive layout (measured, not device presets)', () => {
       expect(screen.getByTestId('open-trade')).toBeTruthy();
       expect(screen.getByTestId('open-loan')).toBeTruthy();
       expect(screen.queryByTestId('open-pay')).toBeNull();
+      expect(screen.queryByTestId('open-chat')).toBeNull();
       expect(screen.queryByTestId('open-properties')).toBeNull();
       await fireEvent.press(screen.getByTestId('open-more'));
-      for (const id of ['more-properties', 'more-pay', 'more-auction']) expect(screen.getByTestId(id)).toBeTruthy();
+      for (const id of ['more-properties', 'more-pay', 'more-chat', 'more-auction']) expect(screen.getByTestId(id)).toBeTruthy();
       await fireEvent.press(screen.getByTestId('more-pay'));
       expect(screen.getByTestId('pay-sheet')).toBeTruthy();
     } else {
-      for (const id of ['open-properties', 'open-trade', 'open-pay', 'open-loan', 'open-auction', 'open-more']) expect(screen.getByTestId(id)).toBeTruthy();
+      for (const id of ['open-properties', 'open-trade', 'open-chat', 'open-loan', 'open-auction', 'open-more']) expect(screen.getByTestId(id)).toBeTruthy();
     }
   });
 });

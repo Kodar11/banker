@@ -50,9 +50,9 @@ describe('Adaptive action bar + More', () => {
     await render(<GameScreen view={viewFor(f, 'Asha')} />);
     await fireEvent(screen.getByTestId('game-scroll'), 'layout', { nativeEvent: { layout: { width: 412, height: 840 } } });
     expect(screen.getByTestId('action-bar-grid')).toBeTruthy();
-    const ids = ['open-properties', 'open-trade', 'open-pay', 'open-loan', 'open-auction', 'open-more'];
-    const labels = ['My Properties', 'Transfer', 'Pay Money', 'Bank / Loan', 'Auction', 'More'];
-    const icons = ['properties', 'transfer', 'pay', 'bank', 'auction', 'more'];
+    const ids = ['open-properties', 'open-trade', 'open-chat', 'open-loan', 'open-auction', 'open-more'];
+    const labels = ['My Properties', 'Transfer', 'Chat / React', 'Bank / Loan', 'Auction', 'More'];
+    const icons = ['properties', 'transfer', 'chat', 'bank', 'auction', 'more'];
     ids.forEach((id, i) => {
       const button = screen.getByTestId(id);
       expect(StyleSheet.flatten(button.props.style).height).toBeGreaterThanOrEqual(44);
@@ -60,7 +60,7 @@ describe('Adaptive action bar + More', () => {
       expect(within(button).getAllByText(/\S/).map((t) => String(t.props.children))).toEqual([labels[i]]);
       expect(within(button).getByTestId(`action-icon-${icons[i]}`)).toBeTruthy();
     });
-    for (const label of ['My Properties', 'Transfer', 'Pay Money', 'Bank / Loan', 'Auction', 'More']) {
+    for (const label of ['My Properties', 'Transfer', 'Chat / React', 'Bank / Loan', 'Auction', 'More']) {
       expect(screen.getByText(label).props.numberOfLines).toBeLessThanOrEqual(2);
     }
     // Auction only works while one is running (auctions start when a property is declined).
@@ -72,7 +72,9 @@ describe('Adaptive action bar + More', () => {
   it('each action opens its existing flow (no duplicate implementations)', async () => {
     const f = new Fixture().loadAs('Asha');
     await render(<GameScreen view={viewFor(f, 'Asha')} />);
-    await fireEvent.press(screen.getByTestId('open-pay'));
+    // Pay Money lives in More now (Chat / React took its place in the bar).
+    await fireEvent.press(screen.getByTestId('open-more'));
+    await fireEvent.press(screen.getByTestId('more-pay'));
     expect(screen.getByTestId('pay-sheet')).toBeTruthy();
     await fireEvent.press(screen.getByTestId('open-loan'));
     expect(screen.queryByTestId('pay-sheet')).toBeNull(); // one sheet at a time
@@ -85,7 +87,7 @@ describe('Adaptive action bar + More', () => {
     expect(screen.queryByTestId(`player-details-${f.ids.Asha}`)).toBeNull();
     await fireEvent.press(screen.getByTestId('open-more'));
     const more = screen.getByTestId('more-actions');
-    for (const id of ['more-properties', 'more-trade', 'more-pay', 'more-loan', 'more-auction', 'more-manage', 'request-undo', 'pause-button', 'open-log', 'open-rules', 'end-game-button']) {
+    for (const id of ['more-properties', 'more-trade', 'more-pay', 'more-chat', 'more-loan', 'more-auction', 'more-manage', 'request-undo', 'pause-button', 'open-log', 'open-rules', 'end-game-button']) {
       expect(within(more).getByTestId(id)).toBeTruthy();
     }
     await fireEvent.press(screen.getByTestId('open-rules'));

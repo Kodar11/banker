@@ -171,7 +171,7 @@ describe('Intermediate: the game table', () => {
     await renderGame(f, 'Asha');
     expect(screen.getByTestId('year-indicator')).toHaveTextContent('Intermediate · Year 1');
     expect(screen.getByTestId('classic-board')).toBeTruthy();
-    for (const id of ['open-properties', 'open-trade', 'open-pay', 'open-loan', 'open-auction', 'open-more']) expect(screen.getByTestId(id)).toBeTruthy();
+    for (const id of ['open-properties', 'open-trade', 'open-chat', 'open-loan', 'open-auction', 'open-more']) expect(screen.getByTestId(id)).toBeTruthy();
   });
 
   it('the year indicator follows the server’s year', async () => {

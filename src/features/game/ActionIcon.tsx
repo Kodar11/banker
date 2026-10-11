@@ -1,8 +1,8 @@
 import { memo } from 'react';
-import Svg, { Circle, Path, Rect } from 'react-native-svg';
+import Svg, { Circle, Path } from 'react-native-svg';
 import { COLORS } from '@/constants/theme';
 
-export type ActionIconName = 'properties' | 'transfer' | 'pay' | 'bank' | 'auction' | 'more';
+export type ActionIconName = 'properties' | 'transfer' | 'chat' | 'bank' | 'auction' | 'more';
 
 /**
  * Line icons for the action area, drawn on a 24 × 24 grid. Vector on purpose:
@@ -25,11 +25,12 @@ export const ActionIcon = memo(function ActionIcon({ name, size = 20, color = CO
           <Path {...line} d="M20 16 H4.5 M8 12.5 L4.5 16 L8 19.5" />
         </>
       ) : null}
-      {name === 'pay' ? (
+      {name === 'chat' ? (
         <>
-          <Rect {...line} x={3} y={6.5} width={18} height={11} rx={2} />
-          <Circle {...line} cx={12} cy={12} r={2.4} />
-          <Path {...line} d="M6.5 12 H6.6 M17.4 12 H17.5" />
+          {/* A speech bubble with a smile: messages and reactions in one. */}
+          <Path {...line} d="M7 4 H17 A3.5 3.5 0 0 1 20.5 7.5 V12.5 A3.5 3.5 0 0 1 17 16 H12 L7.5 20 V16 H7 A3.5 3.5 0 0 1 3.5 12.5 V7.5 A3.5 3.5 0 0 1 7 4 Z" />
+          <Path {...line} d="M9.4 8.6 H9.5 M14.5 8.6 H14.6" />
+          <Path {...line} d="M9.3 11.3 Q12 13.6 14.7 11.3" />
         </>
       ) : null}
       {name === 'bank' ? (

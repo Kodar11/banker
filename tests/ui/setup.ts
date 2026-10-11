@@ -54,7 +54,7 @@ jest.mock('@/lib/realtime', () => ({
 }));
 
 jest.mock('@/lib/gameApi', () => ({
-  gameApi: { create: jest.fn(), join: jest.fn(), state: jest.fn(), action: jest.fn() },
+  gameApi: { create: jest.fn(), join: jest.fn(), state: jest.fn(), action: jest.fn(), chat: jest.fn() },
   isRetryable: (e: { code: string }) => e.code === 'NETWORK' || e.code === 'TIMEOUT',
   callGameApi: jest.fn(),
 }));

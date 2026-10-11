@@ -370,7 +370,7 @@ describe('Main game', () => {
     expect(screen.getByTestId('context-paused')).toBeTruthy();
     expect(screen.getByTestId('turn-title')).toHaveTextContent('GAME PAUSED');
     expect(screen.queryByTestId('roll-button')).toBeNull();
-    expect(screen.queryByTestId('open-pay')).toBeNull(); // only "More" while paused
+    expect(screen.queryByTestId('open-chat')).toBeNull(); // only "More" while paused
     expect(screen.getByTestId('open-more')).toBeTruthy();
     api.action.mockResolvedValue(ok(f.snapshot()));
     await fireEvent.press(screen.getByTestId('resume-button'));

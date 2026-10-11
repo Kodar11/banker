@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import type { GameAction } from '@/engine/index.ts';
 import { Button, Card, Label, PlayerBadge } from '@/components/ui';
 import { ObjectiveResults } from '@/features/objectives/ObjectiveCard';
+import { ChipReaction } from '@/features/quickChat/QuickChatOverlays';
 import { useGameStore } from '@/store/gameStore';
 import { formatINR } from '@/utils/currency';
 import type { GameView } from './useGameView';
@@ -53,6 +54,7 @@ export const PlayersStrip = memo(function PlayersStrip({ view, onSelect }: { vie
               {out ?? formatINR(p.balance)}
               {tag ? <Text className="text-[10px] font-bold text-amber-300"> {tag}</Text> : null}
             </Text>
+            <ChipReaction playerId={p.id} />
           </Pressable>
         );
       })}

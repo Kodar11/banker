@@ -16,6 +16,9 @@ import { GameConfigSummary } from '@/features/lobby/GameConfigEditor';
 import { MyObjective } from '@/features/objectives/ObjectiveCard';
 import { ObjectiveReveal, useObjectiveSeen } from '@/features/objectives/ObjectiveReveal';
 import { PlayerDetails, PlayerDetailsActions, PlayerDetailsHeader } from '@/features/player/PlayerDetails';
+import { ChatBubbles } from '@/features/quickChat/QuickChatOverlays';
+import { QuickChatSheet } from '@/features/quickChat/QuickChatSheet';
+import { useQuickChat } from '@/features/quickChat/useQuickChat';
 import { PropertyDeed } from '@/features/player/PropertyDeed';
 import { TradeOffers } from '@/features/trade/TradeOffers';
 import { TradeSheet } from '@/features/trade/TradeSheet';
@@ -48,8 +51,8 @@ type Panel =
   | { kind: 'config' }
   | { kind: 'objective' };
 
-/** The existing money/trade sheets, optionally prefilled with a player. */
-type Tool = { kind: 'pay'; to: string | null } | { kind: 'trade'; to: string | null } | { kind: 'loan'; tab?: FinanceTab };
+/** The existing money/trade sheets, optionally prefilled with a player — and the reactions sheet. One at a time. */
+type Tool = { kind: 'pay'; to: string | null } | { kind: 'trade'; to: string | null } | { kind: 'loan'; tab?: FinanceTab } | { kind: 'chat' };
 
 /** The auction this device was last taken to: one push per auction, however many screens are mounted. */
 let openedAuctionId: string | null = null;
@@ -68,6 +71,8 @@ export function GameScreen({ view }: { view: GameView }) {
   /** The open sheet, and the auction (if any) that was running when it was opened. */
   const [panelState, setPanelState] = useState<{ panel: Panel; auctionId: string | null } | null>(null);
   const [tool, setTool] = useState<Tool | null>(null);
+  // Quick reactions and messages: sent around the game, never through it (no action, no version, no turn).
+  const chat = useQuickChat({ onSent: () => setTool(null) });
   /** Who the pay / trade sheet was last opened for; changing it remounts (resets) that sheet. */
   const [preselect, setPreselect] = useState<{ pay: string | null; trade: string | null }>({ pay: null, trade: null });
   const [confirmEnd, setConfirmEnd] = useState(false);
@@ -144,7 +149,8 @@ export function GameScreen({ view }: { view: GameView }) {
   };
   const openTool = (next: Tool) => {
     setPanel(null);
-    if (next.kind !== 'loan') setPreselect((p) => ({ ...p, [next.kind]: next.to }));
+    if (next.kind === 'pay' || next.kind === 'trade') setPreselect((p) => ({ ...p, [next.kind]: next.to }));
+    if (next.kind === 'chat') chat.clearBlocked();
     setTool(next);
   };
   const openContext = (target: ContextTarget) => {
@@ -179,7 +185,8 @@ export function GameScreen({ view }: { view: GameView }) {
   const barActions: BarAction[] = [
     { key: 'properties', icon: 'properties', label: 'My Properties', testID: 'open-properties', hint: 'Your cash, properties, loans and history', onPress: () => me && openWallet(me.id) },
     { key: 'trade', icon: 'transfer', label: 'Transfer', testID: 'open-trade', hint: 'Offer a trade of properties and money', onPress: () => openTool({ kind: 'trade', to: null }) },
-    { key: 'pay', icon: 'pay', label: 'Pay Money', testID: 'open-pay', onPress: () => openTool({ kind: 'pay', to: null }) },
+    // Opens the sheet only: nothing is sent until a reaction or message is tapped. (Pay Money is in More, and on every player's sheet.)
+    { key: 'chat', icon: 'chat', label: 'Chat / React', testID: 'open-chat', hint: 'Send a quick reaction or message to everyone', onPress: () => openTool({ kind: 'chat' }) },
     { key: 'loan', icon: 'bank', label: 'Bank / Loan', testID: 'open-loan', onPress: () => openTool({ kind: 'loan' }) },
     {
       key: 'auction',
@@ -207,6 +214,8 @@ export function GameScreen({ view }: { view: GameView }) {
       { key: 'properties', icon: '🏠', label: 'My Properties', testID: 'more-properties', hint: 'Cash, properties, loans and history', onPress: () => openWallet(me.id) },
       { key: 'trade', icon: '🤝', label: 'Transfer', hint: 'Trade properties and money with a player', testID: 'more-trade', onPress: () => openTool({ kind: 'trade', to: null }) },
       { key: 'pay', icon: '💰', label: 'Pay Money', hint: 'Pay another player', testID: 'more-pay', onPress: () => openTool({ kind: 'pay', to: null }) },
+      // Also here, for the screens too short to show it in the bar.
+      { key: 'chat', icon: '💬', label: 'Chat / React', hint: 'Quick reactions and messages to everyone', testID: 'more-chat', onPress: () => openTool({ kind: 'chat' }) },
       { key: 'loan', icon: '🏦', label: 'Bank / Loan', hint: eco ? 'Loans, payments and credit score' : 'Borrow or repay', testID: 'more-loan', onPress: () => openTool({ kind: 'loan' }) },
       // Intermediate Mode with insurance only: a Classic game never lists it.
       ...(eco?.insurance
@@ -458,7 +467,10 @@ export function GameScreen({ view }: { view: GameView }) {
               <Text className="text-xs font-bold uppercase tracking-[2px] text-cream/60">{isIntermediate(state) ? 'Intermediate · India' : 'Classic · India'}</Text>
             )}
           </View>
-          <PlayersStrip view={view} onSelect={openPlayer} />
+          <View>
+            <PlayersStrip view={view} onSelect={openPlayer} />
+            <ChatBubbles players={state.players} meId={me?.id ?? null} />
+          </View>
         </View>
         {myCrisis ? (
           // Instead of the board and its actions — not over them — so there is nothing underneath to tap.
@@ -512,6 +524,7 @@ export function GameScreen({ view }: { view: GameView }) {
         view={view}
         send={send}
       />
+      <QuickChatSheet visible={tool?.kind === 'chat' && playing} onClose={() => setTool(null)} onSend={chat.send} cooling={chat.cooling} blocked={chat.blocked} />
       {/* Classic keeps its loan sheet. Intermediate opens the bank from the same Bank / Loan button. */}
       {eco ? (
         <FinanceHub visible={tool?.kind === 'loan'} initialTab={tool?.kind === 'loan' ? tool.tab : undefined} onClose={() => setTool(null)} view={view} send={send} />

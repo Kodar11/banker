@@ -1,5 +1,5 @@
 import { FunctionsHttpError } from '@supabase/supabase-js';
-import type { ApiRequest, ApiResponse, GameAction, GameConfig, GameMode } from '@/engine/index.ts';
+import type { ApiRequest, ApiResponse, GameAction, GameConfig, GameMode, QuickChatItem, QuickChatResponse } from '@/engine/index.ts';
 import { recordServerTime } from './serverClock';
 import { getSupabase } from './supabase';
 
@@ -8,11 +8,13 @@ const TIMEOUT_MS = 12_000;
 
 export type ApiError = Extract<ApiResponse, { ok: false }>['error'];
 
-/** Thin, typed wrapper around the referee Edge Function. Never throws. */
-export async function callGameApi(body: ApiRequest): Promise<ApiResponse> {
+type TransportFailure = { ok: false; error: { code: 'SERVER_ERROR' | 'NETWORK' | 'TIMEOUT'; message: string } };
+
+/** One POST to the Edge Function. Never throws: a transport problem comes back as a failure of the same shape the server uses. */
+async function invoke<T extends { ok: boolean }>(body: object, onResponse?: (data: T, sentAt: number, receivedAt: number) => void): Promise<T | TransportFailure> {
   try {
     const sentAt = Date.now();
-    const { data, error } = await getSupabase().functions.invoke<ApiResponse>(FUNCTION_NAME, {
+    const { data, error } = await getSupabase().functions.invoke<T>(FUNCTION_NAME, {
       body,
       timeout: TIMEOUT_MS,
     });
@@ -20,7 +22,7 @@ export async function callGameApi(body: ApiRequest): Promise<ApiResponse> {
     if (error) {
       if (error instanceof FunctionsHttpError) {
         try {
-          const parsed = (await error.context.json()) as ApiResponse;
+          const parsed = (await error.context.json()) as T;
           if (parsed && parsed.ok === false) return parsed;
         } catch {
           // fall through
@@ -36,11 +38,18 @@ export async function callGameApi(body: ApiRequest): Promise<ApiResponse> {
       };
     }
     if (!data) return { ok: false, error: { code: 'SERVER_ERROR', message: 'Empty response from the server.' } };
-    if (data.ok) recordServerTime(data.snapshot.serverTime, sentAt, receivedAt);
+    onResponse?.(data, sentAt, receivedAt);
     return data;
   } catch {
     return { ok: false, error: { code: 'NETWORK', message: 'Connection lost. Reconnecting…' } };
   }
+}
+
+/** Thin, typed wrapper around the referee Edge Function. Never throws. */
+export function callGameApi(body: ApiRequest): Promise<ApiResponse> {
+  return invoke<ApiResponse>(body, (data, sentAt, receivedAt) => {
+    if (data.ok) recordServerTime(data.snapshot.serverTime, sentAt, receivedAt);
+  });
 }
 
 export interface Credentials {
@@ -60,6 +69,9 @@ export const gameApi = {
   state: (c: Credentials) => callGameApi({ op: 'state', gameId: c.gameId, playerId: c.playerId, token: c.token }),
   action: (c: Credentials, actionId: string, expectedVersion: number, action: GameAction) =>
     callGameApi({ op: 'action', gameId: c.gameId, playerId: c.playerId, token: c.token, actionId, expectedVersion, action }),
+  /** A quick reaction or preset message to everyone in the game. Not a game action: no version, no snapshot, never retried. */
+  chat: (c: Credentials, eventId: string, item: QuickChatItem) =>
+    invoke<QuickChatResponse>({ op: 'chat', gameId: c.gameId, playerId: c.playerId, token: c.token, eventId, kind: item.kind, key: item.key }),
 };
 
 /** Errors where resending the SAME action id is safe and useful. */
