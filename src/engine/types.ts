@@ -94,6 +94,28 @@ export interface LoanState {
 
 export type AuctionStatus = 'OPEN' | 'CLOSED';
 
+/** Phases a seller's turn can be in when they list a property, and returns to when that auction ends. */
+export type ResaleResumePhase = 'AWAITING_ROLL' | 'AWAITING_PAYMENT' | 'TURN_COMPLETE';
+
+/** SOLD to the high bidder · UNSOLD (no bid, reserve not met, or the sale could not go through) · CANCELLED by the seller before any bid. */
+export type ResaleOutcome = 'SOLD' | 'UNSOLD' | 'CANCELLED';
+
+/**
+ * What makes an auction a resale (Intermediate Mode): a player selling a property they own, with
+ * whatever is built on it, to the highest bidder — provided the bid reaches their reserve price.
+ */
+export interface ResaleTerms {
+  sellerId: string;
+  /** The least the seller accepts. Not a bid: a lower high bid simply does not buy the property. */
+  reservePrice: number;
+  /** What stood on the property when it was listed. The sale goes through only if it still does. */
+  houses: number;
+  hotel: boolean;
+  resumePhase: ResaleResumePhase;
+  /** Null while the auction is open. */
+  outcome: ResaleOutcome | null;
+}
+
 export interface AuctionState {
   id: string;
   propertyKey: PropertyKey;
@@ -113,6 +135,8 @@ export interface AuctionState {
   winnerId: string | null;
   createdAt: string;
   closedAt: string | null;
+  /** Set for a player's resale auction; absent or null for the bank's auction of an unowned property. */
+  resale?: ResaleTerms | null;
 }
 
 export interface DiceRoll {

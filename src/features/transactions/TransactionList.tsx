@@ -14,7 +14,8 @@ export const TRANSACTION_LABELS: Record<TransactionType, string> = {
   HOTEL_PURCHASE: 'Built hotel',
   HOTEL_SALE: 'Sold hotel',
   PROPERTY_SALE: 'Sold property',
-  AUCTION_PAYMENT: 'Won auction',
+  // Paid to the bank for an unowned property, or to the player who auctioned theirs: "Auction" reads right from both sides.
+  AUCTION_PAYMENT: 'Auction',
   LOAN_DISBURSEMENT: 'Loan',
   LOAN_REPAYMENT: 'Loan repayment',
   START_REWARD: 'Passed Start',

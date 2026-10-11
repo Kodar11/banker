@@ -9,17 +9,21 @@ import type { GameStatus, TurnPhase } from './types.ts';
  * TRANSACTION → TURN_COMPLETE | AWAITING_PAYMENT (card: pay after other effects)
  *             | RESOLVING (loan interest paid at Start → now resolve the square landed on)
  * TURN_COMPLETE → AWAITING_ROLL (next player)
+ *
+ * Intermediate Mode: the turn player may put a property of theirs up for auction from
+ * AWAITING_ROLL, AWAITING_PAYMENT or TURN_COMPLETE (→ AUCTION); when that auction ends the turn
+ * returns to the phase it left, with everything else about the turn untouched.
  */
 export const TURN_TRANSITIONS: Readonly<Record<TurnPhase, readonly TurnPhase[]>> = {
-  AWAITING_ROLL: ['MOVING'],
+  AWAITING_ROLL: ['MOVING', 'AUCTION'],
   MOVING: ['RESOLVING'],
   RESOLVING: ['AWAITING_DECISION', 'AWAITING_PAYMENT', 'AWAITING_CARD', 'TURN_COMPLETE', 'MOVING', 'TRANSACTION'],
   AWAITING_DECISION: ['TRANSACTION', 'AUCTION', 'TURN_COMPLETE'],
-  AWAITING_PAYMENT: ['TRANSACTION', 'TURN_COMPLETE'],
+  AWAITING_PAYMENT: ['TRANSACTION', 'TURN_COMPLETE', 'AUCTION'],
   AWAITING_CARD: ['TRANSACTION', 'AWAITING_PAYMENT', 'TURN_COMPLETE'],
-  AUCTION: ['TRANSACTION', 'TURN_COMPLETE'],
+  AUCTION: ['TRANSACTION', 'TURN_COMPLETE', 'AWAITING_ROLL', 'AWAITING_PAYMENT'],
   TRANSACTION: ['TURN_COMPLETE', 'AWAITING_PAYMENT', 'MOVING', 'RESOLVING'],
-  TURN_COMPLETE: ['AWAITING_ROLL'],
+  TURN_COMPLETE: ['AWAITING_ROLL', 'AUCTION'],
 };
 
 export const GAME_STATUS_TRANSITIONS: Readonly<Record<GameStatus, readonly GameStatus[]>> = {

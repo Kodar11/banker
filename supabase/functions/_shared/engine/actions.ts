@@ -99,6 +99,11 @@ export const GameActionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('PLACE_BID'), auctionId: id, amount: rupees }).strict(),
   z.object({ type: z.literal('PASS_AUCTION'), auctionId: id }).strict(),
   z.object({ type: z.literal('CLOSE_AUCTION'), auctionId: id }).strict(),
+  // ---- Property resale auctions (Intermediate Mode; refused in a Classic game) ----
+  /** Put a property I own, with whatever is built on it, up for auction. It sells only to a bid of at least `reservePrice`. */
+  z.object({ type: z.literal('START_RESALE_AUCTION'), propertyKey, reservePrice: rupees }).strict(),
+  /** Withdraw my own resale auction. Only while nobody has bid. */
+  z.object({ type: z.literal('CANCEL_AUCTION'), auctionId: id }).strict(),
   bare('END_TURN'),
   bare('DECLARE_BANKRUPTCY'),
   z

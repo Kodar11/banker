@@ -107,6 +107,14 @@ const IntermediateRulesSchema = z
         crisisIntervalSpaces: z.number().int().positive(),
       })
       .strict(),
+    resale: z
+      .object({
+        /** The highest reserve price a seller may put on a property they auction. */
+        maxReservePrice: rupees,
+        /** "Get ready" time before the first bid is accepted, so every phone has the auction on screen when bidding opens. */
+        startCountdownSeconds: z.number().int().min(0),
+      })
+      .strict(),
     notifications: z
       .object({
         introAutoCloseSeconds: z.number().int().positive(),
@@ -283,6 +291,13 @@ export const INTERMEDIATE_RULES: IntermediateRules = validateIntermediateRules({
     crisisBill: 3000,
     firstCrisisSpaces: 18,
     crisisIntervalSpaces: 36,
+  },
+
+  /** A player auctioning a property they own. Bidding opens at the seller's reserve; increments and the bidding countdown are the game's auction rules. */
+  resale: {
+    /** The highest reserve price a seller may ask. */
+    maxReservePrice: 1_000_000,
+    startCountdownSeconds: 3,
   },
 
   notifications: {

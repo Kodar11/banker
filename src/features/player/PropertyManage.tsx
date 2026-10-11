@@ -12,6 +12,7 @@ import {
 } from '@/engine/index.ts';
 import { Button, Label } from '@/components/ui';
 import type { ButtonProps } from '@/components/ui/Button';
+import { AuctionPropertyAction } from '@/features/auction/ResaleAuction';
 import { useGameAction } from '@/features/game/useGameAction';
 import type { GameView } from '@/features/game/useGameView';
 import { useGameStore } from '@/store/gameStore';
@@ -119,6 +120,8 @@ export function PropertyManage({ view, propertyKey }: { view: GameView; property
           </View>
         );
       })}
+      {/* Intermediate Mode: sell it, buildings and all, to the other players. Renders nothing in a Classic game. */}
+      <AuctionPropertyAction view={view} propertyKey={propertyKey} quietReason={shared} />
       {failure && failure.key === propertyKey ? (
         <Text className="text-center text-sm font-bold text-brick" accessibilityRole="alert" testID="property-manage-error">
           {failure.message}

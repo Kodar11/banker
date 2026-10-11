@@ -95,6 +95,17 @@ function mapAuction(r: Row): AuctionState {
     winnerId: (r.winner_player_id as string | null) ?? null,
     createdAt: iso(r.created_at),
     closedAt: isoOrNull(r.closed_at),
+    // A row without a seller is the bank's auction of an unowned property — every row written before resales existed.
+    resale: r.seller_player_id
+      ? {
+          sellerId: r.seller_player_id as string,
+          reservePrice: Number(r.reserve_price),
+          houses: Number(r.listed_houses),
+          hotel: r.listed_hotel === true,
+          resumePhase: r.resume_phase as NonNullable<AuctionState['resale']>['resumePhase'],
+          outcome: (r.resale_outcome as NonNullable<AuctionState['resale']>['outcome']) ?? null,
+        }
+      : null,
   };
 }
 
@@ -317,16 +328,22 @@ export async function persistResult(tx: Tx, prevVersion: number, result: EngineR
 
   if (s.auction) {
     const a = s.auction;
+    // Resale terms (Intermediate Mode) are written with the listing and never updated; only the outcome is,
+    // once, when the auction closes. The database refuses anything else (guard_resale_auction).
+    const r = a.resale ?? null;
     await tx`
       insert into public.auctions (id, game_id, property_key, status, high_bid, high_bidder_id, minimum_opening_bid,
-        minimum_increment, ends_at, participant_ids, passed_ids, winner_player_id, created_at, closed_at)
+        minimum_increment, ends_at, participant_ids, passed_ids, winner_player_id, created_at, closed_at,
+        seller_player_id, reserve_price, listed_houses, listed_hotel, resume_phase, resale_outcome)
       values (${a.id}, ${s.id}, ${a.propertyKey}, ${a.status}, ${a.highBid}, ${a.highBidderId}, ${a.minimumOpeningBid},
         ${a.minimumIncrement}, ${a.endsAt}, ${a.participantIds}::uuid[], ${a.passedIds}::uuid[], ${a.winnerId},
-        ${a.createdAt}, ${a.closedAt})
+        ${a.createdAt}, ${a.closedAt},
+        ${r?.sellerId ?? null}, ${r?.reservePrice ?? null}, ${r?.houses ?? null}, ${r?.hotel ?? null},
+        ${r?.resumePhase ?? null}, ${r?.outcome ?? null})
       on conflict (id) do update set
         status = excluded.status, high_bid = excluded.high_bid, high_bidder_id = excluded.high_bidder_id,
         ends_at = excluded.ends_at, passed_ids = excluded.passed_ids, winner_player_id = excluded.winner_player_id,
-        closed_at = excluded.closed_at`;
+        closed_at = excluded.closed_at, resale_outcome = excluded.resale_outcome`;
   }
 
   const updated = await tx`
@@ -486,17 +503,26 @@ async function persistInsurance(tx: Tx, s: GameState): Promise<void> {
       created_at: p.createdAt,
       closed_at: p.closedAt,
     }));
+    // Two statements, not one upsert: the table's insert guard ("a policy is bought active") runs on every
+    // row an INSERT proposes, before any conflict is looked at — so a policy that has since been claimed,
+    // expired or ended by a sale must never be proposed for insert again. New policies are inserted
+    // (always ACTIVE); a policy whose status moved is updated, once.
+    const policies = tx.json(rows as unknown as postgres.JSONValue);
     await tx`
       insert into public.insurance_policies (id, game_id, property_key, owner_player_id, purchase_year, premium_paid,
         start_clock, expiry_clock, status, claimed_crisis_id, created_at, closed_at)
       select x.id, ${s.id}::uuid, x.property_key, x.owner_player_id, x.purchase_year, x.premium_paid,
         x.start_clock, x.expiry_clock, x.status, x.claimed_crisis_id, x.created_at, x.closed_at
-      from jsonb_to_recordset(${tx.json(rows as unknown as postgres.JSONValue)}) as x(
+      from jsonb_to_recordset(${policies}) as x(
         id uuid, property_key text, owner_player_id uuid, purchase_year int, premium_paid bigint,
         start_clock int, expiry_clock int, status text, claimed_crisis_id uuid, created_at timestamptz, closed_at timestamptz)
-      on conflict (id) do update set status = excluded.status, claimed_crisis_id = excluded.claimed_crisis_id,
-        closed_at = excluded.closed_at
-      where public.insurance_policies.status is distinct from excluded.status`;
+      where x.status = 'ACTIVE'
+      on conflict (id) do nothing`;
+    await tx`
+      update public.insurance_policies p
+      set status = x.status, claimed_crisis_id = x.claimed_crisis_id, closed_at = x.closed_at
+      from jsonb_to_recordset(${policies}) as x(id uuid, status text, claimed_crisis_id uuid, closed_at timestamptz)
+      where p.id = x.id and p.game_id = ${s.id} and p.status is distinct from x.status`;
   }
   if (insurance.crises.length) {
     const rows = insurance.crises.map((c) => ({

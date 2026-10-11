@@ -122,6 +122,18 @@ Classic games have none of this: no state, no actions, no screens, no restrictio
 
 Deploying this: `npm run deploy:db` (migration `20261013000000_property_insurance.sql`, additive), then `npm run deploy:functions`, then ship the app. A function deployed before the migration cannot store a policy or a crisis.
 
+## Property resale auctions (Intermediate only)
+
+A player can put a property they own — with every house or the hotel on it — up for auction to the other players. A Classic game never has the action, on the phone or on the server.
+
+* **The rules** (shown under House rules): on your own turn (before rolling, after your move is settled, or while you owe a payment) list a property that is not mortgaged and not pledged as loan collateral, with a reserve price of your choosing (up to `INTERMEDIATE_RULES.resale.maxReservePrice`). Bidding **opens at the reserve price** — nothing lower is a bid — after a short "get ready" (`INTERMEDIATE_RULES.resale.startCountdownSeconds`, 3 s) during which no bid is accepted, so the auction is on every phone before the 5-second bidding clock starts. From there it is the game's ordinary auction (increment, countdown reset per bid, grace); the seller never bids. The winning bid is paid buyer → seller and the property moves with its buildings exactly as they stand. No bid: nothing changes hands. The seller may cancel only until the first bid.
+* **Engine** — it runs on the game's one auction: `AuctionState.resale` (seller, reserve, listed buildings, phase to return to, outcome) is the only addition; `PLACE_BID`, `PASS_AUCTION`, `CLOSE_AUCTION`, the timers and the server-side close are the existing ones. New actions: `START_RESALE_AUCTION`, `CANCEL_AUCTION`. One answer for "can this be listed?" (`resaleBlocker` in `src/engine/selectors.ts`) is used by the server and by every screen; `resaleSaleBlocker` re-judges the sale at the close against the state as it is then (mode, ownership, mortgage, collateral, buildings, the bid, the buyer's cash). While listed, the property cannot be built on, mortgaged, sold, traded or pledged.
+* **Insurance** — the seller's policy on a sold property is closed with the sale (`endInsuranceOnSale`): no refund, never revived, not passed on. The buyer is offered the ordinary purchase on the result screen and on the property card; it is optional.
+* **Storage** — migration `20261019000000_property_resale_auctions.sql` adds six nullable columns to `auctions` (null on every auction of an unowned property) and the database's own guarantees: the terms of a listing never change, the seller is never a bidder or the winner, "sold" means a winner whose bid reached the reserve, a closed resale is never rewritten, and a resale row cannot exist in a Classic game.
+* **On the phone** (`src/features/auction/`) — the table's **Auction** button opens the auction screen, which lists your properties under **Auction my property** when nothing is running; every property card you own has **Auction Property**. Both open the same reserve-and-review flow (`ResaleSheet`).
+
+Deploying this: `npm run deploy:db` **first** (the migration is additive), then `npm run deploy:functions`, then ship the app. A function deployed before the migration cannot store an auction.
+
 ## Game settings and secret objectives
 
 The host can customise a small, fixed set of rules on **New game** and, until they press Start, from the lobby (**Change settings**). Everyone in the lobby sees the same summary; once the game starts the settings are locked and readable from **More → Game settings**.

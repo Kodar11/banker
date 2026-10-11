@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Text, View } from 'react-native';
-import { computeRent, getDeed, GROUP_LABELS, isIntermediate, purchasePrice, rentMultiplier, rentTable, type GameState, type PropertyKey } from '@/engine/index.ts';
+import { computeRent, getDeed, GROUP_LABELS, isIntermediate, openResaleFor, purchasePrice, rentMultiplier, rentTable, type GameState, type PropertyKey } from '@/engine/index.ts';
 import { Button, Card, Label, Pill, PlayerBadge } from '@/components/ui';
 import { PROPERTY_GROUP_THEME } from '@/constants/theme';
 import { PropertyValuation } from '@/features/finance/PropertyValuation';
@@ -29,6 +29,7 @@ export function PropertyDeed({ state, propertyKey, playerName, onOwnerPress, chi
   const level = prop.hotel ? 4 : prop.houses;
   const groupTheme = PROPERTY_GROUP_THEME[deed.group];
   const owner = prop.ownerId ? state.players.find((p) => p.id === prop.ownerId) : undefined;
+  const listing = openResaleFor(state, propertyKey);
 
   return (
     <Card className="overflow-hidden p-0" testID="property-deed">
@@ -62,6 +63,12 @@ export function PropertyDeed({ state, propertyKey, playerName, onOwnerPress, chi
           <Button size="sm" variant="secondary" title={`View ${owner.name}`} testID="property-view-owner" onPress={() => onOwnerPress(owner.id)} />
         ) : null}
         {prop.mortgaged ? <Pill tone="bad">Mortgaged — no rent</Pill> : null}
+        {/* Intermediate Mode: its owner is selling it, buildings included. Everyone sees that, like a mortgage. */}
+        {listing ? (
+          <View testID="property-auction-status">
+            <Pill tone="gold">Up for auction · reserve {formatINR(listing.resale!.reservePrice)}</Pill>
+          </View>
+        ) : null}
         <PropertyValuation state={state} propertyKey={propertyKey} />
         {prop.ownerId ? (
           <View>

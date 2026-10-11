@@ -204,8 +204,29 @@ export function buyInsuranceForAll(d: Draft, actor: PlayerState, keys: readonly 
   for (const key of keys) buyInsurance(d, actor, key, expectedPremium);
 }
 
-/** A premium or a crisis bill is never reversed, so earlier actions on that property can no longer be undone around it. */
-function forgetUndoFor(d: Draft, key: PropertyKey): void {
+/**
+ * A property was sold by its owner (a resale auction): the seller's cover on it ends here, for good.
+ * The policy protected the seller's ownership and nobody else's, so it is closed rather than left
+ * dormant — it can never revive if the seller buys the property back — and it does not go to the
+ * buyer, who may insure the property themselves. No refund: unused cover is simply over.
+ */
+export function endInsuranceOnSale(d: Draft, key: PropertyKey, sellerId: string): void {
+  const ins = insuranceOf(d.state);
+  if (!ins) return;
+  for (const policy of ins.policies) {
+    if (policy.propertyKey !== key || policy.ownerId !== sellerId || policy.status !== 'ACTIVE') continue;
+    policy.status = 'EXPIRED';
+    policy.closedAt = d.ctx.now;
+    d.event('INSURANCE_ENDED', sellerId, `${d.name(sellerId)}'s insurance on ${getDeed(key).name} ended with the sale`, {
+      policyId: policy.id,
+      propertyKey: key,
+      reason: 'PROPERTY_SOLD',
+    });
+  }
+}
+
+/** A premium, a crisis bill or an auction sale is never reversed, so earlier actions on that property can no longer be undone around it. */
+export function forgetUndoFor(d: Draft, key: PropertyKey): void {
   const touches = (r: GameState['undoStack'][number]) => r.propertyKey === key || r.propertiesAfter.some((p) => p.key === key);
   if (!d.state.undoStack.some(touches)) return;
   d.state.undoStack = d.state.undoStack.filter((r) => !touches(r));

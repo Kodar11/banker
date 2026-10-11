@@ -102,6 +102,17 @@ export function intermediateRuleEntries(config: GameConfig = defaultGameConfig('
       example: `Insuring three properties costs ${formatINR(3 * premiumForYear(1))} in Year 1 and ${formatINR(3 * premiumForYear(4))} in Year 4.`,
     },
     {
+      title: 'Auctioning your property',
+      lines: [
+        'On your own turn — before you roll, after your move is settled, or while you owe a payment — you may put a property you own up for auction. It goes with every house or the hotel on it: nothing has to be sold first, and the winner pays nothing extra for the buildings.',
+        'A mortgaged property, or one pledged as loan collateral, can’t be auctioned. While the auction runs the property can’t be built on, mortgaged, pledged, traded or sold.',
+        `You set a reserve price (up to ${formatINR(IR.resale.maxReservePrice)}): bidding opens at that price, so the first bid already buys it unless someone bids higher. Every other player may bid; you can’t bid on your own property. The winner pays you, not the bank.`,
+        `After a ${IR.resale.startCountdownSeconds}-second “get ready”, bidders have the usual countdown, and every bid restarts it.`,
+        'No bids: nothing changes hands and no money moves. You may cancel only while nobody has bid.',
+        'Your insurance on a property you sell ends with the sale: no refund, and it does not pass to the buyer, who may insure the property themselves.',
+      ],
+    },
+    {
       title: 'Net worth',
       lines: ['Cash + properties at market value + buildings at cost − what it costs to redeem your mortgages − loans owed.', 'Net worth is not cash: only cash pays an installment.'],
     },

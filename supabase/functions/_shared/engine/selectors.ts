@@ -1,11 +1,15 @@
 import { getDeed, groupMembers, PROPERTY_KEYS, type ColorGroup, type PropertyKey } from './businessBoard.ts';
-import { crisisOwed, economyOf, isPledged, loanLiability, pendingCrises, type GameMode, type IntermediateState } from './intermediateState.ts';
+import { formatINR } from './format.ts';
+import { INTERMEDIATE_RULES as IR } from './intermediateConfig.ts';
+import { crisisOwed, economyOf, isIntermediate, isPledged, loanLiability, pendingCrises, type GameMode, type IntermediateState } from './intermediateState.ts';
 import { BUSINESS_MVP_RULES as RULES } from './rules.ts';
-import type { GameState, LoanState, PlayerState, PropertyState, TradeOffer, UndoableRecord } from './types.ts';
+import type { AuctionState, GameState, LoanState, PlayerState, PropertyState, ResaleResumePhase, ResaleTerms, TradeOffer, UndoableRecord } from './types.ts';
 
 type StateLike = Pick<GameState, 'properties'>;
 /** Mode-aware selectors accept states that carry the mode; without one they read as Classic. */
 type ModeAware = { mode?: GameMode; intermediate?: IntermediateState | null };
+/** Selectors that must respect a running resale auction accept states that carry the auction; without one nothing is listed. */
+type AuctionAware = { auction?: AuctionState | null };
 
 export function ownedBy(state: StateLike, playerId: string): PropertyKey[] {
   return PROPERTY_KEYS.filter((k) => state.properties[k]?.ownerId === playerId);
@@ -273,10 +277,12 @@ export function tradePropertyLabel(state: StateLike, key: PropertyKey): string {
 }
 
 /** Why one side's property can't be traded right now, or null. */
-export function tradePropertyBlocker(state: StateLike & ModeAware, ownerId: string, key: PropertyKey): string | null {
+export function tradePropertyBlocker(state: StateLike & ModeAware & AuctionAware, ownerId: string, key: PropertyKey): string | null {
   const prop = state.properties[key];
   const name = getDeed(key).name;
   if (!prop || prop.ownerId !== ownerId) return `${name} no longer belongs to that player.`;
+  // Intermediate Mode: a property its owner is auctioning goes to the auction's winner or stays put.
+  if (openResaleFor(state, key)) return `${name} is up for auction.`;
   if (RULES.trades.requireNoBuildings && (prop.hotel || prop.houses > 0)) return `Sell the buildings on ${name} before trading it.`;
   if (!RULES.trades.allowMortgaged && prop.mortgaged) return `${name} is mortgaged.`;
   if (isPledged(state, key)) return `${name} is pledged as loan collateral.`;
@@ -288,7 +294,7 @@ export function tradePropertyBlocker(state: StateLike & ModeAware, ownerId: stri
  * again when accepting). Returns the first problem, or null if it can execute.
  */
 export function tradeBlocker(
-  state: Pick<GameState, 'players' | 'properties' | 'status'> & ModeAware,
+  state: Pick<GameState, 'players' | 'properties' | 'status'> & ModeAware & AuctionAware,
   trade: Pick<TradeOffer, 'fromPlayerId' | 'toPlayerId' | 'offeredPropertyKeys' | 'requestedPropertyKeys' | 'offeredMoney' | 'requestedMoney'>,
 ): string | null {
   if (state.status !== 'ACTIVE') return 'The game is not running.';
@@ -334,9 +340,11 @@ function sameProperty(a: PropertyState | undefined, b: PropertyState): boolean {
  * A record is superseded when any property it touched has changed since, or
  * when a player it touched is no longer in the game.
  */
-export function undoBlocker(state: Pick<GameState, 'properties' | 'players'> & ModeAware, record: UndoableRecord): string | null {
+export function undoBlocker(state: Pick<GameState, 'properties' | 'players'> & ModeAware & AuctionAware, record: UndoableRecord): string | null {
   for (const after of record.propertiesAfter) {
     if (isPledged(state, after.key)) return `${getDeed(after.key).name} is pledged as loan collateral — can’t undo.`;
+    // Bidders are bidding on the property as it was listed: nothing about it is taken back meanwhile.
+    if (openResaleFor(state, after.key)) return `${getDeed(after.key).name} is up for auction — can’t undo.`;
     if (!sameProperty(state.properties[after.key], after)) return `${getDeed(after.key).name} has changed since — can’t undo.`;
   }
   for (const id of [record.actorId, ...record.counterpartyIds]) {
@@ -424,6 +432,87 @@ export function propertyActionBlocker(
       if (player.balance < unmortgageCost(key)) return 'Not enough money to unmortgage.';
       return null;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Property resale auctions (Intermediate Mode)
+// ---------------------------------------------------------------------------
+
+/** The resale terms of an auction, or null for the bank's auction of an unowned property. */
+export function resaleOf(auction: Pick<AuctionState, 'resale'> | null | undefined): ResaleTerms | null {
+  return auction?.resale ?? null;
+}
+
+/** The open resale auction this property is listed in, or null. */
+export function openResaleFor(state: AuctionAware, key: PropertyKey): AuctionState | null {
+  const auction = state.auction;
+  return auction && auction.status === 'OPEN' && auction.resale && auction.propertyKey === key ? auction : null;
+}
+
+/**
+ * Server-clock ms at which the first bid is accepted. A resale starts with a short "get ready"
+ * (INTERMEDIATE_RULES.resale.startCountdownSeconds) so the auction is on every phone before
+ * bidding opens; the bank's auction of an unowned property opens the moment it is created.
+ */
+export function auctionOpensAt(auction: Pick<AuctionState, 'createdAt' | 'resale'>): number {
+  return Date.parse(auction.createdAt) + (auction.resale ? IR.resale.startCountdownSeconds * 1000 : 0);
+}
+
+/** The phases of their own turn in which a player may list a property; the turn returns to the same one afterwards. */
+export const RESALE_START_PHASES: readonly ResaleResumePhase[] = ['AWAITING_ROLL', 'AWAITING_PAYMENT', 'TURN_COMPLETE'];
+
+/** Why `amount` can't be a reserve price, or null. The seller chooses it freely within the game's money rules. */
+export function reservePriceBlocker(amount: number): string | null {
+  if (!Number.isInteger(amount) || amount <= 0) return 'Enter a reserve price in whole rupees.';
+  if (amount > IR.resale.maxReservePrice) return `The reserve price can be at most ${formatINR(IR.resale.maxReservePrice)}.`;
+  return null;
+}
+
+/**
+ * Why this player can't put this property up for auction right now, or null.
+ * The engine runs it when the auction is created; the screens show the same answer.
+ */
+export function resaleBlocker(state: GameState, playerId: string, key: PropertyKey): string | null {
+  if (!isIntermediate(state)) return 'Property auctions are only available in Intermediate Mode.';
+  const prop = state.properties[key];
+  const player = state.players.find((p) => p.id === playerId);
+  if (!prop || !player) return 'Unknown property.';
+  if (state.status !== 'ACTIVE') return state.status === 'PAUSED' ? 'Game is paused.' : 'Game is not running.';
+  if (player.status !== 'ACTIVE') return 'You are out of the game.';
+  if (prop.ownerId === null) return 'This property belongs to the bank.';
+  if (prop.ownerId !== playerId) return "You don't own this property.";
+  if (openResaleFor(state, key)) return 'Already up for auction.';
+  if (state.turn.phase === 'AUCTION') return 'Wait for the auction to finish.';
+  const crisis = pendingCrises(state)[0];
+  if (crisis) return crisis.ownerId === playerId ? 'Settle your crisis bill first.' : 'A crisis bill must be settled before play continues.';
+  if (prop.mortgaged) return 'Mortgaged — unmortgage it before auctioning it.';
+  if (isPledged(state, key)) return 'Pledged as loan collateral — repay that loan first.';
+  if (state.turn.playerId !== playerId) return 'You can auction a property during your own turn.';
+  if (!(RESALE_START_PHASES as readonly string[]).includes(state.turn.phase)) return 'Finish your current action first.';
+  if (!state.players.some((p) => p.id !== playerId && p.status === 'ACTIVE')) return 'Nobody else is left to bid.';
+  return null;
+}
+
+/**
+ * Why a closing resale auction does not sell the property, or null when the sale goes through.
+ * Everything is judged against the state as it is NOW — the bid, the reserve, the buyer's cash,
+ * who owns the property and what is on it — so nothing agreed earlier is taken on trust.
+ */
+export function resaleSaleBlocker(state: GameState, auction: AuctionState): string | null {
+  const resale = auction.resale;
+  if (!resale || !isIntermediate(state)) return 'this auction cannot sell a player’s property';
+  if (auction.highBid === null || auction.highBidderId === null) return 'no bids';
+  if (auction.highBid < resale.reservePrice) return 'reserve price not met';
+  const winner = state.players.find((p) => p.id === auction.highBidderId);
+  if (!winner || winner.id === resale.sellerId || !auction.participantIds.includes(winner.id)) return 'the highest bid was not valid';
+  if (winner.status !== 'ACTIVE') return `${winner.name} ${winner.status === 'LEFT' ? 'left the game' : 'is out of the game'}`;
+  const prop = state.properties[auction.propertyKey];
+  if (!prop || prop.ownerId !== resale.sellerId) return 'the seller no longer owns it';
+  if (prop.mortgaged) return 'it was mortgaged';
+  if (isPledged(state, auction.propertyKey)) return 'it was pledged as loan collateral';
+  if (prop.houses !== resale.houses || prop.hotel !== resale.hotel) return 'its buildings changed';
+  if (winner.balance < auction.highBid) return `${winner.name} couldn't pay`;
+  return null;
 }
 
 export function currentPlayer(state: GameState): PlayerState | undefined {

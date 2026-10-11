@@ -4,6 +4,7 @@ import { SafeAreaInsetsContext, SafeAreaView } from 'react-native-safe-area-cont
 import { router, useIsFocused } from 'expo-router';
 import { configOf, economyOf, isIntermediate, isPropertyKey, pendingCrisisOf, positionOfProperty, spaceAt, spaceName, topUndoable, yearProgressPercent, type UndoableRecord } from '@/engine/index.ts';
 import { Button, ConfirmDialog, ConnectionBanner, Sheet } from '@/components/ui';
+import { NEW_AUCTION } from '@/features/auction/AuctionView';
 import { ClassicBoard } from '@/features/board/ClassicBoard';
 import { SquareDetails } from '@/features/board/SquareDetails';
 import { FinanceHub, type FinanceTab } from '@/features/finance/FinanceHub';
@@ -98,6 +99,12 @@ export function GameScreen({ view }: { view: GameView }) {
   const [introSettled, setIntroSettled] = useState(false);
   const settleIntro = useCallback(() => setIntroSettled(true), []);
   const auctionId = state.auction?.status === 'OPEN' ? state.auction.id : null;
+  // Intermediate Mode: with no auction running, the Auction button is where a player puts a property of theirs up for sale.
+  const canListProperty = !auctionId && isIntermediate(state) && state.status === 'ACTIVE' && me?.status === 'ACTIVE';
+  const openAuction = () => {
+    if (auctionId) router.push(`/auction/${auctionId}`);
+    else if (canListProperty) router.push(`/auction/${NEW_AUCTION}`);
+  };
   // A sheet would cover the auction screen, so a sheet opened before an auction started is closed by it.
   const panel = panelState && (!auctionId || panelState.auctionId === auctionId) ? panelState.panel : null;
   const setPanel = useCallback(
@@ -210,9 +217,9 @@ export function GameScreen({ view }: { view: GameView }) {
           icon: 'auction',
           label: 'Auction',
           testID: 'open-auction',
-          disabled: !auctionId,
-          hint: auctionId ? 'Open the live auction' : 'Starts when a player declines a property',
-          onPress: () => auctionId && router.push(`/auction/${auctionId}`),
+          disabled: !auctionId && !canListProperty,
+          hint: auctionId ? 'Open the live auction' : canListProperty ? 'Auction one of your properties' : 'Starts when a player declines a property',
+          onPress: openAuction,
         },
     { key: 'more', icon: 'more', label: 'More', testID: 'open-more', hint: `${hasObjective ? 'Your secret objective, ' : ''}${voiceRoom ? 'auction, voice settings, ' : ''}mortgage, undo, pause, log and rules`.replace(/^./, (c) => c.toUpperCase()), onPress: () => setPanel({ kind: 'more' }) },
   ];
@@ -254,10 +261,13 @@ export function GameScreen({ view }: { view: GameView }) {
         key: 'auction',
         icon: '🔨',
         label: 'Auction',
-        hint: auctionId ? 'Open the live auction' : 'No auction running',
+        hint: auctionId ? 'Open the live auction' : canListProperty ? 'Auction one of your properties' : 'No auction running',
         testID: 'more-auction',
-        disabled: !auctionId,
-        onPress: () => auctionId && router.push(`/auction/${auctionId}`),
+        disabled: !auctionId && !canListProperty,
+        onPress: () => {
+          if (!auctionId) setPanel(null);
+          openAuction();
+        },
       },
       { key: 'manage', icon: '🏗️', label: 'Mortgage, build or sell', hint: 'Pick one of your properties', testID: 'more-manage', onPress: () => openWallet(me.id) },
       {

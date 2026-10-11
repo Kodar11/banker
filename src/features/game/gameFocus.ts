@@ -213,6 +213,7 @@ const IMPORTANT_EVENTS: Readonly<Record<string, { icon: string; label: string }>
   HOST_CHANGED: { icon: '👑', label: 'New host' },
   AUCTION_WON: { icon: '🔨', label: 'Auction result' },
   AUCTION_UNSOLD: { icon: '🔨', label: 'Auction result' },
+  AUCTION_CANCELLED: { icon: '🔨', label: 'Auction cancelled' },
   REST_HOUSE: { icon: '🛏️', label: 'Rest House' },
   CRISIS_STRUCK: { icon: '⚠️', label: 'Crisis' },
   CRISIS_COVERED: { icon: '🛡️', label: 'Crisis · insured' },
@@ -305,12 +306,14 @@ export function pickContext(view: Pick<GameView, 'snapshot' | 'me' | 'current' |
   }
 
   const auction = state.auction?.status === 'OPEN' ? state.auction : null;
+  // A player's own auction (Intermediate Mode) names the seller and the reserve the bids must reach.
+  const resale = auction?.resale ?? null;
   const auctionItem = (): ContextItem | null =>
     auction
       ? {
           kind: 'auction',
           icon: '🔨',
-          label: 'Auction',
+          label: resale ? `Auction · sold by ${resale.sellerId === me?.id ? 'you' : view.playerName(resale.sellerId)}` : 'Auction',
           title: `${getDeed(auction.propertyKey).name} is up for bids`,
           detail: auction.highBid === null ? `Opening bid ${formatINR(minimumNextBid(auction))}` : `Highest ${formatINR(auction.highBid)} · ${view.playerName(auction.highBidderId)}`,
           cta: { label: 'View Auction', target: { kind: 'auction', auctionId: auction.id } },

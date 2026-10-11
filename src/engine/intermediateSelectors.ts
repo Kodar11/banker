@@ -30,7 +30,7 @@ import {
   type IntermediateLoan,
   type IntermediateState,
 } from './intermediateState.ts';
-import { buildingCost, intermediateDebt, intermediateNetAssets, ownedBy, unmortgageCost } from './selectors.ts';
+import { buildingCost, intermediateDebt, intermediateNetAssets, openResaleFor, ownedBy, unmortgageCost } from './selectors.ts';
 import type { GameState } from './types.ts';
 
 /**
@@ -147,14 +147,14 @@ export interface CollateralOption {
   limit: number;
 }
 
-/** Properties this player could pledge: owned outright, undeveloped, not mortgaged, not already pledged. */
-export function eligibleCollateral(state: Pick<GameState, 'properties' | 'mode' | 'intermediate'>, playerId: string): CollateralOption[] {
+/** Properties this player could pledge: owned outright, undeveloped, not mortgaged, not already pledged, not up for auction. */
+export function eligibleCollateral(state: Pick<GameState, 'properties' | 'mode' | 'intermediate'> & { auction?: GameState['auction'] }, playerId: string): CollateralOption[] {
   const eco = economyOf(state);
   if (!eco) return [];
   return ownedBy(state, playerId)
     .filter((key) => {
       const p = state.properties[key];
-      return !!p && !p.mortgaged && !p.hotel && p.houses === 0 && !isPledged(state, key);
+      return !!p && !p.mortgaged && !p.hotel && p.houses === 0 && !isPledged(state, key) && !openResaleFor(state, key);
     })
     .map((key) => {
       const marketValue = eco.market[key]?.value ?? getDeed(key).price;

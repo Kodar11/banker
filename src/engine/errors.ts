@@ -18,6 +18,7 @@ export type GameErrorCode =
   | 'NOT_OWNER'
   | 'INVALID_BID'
   | 'AUCTION_CLOSED'
+  | 'AUCTION_NOT_ALLOWED'
   | 'BUILD_NOT_ALLOWED'
   | 'MORTGAGE_NOT_ALLOWED'
   | 'LOAN_NOT_ALLOWED'

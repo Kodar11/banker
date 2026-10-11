@@ -16,13 +16,26 @@ import { Draft } from './draft.ts';
 import { fail, GameError } from './errors.ts';
 import { formatINR } from './format.ts';
 import { configOf, parseGameConfig } from './gameConfig.ts';
-import { assertCrisisBankruptcy, buyInsurance, buyInsuranceForAll, closeCrisesInBankruptcy, closePendingCrises, crisisGate, payCrisisBill } from './insurance.ts';
+import {
+  assertCrisisBankruptcy,
+  buyInsurance,
+  buyInsuranceForAll,
+  closeCrisesInBankruptcy,
+  closePendingCrises,
+  crisisGate,
+  endInsuranceOnSale,
+  forgetUndoFor,
+  payCrisisBill,
+} from './insurance.ts';
 import { initEconomy, payDefaultedLoan, payInstallment, prepayLoan, recordDiceMovement, takeLoan, writeOffLoans } from './intermediateEngine.ts';
+import { INTERMEDIATE_RULES as IR } from './intermediateConfig.ts';
 import { isIntermediate, normalizeGameMode, type GameMode } from './intermediateState.ts';
 import { assignObjectives, finalizeObjectives, forgetObjectiveTrade, recordObjectiveTrade } from './objectives.ts';
 import { BUSINESS_MVP_RULES as RULES } from './rules.ts';
 import {
+  auctionOpensAt,
   buildingCount,
+  buildingLabel,
   computeRent,
   incomeTaxDue,
   loansWithInterestDue,
@@ -32,6 +45,9 @@ import {
   outstandingPrincipal,
   propertyActionBlocker,
   purchasePrice,
+  resaleBlocker,
+  resaleSaleBlocker,
+  reservePriceBlocker,
   sellBuildingRefund,
   topUndoable,
   tradeBlocker,
@@ -42,6 +58,7 @@ import {
   type PropertyActionKind,
 } from './selectors.ts';
 import type {
+  AuctionState,
   EngineContext,
   EngineResult,
   FollowUp,
@@ -50,6 +67,8 @@ import type {
   Pending,
   PlayerState,
   PropertyState,
+  ResaleResumePhase,
+  ResaleTerms,
   TradeOffer,
   TransactionRecord,
   TurnState,
@@ -355,6 +374,13 @@ export function applyAction(state: GameState, actorId: string, rawAction: unknow
       break;
     case 'CLOSE_AUCTION':
       closeAuction(d, action.auctionId);
+      break;
+    // Property resale auctions. Both refuse a Classic game.
+    case 'START_RESALE_AUCTION':
+      startResaleAuction(d, actor, action.propertyKey, action.reservePrice);
+      break;
+    case 'CANCEL_AUCTION':
+      cancelResaleAuction(d, actor, action.auctionId);
       break;
     case 'END_TURN':
       endTurn(d, actor);
@@ -1034,25 +1060,167 @@ function declineProperty(d: Draft, actor: PlayerState): void {
     d.setPhase('TURN_COMPLETE');
     return;
   }
-  d.setPhase('AUCTION');
-  d.state.auction = {
-    id: d.ctx.newId(),
+  const auction = openNewAuction(d, deed.key, participants);
+  d.event('AUCTION_STARTED', actor.id, `${actor.name} declined ${deed.name} — auction started!`, {
     propertyKey: deed.key,
+    auctionId: auction.id,
+  });
+}
+
+/**
+ * THE way an auction opens — the bank's or a player's: same increments and bidding countdown, one at a time.
+ * A resale differs in two ways only: bidding opens at the seller's reserve price (nobody wastes time on
+ * bids that could never buy it), and the countdown starts after a short "get ready" (auctionOpensAt).
+ */
+function openNewAuction(d: Draft, key: PropertyKey, participantIds: string[], resale: ResaleTerms | null = null): AuctionState {
+  d.setPhase('AUCTION');
+  const leadSeconds = resale ? IR.resale.startCountdownSeconds : 0;
+  const auction: AuctionState = {
+    id: d.ctx.newId(),
+    propertyKey: key,
     status: 'OPEN',
     highBid: null,
     highBidderId: null,
-    minimumOpeningBid: RULES.auction.minimumOpeningBid,
+    minimumOpeningBid: resale ? resale.reservePrice : RULES.auction.minimumOpeningBid,
     minimumIncrement: RULES.auction.minimumIncrement,
-    endsAt: addSeconds(d.ctx.now, RULES.auction.openingTimerSeconds),
-    participantIds: participants,
+    endsAt: addSeconds(d.ctx.now, leadSeconds + RULES.auction.openingTimerSeconds),
+    participantIds,
     passedIds: [],
     winnerId: null,
     createdAt: d.ctx.now,
     closedAt: null,
+    resale,
   };
-  d.event('AUCTION_STARTED', actor.id, `${actor.name} declined ${deed.name} — auction started!`, {
+  d.state.auction = auction;
+  return auction;
+}
+
+// ---------------------------------------------------------------------------
+// Property resale auctions (Intermediate Mode): a player sells a property they own, buildings included
+// ---------------------------------------------------------------------------
+
+/**
+ * Lists `key` for auction on the seller's own turn. Runs on the game's one auction — same bids,
+ * passes, countdown and close — with the seller left out of the bidders, and bidding opening at
+ * the seller's reserve price after a short "get ready". Nothing about the property changes while it is listed: the AUCTION phase
+ * already refuses building, selling and mortgaging, and a listed property can't be traded or pledged.
+ */
+function startResaleAuction(d: Draft, actor: PlayerState, key: PropertyKey, reservePrice: number): void {
+  const why = resaleBlocker(d.state, actor.id, key);
+  if (why) fail(why.startsWith("You don't own") || why.startsWith('This property belongs') ? 'NOT_OWNER' : 'AUCTION_NOT_ALLOWED', why);
+  const badPrice = reservePriceBlocker(reservePrice);
+  if (badPrice) fail('VALIDATION', badPrice);
+  const prop = d.state.properties[key];
+  const label = tradePropertyLabel(d.state, key);
+  const bidders = d
+    .activePlayers()
+    .filter((p) => p.id !== actor.id)
+    .map((p) => p.id);
+  const auction = openNewAuction(d, key, bidders, {
+    sellerId: actor.id,
+    reservePrice,
+    houses: prop.houses,
+    hotel: prop.hotel,
+    // resaleBlocker allowed only these phases.
+    resumePhase: d.state.turn.phase as ResaleResumePhase,
+    outcome: null,
+  });
+  d.event('AUCTION_STARTED', actor.id, `${actor.name} put ${label} up for auction — reserve ${formatINR(reservePrice)}`, {
+    propertyKey: key,
+    auctionId: auction.id,
+    resale: true,
+    sellerId: actor.id,
+    reservePrice,
+    houses: prop.houses,
+    hotel: prop.hotel,
+  });
+}
+
+/** Ends a resale auction and hands the seller's turn back exactly where it was. Every way a resale closes goes through here. */
+function closeResale(d: Draft, auction: AuctionState, resale: ResaleTerms, outcome: NonNullable<ResaleTerms['outcome']>): void {
+  auction.status = 'CLOSED';
+  auction.closedAt = d.ctx.now;
+  resale.outcome = outcome;
+  d.setPhase(resale.resumePhase);
+}
+
+/** The seller withdraws their auction. Only while nobody has bid; a repeat of a cancel that already happened changes nothing. */
+function cancelResaleAuction(d: Draft, actor: PlayerState, auctionId: string): void {
+  const auction = d.state.auction;
+  if (!auction || auction.id !== auctionId) fail('AUCTION_CLOSED', 'That auction is no longer running.');
+  const resale = auction.resale;
+  if (!resale) fail('FORBIDDEN', 'This auction can’t be cancelled.');
+  if (resale.sellerId !== actor.id) fail('FORBIDDEN', 'Only the owner can cancel this auction.');
+  if (auction.status !== 'OPEN') {
+    if (resale.outcome === 'CANCELLED') return;
+    fail('AUCTION_CLOSED', 'That auction has finished.');
+  }
+  if (auction.highBid !== null) fail('AUCTION_NOT_ALLOWED', 'Bidding has started — the auction can no longer be cancelled.');
+  const deed = getDeed(auction.propertyKey);
+  closeResale(d, auction, resale, 'CANCELLED');
+  d.event('AUCTION_CANCELLED', actor.id, `${actor.name} cancelled the auction of ${deed.name}`, {
+    auctionId: auction.id,
     propertyKey: deed.key,
-    auctionId: d.state.auction.id,
+    resale: true,
+    sellerId: actor.id,
+  });
+}
+
+/**
+ * Closes a resale auction: the whole sale, or none of it. The sale is re-judged against the state
+ * as it is now (resaleSaleBlocker); if it stands, the bid goes from the buyer to the seller and the
+ * property moves with every house or its hotel exactly as it is, in this one action. The seller's
+ * insurance on it ends and is not handed on. Anything that fails throws before the draft is
+ * committed, so there is never a payment without the property or a property without the payment.
+ */
+function finalizeResale(d: Draft, auction: AuctionState, resale: ResaleTerms): void {
+  const deed = getDeed(auction.propertyKey);
+  const sellerName = d.name(resale.sellerId);
+  const why = resaleSaleBlocker(d.state, auction);
+  const price = auction.highBid;
+  const winner = auction.highBidderId ? d.player(auction.highBidderId) : null;
+  if (why || price === null || !winner) {
+    closeResale(d, auction, resale, 'UNSOLD');
+    d.event('AUCTION_UNSOLD', null, `${deed.name} stays with ${sellerName} (${why ?? 'no bids'})`, {
+      auctionId: auction.id,
+      propertyKey: deed.key,
+      resale: true,
+      sellerId: resale.sellerId,
+      reservePrice: resale.reservePrice,
+      highBid: price,
+    });
+    return;
+  }
+  const prop = d.state.properties[deed.key];
+  const built = buildingLabel(prop);
+  d.transfer({
+    type: 'AUCTION_PAYMENT',
+    from: winner.id,
+    to: resale.sellerId,
+    amount: price,
+    propertyKey: deed.key,
+    memo: `${deed.name} sold at auction by ${sellerName}`,
+  });
+  endInsuranceOnSale(d, deed.key, resale.sellerId);
+  // Only the owner changes: houses, hotel and everything else on the property go with it untouched.
+  prop.ownerId = winner.id;
+  auction.winnerId = winner.id;
+  closeResale(d, auction, resale, 'SOLD');
+  // Offers and undo entries made for the property under its old owner no longer describe it.
+  const stale = d.state.trades.filter((t) => t.status === 'PENDING' && (t.offeredPropertyKeys.includes(deed.key) || t.requestedPropertyKeys.includes(deed.key)));
+  expireTrades(d, (t) => stale.includes(t));
+  for (const t of stale) {
+    d.event('TRADE_EXPIRED', null, `Trade offer from ${d.name(t.fromPlayerId)} to ${d.name(t.toPlayerId)} closed — ${deed.name} was sold at auction`, { tradeId: t.id, propertyKey: deed.key });
+  }
+  forgetUndoFor(d, deed.key);
+  d.event('AUCTION_WON', winner.id, `${winner.name} bought ${deed.name}${built ? ` (${built})` : ''} from ${sellerName} for ${formatINR(price)}`, {
+    auctionId: auction.id,
+    propertyKey: deed.key,
+    amount: price,
+    resale: true,
+    sellerId: resale.sellerId,
+    houses: prop.houses,
+    hotel: prop.hotel,
   });
 }
 
@@ -1080,9 +1248,13 @@ export function auctionAcceptUntil(auction: { endsAt: string }): number {
 
 function placeBid(d: Draft, actor: PlayerState, auctionId: string, amount: number): void {
   const auction = openAuction(d, auctionId);
+  // A seller never bids on their own property — whatever the participant list says.
+  if (auction.resale?.sellerId === actor.id) fail('FORBIDDEN', "You can't bid on your own property.");
   if (!auction.participantIds.includes(actor.id)) fail('FORBIDDEN', "You're not in this auction.");
   if (auction.passedIds.includes(actor.id)) fail('INVALID_BID', 'You already passed on this auction.');
   if (Date.parse(d.ctx.receivedAt ?? d.ctx.now) >= auctionAcceptUntil(auction)) fail('AUCTION_CLOSED', 'Bidding has ended.');
+  // Resale: no bid counts before the "get ready" is over — the same instant for everyone, on the server's clock.
+  if (Date.parse(d.ctx.receivedAt ?? d.ctx.now) < auctionOpensAt(auction)) fail('INVALID_BID', 'Bidding has not started yet.');
   if (auction.highBidderId === actor.id) fail('INVALID_BID', 'You already have the highest bid.');
   const min = minimumNextBid(auction);
   if (amount < min) fail('INVALID_BID', `Minimum bid is ${formatINR(min)}.`);
@@ -1092,8 +1264,17 @@ function placeBid(d: Draft, actor: PlayerState, auctionId: string, amount: numbe
   auction.endsAt = addSeconds(d.ctx.now, RULES.auction.bidTimerSeconds);
   d.bids.push({ id: d.ctx.newId(), auctionId, playerId: actor.id, amount, actionId: d.ctx.actionId, createdAt: d.ctx.now });
   d.event('BID_PLACED', actor.id, `${actor.name} bid ${formatINR(amount)}`, { auctionId, amount });
-  const stillIn = auction.participantIds.filter((id) => id !== actor.id && !auction.passedIds.includes(id));
-  if (stillIn.length === 0) finalizeAuction(d);
+  if (auctionDecided(auction)) finalizeAuction(d);
+}
+
+/**
+ * Nothing more can happen in this auction, so it closes without waiting for the countdown: everyone
+ * but the high bidder has passed, or everyone passed without a bid.
+ */
+function auctionDecided(auction: AuctionState): boolean {
+  const stillIn = auction.participantIds.filter((id) => !auction.passedIds.includes(id));
+  if (auction.highBidderId === null) return stillIn.length === 0;
+  return stillIn.length === 1 && stillIn[0] === auction.highBidderId;
 }
 
 function passAuction(d: Draft, actor: PlayerState, auctionId: string): void {
@@ -1103,12 +1284,7 @@ function passAuction(d: Draft, actor: PlayerState, auctionId: string): void {
   if (auction.highBidderId === actor.id) fail('INVALID_BID', 'You have the highest bid — you can’t pass.');
   auction.passedIds.push(actor.id);
   d.event('AUCTION_PASSED', actor.id, `${actor.name} passed`, { auctionId });
-  const stillIn = auction.participantIds.filter((id) => !auction.passedIds.includes(id));
-  if (auction.highBidderId !== null) {
-    if (stillIn.length === 1 && stillIn[0] === auction.highBidderId) finalizeAuction(d);
-  } else if (stillIn.length === 0) {
-    finalizeAuction(d);
-  }
+  if (auctionDecided(auction)) finalizeAuction(d);
 }
 
 function closeAuction(d: Draft, auctionId: string): void {
@@ -1120,6 +1296,10 @@ function closeAuction(d: Draft, auctionId: string): void {
 function finalizeAuction(d: Draft): void {
   const auction = d.state.auction;
   if (!auction) return;
+  if (auction.resale) {
+    finalizeResale(d, auction, auction.resale);
+    return;
+  }
   const deed = getDeed(auction.propertyKey);
   auction.status = 'CLOSED';
   auction.closedAt = d.ctx.now;
@@ -1428,14 +1608,22 @@ function leaveTable(d: Draft, actor: PlayerState): void {
   }
 
   const auction = d.state.auction;
-  if (auction && auction.status === 'OPEN' && d.state.turn.phase === 'AUCTION' && auction.participantIds.includes(actor.id)) {
+  if (auction && auction.status === 'OPEN' && d.state.turn.phase === 'AUCTION' && auction.resale?.sellerId === actor.id) {
+    // The seller walked away from their own auction: it is withdrawn, whatever was bid. Nothing is sold.
+    const deed = getDeed(auction.propertyKey);
+    closeResale(d, auction, auction.resale, 'UNSOLD');
+    d.event('AUCTION_UNSOLD', null, `${deed.name} stays with ${actor.name} (${actor.name} left the game)`, {
+      auctionId: auction.id,
+      propertyKey: deed.key,
+      resale: true,
+      sellerId: actor.id,
+    });
+  } else if (auction && auction.status === 'OPEN' && d.state.turn.phase === 'AUCTION' && auction.participantIds.includes(actor.id)) {
     if (auction.highBidderId === actor.id) {
       finalizeAuction(d);
     } else {
       if (!auction.passedIds.includes(actor.id)) auction.passedIds.push(actor.id);
-      const stillIn = auction.participantIds.filter((id) => !auction.passedIds.includes(id));
-      const decided = auction.highBidderId !== null ? stillIn.length === 1 && stillIn[0] === auction.highBidderId : stillIn.length === 0;
-      if (decided) finalizeAuction(d);
+      if (auctionDecided(auction)) finalizeAuction(d);
     }
   }
 
