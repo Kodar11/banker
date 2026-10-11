@@ -1,4 +1,5 @@
 /// <reference types="jest" />
+import { victoryMotion } from '@/features/game/victoryMoment';
 import { useOnboardingStore } from '@/store/onboardingStore';
 /* Jest setup for UI tests: mock native modules and the network layer. */
 
@@ -169,6 +170,9 @@ jest.mock('@/lib/matchmakingApi', () => {
 
 // Every UI test starts as a returning player: the first-launch introduction has been seen.
 // tests/ui/onboarding.test.tsx sets what each of its scenarios needs.
+// A finished game shows its result card at rest: tests/ui/victory.test.tsx switches the celebration on.
 beforeEach(() => {
   useOnboardingStore.setState({ status: 'done' });
+  victoryMotion.enabled = false;
+  victoryMotion.played.clear();
 });

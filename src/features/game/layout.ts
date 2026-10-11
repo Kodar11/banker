@@ -16,6 +16,8 @@ export const MAX_BOARD = 640;
 export const SECTION_GAP = { normal: 8, dense: 6 } as const;
 export const TURN_BAR_HEIGHT = { normal: 68, dense: 56 } as const;
 export const CONTEXT_CARD_HEIGHT = { normal: 76, dense: 62 } as const;
+/** The finished game's result card takes the contextual card's place and holds more: a name row and a row of figures. */
+export const VICTORY_CARD_HEIGHT = { normal: 132, dense: 114 } as const;
 export const SCREEN_PADDING = { top: 4, bottom: 8 } as const;
 /**
  * The turn bar, contextual card and action buttons have fixed heights (so the
@@ -85,6 +87,8 @@ export interface ScreenLayoutInput {
   /** Measured height of the header + player strip (+ connection banner). */
   topHeight: number;
   only?: ActionLayout;
+  /** Heights of the card under the board, when it is not the contextual card (the result card of a finished game). */
+  context?: { readonly normal: number; readonly dense: number };
 }
 
 export interface ScreenLayoutPlan extends GameLayoutPlan {
@@ -112,11 +116,11 @@ const ROOMY = { gap: 4, context: 20, actionRow: 8, turnBar: 6 } as const;
  * empty bands above and below the board. Whatever is still left sits above the
  * action area, which stays at the bottom of the screen.
  */
-export function planScreenLayout({ width, height, topHeight, only }: ScreenLayoutInput): ScreenLayoutPlan {
+export function planScreenLayout({ width, height, topHeight, only, context = CONTEXT_CARD_HEIGHT }: ScreenLayoutInput): ScreenLayoutPlan {
   const variant = (dense: boolean) => {
     const k = dense ? 'dense' : 'normal';
-    const free = height - SCREEN_PADDING.top - SCREEN_PADDING.bottom - topHeight - TURN_BAR_HEIGHT[k] - CONTEXT_CARD_HEIGHT[k] - 4 * SECTION_GAP[k];
-    return { ...planGameLayout({ width, free, only }), dense, gap: SECTION_GAP[k], turnBarHeight: TURN_BAR_HEIGHT[k], contextHeight: CONTEXT_CARD_HEIGHT[k] };
+    const free = height - SCREEN_PADDING.top - SCREEN_PADDING.bottom - topHeight - TURN_BAR_HEIGHT[k] - context[k] - 4 * SECTION_GAP[k];
+    return { ...planGameLayout({ width, free, only }), dense, gap: SECTION_GAP[k], turnBarHeight: TURN_BAR_HEIGHT[k], contextHeight: context[k] };
   };
   const normal = variant(false);
   const plan = normal.fits ? normal : variant(true);

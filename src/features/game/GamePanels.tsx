@@ -2,12 +2,13 @@ import { memo } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import type { GameAction, PlayerState } from '@/engine/index.ts';
-import { Button, Card, Label, PlayerBadge } from '@/components/ui';
+import { Button, Card, InfoTip, Label, PlayerBadge } from '@/components/ui';
 import { ObjectiveResults } from '@/features/objectives/ObjectiveCard';
 import { ChipReaction } from '@/features/quickChat/QuickChatOverlays';
 import { useVoicePresence, VoiceIndicator, voicePresenceLabel } from '@/features/voice/VoiceIndicator';
 import { useGameStore } from '@/store/gameStore';
 import { formatINR } from '@/utils/currency';
+import { finalResult } from './finalResult';
 import type { GameView } from './useGameView';
 
 /**
@@ -99,31 +100,57 @@ export function UndoBanner({ view, send }: { view: GameView; send: (a: GameActio
   );
 }
 
+/** The standings sheet of a finished game: the winner, everyone in the order the server ranked them, and (Capital) the objectives. */
 export function FinishedView({ view }: { view: GameView }) {
-  const { state, events } = view.snapshot;
-  const finished = events.find((e) => e.type === 'GAME_FINISHED');
-  const standings = (finished?.payload.standings as { playerId: string; netWorth: number }[] | undefined) ?? [];
-  const winner = view.playerName(state.winnerId);
+  const { state } = view.snapshot;
+  const result = finalResult(view.snapshot);
+  const winner = view.playerName(result.winnerId);
   return (
     <>
-      <Card testID="finished-card" className="items-center">
-        <Text className="text-6xl">🏆</Text>
-        <Text className="mt-2 text-center text-3xl font-black text-ink">{state.winnerId ? `${winner} wins!` : 'Game over'}</Text>
-        <View className="mt-4 gap-2 self-stretch">
-          {standings.map((s, i) => (
-            <View key={s.playerId} className="flex-row justify-between rounded-xl bg-white px-4 py-3">
-              <Text className="text-lg font-bold text-ink">
-                {i + 1}. {view.playerName(s.playerId)}
-              </Text>
-              <Text className="text-lg font-bold text-ink">{formatINR(s.netWorth)}</Text>
-            </View>
-          ))}
+      <Card testID="finished-card" className="gap-4">
+        <View className="items-center">
+          <Text className="text-5xl">{result.winnerId ? '🏆' : '🏁'}</Text>
+          <Text className="mt-1 text-center text-3xl font-black text-ink" accessibilityRole="header">
+            {result.winnerId ? `${winner} wins!` : 'Game over'}
+          </Text>
+          {result.winnerNetWorth === null ? null : (
+            <Text className="mt-1 text-center text-base font-semibold text-stone-600" testID="finished-winner-worth">
+              Final net worth <Text className="font-black text-felt">{formatINR(result.winnerNetWorth)}</Text>
+            </Text>
+          )}
         </View>
-        <Text className="mt-3 text-center text-xs text-stone-500">
-          {state.mode === 'intermediate'
-            ? 'Net worth = cash + property at market value + buildings at cost − mortgages to redeem − loans owed'
-            : 'Net worth = cash + property at cost + buildings − loans owed'}
-        </Text>
+        <View className="gap-2">
+          <View className="flex-row items-center justify-between gap-3">
+            <Label>Ranked by net worth</Label>
+            <InfoTip
+              label="How net worth works"
+              labelClassName="text-xs font-semibold text-stone-600"
+              testID="net-worth-info"
+              text={
+                state.mode === 'intermediate'
+                  ? 'Net worth = cash + property at market value + buildings at cost − mortgages to redeem − loans owed. The highest net worth wins.'
+                  : 'Net worth = cash + property at cost + buildings − loans owed. The highest net worth wins.'
+              }
+            />
+          </View>
+          {result.standings.map((s, i) => {
+            const won = s.playerId === result.winnerId;
+            return (
+              <View
+                key={s.playerId}
+                testID={`standing-${s.playerId}`}
+                accessible
+                accessibilityLabel={`${i + 1}. ${view.playerName(s.playerId)}${won ? ', winner' : ''}, ${formatINR(s.netWorth)}`}
+                className={`flex-row items-center justify-between gap-3 rounded-xl border-2 px-4 py-3 ${won ? 'border-saffron bg-amber-50' : 'border-transparent bg-white'}`}
+              >
+                <Text className={`flex-1 text-lg text-ink ${won ? 'font-black' : 'font-bold'}`} numberOfLines={2}>
+                  {i + 1}. {view.playerName(s.playerId)}
+                </Text>
+                <Text className={`text-lg text-ink ${won ? 'font-black' : 'font-bold'}`}>{formatINR(s.netWorth)}</Text>
+              </View>
+            );
+          })}
+        </View>
       </Card>
       {/* Capital with secret objectives only: nothing is drawn when the game had none. */}
       <ObjectiveResults view={view} />

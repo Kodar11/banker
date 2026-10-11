@@ -37,11 +37,12 @@ import { FinishedView, PlayersStrip, UndoBanner } from './GamePanels';
 import { needsDecision, pickContext, type ContextTarget } from './gameFocus';
 import { leaveGame } from './leaveGame';
 import { LeaveGameDialog } from './LeaveGameDialog';
-import { planScreenLayout, SCREEN_PADDING, screenGutter, SECTION_GAP } from './layout';
+import { planScreenLayout, SCREEN_PADDING, screenGutter, SECTION_GAP, VICTORY_CARD_HEIGHT } from './layout';
 import { MoreActions, type MoreItem } from './MoreActions';
 import { TurnActionBar } from './TurnActionBar';
 import { sendFailure, useGameAction } from './useGameAction';
 import type { GameView } from './useGameView';
+import { VictoryCard } from './VictoryCard';
 
 /** Information sheets (one at a time, content swapped in place): opening one never changes game state. A property I own is also managed from its sheet. */
 type Panel =
@@ -125,7 +126,7 @@ export function GameScreen({ view }: { view: GameView }) {
   const height = viewport?.height ?? screenSize.height - insets.top - insets.bottom;
   const playing = state.status === 'ACTIVE' && me?.status === 'ACTIVE';
   // Nothing to do but browse (paused, finished, bankrupt): just "More", and the board keeps the room.
-  const plan = planScreenLayout({ width, height, topHeight, only: playing ? undefined : 'compact' });
+  const plan = planScreenLayout({ width, height, topHeight, only: playing ? undefined : 'compact', context: state.status === 'FINISHED' ? VICTORY_CARD_HEIGHT : undefined });
   const onTopLayout = (e: LayoutChangeEvent) => setTopHeight(Math.round(e.nativeEvent.layout.height));
 
   // ---- Table-side effects (unchanged behaviour) ----------------------------
@@ -430,7 +431,7 @@ export function GameScreen({ view }: { view: GameView }) {
         panelBody = <GameLog events={events} players={state.players} limit={30} />;
         break;
       case 'standings':
-        panelTitle = 'Final standings';
+        panelTitle = 'Final Standings';
         panelBody = (
           <>
             <FinishedView view={view} />
@@ -524,7 +525,12 @@ export function GameScreen({ view }: { view: GameView }) {
               <ClassicBoard state={state} size={plan.board} onSquarePress={openSquare} onTokenPress={openPlayer} />
             </View>
 
-            <ContextualCard item={context} height={plan.contextHeight} onAction={openContext} />
+            {state.status === 'FINISHED' ? (
+              // The result takes the card's place: it stays mounted under the standings sheet, so its one celebration is never replayed.
+              <VictoryCard view={view} height={plan.contextHeight} dense={plan.dense} onStandings={() => setPanel({ kind: 'standings' })} />
+            ) : (
+              <ContextualCard item={context} height={plan.contextHeight} onAction={openContext} />
+            )}
 
             {/* Any height the sections could not use sits here, so the actions stay at the bottom of the screen. */}
             <View testID="action-area" style={{ flexGrow: 1, justifyContent: 'flex-end' }}>
