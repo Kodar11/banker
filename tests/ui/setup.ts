@@ -1,4 +1,5 @@
 /// <reference types="jest" />
+import { useOnboardingStore } from '@/store/onboardingStore';
 /* Jest setup for UI tests: mock native modules and the network layer. */
 
 jest.mock('expo-haptics', () => ({
@@ -164,4 +165,10 @@ jest.mock('@/lib/matchmakingApi', () => {
       nudge: jest.fn(async () => undefined),
     },
   };
+});
+
+// Every UI test starts as a returning player: the first-launch introduction has been seen.
+// tests/ui/onboarding.test.tsx sets what each of its scenarios needs.
+beforeEach(() => {
+  useOnboardingStore.setState({ status: 'done' });
 });

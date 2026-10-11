@@ -4,6 +4,14 @@ appId: com.boardgamebank.businessbanker
 ---
 - launchApp:
     clearState: true
+# A fresh install opens on the introduction: skip it, the flows below start from Home.
+- runFlow:
+    when:
+      visible:
+        id: onboarding-skip
+    commands:
+      - tapOn:
+          id: onboarding-skip
 - tapOn:
     id: create-game
 - tapOn:

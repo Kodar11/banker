@@ -7,6 +7,7 @@ export const COLORS = {
   cream: '#FFF8E7',
   ink: '#1F1B16',
   saffron: '#F59E0B',
+  saffronDark: '#B45309',
   brick: '#C2410C',
   /** Physical-board surface and its gilded edge (Board View). */
   board: '#F7F1E1',

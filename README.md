@@ -28,7 +28,8 @@ App (Expo Router)  ──POST action──▶  Edge Function `game-action`  ─�
 ```
 app/                     Routes only (Expo Router)
   _layout.tsx            Root stack + single realtime/sync host
-  index.tsx              Home
+  index.tsx              Home (a first launch shows the introduction here instead)
+  onboarding.tsx         The introduction again, from House rules → "Replay intro"
   create-game.tsx        Create (select Business, host name)
   join-game.tsx          Join by 6-digit code or QR (deep link businessbanker://join-game?code=…)
   lobby/[gameId].tsx     Code, QR, players, ready, start

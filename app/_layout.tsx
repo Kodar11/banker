@@ -11,6 +11,7 @@ import { MatchmakingHost } from '@/features/matchmaking/MatchmakingHost';
 import { SocialHost } from '@/features/social/SocialHost';
 import { VoiceHost } from '@/features/voice/voice';
 import { useLearningStore } from '@/store/learningStore';
+import { useOnboardingStore } from '@/store/onboardingStore';
 import { useSessionStore } from '@/store/sessionStore';
 
 /**
@@ -29,10 +30,12 @@ export const unstable_settings = {
 export default function RootLayout() {
   const hydrate = useSessionStore((s) => s.hydrate);
   const hydrateLearning = useLearningStore((s) => s.hydrate);
+  const hydrateOnboarding = useOnboardingStore((s) => s.hydrate);
   useEffect(() => {
     void hydrate();
     void hydrateLearning();
-  }, [hydrate, hydrateLearning]);
+    void hydrateOnboarding();
+  }, [hydrate, hydrateLearning, hydrateOnboarding]);
 
   return (
     <SafeAreaProvider>

@@ -5,11 +5,13 @@ import { Button, Screen } from '@/components/ui';
 import { ProfileEntry } from '@/features/account/ProfileEntry';
 import { detachFromGame } from '@/features/game/leaveGame';
 import { PlayOnlineEntry } from '@/features/matchmaking/PlayOnlineView';
+import { OnboardingFlow } from '@/features/onboarding/OnboardingFlow';
 import { FriendsEntry } from '@/features/social/FriendsEntry';
 import { activeGameRoute } from '@/utils/navigation';
 import { startupRouting } from '@/utils/startupRouting';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { useGameStore } from '@/store/gameStore';
+import { onboardingDecision, useOnboardingStore } from '@/store/onboardingStore';
 import { useSessionStore } from '@/store/sessionStore';
 
 export default function Home() {
@@ -21,6 +23,9 @@ export default function Home() {
   const gone = !!loadError && ['FORBIDDEN', 'NOT_FOUND', 'GAME_EXPIRED'].includes(loadError.code);
   const target = session && status ? activeGameRoute(session.gameId, status) : null;
   const pathname = usePathname();
+  const onboarding = onboardingDecision({ status: useOnboardingStore((s) => s.status), sessionHydrated: hydrated, hasSession: !!session, pathname });
+  const completeOnboarding = useOnboardingStore((s) => s.complete);
+  const deferOnboarding = useOnboardingStore((s) => s.defer);
 
   // Startup restoration: an active lobby/game opens directly; a game that is gone is forgotten.
   useEffect(() => {
@@ -50,6 +55,17 @@ export default function Home() {
   useEffect(() => {
     if (pathname === '/' && session && (status === 'FINISHED' || left)) detachFromGame();
   }, [pathname, session, status, left]);
+
+  // A first launch that opened an invite link, or has a game to go back to, goes there: the
+  // introduction waits for a later launch instead of standing in the way.
+  useEffect(() => {
+    if (onboarding === 'defer') deferOnboarding();
+  }, [onboarding, deferOnboarding]);
+
+  // Until it is known whether this is a first launch, show the table and nothing on it — never Home for an instant.
+  if (onboarding === 'wait') return <View className="flex-1 bg-felt" testID="home-loading" />;
+  // First launch: the introduction is shown in Home's place, so finishing or skipping it needs no navigation.
+  if (onboarding === 'show') return <OnboardingFlow onFinish={completeOnboarding} />;
 
   return (
     <Screen

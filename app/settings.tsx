@@ -2,6 +2,7 @@
 import { goBack } from '@/utils/navigation';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
+import { router } from 'expo-router';
 import { configOf, GAME_MODE_NAMES, intermediateRuleEntries, ruleSections, topRules, type RuleEntry } from '@/engine/index.ts';
 import { Button, Card, Screen } from '@/components/ui';
 import { LeaveGameDialog } from '@/features/game/LeaveGameDialog';
@@ -108,6 +109,15 @@ export default function Settings() {
           rules={intermediateRuleEntries(config)}
         />
       ) : null}
+
+      <Button
+        size="sm"
+        variant="ghost"
+        title="Replay intro"
+        testID="replay-onboarding"
+        accessibilityHint="Shows the short introduction to the game again"
+        onPress={() => router.push('/onboarding')}
+      />
 
       {session ? (
         <Button
