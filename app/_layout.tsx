@@ -1,6 +1,7 @@
 import '../global.css';
 import { useEffect } from 'react';
 import { Stack } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NoticeToast } from '@/components/ui';
@@ -23,6 +24,16 @@ import { useSessionStore } from '@/store/sessionStore';
 /** A screen that throws while rendering shows a recoverable error screen; the game session is kept. */
 export { CrashScreen as ErrorBoundary } from '@/components/ui/CrashScreen';
 
+/**
+ * The launch screen stays up until storage has said where this launch goes (introduction, Home or a
+ * game), so the first thing seen after it is a real screen, not the empty table. It then fades out.
+ */
+const SPLASH_MAX_MS = 4000;
+SplashScreen.setOptions({ duration: 300, fade: true });
+SplashScreen.preventAutoHideAsync().catch(() => undefined);
+// Whatever happens to storage or the first render, the launch screen never stays up for good.
+setTimeout(() => SplashScreen.hide(), SPLASH_MAX_MS);
+
 export const unstable_settings = {
   anchor: 'index',
 };
@@ -36,6 +47,13 @@ export default function RootLayout() {
     void hydrateLearning();
     void hydrateOnboarding();
   }, [hydrate, hydrateLearning, hydrateOnboarding]);
+
+  const sessionHydrated = useSessionStore((s) => s.hydrated);
+  const onboardingKnown = useOnboardingStore((s) => s.status !== 'unknown');
+  const launchReady = sessionHydrated && onboardingKnown;
+  useEffect(() => {
+    if (launchReady) SplashScreen.hide();
+  }, [launchReady]);
 
   return (
     <SafeAreaProvider>
