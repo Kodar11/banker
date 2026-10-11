@@ -58,7 +58,7 @@ export function PropertyManage({ view, propertyKey }: { view: GameView; property
       actions.push({
         kind: 'SELL_BUILDING',
         title: `Sell ${prop.hotel ? 'Hotel' : 'House'} · +${formatINR(sellBuildingRefund(propertyKey, prop))}`,
-        variant: 'secondary',
+        variant: 'neutral',
         note: prop.hotel ? `Sells the hotel and the ${BUSINESS_MVP_RULES.building.maxHouses} houses it replaced.` : undefined,
         why: why('SELL_BUILDING'),
       });
@@ -77,7 +77,7 @@ export function PropertyManage({ view, propertyKey }: { view: GameView; property
     actions.push({
       kind: 'MORTGAGE_PROPERTY',
       title: `Mortgage · +${formatINR(mortgagePayout(propertyKey))}`,
-      variant: 'secondary',
+      variant: 'neutral',
       note: built ? 'Your buildings stay, but earn no rent until you unmortgage.' : 'No rent while it is mortgaged.',
       why: why('MORTGAGE_PROPERTY'),
     });

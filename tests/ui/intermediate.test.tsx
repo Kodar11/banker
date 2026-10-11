@@ -496,8 +496,17 @@ describe('Capital: property details', () => {
     expect(within(v).getByTestId('valuation-change')).toHaveTextContent(/\+10%/);
     expect(within(v).getByTestId('valuation-trend')).toHaveTextContent(/\+5% a year/);
     expect(within(v).getByTestId('valuation-projection')).toHaveTextContent(/in 5 years.*₹13,100/);
-    expect(within(v).getByTestId('valuation-projection-note')).toHaveTextContent(/A projection, not a guaranteed price/);
     expect(within(v).getByTestId('valuation-real')).toHaveTextContent(/₹9,342/);
+    // The explanations sit behind each label's ⓘ; the figures above stay in view without them.
+    expect(screen.queryByText(/A projection, not a guaranteed price/)).toBeNull();
+    await fireEvent.press(within(v).getByTestId('valuation-projection-info'));
+    expect(screen.getByTestId('valuation-projection-info-text')).toHaveTextContent(/A projection, not a guaranteed price/);
+    await fireEvent.press(screen.getByTestId('valuation-projection-info-close'));
+    expect(screen.queryByTestId('valuation-projection-info-text')).toBeNull();
+    await fireEvent.press(within(v).getByTestId('valuation-real-info'));
+    expect(screen.getByTestId('valuation-real-info-text')).toHaveTextContent(/inflation/i);
+    await fireEvent.press(screen.getByTestId('valuation-real-info-backdrop', { includeHiddenElements: true }));
+    expect(screen.queryByTestId('valuation-real-info-text')).toBeNull();
     // The printed deed is unchanged underneath.
     expect(within(screen.getByTestId('rent-table')).getByText('₹1,200')).toBeTruthy();
     expect(screen.getAllByText('₹7,500').length).toBeGreaterThan(0); // house and hotel cost

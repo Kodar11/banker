@@ -1,15 +1,27 @@
 import { Text, View } from 'react-native';
 import { getDeed, INTERMEDIATE_RULES, pledgedLoan, propertyValuation, type GameState, type PropertyKey } from '@/engine/index.ts';
-import { Label, Pill } from '@/components/ui';
+import { InfoTip, Label, Pill } from '@/components/ui';
 import { formatINR } from '@/utils/currency';
 
 const IR = INTERMEDIATE_RULES;
 
-function Line({ label, value, tone, testID }: { label: string; value: string; tone?: 'up' | 'down'; testID?: string }) {
+/** With `info`, the label carries an ⓘ that opens that explanation; the value stays in view either way. */
+function Line({ label, value, tone, info, testID }: { label: string; value: string; tone?: 'up' | 'down'; info?: string; testID?: string }) {
+  const amount = <Text className={`text-right text-base font-bold ${tone === 'up' ? 'text-green-700' : tone === 'down' ? 'text-brick' : 'text-ink'}`}>{value}</Text>;
+  if (info) {
+    return (
+      <View className="flex-row items-center justify-between gap-3 py-0.5" testID={testID}>
+        <View className="min-w-0 flex-1 flex-row">
+          <InfoTip label={label} text={info} testID={testID ? `${testID}-info` : undefined} />
+        </View>
+        {amount}
+      </View>
+    );
+  }
   return (
     <View className="flex-row items-baseline justify-between gap-3 py-0.5" testID={testID}>
       <Text className="flex-1 text-sm text-stone-600">{label}</Text>
-      <Text className={`text-right text-base font-bold ${tone === 'up' ? 'text-green-700' : tone === 'down' ? 'text-brick' : 'text-ink'}`}>{value}</Text>
+      {amount}
     </View>
   );
 }
@@ -42,23 +54,25 @@ export function PropertyValuation({ state, propertyKey }: { state: GameState; pr
         testID="valuation-change"
       />
       <Line label="Expected trend" value={`${percent(v.trendPercent)} a year`} testID="valuation-trend" />
-      <Line label={`Projected value in ${v.projectionYears} years`} value={formatINR(v.projectedValue)} testID="valuation-projection" />
-      <Text className="text-xs text-stone-500" testID="valuation-projection-note">
-        A projection, not a guaranteed price: today’s value growing at the expected trend. Each year’s real market change is unknown until it happens.
-      </Text>
+      <Line
+        label={`Projected value in ${v.projectionYears} years`}
+        value={formatINR(v.projectedValue)}
+        info="A projection, not a guaranteed price: today’s value growing at the expected trend. Each year’s real market change is unknown until it happens."
+        testID="valuation-projection"
+      />
       <Line
         label={v.inflationYears > 0 ? 'Value in Year-1 money' : 'Value in today’s money'}
         value={formatINR(v.realValue)}
         tone={v.inflationYears > 0 ? (v.realValue >= v.originalPrice ? 'up' : 'down') : undefined}
+        info={
+          v.inflationYears > 0
+            ? `After ${v.inflationYears} year${v.inflationYears === 1 ? '' : 's'} of ${IR.inflation.ratePercent}% inflation, ${formatINR(v.marketValue)} buys what ${formatINR(v.realValue)} did in Year 1. ${
+                v.realValue >= v.originalPrice ? 'It has kept ahead of inflation.' : 'It has not kept up with inflation.'
+              }`
+            : `Inflation is ${IR.inflation.ratePercent}% a year: a value has to grow that fast just to keep its buying power.`
+        }
         testID="valuation-real"
       />
-      <Text className="text-xs text-stone-500">
-        {v.inflationYears > 0
-          ? `After ${v.inflationYears} year${v.inflationYears === 1 ? '' : 's'} of ${IR.inflation.ratePercent}% inflation, ${formatINR(v.marketValue)} buys what ${formatINR(v.realValue)} did in Year 1. ${
-              v.realValue >= v.originalPrice ? 'It has kept ahead of inflation.' : 'It has not kept up with inflation.'
-            }`
-          : `Inflation is ${IR.inflation.ratePercent}% a year: a value has to grow that fast just to keep its buying power.`}
-      </Text>
       {pledged ? (
         <Text className="text-xs font-semibold text-amber-800" testID="valuation-pledged">
           {getDeed(propertyKey).name} secures a loan. It still earns rent, but can’t be mortgaged, sold, traded or built on until that loan is repaid.

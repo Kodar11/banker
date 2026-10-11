@@ -175,7 +175,7 @@ export function AuctionPropertyAction({ view, propertyKey, quietReason = null }:
     return (
       <View className="gap-2" testID="property-in-auction">
         <Pill tone="gold">Up for auction</Pill>
-        <Button title="View auction" size="md" variant="secondary" testID="action-VIEW_AUCTION" onPress={() => router.push(`/auction/${listing.id}`)} />
+        <Button title="View auction" size="md" variant="neutral" testID="action-VIEW_AUCTION" onPress={() => router.push(`/auction/${listing.id}`)} />
       </View>
     );
   }
@@ -184,7 +184,7 @@ export function AuctionPropertyAction({ view, propertyKey, quietReason = null }:
   const caption = why ? (why === quietReason ? null : why) : prop.hotel || prop.houses > 0 ? `Sold with its ${prop.hotel ? 'hotel' : prop.houses === 1 ? 'house' : 'houses'} to the highest bidder, starting at your reserve.` : 'To the highest bidder, starting at your reserve.';
   return (
     <View className="gap-1">
-      <Button title="Auction Property" size="md" variant="secondary" testID="action-AUCTION_PROPERTY" disabled={!!why || !!pending} onPress={() => setOpen(true)} />
+      <Button title="Auction Property" size="md" variant="neutral" testID="action-AUCTION_PROPERTY" disabled={!!why || !!pending} onPress={() => setOpen(true)} />
       {caption ? (
         <Text className="text-center text-xs font-semibold text-stone-600" testID="action-note-AUCTION_PROPERTY">
           {caption}

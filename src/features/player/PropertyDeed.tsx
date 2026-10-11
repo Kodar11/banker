@@ -95,15 +95,18 @@ export function PropertyDeed({ state, propertyKey, playerName, onOwnerPress, chi
             );
           })}
         </View>
-        <View className="flex-row flex-wrap gap-x-6 gap-y-2">
+        <View className="gap-2">
           {deed.kind === 'CITY' ? (
-            <>
+            <View className="flex-row gap-2 rounded-2xl bg-white p-3" testID="property-costs">
               <Info label="House cost" value={formatINR(deed.houseCost)} />
               <Info label="Hotel cost" value={formatINR(deed.hotelCost)} />
               <Info label="Built" value={prop.hotel ? 'Hotel' : `${prop.houses} house${prop.houses === 1 ? '' : 's'}`} testID="property-built" />
-            </>
+            </View>
           ) : null}
-          <Info label="Mortgage value" value={formatINR(deed.mortgageValue)} />
+          <View className="flex-row items-center justify-between gap-3 px-3" testID="property-mortgage-value">
+            <Label className="shrink">Mortgage value</Label>
+            <Text className="text-base font-bold text-ink">{formatINR(deed.mortgageValue)}</Text>
+          </View>
         </View>
         {children}
       </View>
@@ -111,11 +114,16 @@ export function PropertyDeed({ state, propertyKey, playerName, onOwnerPress, chi
   );
 }
 
+/** One of three equal columns. Label and value each stay on one line, shrinking a little before they would clip. */
 function Info({ label, value, testID }: { label: string; value: string; testID?: string }) {
   return (
-    <View testID={testID}>
-      <Text className="text-xs font-bold uppercase tracking-wider text-stone-500">{label}</Text>
-      <Text className="text-base font-bold text-ink">{value}</Text>
+    <View className="min-w-0 flex-1" testID={testID}>
+      <Text className="text-xs font-bold uppercase tracking-wider text-stone-500" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+        {label}
+      </Text>
+      <Text className="text-base font-bold text-ink" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+        {value}
+      </Text>
     </View>
   );
 }

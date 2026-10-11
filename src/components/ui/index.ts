@@ -2,6 +2,7 @@ export { Button } from './Button';
 export { Card, Label, Pill } from './Card';
 export { ConfirmDialog } from './ConfirmDialog';
 export { ConnectionBanner, ErrorState, LoadingState, NoticeToast } from './Feedback';
+export { InfoTip } from './InfoTip';
 export { Screen } from './Screen';
 export { Sheet } from './Sheet';
 export { MoneyField, TextField } from './TextField';

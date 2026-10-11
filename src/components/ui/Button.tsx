@@ -1,6 +1,6 @@
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
-type Variant = 'primary' | 'secondary' | 'danger' | 'ghost' | 'success' | 'outline';
+type Variant = 'primary' | 'secondary' | 'danger' | 'ghost' | 'success' | 'outline' | 'neutral';
 
 const VARIANTS: Record<Variant, { box: string; text: string; spinner: string }> = {
   primary: { box: 'bg-saffron border-b-4 border-saffron-dark', text: 'text-ink', spinner: '#1F1B16' },
@@ -9,6 +9,8 @@ const VARIANTS: Record<Variant, { box: string; text: string; spinner: string }> 
   danger: { box: 'bg-brick border-b-4 border-red-900', text: 'text-white', spinner: '#fff' },
   // A consequential action on a light surface that should not shout (e.g. sell to bank).
   outline: { box: 'border-2 border-brick/60', text: 'text-brick', spinner: '#C2410C' },
+  // An everyday action on a light surface, next to a filled or `outline` one (e.g. mortgage, auction).
+  neutral: { box: 'border-2 border-stone-400', text: 'text-ink', spinner: '#1F1B16' },
   ghost: { box: 'bg-white/10 border border-white/30', text: 'text-cream', spinner: '#FFF8E7' },
 };
 
@@ -64,16 +66,18 @@ export function Button({
       {loading ? (
         <ActivityIndicator color={v.spinner} />
       ) : (
-        <View className="items-center">
+        // Full width, text centred — not a box that hugs the title: some Android phones measure a hugging
+        // box a hair too narrow and push the last word onto a second line with room to spare.
+        <View className="self-stretch">
           <Text
-            className={`${textSize} font-extrabold tracking-wide ${v.text}`}
+            className={`text-center ${textSize} font-extrabold tracking-wide ${v.text}`}
             numberOfLines={oneLine ? 1 : undefined}
             adjustsFontSizeToFit={oneLine}
             minimumFontScale={0.75}
           >
             {title}
           </Text>
-          {subtitle ? <Text className={`text-sm font-semibold opacity-80 ${v.text}`}>{subtitle}</Text> : null}
+          {subtitle ? <Text className={`text-center text-sm font-semibold opacity-80 ${v.text}`}>{subtitle}</Text> : null}
         </View>
       )}
     </Pressable>
