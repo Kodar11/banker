@@ -6,6 +6,7 @@ import {
   normalizeGameConfig,
   normalizeGameMode,
   PROPERTY_KEYS,
+  redactFinances,
   redactObjectives,
   type AuctionState,
   type EngineResult,
@@ -244,8 +245,9 @@ function mapObjectives(rows: readonly Row[], trades: unknown): ObjectivesState |
 
 /**
  * What one player's device receives. `viewerId` is required on purpose: every snapshot that leaves the
- * server is cut down to what that player may see (redactObjectives), so no code path can send another
- * player's secret objective by forgetting to ask who is looking.
+ * server is cut down to what that player may see (redactObjectives, redactFinances), so no code path
+ * can send another player's secret objective - or, in a game with hidden finances, their money - by
+ * forgetting to ask who is looking. Create, join, state and action all answer through here.
  */
 export async function loadSnapshot(tx: Tx, game: Row, viewerId: string): Promise<GameSnapshot> {
   const id = game.id as string;
@@ -254,12 +256,15 @@ export async function loadSnapshot(tx: Tx, game: Row, viewerId: string): Promise
     tx`select * from public.game_events where game_id = ${id} order by seq desc limit 60`,
     tx`select * from public.transactions where game_id = ${id} order by seq desc limit 400`,
   ]);
-  return {
-    state: redactObjectives(state, viewerId),
-    events: events.map(mapEvent),
-    transactions: transactions.map(mapTransaction),
-    serverTime: new Date().toISOString(),
-  };
+  return redactFinances(
+    {
+      state: redactObjectives(state, viewerId),
+      events: events.map(mapEvent),
+      transactions: transactions.map(mapTransaction),
+      serverTime: new Date().toISOString(),
+    },
+    viewerId,
+  );
 }
 
 /** Inserts the rows for a brand-new game (after engine.createGame). */

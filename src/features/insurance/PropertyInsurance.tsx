@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Text, View } from 'react-native';
 import {
   averageSpaces,
+  canSeeFinances,
   economyOf,
   getDeed,
   INTERMEDIATE_RULES,
@@ -102,13 +103,15 @@ export function PropertyInsurance({ view, propertyKey }: { view: GameView; prope
   if (!eco || !insurance || prop.ownerId === null) return null;
 
   const mine = prop.ownerId === view.me?.id;
+  // Hidden finances: whether another player's property is insured is theirs to know (this phone is not sent it).
+  const known = canSeeFinances(state, view.me?.id, prop.ownerId);
   const { active, latest } = insurance;
   const ended = !active && latest ? (latest.status === 'CLAIMED' ? 'claimed' : 'expired') : null;
   return (
     <View className="mt-1 gap-2 border-t border-stone-200 pt-4" testID="property-insurance">
       <View className="flex-row items-center justify-between">
         <Label>Insurance</Label>
-        <View testID="insurance-status">{active ? <Pill tone="good">Insured</Pill> : <Pill tone="warn">Not insured</Pill>}</View>
+        <View testID="insurance-status">{!known ? <Pill>Private</Pill> : active ? <Pill tone="good">Insured</Pill> : <Pill tone="warn">Not insured</Pill>}</View>
       </View>
       {mine ? (
         <View className="rounded-2xl bg-white p-3">

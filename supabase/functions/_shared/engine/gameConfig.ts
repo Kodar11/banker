@@ -14,6 +14,15 @@ import { BUSINESS_MVP_RULES as RULES } from './rules.ts';
  * and the defaults below are exactly those rules' values, so an untouched config plays the game
  * as it has always been played.
  */
+/**
+ * Who may see a player's money. `open`: everyone sees everyone's finances, as the game has always been.
+ * `hidden`: each player sees only their own cash, ledger, loans and credit until the game has finished;
+ * the board, property ownership, buildings, mortgages, auctions and trades stay public either way.
+ * What exactly is private is decided in one place: financialPrivacy.ts.
+ */
+export const FINANCIAL_PRIVACY_MODES = ['open', 'hidden'] as const;
+export type FinancialPrivacy = (typeof FINANCIAL_PRIVACY_MODES)[number];
+
 export type GameConfig = {
   /** Cash every player receives from the bank when the game starts. */
   startingCash: number;
@@ -23,6 +32,8 @@ export type GameConfig = {
   marketVolatility: MarketVolatility;
   /** Capital Mode only: each player gets a private objective with an end-of-game bonus. Always false in Classic. */
   secretObjectives: boolean;
+  /** Open or hidden finances. Chosen by the host when the game is created and fixed from then on — not even the lobby can change it. */
+  financialPrivacy: FinancialPrivacy;
 };
 
 /** What a host can pick. Enforced by the server, offered by the Create Game screen. */
@@ -41,6 +52,7 @@ export function defaultGameConfig(mode: GameMode): GameConfig {
     loanLimit: intermediate ? IR.loans.maxOutstandingPrincipal : RULES.loans.maxOutstandingPrincipal,
     marketVolatility: IR.market.defaultProfile,
     secretObjectives: intermediate,
+    financialPrivacy: 'open',
   };
 }
 
@@ -69,6 +81,7 @@ const GameConfigInputSchema = z
     loanLimit: amount('loanLimit', 'The loan limit').optional(),
     marketVolatility: z.enum(MARKET_VOLATILITIES, { error: 'Choose Stable, Balanced or Volatile for the property market.' }).optional(),
     secretObjectives: z.boolean({ error: 'Secret objectives must be on or off.' }).optional(),
+    financialPrivacy: z.enum(FINANCIAL_PRIVACY_MODES, { error: 'Choose Open or Hidden finances.' }).optional(),
   })
   .strict();
 
@@ -82,6 +95,7 @@ function build(mode: GameMode, input: GameConfigInput, base: GameConfig): GameCo
     // Classic has no property market and no objectives: whatever was sent, these stay inert.
     marketVolatility: intermediate ? (input.marketVolatility ?? base.marketVolatility) : base.marketVolatility,
     secretObjectives: intermediate ? (input.secretObjectives ?? base.secretObjectives) : false,
+    financialPrivacy: input.financialPrivacy ?? base.financialPrivacy,
   };
 }
 
@@ -96,6 +110,20 @@ export function parseGameConfig(mode: GameMode, raw: unknown): GameConfig {
     fail('VALIDATION', issue?.code === 'unrecognized_keys' || !issue ? 'Those game settings are not valid.' : issue.message);
   }
   return build(mode, parsed.data, defaultGameConfig(mode));
+}
+
+/**
+ * The settings a host asked for in the lobby (UPDATE_CONFIG). Everything is validated as at creation,
+ * except financial privacy: that was fixed when the game was created, so it is carried over from the
+ * current config, and asking for the other one is refused rather than silently ignored.
+ */
+export function updateGameConfig(mode: GameMode, current: GameConfig, raw: unknown): GameConfig {
+  const next = parseGameConfig(mode, raw);
+  const asked = (raw as { financialPrivacy?: unknown } | null | undefined)?.financialPrivacy;
+  if (asked !== undefined && asked !== current.financialPrivacy) {
+    fail('VALIDATION', 'Open or hidden finances is chosen when the game is created and can’t be changed.');
+  }
+  return { ...next, financialPrivacy: current.financialPrivacy };
 }
 
 /**
@@ -123,7 +151,8 @@ export function isDefaultGameConfig(mode: GameMode, config: GameConfig): boolean
     config.startingCash === d.startingCash &&
     config.loanLimit === d.loanLimit &&
     config.marketVolatility === d.marketVolatility &&
-    config.secretObjectives === d.secretObjectives
+    config.secretObjectives === d.secretObjectives &&
+    config.financialPrivacy === d.financialPrivacy
   );
 }
 
@@ -137,6 +166,11 @@ export const MARKET_VOLATILITY_LABELS: Record<MarketVolatility, { label: string;
   stable: { label: 'Stable', hint: 'Small yearly changes. Values never fall more than 10%.' },
   balanced: { label: 'Balanced', hint: 'The standard market: rises are a little more likely than falls.' },
   volatile: { label: 'Volatile', hint: 'Big swings both ways. A 20% rise or fall is common.' },
+};
+
+export const FINANCIAL_PRIVACY_LABELS: Record<FinancialPrivacy, { label: string; hint: string }> = {
+  open: { label: 'Open', hint: 'Everyone can view every player’s financial information.' },
+  hidden: { label: 'Hidden', hint: 'Each player sees their own finances. Opponents see only public game information.' },
 };
 
 export interface ConfigSummaryRow {
@@ -158,5 +192,6 @@ export function gameConfigSummary(mode: GameMode, config: GameConfig): ConfigSum
       { key: 'secretObjectives', label: 'Secret objectives', value: config.secretObjectives ? 'Enabled' : 'Disabled' },
     );
   }
+  rows.push({ key: 'financialPrivacy', label: 'Finances', value: FINANCIAL_PRIVACY_LABELS[config.financialPrivacy].label });
   return rows;
 }

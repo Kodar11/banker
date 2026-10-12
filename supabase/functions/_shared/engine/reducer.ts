@@ -15,7 +15,7 @@ import { DECK_LABELS, findCard, type CardDefinition, type Deck, type MoveDirecti
 import { Draft } from './draft.ts';
 import { fail, GameError } from './errors.ts';
 import { formatINR } from './format.ts';
-import { configOf, parseGameConfig } from './gameConfig.ts';
+import { configOf, parseGameConfig, updateGameConfig } from './gameConfig.ts';
 import {
   assertCrisisBankruptcy,
   buyInsurance,
@@ -260,7 +260,7 @@ export function applyAction(state: GameState, actorId: string, rawAction: unknow
       break;
     case 'UPDATE_CONFIG':
       if (!actor.isHost) fail('FORBIDDEN', 'Only the host can change the game settings.');
-      d.state.config = parseGameConfig(d.state.mode, action.config);
+      d.state.config = updateGameConfig(d.state.mode, configOf(d.state), action.config);
       d.event('GAME_CONFIG_UPDATED', actorId, `${actor.name} changed the game settings`, { config: d.state.config });
       break;
     case 'SET_LOBBY_LOCK':

@@ -1,5 +1,5 @@
 import { Pressable, Text, View } from 'react-native';
-import { netWorth, ownedBy, spaceName, totalDebt } from '@/engine/index.ts';
+import { canSeeFinances, netWorth, ownedBy, spaceName, totalDebt } from '@/engine/index.ts';
 import { Button, Pill, PlayerBadge } from '@/components/ui';
 import { COLORS } from '@/constants/theme';
 import { ActionIcon } from '@/features/game/ActionIcon';
@@ -72,7 +72,9 @@ export function PlayerDetails({ view, playerId, onPropertyPress, onOpenWallet }:
   const found = findPlayer(view, playerId);
   if (!found) return <Text className="text-base text-stone-600">Player not found.</Text>;
   const { state, player, isMe } = found;
-  const debt = totalDebt(state, player.id);
+  // Hidden finances: another player's money is not on this phone at all. What they own and where they stand still is.
+  const open = canSeeFinances(state, found.me?.id, player.id);
+  const debt = open ? totalDebt(state, player.id) : 0;
   const canManage = isMe && state.status === 'ACTIVE' && player.status === 'ACTIVE';
 
   return (
@@ -80,13 +82,17 @@ export function PlayerDetails({ view, playerId, onPropertyPress, onOpenWallet }:
       <View className="rounded-3xl bg-felt p-5" testID="player-details-summary">
         <Text className="text-xs font-bold uppercase tracking-widest text-cream/70">Cash</Text>
         <Text className="text-4xl font-black text-cream" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} testID="player-details-balance">
-          {formatINR(player.balance)}
+          {open ? formatINR(player.balance) : 'Private'}
         </Text>
         {/* Label left, value right: stays aligned on a narrow phone, and a long square name wraps instead of squeezing. */}
         <View className="mt-4 gap-2.5 rounded-2xl bg-felt-dark px-4 py-3">
           <SummaryRow label="Location" value={player.status !== 'ACTIVE' ? 'Off the board' : spaceName(player.position)} testID="player-details-location" />
-          <SummaryRow label="Net worth" value={formatINR(netWorth(state, player.id))} testID="player-details-net-worth" />
-          <SummaryRow label="Loans owed" value={formatINR(debt)} warn={debt > 0} testID="player-details-loans" />
+          {open ? (
+            <>
+              <SummaryRow label="Net worth" value={formatINR(netWorth(state, player.id))} testID="player-details-net-worth" />
+              <SummaryRow label="Loans owed" value={formatINR(debt)} warn={debt > 0} testID="player-details-loans" />
+            </>
+          ) : null}
         </View>
       </View>
 
@@ -98,23 +104,29 @@ export function PlayerDetails({ view, playerId, onPropertyPress, onOpenWallet }:
         hint={canManage ? 'Tap a property to build, mortgage or sell.' : undefined}
       />
 
-      <Pressable
-        onPress={() => onOpenWallet(player.id)}
-        accessibilityRole="button"
-        accessibilityLabel="Wallet and history"
-        accessibilityHint="Opens transactions, loans and financial history"
-        testID="player-open-wallet"
-        className="min-h-[60px] flex-row items-center gap-3 rounded-2xl border border-stone-300 px-4 py-2.5 active:opacity-80"
-      >
-        <View className="h-9 w-9 items-center justify-center rounded-full bg-felt">
-          <ActionIcon name="bank" size={18} color={COLORS.cream} />
-        </View>
-        <View className="flex-1">
-          <Text className="text-base font-bold text-ink">Wallet & History</Text>
-          <Text className="text-xs text-stone-500">Transactions, loans and financial history</Text>
-        </View>
-        <Text className="text-lg text-stone-400">›</Text>
-      </Pressable>
+      {open ? (
+        <Pressable
+          onPress={() => onOpenWallet(player.id)}
+          accessibilityRole="button"
+          accessibilityLabel="Wallet and history"
+          accessibilityHint="Opens transactions, loans and financial history"
+          testID="player-open-wallet"
+          className="min-h-[60px] flex-row items-center gap-3 rounded-2xl border border-stone-300 px-4 py-2.5 active:opacity-80"
+        >
+          <View className="h-9 w-9 items-center justify-center rounded-full bg-felt">
+            <ActionIcon name="bank" size={18} color={COLORS.cream} />
+          </View>
+          <View className="flex-1">
+            <Text className="text-base font-bold text-ink">Wallet & History</Text>
+            <Text className="text-xs text-stone-500">Transactions, loans and financial history</Text>
+          </View>
+          <Text className="text-lg text-stone-400">›</Text>
+        </Pressable>
+      ) : (
+        <Text className="text-center text-xs font-semibold text-stone-500" testID="player-details-private">
+          This game has hidden finances: each player’s cash, loans and history are their own.
+        </Text>
+      )}
     </View>
   );
 }

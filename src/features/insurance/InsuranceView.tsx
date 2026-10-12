@@ -3,6 +3,7 @@ import { Pressable, Text, View } from 'react-native';
 import {
   activePolicyFor,
   averageSpaces,
+  financesHidden,
   economyOf,
   gameClock,
   getDeed,
@@ -276,7 +277,8 @@ export function InsuranceView({ view }: { view: GameView }) {
         )}
       </Card>
 
-      {others.length ? (
+      {/* Hidden finances: who else is insured is not shown, and not sent. */}
+      {others.length && !financesHidden(state) ? (
         <Card testID="insurance-others">
           <Label>Other players’ properties</Label>
           <View className="mt-2 gap-1">

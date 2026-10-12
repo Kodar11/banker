@@ -131,14 +131,14 @@ describe.skipIf(!DATABASE_URL)('game customization and secret objectives (Postgr
   describe('the server owns the configuration', () => {
     it('a game created with no settings stores the defaults of its mode', async () => {
       const classic = await setupGame({ start: false });
-      expect(await storedConfig(classic)).toEqual({ startingCash: 25000, loanLimit: 20000, marketVolatility: 'balanced', secretObjectives: false });
+      expect(await storedConfig(classic)).toEqual({ startingCash: 25000, loanLimit: 20000, marketVolatility: 'balanced', secretObjectives: false, financialPrivacy: 'open' });
       const intermediate = await setupGame({ mode: 'intermediate', start: false });
-      expect(await storedConfig(intermediate)).toEqual({ startingCash: 25000, loanLimit: 20000, marketVolatility: 'balanced', secretObjectives: true });
+      expect(await storedConfig(intermediate)).toEqual({ startingCash: 25000, loanLimit: 20000, marketVolatility: 'balanced', secretObjectives: true, financialPrivacy: 'open' });
     });
 
     it('normalises what it is sent: missing settings take defaults, Classic never keeps Capital ones', async () => {
       const g = await setupGame({ config: { startingCash: 40000, marketVolatility: 'volatile', secretObjectives: true }, start: false });
-      expect(await storedConfig(g)).toEqual({ startingCash: 40000, loanLimit: 20000, marketVolatility: 'balanced', secretObjectives: false });
+      expect(await storedConfig(g)).toEqual({ startingCash: 40000, loanLimit: 20000, marketVolatility: 'balanced', secretObjectives: false, financialPrivacy: 'open' });
       expect((await g.view('Asha')).state.config).toEqual(await storedConfig(g));
     });
 
@@ -164,7 +164,7 @@ describe.skipIf(!DATABASE_URL)('game customization and secret objectives (Postgr
     });
 
     it('every player — host, joiner, and anyone reconnecting — receives the same configuration', async () => {
-      const config = { startingCash: 35000, loanLimit: 15000, marketVolatility: 'stable', secretObjectives: false };
+      const config = { startingCash: 35000, loanLimit: 15000, marketVolatility: 'stable', secretObjectives: false, financialPrivacy: 'open' };
       const g = await setupGame({ mode: 'intermediate', config, names: ['Asha', 'Bilal', 'Chitra'], start: false });
       // What each of them was handed when they entered…
       for (const name of g.names) expect(g.joinedSnapshots[name]!.state.config).toEqual(config);
@@ -205,7 +205,7 @@ describe.skipIf(!DATABASE_URL)('game customization and secret objectives (Postgr
       const g = await setupGame({ mode: 'intermediate', start: false });
       await sql`update public.games set config = null where id = ${g.gameId}`;
       const lobby = await g.view('Bilal');
-      expect(lobby.state.config).toEqual({ startingCash: 25000, loanLimit: 20000, marketVolatility: 'balanced', secretObjectives: false });
+      expect(lobby.state.config).toEqual({ startingCash: 25000, loanLimit: 20000, marketVolatility: 'balanced', secretObjectives: false, financialPrivacy: 'open' });
       ok(await g.act('Asha', { type: 'START_GAME' }));
       const s = await g.view('Asha');
       expect(s.state.players.every((p) => p.balance === 25000)).toBe(true);
@@ -220,7 +220,7 @@ describe.skipIf(!DATABASE_URL)('game customization and secret objectives (Postgr
   describe('the configuration is the host’s until the game starts, then locked', () => {
     it('the host changes it in the lobby and everyone sees the change', async () => {
       const g = await setupGame({ mode: 'intermediate', start: false });
-      const next = { startingCash: 45000, loanLimit: 30000, marketVolatility: 'volatile', secretObjectives: false };
+      const next = { startingCash: 45000, loanLimit: 30000, marketVolatility: 'volatile', secretObjectives: false, financialPrivacy: 'open' };
       ok(await g.act('Asha', { type: 'UPDATE_CONFIG', config: next }));
       expect(await storedConfig(g)).toEqual(next);
       for (const name of g.names) expect((await g.view(name)).state.config).toEqual(next);
@@ -288,7 +288,7 @@ describe.skipIf(!DATABASE_URL)('game customization and secret objectives (Postgr
     });
 
     it('survives the host leaving and every reconnect', async () => {
-      const config = { startingCash: 20000, loanLimit: 10000, marketVolatility: 'balanced', secretObjectives: false };
+      const config = { startingCash: 20000, loanLimit: 10000, marketVolatility: 'balanced', secretObjectives: false, financialPrivacy: 'open' };
       const g = await setupGame({ config, names: ['Asha', 'Bilal', 'Chitra'] });
       ok(await g.act('Asha', { type: 'LEAVE_GAME' }));
       for (let i = 0; i < 3; i += 1) expect((await g.view('Bilal')).state.config).toEqual(config);

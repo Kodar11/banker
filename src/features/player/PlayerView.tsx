@@ -1,7 +1,7 @@
 import { goBack } from '@/utils/navigation';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
-import { buildingCount, clockLabel, creditScoreOf, economyOf, INTERMEDIATE_RULES, loanOutstandingPrincipal, loansOf, netWorth, nextInterestCircuit, nextScheduledInstallment, ownedBy, payableInstallment, totalDebt } from '@/engine/index.ts';
+import { buildingCount, canSeeFinances, clockLabel, creditScoreOf, economyOf, INTERMEDIATE_RULES, loanOutstandingPrincipal, loansOf, netWorth, nextInterestCircuit, nextScheduledInstallment, ownedBy, payableInstallment, totalDebt } from '@/engine/index.ts';
 import { Button, Card, Label, Pill, PlayerBadge, Screen } from '@/components/ui';
 import type { GameView } from '@/features/game/useGameView';
 import { useGameAction } from '@/features/game/useGameAction';
@@ -27,8 +27,10 @@ export function PlayerView({ view, playerId }: { view: GameView; playerId: strin
   const isMe = view.me?.id === player.id;
   const keys = ownedBy(state, player.id);
   const { houses, hotels } = buildingCount(state, player.id);
+  // Hidden finances: of another player this phone holds only what the table can see - no cash, loans, credit or ledger.
+  const open = canSeeFinances(state, view.me?.id, player.id);
   const loans = state.loans.filter((l) => l.playerId === player.id);
-  const debt = totalDebt(state, player.id);
+  const debt = open ? totalDebt(state, player.id) : 0;
   // Capital Mode: the wallet lists this game's loan contracts and opens the bank instead of the Classic loan sheet.
   const eco = economyOf(state);
   const contracts = eco ? loansOf(eco, player.id) : [];
@@ -45,14 +47,14 @@ export function PlayerView({ view, playerId }: { view: GameView; playerId: strin
           <Label>{isMe ? 'Your wallet' : `${player.name}'s wallet`}</Label>
         </View>
         <Text className="text-hero text-ink" testID="wallet-balance">
-          {formatINR(player.balance)}
+          {open ? formatINR(player.balance) : 'Private'}
         </Text>
         <View className="mt-3 flex-row flex-wrap gap-x-6 gap-y-2">
-          <Stat label="Net worth" value={formatINR(netWorth(state, player.id))} />
-          <Stat label="Loans owed" value={formatINR(debt)} warn={debt > 0} />
+          {open ? <Stat label="Net worth" value={formatINR(netWorth(state, player.id))} /> : null}
+          {open ? <Stat label="Loans owed" value={formatINR(debt)} warn={debt > 0} /> : null}
           <Stat label="Houses" value={String(houses)} />
           <Stat label="Hotels" value={String(hotels)} />
-          {eco ? <Stat label="Credit score" value={String(creditScoreOf(eco, player.id))} /> : null}
+          {eco && open ? <Stat label="Credit score" value={String(creditScoreOf(eco, player.id))} /> : null}
         </View>
       </Card>
 
@@ -60,62 +62,72 @@ export function PlayerView({ view, playerId }: { view: GameView; playerId: strin
         <PropertyList state={state} properties={keys.map((k) => state.properties[k])} />
       </Card>
 
-      <Card>
-        <View className="flex-row items-center justify-between">
-          <Label>Loans</Label>
-          {isMe && state.status === 'ACTIVE' && player.status === 'ACTIVE' ? (
-            <Button size="sm" variant="secondary" title="Borrow / repay" testID="wallet-loan" onPress={() => setLoanOpen(true)} />
-          ) : null}
-        </View>
-        <View className="mt-3 gap-2">
-          {eco ? (
-            contracts.length ? (
-              contracts.map((l) => {
-                const due = payableInstallment(l);
-                const next = nextScheduledInstallment(l);
-                return (
-                  <View key={l.id} className="flex-row items-center justify-between gap-2 rounded-xl bg-white px-4 py-3" testID="wallet-contract">
-                    <View className="flex-1">
-                      <Text className="text-base font-bold text-ink">
-                        {INTERMEDIATE_RULES.loans.products[l.product].name} · {formatINR(l.principal)}
-                      </Text>
+      {open ? null : (
+        <Card testID="wallet-private">
+          <Label>Finances</Label>
+          <Text className="mt-2 text-base text-stone-600">This game has hidden finances. {player.name}’s cash, loans and history are private.</Text>
+        </Card>
+      )}
+      {open ? (
+        <>
+          <Card>
+            <View className="flex-row items-center justify-between">
+              <Label>Loans</Label>
+              {isMe && state.status === 'ACTIVE' && player.status === 'ACTIVE' ? (
+                <Button size="sm" variant="secondary" title="Borrow / repay" testID="wallet-loan" onPress={() => setLoanOpen(true)} />
+              ) : null}
+            </View>
+            <View className="mt-3 gap-2">
+              {eco ? (
+                contracts.length ? (
+                  contracts.map((l) => {
+                    const due = payableInstallment(l);
+                    const next = nextScheduledInstallment(l);
+                    return (
+                      <View key={l.id} className="flex-row items-center justify-between gap-2 rounded-xl bg-white px-4 py-3" testID="wallet-contract">
+                        <View className="flex-1">
+                          <Text className="text-base font-bold text-ink">
+                            {INTERMEDIATE_RULES.loans.products[l.product].name} · {formatINR(l.principal)}
+                          </Text>
+                          <Text className="text-xs text-stone-500">
+                            {l.ratePercent}% · left {formatINR(loanOutstandingPrincipal(l))}
+                            {due ? ` · ${formatINR(due.principal + due.interest)} ${due.status === 'OVERDUE' ? 'overdue' : 'due now'}` : next ? ` · next ${clockLabel(eco, next.dueAt)}` : ''}
+                          </Text>
+                        </View>
+                        <Pill tone={l.status === 'ACTIVE' ? 'warn' : l.status === 'REPAID' ? 'good' : l.status === 'DEFAULTED' ? 'bad' : 'neutral'}>{l.status.replace('_', ' ').toLowerCase()}</Pill>
+                      </View>
+                    );
+                  })
+                ) : (
+                  <Text className="text-base text-stone-500">No loans.</Text>
+                )
+              ) : loans.length ? (
+                loans.map((l) => (
+                  <View key={l.id} className="flex-row items-center justify-between rounded-xl bg-white px-4 py-3">
+                    <View>
+                      <Text className="text-base font-bold text-ink">Borrowed {formatINR(l.principal)}</Text>
                       <Text className="text-xs text-stone-500">
-                        {l.ratePercent}% · left {formatINR(loanOutstandingPrincipal(l))}
-                        {due ? ` · ${formatINR(due.principal + due.interest)} ${due.status === 'OVERDUE' ? 'overdue' : 'due now'}` : next ? ` · next ${clockLabel(eco, next.dueAt)}` : ''}
+                        {l.interestRatePercent}% · left {formatINR(l.outstanding)} ·{' '}
+                        {nextInterestCircuit(l) !== null ? `${formatINR(l.interestAmount)} interest at next Start` : `interest paid ${formatINR(l.interestPaid)}`}
                       </Text>
                     </View>
-                    <Pill tone={l.status === 'ACTIVE' ? 'warn' : l.status === 'REPAID' ? 'good' : l.status === 'DEFAULTED' ? 'bad' : 'neutral'}>{l.status.replace('_', ' ').toLowerCase()}</Pill>
+                    <Pill tone={l.status === 'ACTIVE' ? 'warn' : l.status === 'REPAID' ? 'good' : 'bad'}>{l.status.toLowerCase()}</Pill>
                   </View>
-                );
-              })
-            ) : (
-              <Text className="text-base text-stone-500">No loans.</Text>
-            )
-          ) : loans.length ? (
-            loans.map((l) => (
-              <View key={l.id} className="flex-row items-center justify-between rounded-xl bg-white px-4 py-3">
-                <View>
-                  <Text className="text-base font-bold text-ink">Borrowed {formatINR(l.principal)}</Text>
-                  <Text className="text-xs text-stone-500">
-                    {l.interestRatePercent}% · left {formatINR(l.outstanding)} ·{' '}
-                    {nextInterestCircuit(l) !== null ? `${formatINR(l.interestAmount)} interest at next Start` : `interest paid ${formatINR(l.interestPaid)}`}
-                  </Text>
-                </View>
-                <Pill tone={l.status === 'ACTIVE' ? 'warn' : l.status === 'REPAID' ? 'good' : 'bad'}>{l.status.toLowerCase()}</Pill>
-              </View>
-            ))
-          ) : (
-            <Text className="text-base text-stone-500">No loans.</Text>
-          )}
-        </View>
-      </Card>
+                ))
+              ) : (
+                <Text className="text-base text-stone-500">No loans.</Text>
+              )}
+            </View>
+          </Card>
 
-      <Card>
-        <Label>History</Label>
-        <View className="mt-3">
-          <TransactionList transactions={transactions} playerId={player.id} nameOf={view.playerName} />
-        </View>
-      </Card>
+          <Card>
+            <Label>History</Label>
+            <View className="mt-3">
+              <TransactionList transactions={transactions} playerId={player.id} nameOf={view.playerName} />
+            </View>
+          </Card>
+        </>
+      ) : null}
       {isMe && !eco ? <LoanSheet visible={loanOpen} onClose={() => setLoanOpen(false)} view={view} send={send} /> : null}
       {isMe && eco ? <FinanceHub visible={loanOpen} onClose={() => setLoanOpen(false)} view={view} send={send} initialTab="loans" /> : null}
     </Screen>

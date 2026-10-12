@@ -27,7 +27,7 @@ export default function CreateGame() {
   // The money settings are the host's own choices, so they follow them to the other mode; everything else takes that mode's default.
   const chooseMode = (mode: GameMode) => {
     setGameMode(mode);
-    setConfig((c) => ({ ...defaultGameConfig(mode), startingCash: c.startingCash, loanLimit: c.loanLimit }));
+    setConfig((c) => ({ ...defaultGameConfig(mode), startingCash: c.startingCash, loanLimit: c.loanLimit, financialPrivacy: c.financialPrivacy }));
   };
 
   return (
@@ -94,10 +94,10 @@ export default function CreateGame() {
       <Text className="text-xs text-cream/60">Everyone who joins plays the mode you pick. It can’t be changed after the game is created.</Text>
       <Label className="text-cream/70">Game settings</Label>
       <Card testID="game-settings">
-        <GameConfigEditor mode={gameMode} value={config} onChange={setConfig} />
+        <GameConfigEditor mode={gameMode} value={config} onChange={setConfig} privacyEditable />
       </Card>
       <Card testID="game-review">
-        <GameConfigSummary mode={gameMode} config={config} title="Review" note="You can still change these settings in the lobby, until you start the game." />
+        <GameConfigSummary mode={gameMode} config={config} title="Review" note="You can still change these settings in the lobby until you start the game. Open or hidden finances is fixed once the game is created." />
       </Card>
     </Screen>
   );

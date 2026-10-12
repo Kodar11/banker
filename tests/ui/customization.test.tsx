@@ -183,11 +183,12 @@ describe('Create game: settings', () => {
       loanLimit: 10000,
       marketVolatility: 'balanced',
       secretObjectives: false,
+      financialPrivacy: 'open',
     });
   });
 
   it('a customised Capital game sends its mode and settings', async () => {
-    const config = { startingCash: 25000, loanLimit: 20000, marketVolatility: 'stable', secretObjectives: false } as const;
+    const config = { startingCash: 25000, loanLimit: 20000, marketVolatility: 'stable', secretObjectives: false, financialPrivacy: 'open' } as const;
     const f = new Fixture(['Tanmay'], { start: false, mode: 'intermediate', config });
     api.create.mockResolvedValue(ok(f.snapshot()));
     await render(<CreateGame />);
@@ -211,7 +212,7 @@ describe('Create game: settings', () => {
 });
 
 describe('Lobby: the rules every player will play by', () => {
-  const config = { startingCash: 30000, loanLimit: 25000, marketVolatility: 'balanced', secretObjectives: true } as const;
+  const config = { startingCash: 30000, loanLimit: 25000, marketVolatility: 'balanced', secretObjectives: true, financialPrivacy: 'open' } as const;
 
   it.each(['Asha', 'Bilal'])('%s sees the same mode and settings', async (name) => {
     const f = new Fixture(['Asha', 'Bilal'], { start: false, mode: 'intermediate', config }).loadAs(name);
@@ -257,7 +258,7 @@ describe('Lobby: the rules every player will play by', () => {
     await waitFor(() => expect(api.action).toHaveBeenCalledTimes(1));
     expect(api.action.mock.calls[0]![3]).toEqual({
       type: 'UPDATE_CONFIG',
-      config: { startingCash: 30000, loanLimit: 20000, marketVolatility: 'volatile', secretObjectives: true },
+      config: { startingCash: 30000, loanLimit: 20000, marketVolatility: 'volatile', secretObjectives: true, financialPrivacy: 'open' },
     });
   });
 

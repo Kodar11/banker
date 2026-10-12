@@ -1,6 +1,8 @@
 import { Pressable, Text, View } from 'react-native';
 import {
   defaultGameConfig,
+  FINANCIAL_PRIVACY_LABELS,
+  FINANCIAL_PRIVACY_MODES,
   GAME_CONFIG_LIMITS,
   gameConfigSummary,
   isDefaultGameConfig,
@@ -79,15 +81,19 @@ interface EditorProps {
   mode: GameMode;
   value: GameConfig;
   onChange: (next: GameConfig) => void;
+  /** Open or hidden finances can be chosen. Only when creating a game: afterwards it is fixed, so the lobby leaves it out. */
+  privacyEditable?: boolean;
 }
 
 /**
  * The settings a host may change, grouped: money for every game, then the Capital extras.
  * It only offers what the server accepts (same limits, same steps), and the server checks again.
  */
-export function GameConfigEditor({ mode, value, onChange }: EditorProps) {
+export function GameConfigEditor({ mode, value, onChange, privacyEditable = false }: EditorProps) {
   const set = (patch: Partial<GameConfig>) => onChange({ ...value, ...patch });
-  const isDefault = isDefaultGameConfig(mode, value);
+  // Where financial privacy can't be edited it is not this editor's to restore either: it keeps the game's own.
+  const defaults = { ...defaultGameConfig(mode), ...(privacyEditable ? {} : { financialPrivacy: value.financialPrivacy }) };
+  const isDefault = isDefaultGameConfig(mode, privacyEditable ? value : { ...value, financialPrivacy: defaultGameConfig(mode).financialPrivacy });
   return (
     <View className="gap-4" testID="config-editor">
       <AmountRow field="startingCash" label="Starting cash" hint="Each player, from the bank" value={value.startingCash} onChange={(startingCash) => set({ startingCash })} />
@@ -123,8 +129,22 @@ export function GameConfigEditor({ mode, value, onChange }: EditorProps) {
           </View>
         </>
       ) : null}
+      {privacyEditable ? (
+        <View className="gap-1.5">
+          <Text className="text-base font-extrabold text-ink">Financial privacy</Text>
+          <Choice
+            testID="config-privacy"
+            value={value.financialPrivacy}
+            options={FINANCIAL_PRIVACY_MODES.map((v) => ({ value: v, label: `${FINANCIAL_PRIVACY_LABELS[v].label} finances` }))}
+            onChange={(financialPrivacy) => set({ financialPrivacy })}
+          />
+          <Text className="text-xs text-stone-500" testID="config-privacy-hint">
+            {FINANCIAL_PRIVACY_LABELS[value.financialPrivacy].hint} It can’t be changed after the game is created.
+          </Text>
+        </View>
+      ) : null}
       <Pressable
-        onPress={() => onChange(defaultGameConfig(mode))}
+        onPress={() => onChange(defaults)}
         disabled={isDefault}
         accessibilityRole="button"
         accessibilityLabel="Restore default settings"

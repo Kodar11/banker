@@ -5,7 +5,8 @@
 //   changes + ledger + events + action record in ONE transaction → broadcast.
 //
 // Every snapshot returned is the requesting player's view (loadSnapshot): other players' secret
-// objectives never leave the server while a game is running. Broadcasts carry only public events.
+// objectives never leave the server while a game is running, and in a game with hidden finances
+// neither does their money. Broadcasts go to everyone at once, so they carry only public events.
 //
 // Runtime-agnostic so it can be integration-tested in Node against real Postgres.
 import {
@@ -14,6 +15,7 @@ import {
   GameError,
   isGameError,
   joinGame,
+  publicEvents,
   applyAction,
   auctionAcceptUntil,
   RULES_VERSION,
@@ -22,6 +24,7 @@ import {
   type ApiResponse,
   type EngineContext,
   type GameActionType,
+  type GameEventRecord,
   type GameState,
   type StateBroadcast,
 } from '../_shared/engine/index.ts';
@@ -238,7 +241,7 @@ async function joinOp(
 
   if ('duplicate' in outcome && outcome.duplicate) return duplicateOf(deps, outcome.duplicate, req.token, 'JOIN_GAME', gameId);
   const { playerId, snapshot, result } = outcome as Exclude<typeof outcome, { duplicate: unknown }>;
-  await notify(deps, gameId, result.state.version, result.events);
+  await notify(deps, result.state, result.events);
   return { status: 200, body: { ok: true, gameId, playerId, snapshot } };
 }
 
@@ -328,7 +331,7 @@ async function actionOp(
 
   if (!outcome.duplicate) {
     if (outcome.deadlineSet) scheduleAuctionClose(deps, outcome.result.state);
-    await notify(deps, req.gameId, outcome.result.state.version, outcome.result.events);
+    await notify(deps, outcome.result.state, outcome.result.events);
   }
   return {
     status: 200,
@@ -388,21 +391,21 @@ export async function closeAuctionIfDue(gameId: string, auctionId: string, deps:
     return closed;
   });
   if (!result) return false;
-  await notify(deps, gameId, result.state.version, result.events);
+  await notify(deps, result.state, result.events);
   return true;
 }
 
-async function notify(
-  deps: HandlerDeps,
-  gameId: string,
-  version: number,
-  events: { type: string; message: string; actorId: string | null }[],
-): Promise<void> {
+/**
+ * Tells every device the game moved on. The topic is not addressed to one player, so in a game with
+ * hidden finances the events are cut down to what anyone may read (publicEvents); each device then
+ * fetches its own view of the state.
+ */
+async function notify(deps: HandlerDeps, state: GameState, events: GameEventRecord[]): Promise<void> {
   if (!deps.broadcast) return;
   try {
-    await deps.broadcast(gameId, {
-      version,
-      events: events.map((e) => ({ type: e.type, message: e.message, actorId: e.actorId })),
+    await deps.broadcast(state.id, {
+      version: state.version,
+      events: publicEvents(state, events).map((e) => ({ type: e.type, message: e.message, actorId: e.actorId })),
     });
   } catch (error) {
     // Committed already; clients also refetch on reconnect/poll, so never fail the action.
