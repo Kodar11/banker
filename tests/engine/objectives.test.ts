@@ -77,7 +77,7 @@ function trade(g: TestGame, from: string, to: string, key: PropertyKey, actionId
   return g.act(to, { type: 'ACCEPT_TRADE', tradeId: offer.id }, actionId);
 }
 
-const end = (g: TestGame, host = 'Asha') => g.act(host, { type: 'END_GAME' });
+const end = (g: TestGame, host = 'Asha') => g.endByVote(host);
 const resultOf = (g: TestGame, name: string): ObjectiveResult => g.state.objectives!.results!.find((r) => r.playerId === g.id(name))!;
 const rewards = (g: TestGame) => g.ledger.filter((t) => t.type === 'OBJECTIVE_REWARD');
 
@@ -701,7 +701,7 @@ describe('the end of the game', () => {
     const results = structuredClone(g.state.objectives!.results);
     expect(rewards(g)).toHaveLength(2);
     for (const name of ['Asha', 'Bilal']) {
-      expect(refusal(() => g.act(name, { type: 'END_GAME' })).code).toBe('GAME_FINISHED');
+      expect(refusal(() => g.act(name, { type: 'REQUEST_END_VOTE' })).code).toBe('GAME_FINISHED');
       expect(refusal(() => g.act(name, { type: 'LEAVE_GAME' })).code).toBe('GAME_FINISHED');
     }
     expect(rewards(g)).toHaveLength(2);
@@ -768,9 +768,9 @@ describe('the end of the game', () => {
     const r = end(g);
     expect(g.state.objectives).toBeNull();
     expect(r.transactions).toEqual([]);
-    expect(r.events.map((e) => e.type)).toEqual(['GAME_FINISHED']);
+    expect(r.events.map((e) => e.type)).toEqual(['END_VOTE_CLOSED', 'GAME_FINISHED']);
     expect(g.state.winnerId).toBe(g.id('Asha'));
-    expect(r.events[0]!.payload.standings).toEqual([
+    expect(r.events[1]!.payload.standings).toEqual([
       { playerId: g.id('Asha'), netWorth: 26500 },
       { playerId: g.id('Bilal'), netWorth: 25000 },
     ]);

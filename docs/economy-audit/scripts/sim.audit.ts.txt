@@ -1,0 +1,31 @@
+// TEMPORARY AUDIT EXPERIMENT - not part of the repository's test suite.
+import { writeFileSync } from 'node:fs';
+import { expect, it } from 'vitest';
+import type { GameMode } from '@/engine/index.ts';
+import { runGame, summarise, SEEDS, type Result } from './simcore.ts';
+
+const OUT = process.env.AUDIT_DIR!;
+
+const summary: Record<string, ReturnType<typeof summarise>> = {};
+
+it('whole-game simulations: 5/7/10 years x 2/4/8 players x Classic/Capital, mixed and uniform strategies', () => {
+  for (const mode of ['classic', 'intermediate'] as GameMode[]) {
+    for (const years of [5, 7, 10]) {
+      for (const players of [2, 4, 8]) {
+        for (const set of ['mixed', 'uniform'] as const) {
+          const results: Result[] = [];
+          for (let seed = 1; seed <= SEEDS; seed += 1) results.push(runGame({ mode, players, years, seed, set }));
+          summary[`${mode}|${years}y|${players}p|${set}`] = summarise(results);
+        }
+      }
+    }
+  }
+  for (const mode of ['classic', 'intermediate'] as GameMode[]) {
+    const results: Result[] = [];
+    for (let seed = 1; seed <= SEEDS; seed += 1) results.push(runGame({ mode, players: 4, years: 5, seed, set: 'mixed', earlyEndYear: 3 }));
+    summary[`${mode}|5y-early3|4p|mixed`] = summarise(results);
+  }
+  writeFileSync(`${OUT}/sim-results.json`, JSON.stringify(summary, null, 1));
+  const total = Object.values(summary).reduce((s, x) => s + x.ledgerViolations, 0);
+  expect(total).toBe(0);
+});

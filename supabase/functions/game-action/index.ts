@@ -37,7 +37,7 @@ const broadcastChat = (gameId: string, event: QuickChatEvent) => send(gameId, QU
 // Supabase Edge Runtime global: keeps the worker alive until the promise settles.
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void } | undefined;
 
-/** Runs `task` after the response has been sent (the auction close timer, a few seconds at most). */
+/** Runs `task` after the response has been sent (the auction close timer: a few seconds; the end-game vote timer: half a minute). */
 function defer(delayMs: number, task: () => Promise<void>): void {
   const run = new Promise<void>((resolve) => setTimeout(resolve, delayMs)).then(task);
   if (typeof EdgeRuntime !== 'undefined') EdgeRuntime.waitUntil(run);

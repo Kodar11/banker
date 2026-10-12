@@ -2,12 +2,14 @@ import {
   applyAction,
   auctionAcceptUntil,
   auctionOpensAt,
+  endVoteDeadline,
   createGame,
   economyOf,
   isGameError,
   joinGame,
   loanOffers,
   minimumNextBid,
+  openEndVote,
   ownedBy,
   pendingCrises,
   premiumForYear,
@@ -177,6 +179,24 @@ function candidates(table: Table, nowMs: number, random: () => number, tempo: { 
     return out;
   }
   if (s.status !== 'ACTIVE') return out;
+
+  // ---- a vote on ending the game: until it is settled the table offers nothing else ----
+  const vote = openEndVote(s);
+  if (vote) {
+    for (const id of vote.electorate) {
+      const voter = s.players.find((p) => p.id === id);
+      if (!voter || voter.status !== 'ACTIVE' || id in vote.ballots) continue;
+      // Some players let the time run out: a missing ballot is part of the game.
+      if (tempo.exhaustive || random() < 0.7) add(index(id), { type: 'CAST_END_VOTE', voteId: vote.id, choice: random() < 0.4 ? 'END' : 'CONTINUE' }, true);
+    }
+    const closer = active[0];
+    if (closer) add(index(closer.id), { type: 'CLOSE_END_VOTE', voteId: vote.id }, START_MS + nowMs >= endVoteDeadline(vote));
+    if (random() < tempo.leave) {
+      const leaver = pick(active, random);
+      if (leaver) add(index(leaver.id), { type: 'LEAVE_GAME' }, true);
+    }
+    return out;
+  }
 
   const turn = s.turn;
   const me = index(turn.playerId);
@@ -351,12 +371,16 @@ function candidates(table: Table, nowMs: number, random: () => number, tempo: { 
     const pauser = pick(active, random);
     if (pauser) add(index(pauser.id), { type: 'PAUSE_GAME' }, true);
   }
-  if (random() < 0.002 && s.hostPlayerId) add(index(s.hostPlayerId), { type: 'END_GAME' }, true);
+  // Anyone may ask for a vote on ending early; the engine decides whether this is a moment for one.
+  if (random() < 0.01) {
+    const asker = pick(active, random);
+    if (asker) add(index(asker.id), { type: 'REQUEST_END_VOTE' }, true);
+  }
   return out;
 }
 
 /** Actions that only stop or leave the game: they do not count as "the game can go on". */
-const NOT_PROGRESS = new Set<GameAction['type']>(['LEAVE_GAME', 'PAUSE_GAME', 'END_GAME']);
+const NOT_PROGRESS = new Set<GameAction['type']>(['LEAVE_GAME', 'PAUSE_GAME', 'REQUEST_END_VOTE']);
 
 export function runScenario(scenario: Scenario, maxSteps: number): RunOutcome {
   const random = prng(scenario.seed);
@@ -397,6 +421,13 @@ export function runScenario(scenario: Scenario, maxSteps: number): RunOutcome {
       nowMs = Math.max(nowMs, auctionAcceptUntil(table.state.auction) - START_MS);
       const closer = table.state.players.findIndex((p) => p.status === 'ACTIVE');
       applied = tryApply(table.ids.indexOf(table.state.players[closer]!.id), { type: 'CLOSE_AUCTION', auctionId: table.state.auction.id });
+    }
+    const voting = openEndVote(table.state);
+    if (!applied && voting && table.state.status === 'ACTIVE') {
+      // Nobody else votes: time runs out and the vote is closed on what was cast.
+      nowMs = Math.max(nowMs, endVoteDeadline(voting) - START_MS);
+      const closer = table.state.players.findIndex((p) => p.status === 'ACTIVE');
+      applied = tryApply(table.ids.indexOf(table.state.players[closer]!.id), { type: 'CLOSE_END_VOTE', voteId: voting.id });
     }
     if (!applied) {
       // Liveness: a running game always has something a player can do to move it on.

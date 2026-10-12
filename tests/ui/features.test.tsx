@@ -87,7 +87,7 @@ describe('Adaptive action bar + More', () => {
     expect(screen.queryByTestId(`player-details-${f.ids.Asha}`)).toBeNull();
     await fireEvent.press(screen.getByTestId('open-more'));
     const more = screen.getByTestId('more-actions');
-    for (const id of ['more-properties', 'more-trade', 'more-pay', 'more-chat', 'more-loan', 'more-auction', 'more-manage', 'request-undo', 'pause-button', 'open-log', 'open-rules', 'end-game-button']) {
+    for (const id of ['more-properties', 'more-trade', 'more-pay', 'more-chat', 'more-loan', 'more-auction', 'more-manage', 'request-undo', 'pause-button', 'open-log', 'open-rules', 'request-end-vote']) {
       expect(within(more).getByTestId(id)).toBeTruthy();
     }
     await fireEvent.press(screen.getByTestId('open-rules'));

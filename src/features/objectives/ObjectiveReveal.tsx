@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Modal, Text, View } from 'react-native';
-import * as SecureStore from 'expo-secure-store';
 import { objectiveView } from '@/engine/index.ts';
 import { Button } from '@/components/ui';
 import type { GameView } from '@/features/game/useGameView';
 import { formatINR } from '@/utils/currency';
+import { useSeenOnce } from '@/utils/useSeenOnce';
 
 /** The game (and seat) whose objective this device has already shown its player. One game at a time, so one value. */
 export const OBJECTIVE_SEEN_KEY = 'business-banker.objective-seen.v1';
@@ -16,32 +16,8 @@ export const objectiveSeenValue = (gameId: string, playerId: string) => `${gameI
  * `seen` is null until storage has answered, and always null without a player (no objective).
  */
 export function useObjectiveSeen(gameId: string, playerId: string | null): { seen: boolean | null; markSeen: () => void } {
-  const value = playerId ? objectiveSeenValue(gameId, playerId) : null;
-  const [known, setKnown] = useState<{ value: string; seen: boolean } | null>(null);
-
-  useEffect(() => {
-    if (!value) return;
-    let cancelled = false;
-    SecureStore.getItemAsync(OBJECTIVE_SEEN_KEY)
-      .then((stored) => {
-        if (!cancelled) setKnown((now) => (now?.value === value && now.seen ? now : { value, seen: stored === value }));
-      })
-      // Storage unavailable: the entry in More still works, so skip the reveal rather than repeat it forever.
-      .catch(() => {
-        if (!cancelled) setKnown({ value, seen: true });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [value]);
-
-  const markSeen = useCallback(() => {
-    if (!value) return;
-    setKnown({ value, seen: true });
-    SecureStore.setItemAsync(OBJECTIVE_SEEN_KEY, value).catch(() => undefined);
-  }, [value]);
-
-  return { seen: value && known?.value === value ? known.seen : null, markSeen };
+  // Storage unavailable: the entry in More still works, so the reveal is skipped rather than repeated forever.
+  return useSeenOnce(OBJECTIVE_SEEN_KEY, playerId ? objectiveSeenValue(gameId, playerId) : null);
 }
 
 interface RevealProps {

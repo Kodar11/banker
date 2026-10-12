@@ -97,7 +97,7 @@ describe('Home & startup navigation', () => {
   });
 
   it('finished game: stays on Home, no resume', async () => {
-    new Fixture().act('Asha', { type: 'END_GAME' }).loadAs('Asha');
+    new Fixture().endByVote('Asha').loadAs('Asha');
     await render(<Home />);
     expect(screen.queryByTestId('resume-game')).toBeNull();
     expect(router.replace).not.toHaveBeenCalled();
@@ -378,7 +378,7 @@ describe('Main game', () => {
   });
 
   it('finished game shows the winner', async () => {
-    const f = new Fixture().act('Asha', { type: 'END_GAME' }).loadAs('Bilal');
+    const f = new Fixture().endByVote('Asha').loadAs('Bilal');
     await render(<GameScreen view={viewFor(f, 'Bilal')} />);
     expect(screen.getByTestId('context-card')).toHaveTextContent(/wins!/);
     await fireEvent.press(screen.getByTestId('context-cta')); // Standings

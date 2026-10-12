@@ -123,20 +123,20 @@ describe('Club and Rest House', () => {
   });
 });
 
-describe('End Game confirmation', () => {
-  it('opens an in-app dialog; Cancel does not end the game', async () => {
+describe('Request End-Game Vote (replaces the host’s End Game)', () => {
+  it('opens an in-app dialog that says what asking means; Cancel sends nothing', async () => {
     const f = new Fixture().loadAs('Asha');
     await render(<GameScreen view={viewFor(f, 'Asha')} />);
-    expect(screen.queryByTestId('end-game-dialog')).toBeNull();
+    expect(screen.queryByTestId('end-vote-dialog')).toBeNull();
     await fireEvent.press(screen.getByTestId('open-more'));
-    await fireEvent.press(screen.getByTestId('end-game-button'));
-    const dialog = screen.getByTestId('end-game-dialog');
-    expect(within(dialog).getByText('🏆')).toBeTruthy();
-    expect(within(dialog).getByText('End Game?')).toBeTruthy();
-    expect(within(dialog).getByText('Are you sure you want to finish this game?')).toBeTruthy();
-    expect(within(dialog).getByText('Highest net worth wins.')).toBeTruthy();
-    await fireEvent.press(screen.getByTestId('end-game-dialog-cancel'));
-    expect(screen.queryByTestId('end-game-dialog')).toBeNull();
+    expect(screen.getByTestId('request-end-vote')).toHaveTextContent(/Request End-Game Vote.*Ask all active players to vote on ending the match\./);
+    await fireEvent.press(screen.getByTestId('request-end-vote'));
+    const dialog = screen.getByTestId('end-vote-dialog');
+    expect(within(dialog).getByText('Request an end-game vote?')).toBeTruthy();
+    expect(within(dialog).getByText('Every active player gets 30 seconds to vote. The game ends only if 2 of 2 vote to end.')).toBeTruthy();
+    expect(within(dialog).getByText('You can ask once per financial year. Asking counts as your own vote to end.')).toBeTruthy();
+    await fireEvent.press(screen.getByTestId('end-vote-dialog-cancel'));
+    expect(screen.queryByTestId('end-vote-dialog')).toBeNull();
     expect(api.action).not.toHaveBeenCalled();
   });
 
@@ -144,46 +144,63 @@ describe('End Game confirmation', () => {
     const f = new Fixture().loadAs('Asha');
     await render(<GameScreen view={viewFor(f, 'Asha')} />);
     await fireEvent.press(screen.getByTestId('open-more'));
-    await fireEvent.press(screen.getByTestId('end-game-button'));
+    await fireEvent.press(screen.getByTestId('request-end-vote'));
     // The hardware back button reaches a Modal as onRequestClose.
-    let modal = screen.getByTestId('end-game-dialog').parent;
+    let modal = screen.getByTestId('end-vote-dialog').parent;
     while (modal && modal.type !== 'Modal') modal = modal.parent;
     await fireEvent(modal!, 'requestClose');
-    expect(screen.queryByTestId('end-game-dialog')).toBeNull();
-    await fireEvent.press(screen.getByTestId('open-more'));
-    await fireEvent.press(screen.getByTestId('end-game-button'));
-    expect(screen.getByTestId('end-game-dialog')).toBeTruthy();
+    expect(screen.queryByTestId('end-vote-dialog')).toBeNull();
+    await fireEvent.press(screen.getByTestId('request-end-vote'));
+    expect(screen.getByTestId('end-vote-dialog')).toBeTruthy();
     // Hidden from screen readers (the card is accessibilityViewIsModal) but tappable.
-    await fireEvent.press(screen.getByTestId('end-game-dialog-backdrop', { includeHiddenElements: true }));
-    expect(screen.queryByTestId('end-game-dialog')).toBeNull();
+    await fireEvent.press(screen.getByTestId('end-vote-dialog-backdrop', { includeHiddenElements: true }));
+    expect(screen.queryByTestId('end-vote-dialog')).toBeNull();
     expect(api.action).not.toHaveBeenCalled();
   });
 
-  it('End Game sends END_GAME (destructive styling) and closes', async () => {
+  it('Start Vote sends REQUEST_END_VOTE — never an END_GAME — and returns to the table', async () => {
     const f = new Fixture().loadAs('Asha');
-    const finished = new Fixture().act('Asha', { type: 'END_GAME' });
-    api.action.mockResolvedValue(ok({ ...finished.snapshot(), state: { ...finished.state, id: f.state.id, version: f.state.version + 1 } }));
+    const asked = new Fixture().act('Asha', { type: 'REQUEST_END_VOTE' });
+    api.action.mockResolvedValue(ok({ ...asked.snapshot(), state: { ...asked.state, id: f.state.id, version: f.state.version + 1 } }));
     await render(<GameScreen view={viewFor(f, 'Asha')} />);
     await fireEvent.press(screen.getByTestId('open-more'));
-    await fireEvent.press(screen.getByTestId('end-game-button'));
-    const confirm = screen.getByTestId('end-game-dialog-confirm');
-    expect(confirm).toHaveTextContent('End Game');
+    await fireEvent.press(screen.getByTestId('request-end-vote'));
+    const confirm = screen.getByTestId('end-vote-dialog-confirm');
+    expect(confirm).toHaveTextContent('Start Vote');
     await fireEvent.press(confirm);
-    await waitFor(() => expect(api.action.mock.calls[0]![3]).toEqual({ type: 'END_GAME' }));
-    await waitFor(() => expect(screen.queryByTestId('end-game-dialog')).toBeNull());
+    await waitFor(() => expect(api.action.mock.calls[0]![3]).toEqual({ type: 'REQUEST_END_VOTE' }));
+    expect(api.action).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(screen.queryByTestId('end-vote-dialog')).toBeNull());
+    expect(screen.queryByTestId('sheet-more')).toBeNull();
   });
 
-  it('only the host sees End Game; the paused screen uses the same confirmation', async () => {
+  it('a refusal stays in the dialog with the server’s reason, to try again', async () => {
     const f = new Fixture().loadAs('Bilal');
+    api.action.mockResolvedValue({ ok: false, error: { code: 'INVALID_PHASE', message: 'A vote on ending the game is in progress.' } });
     await render(<GameScreen view={viewFor(f, 'Bilal')} />);
     await fireEvent.press(screen.getByTestId('open-more'));
-    expect(screen.getByTestId('more-actions')).toBeTruthy();
+    await fireEvent.press(screen.getByTestId('request-end-vote'));
+    await fireEvent.press(screen.getByTestId('end-vote-dialog-confirm'));
+    await waitFor(() => expect(screen.getByTestId('end-vote-dialog-error')).toHaveTextContent('A vote on ending the game is in progress.'));
+    expect(screen.getByTestId('end-vote-dialog')).toBeTruthy();
+  });
+
+  it('the host has no End Game of their own, playing or paused; a paused table must be resumed before anyone asks', async () => {
+    const f = new Fixture().loadAs('Asha');
+    const playing = await render(<GameScreen view={viewFor(f, 'Asha')} />);
+    await fireEvent.press(screen.getByTestId('open-more'));
     expect(screen.queryByTestId('end-game-button')).toBeNull();
+    expect(screen.queryByTestId('end-game-dialog')).toBeNull();
+    await playing.unmount();
     const paused = new Fixture().act('Bilal', { type: 'PAUSE_GAME' }).loadAs('Asha');
     await render(<GameScreen view={viewFor(paused, 'Asha')} />);
     await fireEvent.press(screen.getByTestId('open-more'));
-    await fireEvent.press(screen.getByTestId('end-game-button'));
-    expect(screen.getByTestId('end-game-dialog')).toBeTruthy();
+    expect(screen.queryByTestId('end-game-button')).toBeNull();
+    const request = screen.getByTestId('request-end-vote');
+    expect(request.props.accessibilityState.disabled).toBe(true);
+    expect(request).toHaveTextContent(/Resume the game first\./);
+    await fireEvent.press(request);
+    expect(screen.queryByTestId('end-vote-dialog')).toBeNull();
     expect(api.action).not.toHaveBeenCalled();
   });
 });

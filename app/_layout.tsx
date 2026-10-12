@@ -7,6 +7,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NoticeToast } from '@/components/ui';
 import { COLORS } from '@/constants/theme';
 import { AccountHost } from '@/features/account/AccountHost';
+import { EndVoteHost } from '@/features/game/EndVote';
 import { GameSyncHost } from '@/features/game/sync';
 import { MatchmakingHost } from '@/features/matchmaking/MatchmakingHost';
 import { SocialHost } from '@/features/social/SocialHost';
@@ -71,6 +72,8 @@ export default function RootLayout() {
         <Stack.Screen name="index" />
         <Stack.Screen name="property/[key]" options={{ presentation: 'modal' }} />
       </Stack>
+      {/* Above every screen: a vote on ending the game reaches a player wherever they are in the app. */}
+      <EndVoteHost />
       <NoticeToast />
     </SafeAreaProvider>
   );

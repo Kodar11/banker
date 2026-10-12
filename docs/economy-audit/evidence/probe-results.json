@@ -1,0 +1,1879 @@
+{
+ "P1_classicLoanInterest": [
+  {
+   "repaidBeforeStart": 0,
+   "interestCharged": 2000,
+   "startReward": 1500
+  },
+  {
+   "repaidBeforeStart": 19000,
+   "interestCharged": 2000,
+   "startReward": 1500
+  },
+  {
+   "repaidBeforeStart": 20000,
+   "interestCharged": 0,
+   "startReward": 1500
+  }
+ ],
+ "P2_assetStripping": {
+  "rentOwed": 15000,
+  "couldAffordIt": true,
+  "transferWhileOwing": "OK",
+  "bankruptcy": "OK",
+  "before": {
+   "asha": 25000,
+   "bilal": 25000,
+   "chitra": 25000
+  },
+  "after": {
+   "asha": 0,
+   "bilal": 25000,
+   "chitra": 50000
+  },
+  "ashaStatus": "BANKRUPT",
+  "madrasOwnerAfter": null
+ },
+ "P3_leaving": {
+  "leaveWhileOwing": {
+   "owed": 7500,
+   "ashaStatus": "LEFT",
+   "ashaCashKept": 25000,
+   "bilalReceived": 0,
+   "gameStatus": "ACTIVE"
+  },
+  "rentToLeftOwner": {
+   "pending": {
+    "kind": "PAYMENT",
+    "reason": "RENT",
+    "amount": 7500,
+    "toPlayerId": "00000000-0000-4000-8000-00000000007c",
+    "propertyKey": "DELHI",
+    "label": "Rent for Delhi",
+    "cardId": null
+   },
+   "bilalStatus": "LEFT",
+   "bilalReceived": 7500
+  }
+ },
+ "P5_creditFarming": {
+  "scores": [
+   700,
+   715,
+   730,
+   745,
+   760,
+   775,
+   790,
+   805,
+   820,
+   835,
+   850
+  ],
+  "emergencyRateOffered": [
+   19,
+   19,
+   19,
+   19,
+   18,
+   18,
+   18,
+   18,
+   18,
+   18
+  ],
+  "interestPaid": 0,
+  "cashChange": 0,
+  "diceRolled": 0,
+  "longTermRateBefore": 9,
+  "longTermRateAfter": 8
+ },
+ "P6_cashGuardianByLoan": {
+  "cashTarget": 12000,
+  "reward": 4000,
+  "cashBeforeLoan": 9000,
+  "completedBeforeLoan": false,
+  "completedAfterLoan": true,
+  "netWorthBeforeLoan": 9000,
+  "netWorthAfterLoan": 9000,
+  "objectiveRewardPaid": 4000,
+  "finalNetWorth": 13000,
+  "results": [
+   {
+    "playerId": "00000000-0000-4000-8000-0000000000f4",
+    "objectiveId": "CASH_GUARDIAN",
+    "completed": true,
+    "reward": 4000,
+    "detail": "Finished with ₹19,000 cash (needs ₹12,000)."
+   },
+   {
+    "playerId": "00000000-0000-4000-8000-0000000000f9",
+    "objectiveId": "BUILDER",
+    "completed": false,
+    "reward": 0,
+    "detail": "Finished with 0 houses (needs 3)."
+   }
+  ]
+ },
+ "P7_unsecuredDefault": {
+  "ratePercent": 9,
+  "scheduled": {
+   "lines": [
+    {
+     "principal": 2506,
+     "interest": 1350
+    },
+    {
+     "principal": 2732,
+     "interest": 1124
+    },
+    {
+     "principal": 2977,
+     "interest": 879
+    },
+    {
+     "principal": 3245,
+     "interest": 611
+    },
+    {
+     "principal": 3540,
+     "interest": 319
+    }
+   ],
+   "principal": 15000,
+   "interest": 4283,
+   "total": 19283
+  },
+  "statusAfter": "DEFAULTED",
+  "defaultBalanceFixedAt": 17767,
+  "cashEverPaidToBankOnLoans": 0,
+  "ashaStatus": "ACTIVE",
+  "creditScore": 475,
+  "timeline": [
+   {
+    "clockYears": 1.07,
+    "type": "LOAN_INSTALLMENT_DUE",
+    "message": "Asha's Long-term Loan installment 1 of ₹3,856 is due"
+   },
+   {
+    "clockYears": 1.07,
+    "type": "LOAN_INSTALLMENT_DUE",
+    "message": "Asha's Secured Loan installment 1 of ₹1,524 is due"
+   },
+   {
+    "clockYears": 1.07,
+    "type": "CREDIT_SCORE_CHANGED",
+    "message": "Asha's credit score 700 → 705 (finished a financial year with nothing overdue)"
+   },
+   {
+    "clockYears": 1.26,
+    "type": "LOAN_INSTALLMENT_OVERDUE",
+    "message": "Asha missed Long-term Loan installment 1 — overdue"
+   },
+   {
+    "clockYears": 1.26,
+    "type": "CREDIT_SCORE_CHANGED",
+    "message": "Asha's credit score 705 → 685 (an installment became overdue)"
+   },
+   {
+    "clockYears": 1.26,
+    "type": "LOAN_INSTALLMENT_OVERDUE",
+    "message": "Asha missed Secured Loan installment 1 — overdue"
+   },
+   {
+    "clockYears": 1.26,
+    "type": "CREDIT_SCORE_CHANGED",
+    "message": "Asha's credit score 685 → 665 (an installment became overdue)"
+   },
+   {
+    "clockYears": 2.04,
+    "type": "LOAN_INSTALLMENT_DUE",
+    "message": "Asha's Long-term Loan installment 2 of ₹3,856 is due"
+   },
+   {
+    "clockYears": 2.04,
+    "type": "LOAN_INSTALLMENT_DUE",
+    "message": "Asha's Secured Loan installment 2 of ₹1,524 is due"
+   },
+   {
+    "clockYears": 2.33,
+    "type": "LOAN_INSTALLMENT_OVERDUE",
+    "message": "Asha missed Long-term Loan installment 2 — overdue"
+   },
+   {
+    "clockYears": 2.33,
+    "type": "CREDIT_SCORE_CHANGED",
+    "message": "Asha's credit score 665 → 645 (an installment became overdue)"
+   },
+   {
+    "clockYears": 2.33,
+    "type": "LOAN_DEFAULTED",
+    "message": "Asha defaulted on a Long-term Loan — ₹17,767 owed"
+   },
+   {
+    "clockYears": 2.33,
+    "type": "CREDIT_SCORE_CHANGED",
+    "message": "Asha's credit score 645 → 570 (a loan went into default)"
+   },
+   {
+    "clockYears": 2.33,
+    "type": "LOAN_INSTALLMENT_OVERDUE",
+    "message": "Asha missed Secured Loan installment 2 — overdue"
+   },
+   {
+    "clockYears": 2.33,
+    "type": "CREDIT_SCORE_CHANGED",
+    "message": "Asha's credit score 570 → 550 (an installment became overdue)"
+   },
+   {
+    "clockYears": 2.33,
+    "type": "LOAN_DEFAULTED",
+    "message": "Asha defaulted on a Secured Loan — ₹4,506 owed"
+   },
+   {
+    "clockYears": 2.33,
+    "type": "CREDIT_SCORE_CHANGED",
+    "message": "Asha's credit score 550 → 475 (a loan went into default)"
+   },
+   {
+    "clockYears": 2.33,
+    "type": "COLLATERAL_SEIZED",
+    "message": "The bank took Mumbai (worth ₹10,300) for Asha's defaulted loan and returned ₹5,794"
+   }
+  ]
+ },
+ "P12_securedDefault": {
+  "ratePercent": 7,
+  "scheduled": {
+   "lines": [
+    {
+     "principal": 1244,
+     "interest": 280
+    },
+    {
+     "principal": 1331,
+     "interest": 193
+    },
+    {
+     "principal": 1425,
+     "interest": 100
+    }
+   ],
+   "principal": 4000,
+   "interest": 573,
+   "total": 4573
+  },
+  "statusAfter": "SETTLED",
+  "settlement": {
+   "propertyKey": "MUMBAI",
+   "value": 10300,
+   "applied": 4506,
+   "surplus": 5794
+  },
+  "remainingOwed": 0,
+  "surplusPaid": 5794,
+  "mumbaiOwner": null,
+  "sellToBankWouldPay": 4250
+ },
+ "P8_dealMakerSwap": {
+  "counts": {
+   "asha": 2,
+   "bilal": 2
+  },
+  "indoreOwner": "Asha",
+  "netCashMoved": 0,
+  "rewards": [
+   {
+    "playerId": "00000000-0000-4000-8000-0000000002ca",
+    "objectiveId": "DEAL_MAKER",
+    "completed": true,
+    "reward": 4000,
+    "detail": "Finished with 2 trades completed (needs 2)."
+   },
+   {
+    "playerId": "00000000-0000-4000-8000-0000000002cf",
+    "objectiveId": "DEAL_MAKER",
+    "completed": true,
+    "reward": 4000,
+    "detail": "Finished with 2 trades completed (needs 2)."
+   }
+  ]
+ },
+ "P9_netWorthEffects": [
+  {
+   "mode": "classic",
+   "action": "build house (2000)",
+   "cashChange": -2000,
+   "netWorthChange": 0
+  },
+  {
+   "mode": "classic",
+   "action": "sell house (refund 1000)",
+   "cashChange": 1000,
+   "netWorthChange": -1000
+  },
+  {
+   "mode": "classic",
+   "action": "mortgage (750)",
+   "cashChange": 750,
+   "netWorthChange": 0
+  },
+  {
+   "mode": "classic",
+   "action": "unmortgage (825)",
+   "cashChange": -825,
+   "netWorthChange": -75
+  },
+  {
+   "mode": "classic",
+   "action": "sell to bank (750)",
+   "cashChange": 750,
+   "netWorthChange": -750
+  },
+  {
+   "mode": "intermediate",
+   "action": "build house (2000)",
+   "cashChange": -2000,
+   "netWorthChange": 0
+  },
+  {
+   "mode": "intermediate",
+   "action": "sell house (refund 1000)",
+   "cashChange": 1000,
+   "netWorthChange": -1000
+  },
+  {
+   "mode": "intermediate",
+   "action": "mortgage (750)",
+   "cashChange": 750,
+   "netWorthChange": -75
+  },
+  {
+   "mode": "intermediate",
+   "action": "unmortgage (825)",
+   "cashChange": -825,
+   "netWorthChange": 0
+  },
+  {
+   "mode": "intermediate",
+   "action": "sell to bank (750)",
+   "cashChange": 750,
+   "netWorthChange": -750
+  }
+ ],
+ "P10_loanSchedules": [
+  {
+   "score": 700,
+   "product": "EMERGENCY",
+   "amount": 1000,
+   "marketRatePercent": 20,
+   "creditAdjustmentPercent": -1,
+   "ratePercent": 19,
+   "level": 1190,
+   "lines": [
+    {
+     "principal": 1000,
+     "interest": 190
+    }
+   ],
+   "totalInterest": 190,
+   "totalRepaid": 1190
+  },
+  {
+   "score": 700,
+   "product": "EMERGENCY",
+   "amount": 5000,
+   "marketRatePercent": 20,
+   "creditAdjustmentPercent": -1,
+   "ratePercent": 19,
+   "level": 5950,
+   "lines": [
+    {
+     "principal": 5000,
+     "interest": 950
+    }
+   ],
+   "totalInterest": 950,
+   "totalRepaid": 5950
+  },
+  {
+   "score": 700,
+   "product": "PERSONAL",
+   "amount": 10000,
+   "marketRatePercent": 12,
+   "creditAdjustmentPercent": -1,
+   "ratePercent": 11,
+   "level": 4092,
+   "lines": [
+    {
+     "principal": 2992,
+     "interest": 1100
+    },
+    {
+     "principal": 3321,
+     "interest": 771
+    },
+    {
+     "principal": 3687,
+     "interest": 406
+    }
+   ],
+   "totalInterest": 2277,
+   "totalRepaid": 12277
+  },
+  {
+   "score": 700,
+   "product": "SECURED",
+   "amount": 10000,
+   "marketRatePercent": 8,
+   "creditAdjustmentPercent": -1,
+   "ratePercent": 7,
+   "level": 3811,
+   "lines": [
+    {
+     "principal": 3111,
+     "interest": 700
+    },
+    {
+     "principal": 3329,
+     "interest": 482
+    },
+    {
+     "principal": 3560,
+     "interest": 249
+    }
+   ],
+   "totalInterest": 1431,
+   "totalRepaid": 11431
+  },
+  {
+   "score": 700,
+   "product": "LONG_TERM",
+   "amount": 15000,
+   "marketRatePercent": 10,
+   "creditAdjustmentPercent": -1,
+   "ratePercent": 9,
+   "level": 3856,
+   "lines": [
+    {
+     "principal": 2506,
+     "interest": 1350
+    },
+    {
+     "principal": 2732,
+     "interest": 1124
+    },
+    {
+     "principal": 2977,
+     "interest": 879
+    },
+    {
+     "principal": 3245,
+     "interest": 611
+    },
+    {
+     "principal": 3540,
+     "interest": 319
+    }
+   ],
+   "totalInterest": 4283,
+   "totalRepaid": 19283
+  },
+  {
+   "score": 700,
+   "product": "FLEXIBLE",
+   "amount": 10000,
+   "marketRatePercent": 7,
+   "creditAdjustmentPercent": -1,
+   "ratePercent": 6,
+   "level": 3741,
+   "lines": [
+    {
+     "principal": 3141,
+     "interest": 600
+    },
+    {
+     "principal": 3329,
+     "interest": 412
+    },
+    {
+     "principal": 3530,
+     "interest": 212
+    }
+   ],
+   "totalInterest": 1224,
+   "totalRepaid": 11224
+  },
+  {
+   "score": 850,
+   "product": "EMERGENCY",
+   "amount": 1000,
+   "marketRatePercent": 20,
+   "creditAdjustmentPercent": -2,
+   "ratePercent": 18,
+   "level": 1180,
+   "lines": [
+    {
+     "principal": 1000,
+     "interest": 180
+    }
+   ],
+   "totalInterest": 180,
+   "totalRepaid": 1180
+  },
+  {
+   "score": 850,
+   "product": "EMERGENCY",
+   "amount": 5000,
+   "marketRatePercent": 20,
+   "creditAdjustmentPercent": -2,
+   "ratePercent": 18,
+   "level": 5900,
+   "lines": [
+    {
+     "principal": 5000,
+     "interest": 900
+    }
+   ],
+   "totalInterest": 900,
+   "totalRepaid": 5900
+  },
+  {
+   "score": 850,
+   "product": "PERSONAL",
+   "amount": 10000,
+   "marketRatePercent": 12,
+   "creditAdjustmentPercent": -2,
+   "ratePercent": 10,
+   "level": 4021,
+   "lines": [
+    {
+     "principal": 3021,
+     "interest": 1000
+    },
+    {
+     "principal": 3323,
+     "interest": 698
+    },
+    {
+     "principal": 3656,
+     "interest": 366
+    }
+   ],
+   "totalInterest": 2064,
+   "totalRepaid": 12064
+  },
+  {
+   "score": 850,
+   "product": "SECURED",
+   "amount": 10000,
+   "marketRatePercent": 8,
+   "creditAdjustmentPercent": -2,
+   "ratePercent": 6,
+   "level": 3741,
+   "lines": [
+    {
+     "principal": 3141,
+     "interest": 600
+    },
+    {
+     "principal": 3329,
+     "interest": 412
+    },
+    {
+     "principal": 3530,
+     "interest": 212
+    }
+   ],
+   "totalInterest": 1224,
+   "totalRepaid": 11224
+  },
+  {
+   "score": 850,
+   "product": "LONG_TERM",
+   "amount": 15000,
+   "marketRatePercent": 10,
+   "creditAdjustmentPercent": -2,
+   "ratePercent": 8,
+   "level": 3757,
+   "lines": [
+    {
+     "principal": 2557,
+     "interest": 1200
+    },
+    {
+     "principal": 2762,
+     "interest": 995
+    },
+    {
+     "principal": 2983,
+     "interest": 774
+    },
+    {
+     "principal": 3221,
+     "interest": 536
+    },
+    {
+     "principal": 3477,
+     "interest": 278
+    }
+   ],
+   "totalInterest": 3783,
+   "totalRepaid": 18783
+  },
+  {
+   "score": 850,
+   "product": "FLEXIBLE",
+   "amount": 10000,
+   "marketRatePercent": 7,
+   "creditAdjustmentPercent": -2,
+   "ratePercent": 5,
+   "level": 3672,
+   "lines": [
+    {
+     "principal": 3172,
+     "interest": 500
+    },
+    {
+     "principal": 3331,
+     "interest": 341
+    },
+    {
+     "principal": 3497,
+     "interest": 175
+    }
+   ],
+   "totalInterest": 1016,
+   "totalRepaid": 11016
+  },
+  {
+   "score": 500,
+   "product": "EMERGENCY",
+   "amount": 1000,
+   "marketRatePercent": 20,
+   "creditAdjustmentPercent": 6,
+   "ratePercent": 26,
+   "level": 1260,
+   "lines": [
+    {
+     "principal": 1000,
+     "interest": 260
+    }
+   ],
+   "totalInterest": 260,
+   "totalRepaid": 1260
+  },
+  {
+   "score": 500,
+   "product": "EMERGENCY",
+   "amount": 5000,
+   "marketRatePercent": 20,
+   "creditAdjustmentPercent": 6,
+   "ratePercent": 26,
+   "level": 6300,
+   "lines": [
+    {
+     "principal": 5000,
+     "interest": 1300
+    }
+   ],
+   "totalInterest": 1300,
+   "totalRepaid": 6300
+  },
+  {
+   "score": 500,
+   "product": "PERSONAL",
+   "amount": 10000,
+   "marketRatePercent": 12,
+   "creditAdjustmentPercent": 6,
+   "ratePercent": 18,
+   "level": 4599,
+   "lines": [
+    {
+     "principal": 2799,
+     "interest": 1800
+    },
+    {
+     "principal": 3303,
+     "interest": 1296
+    },
+    {
+     "principal": 3898,
+     "interest": 702
+    }
+   ],
+   "totalInterest": 3798,
+   "totalRepaid": 13798
+  },
+  {
+   "score": 500,
+   "product": "SECURED",
+   "amount": 10000,
+   "marketRatePercent": 8,
+   "creditAdjustmentPercent": 6,
+   "ratePercent": 14,
+   "level": 4307,
+   "lines": [
+    {
+     "principal": 2907,
+     "interest": 1400
+    },
+    {
+     "principal": 3314,
+     "interest": 993
+    },
+    {
+     "principal": 3779,
+     "interest": 529
+    }
+   ],
+   "totalInterest": 2922,
+   "totalRepaid": 12922
+  },
+  {
+   "score": 500,
+   "product": "LONG_TERM",
+   "amount": 15000,
+   "marketRatePercent": 10,
+   "creditAdjustmentPercent": 6,
+   "ratePercent": 16,
+   "level": 4581,
+   "lines": [
+    {
+     "principal": 2181,
+     "interest": 2400
+    },
+    {
+     "principal": 2530,
+     "interest": 2051
+    },
+    {
+     "principal": 2935,
+     "interest": 1646
+    },
+    {
+     "principal": 3404,
+     "interest": 1177
+    },
+    {
+     "principal": 3950,
+     "interest": 632
+    }
+   ],
+   "totalInterest": 7906,
+   "totalRepaid": 22906
+  },
+  {
+   "score": 500,
+   "product": "FLEXIBLE",
+   "amount": 10000,
+   "marketRatePercent": 7,
+   "creditAdjustmentPercent": 6,
+   "ratePercent": 13,
+   "level": 4235,
+   "lines": [
+    {
+     "principal": 2935,
+     "interest": 1300
+    },
+    {
+     "principal": 3317,
+     "interest": 918
+    },
+    {
+     "principal": 3748,
+     "interest": 487
+    }
+   ],
+   "totalInterest": 2705,
+   "totalRepaid": 12705
+  }
+ ],
+ "P11_tie": {
+  "standings": [
+   {
+    "playerId": "00000000-0000-4000-8000-000000000322",
+    "netWorth": 25000
+   },
+   {
+    "playerId": "00000000-0000-4000-8000-000000000327",
+    "netWorth": 25000
+   },
+   {
+    "playerId": "00000000-0000-4000-8000-00000000032a",
+    "netWorth": 25000
+   }
+  ],
+  "winner": "Asha",
+  "seats": [
+   {
+    "name": "Asha",
+    "seat": 0
+   },
+   {
+    "name": "Bilal",
+    "seat": 1
+   },
+   {
+    "name": "Chitra",
+    "seat": 2
+   }
+  ]
+ },
+ "P13_insurance": [
+  {
+   "insured": false,
+   "crisisAtClock": 36,
+   "struck": "INDORE",
+   "status": "PAID",
+   "bill": 3000,
+   "premiumsPaid": 0,
+   "crisisPaid": 3000,
+   "propertyPrice": 1500
+  },
+  {
+   "insured": true,
+   "crisisAtClock": 36,
+   "struck": "INDORE",
+   "status": "COVERED",
+   "bill": 3000,
+   "premiumsPaid": 500,
+   "crisisPaid": 0,
+   "propertyPrice": 1500
+  }
+ ],
+ "P14_deeds": [
+  {
+   "key": "MUMBAI",
+   "group": "BLUE",
+   "price": 8500,
+   "mortgage": 4250,
+   "unmortgage": 4675,
+   "mortgagePct": 50,
+   "position": 1,
+   "houseCost": 7500,
+   "hotelCost": 7500,
+   "rents": [
+    1200,
+    4000,
+    5500,
+    7500,
+    9000
+   ],
+   "invested": [
+    8500,
+    16000,
+    23500,
+    31000,
+    38500
+   ],
+   "landingsToRecover": [
+    7.1,
+    4,
+    4.3,
+    4.1,
+    4.3
+   ],
+   "rentYieldPct": [
+    14.1,
+    25,
+    23.4,
+    24.2,
+    23.4
+   ],
+   "marginalYieldPct": [
+    14.1,
+    37.3,
+    20,
+    26.7,
+    20
+   ]
+  },
+  {
+   "key": "AHMEDABAD",
+   "group": "BLUE",
+   "price": 4000,
+   "mortgage": 2000,
+   "unmortgage": 2200,
+   "mortgagePct": 50,
+   "position": 4,
+   "houseCost": 4500,
+   "hotelCost": 4500,
+   "rents": [
+    400,
+    1500,
+    3000,
+    4200,
+    5000
+   ],
+   "invested": [
+    4000,
+    8500,
+    13000,
+    17500,
+    22000
+   ],
+   "landingsToRecover": [
+    10,
+    5.7,
+    4.3,
+    4.2,
+    4.4
+   ],
+   "rentYieldPct": [
+    10,
+    17.6,
+    23.1,
+    24,
+    22.7
+   ],
+   "marginalYieldPct": [
+    10,
+    24.4,
+    33.3,
+    26.7,
+    17.8
+   ]
+  },
+  {
+   "key": "CALCUTTA",
+   "group": "BLUE",
+   "price": 6500,
+   "mortgage": 3250,
+   "unmortgage": 3575,
+   "mortgagePct": 50,
+   "position": 25,
+   "houseCost": 6000,
+   "hotelCost": 6000,
+   "rents": [
+    800,
+    3200,
+    4500,
+    6500,
+    8000
+   ],
+   "invested": [
+    6500,
+    12500,
+    18500,
+    24500,
+    30500
+   ],
+   "landingsToRecover": [
+    8.1,
+    3.9,
+    4.1,
+    3.8,
+    3.8
+   ],
+   "rentYieldPct": [
+    12.3,
+    25.6,
+    24.3,
+    26.5,
+    26.2
+   ],
+   "marginalYieldPct": [
+    12.3,
+    40,
+    21.7,
+    33.3,
+    25
+   ]
+  },
+  {
+   "key": "HYDERABAD",
+   "group": "BLUE",
+   "price": 3500,
+   "mortgage": 1750,
+   "unmortgage": 1925,
+   "mortgagePct": 50,
+   "position": 26,
+   "houseCost": 5000,
+   "hotelCost": 5000,
+   "rents": [
+    300,
+    1200,
+    3000,
+    4500,
+    6000
+   ],
+   "invested": [
+    3500,
+    8500,
+    13500,
+    18500,
+    23500
+   ],
+   "landingsToRecover": [
+    11.7,
+    7.1,
+    4.5,
+    4.1,
+    3.9
+   ],
+   "rentYieldPct": [
+    8.6,
+    14.1,
+    22.2,
+    24.3,
+    25.5
+   ],
+   "marginalYieldPct": [
+    8.6,
+    18,
+    36,
+    30,
+    30
+   ]
+  },
+  {
+   "key": "DARJEELING",
+   "group": "BLUE",
+   "price": 2500,
+   "mortgage": 1250,
+   "unmortgage": 1375,
+   "mortgagePct": 50,
+   "position": 23,
+   "houseCost": 3000,
+   "hotelCost": 3000,
+   "rents": [
+    200,
+    1200,
+    2600,
+    3500,
+    5000
+   ],
+   "invested": [
+    2500,
+    5500,
+    8500,
+    11500,
+    14500
+   ],
+   "landingsToRecover": [
+    12.5,
+    4.6,
+    3.3,
+    3.3,
+    2.9
+   ],
+   "rentYieldPct": [
+    8,
+    21.8,
+    30.6,
+    30.4,
+    34.5
+   ],
+   "marginalYieldPct": [
+    8,
+    33.3,
+    46.7,
+    30,
+    50
+   ]
+  },
+  {
+   "key": "SHIMLA",
+   "group": "PURPLE",
+   "price": 2200,
+   "mortgage": 1100,
+   "unmortgage": 1210,
+   "mortgagePct": 50,
+   "position": 14,
+   "houseCost": 3500,
+   "hotelCost": 3500,
+   "rents": [
+    200,
+    1000,
+    2750,
+    4500,
+    6000
+   ],
+   "invested": [
+    2200,
+    5700,
+    9200,
+    12700,
+    16200
+   ],
+   "landingsToRecover": [
+    11,
+    5.7,
+    3.3,
+    2.8,
+    2.7
+   ],
+   "rentYieldPct": [
+    9.1,
+    17.5,
+    29.9,
+    35.4,
+    37
+   ],
+   "marginalYieldPct": [
+    9.1,
+    22.9,
+    50,
+    50,
+    42.9
+   ]
+  },
+  {
+   "key": "MADRAS",
+   "group": "PURPLE",
+   "price": 7000,
+   "mortgage": 3500,
+   "unmortgage": 3850,
+   "mortgagePct": 50,
+   "position": 28,
+   "houseCost": 6500,
+   "hotelCost": 6500,
+   "rents": [
+    900,
+    3500,
+    5000,
+    7000,
+    8500
+   ],
+   "invested": [
+    7000,
+    13500,
+    20000,
+    26500,
+    33000
+   ],
+   "landingsToRecover": [
+    7.8,
+    3.9,
+    4,
+    3.8,
+    3.9
+   ],
+   "rentYieldPct": [
+    12.9,
+    25.9,
+    25,
+    26.4,
+    25.8
+   ],
+   "marginalYieldPct": [
+    12.9,
+    40,
+    23.1,
+    30.8,
+    23.1
+   ]
+  },
+  {
+   "key": "AMRITSAR",
+   "group": "PURPLE",
+   "price": 3300,
+   "mortgage": 1050,
+   "unmortgage": 1155,
+   "mortgagePct": 31.8,
+   "position": 15,
+   "houseCost": 4500,
+   "hotelCost": 4500,
+   "rents": [
+    300,
+    1400,
+    2800,
+    4000,
+    5000
+   ],
+   "invested": [
+    3300,
+    7800,
+    12300,
+    16800,
+    21300
+   ],
+   "landingsToRecover": [
+    11,
+    5.6,
+    4.4,
+    4.2,
+    4.3
+   ],
+   "rentYieldPct": [
+    9.1,
+    17.9,
+    22.8,
+    23.8,
+    23.5
+   ],
+   "marginalYieldPct": [
+    9.1,
+    24.4,
+    31.1,
+    26.7,
+    22.2
+   ]
+  },
+  {
+   "key": "SRINAGAR",
+   "group": "PURPLE",
+   "price": 5000,
+   "mortgage": 2500,
+   "unmortgage": 2750,
+   "mortgagePct": 50,
+   "position": 17,
+   "houseCost": 6000,
+   "hotelCost": 6000,
+   "rents": [
+    550,
+    3500,
+    5000,
+    7000,
+    8000
+   ],
+   "invested": [
+    5000,
+    11000,
+    17000,
+    23000,
+    29000
+   ],
+   "landingsToRecover": [
+    9.1,
+    3.1,
+    3.4,
+    3.3,
+    3.6
+   ],
+   "rentYieldPct": [
+    11,
+    31.8,
+    29.4,
+    30.4,
+    27.6
+   ],
+   "marginalYieldPct": [
+    11,
+    49.2,
+    25,
+    33.3,
+    16.7
+   ]
+  },
+  {
+   "key": "BANGALORE",
+   "group": "PURPLE",
+   "price": 4000,
+   "mortgage": 2000,
+   "unmortgage": 2200,
+   "mortgagePct": 50,
+   "position": 30,
+   "houseCost": 4500,
+   "hotelCost": 4500,
+   "rents": [
+    400,
+    1500,
+    3000,
+    4500,
+    5500
+   ],
+   "invested": [
+    4000,
+    8500,
+    13000,
+    17500,
+    22000
+   ],
+   "landingsToRecover": [
+    10,
+    5.7,
+    4.3,
+    3.9,
+    4
+   ],
+   "rentYieldPct": [
+    10,
+    17.6,
+    23.1,
+    25.7,
+    25
+   ],
+   "marginalYieldPct": [
+    10,
+    24.4,
+    33.3,
+    33.3,
+    22.2
+   ]
+  },
+  {
+   "key": "INDORE",
+   "group": "GREEN",
+   "price": 1500,
+   "mortgage": 750,
+   "unmortgage": 825,
+   "mortgagePct": 50,
+   "position": 6,
+   "houseCost": 2000,
+   "hotelCost": 2000,
+   "rents": [
+    200,
+    600,
+    1500,
+    2500,
+    3600
+   ],
+   "invested": [
+    1500,
+    3500,
+    5500,
+    7500,
+    9500
+   ],
+   "landingsToRecover": [
+    7.5,
+    5.8,
+    3.7,
+    3,
+    2.6
+   ],
+   "rentYieldPct": [
+    13.3,
+    17.1,
+    27.3,
+    33.3,
+    37.9
+   ],
+   "marginalYieldPct": [
+    13.3,
+    20,
+    45,
+    50,
+    55
+   ]
+  },
+  {
+   "key": "AGRA",
+   "group": "GREEN",
+   "price": 2500,
+   "mortgage": 1250,
+   "unmortgage": 1375,
+   "mortgagePct": 50,
+   "position": 19,
+   "houseCost": 3000,
+   "hotelCost": 3000,
+   "rents": [
+    200,
+    900,
+    1600,
+    2500,
+    3500
+   ],
+   "invested": [
+    2500,
+    5500,
+    8500,
+    11500,
+    14500
+   ],
+   "landingsToRecover": [
+    12.5,
+    6.1,
+    5.3,
+    4.6,
+    4.1
+   ],
+   "rentYieldPct": [
+    8,
+    16.4,
+    18.8,
+    21.7,
+    24.1
+   ],
+   "marginalYieldPct": [
+    8,
+    23.3,
+    23.3,
+    30,
+    33.3
+   ]
+  },
+  {
+   "key": "KANPUR",
+   "group": "GREEN",
+   "price": 4000,
+   "mortgage": 2000,
+   "unmortgage": 2200,
+   "mortgagePct": 50,
+   "position": 21,
+   "houseCost": 4500,
+   "hotelCost": 4500,
+   "rents": [
+    400,
+    1500,
+    3000,
+    4500,
+    5500
+   ],
+   "invested": [
+    4000,
+    8500,
+    13000,
+    17500,
+    22000
+   ],
+   "landingsToRecover": [
+    10,
+    5.7,
+    4.3,
+    3.9,
+    4
+   ],
+   "rentYieldPct": [
+    10,
+    17.6,
+    23.1,
+    25.7,
+    25
+   ],
+   "marginalYieldPct": [
+    10,
+    24.4,
+    33.3,
+    33.3,
+    22.2
+   ]
+  },
+  {
+   "key": "PATNA",
+   "group": "GREEN",
+   "price": 2000,
+   "mortgage": 1000,
+   "unmortgage": 1100,
+   "mortgagePct": 50,
+   "position": 22,
+   "houseCost": 2500,
+   "hotelCost": 2500,
+   "rents": [
+    150,
+    800,
+    2000,
+    3000,
+    4500
+   ],
+   "invested": [
+    2000,
+    4500,
+    7000,
+    9500,
+    12000
+   ],
+   "landingsToRecover": [
+    13.3,
+    5.6,
+    3.5,
+    3.2,
+    2.7
+   ],
+   "rentYieldPct": [
+    7.5,
+    17.8,
+    28.6,
+    31.6,
+    37.5
+   ],
+   "marginalYieldPct": [
+    7.5,
+    26,
+    48,
+    40,
+    60
+   ]
+  },
+  {
+   "key": "JAIPUR",
+   "group": "GREEN",
+   "price": 3000,
+   "mortgage": 1500,
+   "unmortgage": 1650,
+   "mortgagePct": 50,
+   "position": 8,
+   "houseCost": 4000,
+   "hotelCost": 4000,
+   "rents": [
+    250,
+    1500,
+    2700,
+    4000,
+    5500
+   ],
+   "invested": [
+    3000,
+    7000,
+    11000,
+    15000,
+    19000
+   ],
+   "landingsToRecover": [
+    12,
+    4.7,
+    4.1,
+    3.8,
+    3.5
+   ],
+   "rentYieldPct": [
+    8.3,
+    21.4,
+    24.5,
+    26.7,
+    28.9
+   ],
+   "marginalYieldPct": [
+    8.3,
+    31.3,
+    30,
+    32.5,
+    37.5
+   ]
+  },
+  {
+   "key": "DELHI",
+   "group": "PINK",
+   "price": 6000,
+   "mortgage": 4000,
+   "unmortgage": 4400,
+   "mortgagePct": 66.7,
+   "position": 10,
+   "houseCost": 5000,
+   "hotelCost": 5000,
+   "rents": [
+    750,
+    3000,
+    4300,
+    5500,
+    7500
+   ],
+   "invested": [
+    6000,
+    11000,
+    16000,
+    21000,
+    26000
+   ],
+   "landingsToRecover": [
+    8,
+    3.7,
+    3.7,
+    3.8,
+    3.5
+   ],
+   "rentYieldPct": [
+    12.5,
+    27.3,
+    26.9,
+    26.2,
+    28.8
+   ],
+   "marginalYieldPct": [
+    12.5,
+    45,
+    26,
+    24,
+    40
+   ]
+  },
+  {
+   "key": "CHANDIGARH",
+   "group": "PINK",
+   "price": 2500,
+   "mortgage": 1250,
+   "unmortgage": 1375,
+   "mortgagePct": 50,
+   "position": 11,
+   "houseCost": 3000,
+   "hotelCost": 3000,
+   "rents": [
+    200,
+    900,
+    1600,
+    2500,
+    3500
+   ],
+   "invested": [
+    2500,
+    5500,
+    8500,
+    11500,
+    14500
+   ],
+   "landingsToRecover": [
+    12.5,
+    6.1,
+    5.3,
+    4.6,
+    4.1
+   ],
+   "rentYieldPct": [
+    8,
+    16.4,
+    18.8,
+    21.7,
+    24.1
+   ],
+   "marginalYieldPct": [
+    8,
+    23.3,
+    23.3,
+    30,
+    33.3
+   ]
+  },
+  {
+   "key": "COCHIN",
+   "group": "PINK",
+   "price": 3000,
+   "mortgage": 1500,
+   "unmortgage": 1650,
+   "mortgagePct": 50,
+   "position": 33,
+   "houseCost": 4000,
+   "hotelCost": 4000,
+   "rents": [
+    300,
+    1200,
+    2000,
+    4250,
+    5500
+   ],
+   "invested": [
+    3000,
+    7000,
+    11000,
+    15000,
+    19000
+   ],
+   "landingsToRecover": [
+    10,
+    5.8,
+    5.5,
+    3.5,
+    3.5
+   ],
+   "rentYieldPct": [
+    10,
+    17.1,
+    18.2,
+    28.3,
+    28.9
+   ],
+   "marginalYieldPct": [
+    10,
+    22.5,
+    20,
+    56.3,
+    31.3
+   ]
+  },
+  {
+   "key": "OOTACAMUND",
+   "group": "PINK",
+   "price": 2500,
+   "mortgage": 1250,
+   "unmortgage": 1375,
+   "mortgagePct": 50,
+   "position": 32,
+   "houseCost": 3000,
+   "hotelCost": 3000,
+   "rents": [
+    200,
+    1000,
+    2250,
+    3500,
+    4500
+   ],
+   "invested": [
+    2500,
+    5500,
+    8500,
+    11500,
+    14500
+   ],
+   "landingsToRecover": [
+    12.5,
+    5.5,
+    3.8,
+    3.3,
+    3.2
+   ],
+   "rentYieldPct": [
+    8,
+    18.2,
+    26.5,
+    30.4,
+    31
+   ],
+   "marginalYieldPct": [
+    8,
+    26.7,
+    41.7,
+    41.7,
+    33.3
+   ]
+  },
+  {
+   "key": "MARGAO",
+   "group": "PINK",
+   "price": 4000,
+   "mortgage": 2000,
+   "unmortgage": 2200,
+   "mortgagePct": 50,
+   "position": 35,
+   "houseCost": 4500,
+   "hotelCost": 4500,
+   "rents": [
+    400,
+    2200,
+    3500,
+    5000,
+    6500
+   ],
+   "invested": [
+    4000,
+    8500,
+    13000,
+    17500,
+    22000
+   ],
+   "landingsToRecover": [
+    10,
+    3.9,
+    3.7,
+    3.5,
+    3.4
+   ],
+   "rentYieldPct": [
+    10,
+    25.9,
+    26.9,
+    28.6,
+    29.5
+   ],
+   "marginalYieldPct": [
+    10,
+    40,
+    28.9,
+    33.3,
+    33.3
+   ]
+  },
+  {
+   "key": "RAILWAY",
+   "group": "TRANSPORT_UTILITY",
+   "price": 9500,
+   "mortgage": 4750,
+   "unmortgage": 5225,
+   "mortgagePct": 50,
+   "position": 3,
+   "rent": {
+    "type": "FIXED",
+    "base": 1000,
+    "pairedWith": "BEST",
+    "pairedRent": 1350
+   }
+  },
+  {
+   "key": "AIR_INDIA",
+   "group": "TRANSPORT_UTILITY",
+   "price": 10500,
+   "mortgage": 4750,
+   "unmortgage": 5225,
+   "mortgagePct": 45.2,
+   "position": 24,
+   "rent": {
+    "type": "FIXED",
+    "base": 1200,
+    "pairedWith": "WATER_WORKS",
+    "pairedRent": 1350
+   }
+  },
+  {
+   "key": "MOTOR_BOAT",
+   "group": "TRANSPORT_UTILITY",
+   "price": 5500,
+   "mortgage": 1750,
+   "unmortgage": 1925,
+   "mortgagePct": 31.8,
+   "position": 34,
+   "rent": {
+    "type": "DICE_MULTIPLIER",
+    "multiplier": 100,
+    "pairedWith": "ELECTRIC_COMPANY",
+    "pairedMultiplier": 200
+   }
+  },
+  {
+   "key": "BEST",
+   "group": "TRANSPORT_UTILITY",
+   "price": 3500,
+   "mortgage": 1750,
+   "unmortgage": 1925,
+   "mortgagePct": 50,
+   "position": 13,
+   "rent": {
+    "type": "FIXED",
+    "base": 600,
+    "pairedWith": "RAILWAY",
+    "pairedRent": 1350
+   }
+  },
+  {
+   "key": "ELECTRIC_COMPANY",
+   "group": "TRANSPORT_UTILITY",
+   "price": 2500,
+   "mortgage": 1750,
+   "unmortgage": 1925,
+   "mortgagePct": 70,
+   "position": 12,
+   "rent": {
+    "type": "DICE_MULTIPLIER",
+    "multiplier": 50,
+    "pairedWith": "MOTOR_BOAT",
+    "pairedMultiplier": 100
+   }
+  },
+  {
+   "key": "WATER_WORKS",
+   "group": "TRANSPORT_UTILITY",
+   "price": 3200,
+   "mortgage": 1600,
+   "unmortgage": 1760,
+   "mortgagePct": 50,
+   "position": 2,
+   "rent": {
+    "type": "FIXED",
+    "base": 500,
+    "pairedWith": "AIR_INDIA",
+    "pairedRent": 1000
+   }
+  }
+ ],
+ "P15_auctionArbitrage": {
+  "deedPrice": 6000,
+  "wonFor": 100,
+  "wonByDecliner": true,
+  "soldToBankFor": 4000,
+  "profit": 3900,
+  "delhiOwnerAfter": null
+ },
+ "P16_manualCard": {
+  "phaseAfterRoll": "AWAITING_CARD",
+  "card": {
+   "cardId": "CHANCE_ODD_11",
+   "deck": "CHANCE",
+   "table": "ODD",
+   "rollTotal": 11,
+   "text": "Not in the supplied card data — read the physical card.",
+   "verified": false
+  },
+  "claim": "OK",
+  "received": 10000,
+  "otherPlayerCanAskToUndo": "FORBIDDEN: Only players involved can ask to undo this."
+ }
+}

@@ -3,6 +3,7 @@ import type { Draft } from './draft.ts';
 import { fail } from './errors.ts';
 import { formatINR } from './format.ts';
 import { configOf } from './gameConfig.ts';
+import { financialYearCap } from './gameEnd.ts';
 import { processCrisisCheckpoints } from './insurance.ts';
 import { freshInsurance } from './insuranceState.ts';
 import { INTERMEDIATE_RULES as IR, type CreditEventType, type LoanProductKey } from './intermediateConfig.ts';
@@ -145,7 +146,20 @@ export function recordDiceMovement(d: Draft, player: PlayerState, spaces: number
   const eco = economyOf(d.state);
   if (!eco || spaces <= 0 || !(player.id in eco.movement)) return;
   eco.movement[player.id] = (eco.movement[player.id] ?? 0) + spaces;
-  const target = yearAt(eco, gameClock(eco));
+  advanceCalendar(d, eco);
+}
+
+/**
+ * Brings the economy up to date with the game clock (steps 2–5 above). Every step is a one-way move
+ * of stored state, so running it again at the same clock changes nothing.
+ *
+ * In a game with a duration the calendar stops at the game's last financial year: the year after it
+ * does not begin — no market change, no new premiums — until the players have voted to play it
+ * (financialYearCap). The reducer calls this again when they do. Loan and crisis checkpoints run on
+ * the clock itself and are not held back.
+ */
+export function advanceCalendar(d: Draft, eco: IntermediateState): void {
+  const target = Math.min(yearAt(eco, gameClock(eco)), financialYearCap(d.state));
   const reports: YearReport[] = [];
   while (eco.year < target) reports.push(startNextYear(d, eco));
   processLoanCheckpoints(d, eco);

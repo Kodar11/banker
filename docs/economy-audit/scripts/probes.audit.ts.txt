@@ -1,0 +1,375 @@
+// TEMPORARY AUDIT EXPERIMENT - not part of the repository's test suite.
+// Targeted probes of the real engine. Each records what it observed to probe-results.json.
+import { writeFileSync } from 'node:fs';
+import { afterAll, expect, it } from 'vitest';
+import {
+  economyOf,
+  gameClock,
+  getDeed,
+  netWorth,
+  offeredRate,
+  openEndVote,
+  pendingCrises,
+  previewLoan,
+  completedTradeCount,
+  OBJECTIVES,
+  objectiveTerms,
+  annualInstallment,
+  PROPERTY_KEYS,
+  PROPERTY_DEEDS,
+  mortgagePayout,
+  unmortgageCost,
+  positionOfProperty,
+  INTERMEDIATE_RULES as IR,
+  type GameAction,
+  type LoanProductKey,
+  type PropertyKey,
+  type TransactionRecord,
+} from '@/engine/index.ts';
+import { TestGame } from '#tests/engine/harness.ts';
+
+const OUT = process.env.AUDIT_DIR!;
+const out: Record<string, unknown> = {};
+afterAll(() => writeFileSync(`${OUT}/probe-results.json`, JSON.stringify(out, null, 1)));
+
+const sum = (txs: TransactionRecord[], type: string, pid?: string) => txs.filter((t) => t.type === type && (!pid || t.fromPlayerId === pid || t.toPlayerId === pid)).reduce((s, t) => s + t.amount, 0);
+const tryAct = (g: TestGame, name: string, action: GameAction): string => {
+  try {
+    g.act(name, action);
+    return 'OK';
+  } catch (e) {
+    return `${(e as { code?: string }).code}: ${(e as Error).message}`;
+  }
+};
+
+/** Plays the current player's whole turn with dice a+b, declining every purchase and paying whatever is owed. */
+function playTurn(g: TestGame, a = 3, b = 4): void {
+  const name = g.current;
+  if (g.player(name).inJail) g.act(name, { type: 'PAY_JAIL_FINE' });
+  g.roll(name, a, b);
+  for (let guard = 0; guard < 200; guard += 1) {
+    if (g.state.status !== 'ACTIVE' || openEndVote(g.state)) return;
+    const crisis = pendingCrises(g.state)[0];
+    if (crisis) {
+      const owner = g.state.players.find((p) => p.id === crisis.ownerId)!.name;
+      g.act(owner, { type: 'PAY_CRISIS_BILL', crisisId: crisis.id });
+      continue;
+    }
+    const turn = g.state.turn;
+    if (turn.phase === 'AWAITING_DECISION') g.act(name, { type: 'DECLINE_PROPERTY' });
+    else if (turn.phase === 'AUCTION') {
+      const auction = g.state.auction!;
+      const next = auction.participantIds.find((id) => !auction.passedIds.includes(id))!;
+      g.act(g.state.players.find((p) => p.id === next)!.name, { type: 'PASS_AUCTION', auctionId: auction.id });
+    } else if (turn.phase === 'AWAITING_PAYMENT' && turn.pending?.kind === 'PAYMENT') {
+      const pay = { RENT: 'PAY_RENT', TAX: 'PAY_TAX', CARD: 'PAY_CARD', LOAN_INTEREST: 'PAY_INTEREST', CLUB: 'PAY_CLUB' } as const;
+      g.act(name, { type: pay[turn.pending.reason] });
+    } else if (turn.phase === 'AWAITING_CARD') g.act(name, { type: 'RESOLVE_CARD', resolution: 'NONE' });
+    else if (turn.phase === 'TURN_COMPLETE') {
+      g.act(name, { type: 'END_TURN' });
+      return;
+    } else throw new Error(`unexpected phase ${turn.phase}`);
+  }
+}
+
+it('P1 Classic loan: full repayment before Start = no interest; partial repayment = full interest', () => {
+  const run = (repay: number) => {
+    const g = new TestGame(['Asha', 'Bilal']);
+    g.act('Asha', { type: 'REQUEST_LOAN', amount: 20000 });
+    const loan = g.state.loans[0]!;
+    if (repay > 0) g.act('Asha', { type: 'REPAY_LOAN', loanId: loan.id, amount: repay });
+    g.placeAt('Asha', 30);
+    g.roll('Asha', 4, 4); // 30 + 8 passes Start
+    if (g.state.turn.phase === 'AWAITING_PAYMENT') g.act('Asha', { type: 'PAY_INTEREST' });
+    return { repaidBeforeStart: repay, interestCharged: sum(g.ledger, 'LOAN_INTEREST'), startReward: sum(g.ledger, 'START_REWARD') };
+  };
+  const rows = [run(0), run(19000), run(20000)];
+  out.P1_classicLoanInterest = rows;
+  expect(rows.map((r) => r.interestCharged)).toEqual([2000, 2000, 0]);
+});
+
+it('P2 Classic: a debtor can give their cash away mid-debt and then go bankrupt; the creditor gets nothing', () => {
+  const g = new TestGame(['Asha', 'Bilal', 'Chitra']);
+  g.give('Bilal', 'DELHI', { hotel: true });
+  g.give('Bilal', 'COCHIN');
+  g.give('Bilal', 'MARGAO');
+  g.give('Asha', 'MADRAS');
+  g.landOn('Asha', positionOfProperty('DELHI'), 8);
+  const owed = g.state.turn.pending?.kind === 'PAYMENT' ? g.state.turn.pending.amount : 0;
+  const before = { asha: g.balance('Asha'), bilal: g.balance('Bilal'), chitra: g.balance('Chitra') };
+  const transfer = tryAct(g, 'Asha', { type: 'TRANSFER_MONEY', toPlayerId: g.id('Chitra'), amount: g.balance('Asha') });
+  const bankrupt = tryAct(g, 'Asha', { type: 'DECLARE_BANKRUPTCY' });
+  out.P2_assetStripping = {
+    rentOwed: owed,
+    couldAffordIt: before.asha >= owed,
+    transferWhileOwing: transfer,
+    bankruptcy: bankrupt,
+    before,
+    after: { asha: g.balance('Asha'), bilal: g.balance('Bilal'), chitra: g.balance('Chitra') },
+    ashaStatus: g.player('Asha').status,
+    madrasOwnerAfter: g.state.properties.MADRAS.ownerId,
+  };
+  expect(owed).toBe(15000);
+  expect(g.balance('Bilal')).toBe(before.bilal);
+  expect(g.player('Asha').status).toBe('BANKRUPT');
+});
+
+it('P3 Classic: leaving while owing rent pays nothing; rent paid later to a LEFT owner still leaves the payer', () => {
+  const g = new TestGame(['Asha', 'Bilal', 'Chitra']);
+  g.give('Bilal', 'DELHI', { hotel: true });
+  g.landOn('Asha', positionOfProperty('DELHI'), 8);
+  const owed = g.state.turn.pending?.kind === 'PAYMENT' ? g.state.turn.pending.amount : 0;
+  const bilalBefore = g.balance('Bilal');
+  g.act('Asha', { type: 'LEAVE_GAME' });
+  const a = { owed, ashaStatus: g.player('Asha').status, ashaCashKept: g.balance('Asha'), bilalReceived: g.balance('Bilal') - bilalBefore, gameStatus: g.state.status };
+  // Now Bilal leaves too?  No - keep two players. Instead: a LEFT owner still collects rent.
+  const g2 = new TestGame(['Asha', 'Bilal', 'Chitra']);
+  g2.give('Bilal', 'DELHI', { hotel: true });
+  g2.act('Bilal', { type: 'LEAVE_GAME' });
+  g2.landOn('Asha', positionOfProperty('DELHI'), 8);
+  const pending = g2.state.turn.pending;
+  const bilal0 = g2.balance('Bilal');
+  if (g2.state.turn.phase === 'AWAITING_PAYMENT') g2.act('Asha', { type: 'PAY_RENT' });
+  out.P3_leaving = { leaveWhileOwing: a, rentToLeftOwner: { pending, bilalStatus: g2.player('Bilal').status, bilalReceived: g2.balance('Bilal') - bilal0 } };
+  expect(a.bilalReceived).toBe(0);
+});
+
+it('P5 Capital: borrow and prepay at once = free credit score', () => {
+  const g = new TestGame(['Asha', 'Bilal'], { mode: 'intermediate' });
+  const scores: number[] = [economyOf(g.state)!.credit[g.id('Asha')]!];
+  const rates: number[] = [];
+  for (let i = 0; i < 10; i += 1) {
+    const rate = offeredRate('EMERGENCY', scores[scores.length - 1]!).ratePercent;
+    rates.push(rate);
+    g.act('Asha', { type: 'TAKE_INTERMEDIATE_LOAN', product: 'EMERGENCY', amount: 1000, expectedRatePercent: rate });
+    const loan = economyOf(g.state)!.loans[economyOf(g.state)!.loans.length - 1]!;
+    g.act('Asha', { type: 'PREPAY_INTERMEDIATE_LOAN', loanId: loan.id, amount: 1000 });
+    scores.push(economyOf(g.state)!.credit[g.id('Asha')]!);
+  }
+  out.P5_creditFarming = {
+    scores,
+    emergencyRateOffered: rates,
+    interestPaid: sum(g.ledger, 'LOAN_INTEREST'),
+    cashChange: g.balance('Asha') - 25000,
+    diceRolled: gameClock(economyOf(g.state)!),
+    longTermRateBefore: offeredRate('LONG_TERM', 700).ratePercent,
+    longTermRateAfter: offeredRate('LONG_TERM', scores[scores.length - 1]!).ratePercent,
+  };
+  expect(sum(g.ledger, 'LOAN_INTEREST')).toBe(0);
+  expect(scores[scores.length - 1]).toBe(850);
+});
+
+it('P6 Capital: a last-minute loan completes Cash Guardian and costs nothing in net worth', () => {
+  const g = new TestGame(['Asha', 'Bilal'], { mode: 'intermediate', config: { secretObjectives: true } });
+  g.state.objectives!.assignments[g.id('Asha')] = 'CASH_GUARDIAN';
+  g.state.objectives!.assignments[g.id('Bilal')] = 'BUILDER';
+  g.act('Asha', { type: 'TRANSFER_MONEY', toPlayerId: g.id('Bilal'), amount: 16000 });
+  const terms = objectiveTerms('CASH_GUARDIAN', 25000);
+  const check0 = OBJECTIVES.CASH_GUARDIAN.evaluate(g.state, g.id('Asha'), terms).completed;
+  const nw0 = netWorth(g.state, g.id('Asha'));
+  const rate = offeredRate('PERSONAL', 700).ratePercent;
+  g.act('Asha', { type: 'TAKE_INTERMEDIATE_LOAN', product: 'PERSONAL', amount: 10000, expectedRatePercent: rate });
+  const check1 = OBJECTIVES.CASH_GUARDIAN.evaluate(g.state, g.id('Asha'), terms).completed;
+  const nw1 = netWorth(g.state, g.id('Asha'));
+  g.endByVote('Asha');
+  out.P6_cashGuardianByLoan = {
+    cashTarget: terms.cashTarget,
+    reward: terms.reward,
+    cashBeforeLoan: 9000,
+    completedBeforeLoan: check0,
+    completedAfterLoan: check1,
+    netWorthBeforeLoan: nw0,
+    netWorthAfterLoan: nw1,
+    objectiveRewardPaid: sum(g.ledger, 'OBJECTIVE_REWARD', g.id('Asha')),
+    finalNetWorth: netWorth(g.state, g.id('Asha')),
+    results: g.state.objectives!.results,
+  };
+  expect(check0).toBe(false);
+  expect(check1).toBe(true);
+  expect(nw1).toBe(nw0);
+});
+
+it('P7/P12 Capital: an unpaid unsecured loan is never collected; a secured default sells the property to the bank at market value', () => {
+  const g = new TestGame(['Asha', 'Bilal'], { mode: 'intermediate', config: { durationYears: 10 } });
+  g.give('Asha', 'MUMBAI');
+  const eco0 = economyOf(g.state)!;
+  const ltRate = offeredRate('LONG_TERM', 700).ratePercent;
+  const secRate = offeredRate('SECURED', 700).ratePercent;
+  g.act('Asha', { type: 'TAKE_INTERMEDIATE_LOAN', product: 'LONG_TERM', amount: 15000, expectedRatePercent: ltRate });
+  g.act('Asha', { type: 'TAKE_INTERMEDIATE_LOAN', product: 'SECURED', amount: 4000, collateralKey: 'MUMBAI', expectedRatePercent: secRate });
+  const preview = previewLoan('LONG_TERM', 15000, ltRate);
+  const secPreview = previewLoan('SECURED', 4000, secRate);
+  const length = eco0.playerCount * IR.year.spacesPerYear;
+  const timeline: unknown[] = [];
+  let seen = 0;
+  for (let i = 0; i < 80 && g.state.status === 'ACTIVE' && gameClock(economyOf(g.state)!) < 3.5 * length; i += 1) {
+    playTurn(g);
+    for (const r of g.results.slice(seen)) {
+      for (const e of r.events) {
+        if (['LOAN_INSTALLMENT_DUE', 'LOAN_INSTALLMENT_OVERDUE', 'LOAN_DEFAULTED', 'COLLATERAL_SEIZED', 'CREDIT_SCORE_CHANGED'].includes(e.type)) {
+          timeline.push({ clockYears: +(gameClock(economyOf(g.state)!) / length).toFixed(2), type: e.type, message: e.message });
+        }
+      }
+    }
+    seen = g.results.length;
+  }
+  const eco = economyOf(g.state)!;
+  const lt = eco.loans.find((l) => l.product === 'LONG_TERM')!;
+  const sec = eco.loans.find((l) => l.product === 'SECURED')!;
+  out.P7_unsecuredDefault = {
+    ratePercent: ltRate,
+    scheduled: preview,
+    statusAfter: lt.status,
+    defaultBalanceFixedAt: lt.defaultBalance,
+    cashEverPaidToBankOnLoans: sum(g.ledger, 'LOAN_REPAYMENT', g.id('Asha')) + sum(g.ledger, 'LOAN_INTEREST', g.id('Asha')),
+    ashaStatus: g.player('Asha').status,
+    creditScore: eco.credit[g.id('Asha')],
+    timeline,
+  };
+  out.P12_securedDefault = {
+    ratePercent: secRate,
+    scheduled: secPreview,
+    statusAfter: sec.status,
+    settlement: sec.settlement,
+    remainingOwed: sec.defaultBalance,
+    surplusPaid: sum(g.ledger, 'COLLATERAL_SURPLUS', g.id('Asha')),
+    mumbaiOwner: g.state.properties.MUMBAI.ownerId,
+    sellToBankWouldPay: getDeed('MUMBAI').mortgageValue,
+  };
+  expect(lt.status).toBe('DEFAULTED');
+  expect(g.player('Asha').status).toBe('ACTIVE');
+});
+
+it('P8 Capital: two players swap one property back and forth and both complete Deal Maker', () => {
+  const g = new TestGame(['Asha', 'Bilal'], { mode: 'intermediate', config: { secretObjectives: true } });
+  g.state.objectives!.assignments[g.id('Asha')] = 'DEAL_MAKER';
+  g.state.objectives!.assignments[g.id('Bilal')] = 'DEAL_MAKER';
+  g.give('Asha', 'INDORE');
+  g.act('Asha', { type: 'CREATE_TRADE', toPlayerId: g.id('Bilal'), offeredPropertyKeys: ['INDORE'], requestedPropertyKeys: [], offeredMoney: 0, requestedMoney: 1 });
+  g.act('Bilal', { type: 'ACCEPT_TRADE', tradeId: g.state.trades[g.state.trades.length - 1]!.id });
+  g.act('Bilal', { type: 'CREATE_TRADE', toPlayerId: g.id('Asha'), offeredPropertyKeys: ['INDORE'], requestedPropertyKeys: [], offeredMoney: 0, requestedMoney: 1 });
+  g.act('Asha', { type: 'ACCEPT_TRADE', tradeId: g.state.trades[g.state.trades.length - 1]!.id });
+  const counts = { asha: completedTradeCount(g.state.objectives, g.id('Asha')), bilal: completedTradeCount(g.state.objectives, g.id('Bilal')) };
+  g.endByVote('Asha');
+  out.P8_dealMakerSwap = { counts, indoreOwner: g.state.players.find((p) => p.id === g.state.properties.INDORE.ownerId)?.name, netCashMoved: 0, rewards: g.state.objectives!.results };
+  expect(sum(g.ledger, 'OBJECTIVE_REWARD')).toBe(8000);
+});
+
+it('P9 Net worth effect of each property action, Classic vs Capital', () => {
+  const rows: unknown[] = [];
+  for (const mode of ['classic', 'intermediate'] as const) {
+    const g = new TestGame(['Asha', 'Bilal'], { mode });
+    g.give('Asha', 'INDORE');
+    const id = g.id('Asha');
+    const step = (label: string, action: GameAction) => {
+      const nw = netWorth(g.state, id);
+      const cash = g.balance('Asha');
+      g.act('Asha', action);
+      rows.push({ mode, action: label, cashChange: g.balance('Asha') - cash, netWorthChange: netWorth(g.state, id) - nw });
+    };
+    step('build house (2000)', { type: 'BUILD_HOUSE', propertyKey: 'INDORE' });
+    step('sell house (refund 1000)', { type: 'SELL_BUILDING', propertyKey: 'INDORE' });
+    step('mortgage (750)', { type: 'MORTGAGE_PROPERTY', propertyKey: 'INDORE' });
+    step('unmortgage (825)', { type: 'UNMORTGAGE_PROPERTY', propertyKey: 'INDORE' });
+    step('sell to bank (750)', { type: 'SELL_PROPERTY', propertyKey: 'INDORE' });
+  }
+  out.P9_netWorthEffects = rows;
+});
+
+it('P10 Loan schedules from the engine for each product, at the starting score and at a Poor score', () => {
+  const rows: unknown[] = [];
+  const cases: [LoanProductKey, number][] = [
+    ['EMERGENCY', 1000],
+    ['EMERGENCY', 5000],
+    ['PERSONAL', 10000],
+    ['SECURED', 10000],
+    ['LONG_TERM', 15000],
+    ['FLEXIBLE', 10000],
+  ];
+  for (const score of [700, 850, 500]) {
+    for (const [product, amount] of cases) {
+      const rate = offeredRate(product, score);
+      const p = previewLoan(product, amount, rate.ratePercent);
+      rows.push({ score, product, amount, ...rate, level: annualInstallment(amount, rate.ratePercent, IR.loans.products[product].tenureYears), lines: p.lines, totalInterest: p.interest, totalRepaid: p.total });
+    }
+  }
+  out.P10_loanSchedules = rows;
+});
+
+it('P11 A tie in final net worth is won by the earlier seat', () => {
+  const g = new TestGame(['Asha', 'Bilal', 'Chitra']);
+  const finished = g.endByVote('Asha');
+  const e = finished.events.find((x) => x.type === 'GAME_FINISHED')!;
+  out.P11_tie = { standings: e.payload.standings, winner: g.state.players.find((p) => p.id === g.state.winnerId)?.name, seats: g.state.players.map((p) => ({ name: p.name, seat: p.seat })) };
+  expect(g.state.winnerId).toBe(g.id('Asha'));
+});
+
+it('P13 Capital insurance worked example: the only owned property is struck at the first checkpoint', () => {
+  const run = (insured: boolean) => {
+    const g = new TestGame(['Asha', 'Bilal'], { mode: 'intermediate' });
+    g.give('Asha', 'INDORE');
+    if (insured) g.act('Asha', { type: 'INSURE_PROPERTY', propertyKey: 'INDORE', expectedPremium: 500 });
+    for (let i = 0; i < 12 && economyOf(g.state)!.insurance!.crises.length === 0; i += 1) playTurn(g);
+    const crisis = economyOf(g.state)!.insurance!.crises[0]!;
+    return {
+      insured,
+      crisisAtClock: crisis.checkpointClock,
+      struck: crisis.propertyKey,
+      status: crisis.status,
+      bill: crisis.amount,
+      premiumsPaid: sum(g.ledger, 'INSURANCE_PREMIUM'),
+      crisisPaid: sum(g.ledger, 'CRISIS_PAYMENT'),
+      propertyPrice: getDeed('INDORE').price,
+    };
+  };
+  out.P13_insurance = [run(false), run(true)];
+});
+
+it('P14 Deed table: prices, costs, mortgage ratios, payback', () => {
+  const rows = PROPERTY_KEYS.map((k: PropertyKey) => {
+    const d = PROPERTY_DEEDS[k];
+    const base = { key: k, group: d.group, price: d.price, mortgage: mortgagePayout(k), unmortgage: unmortgageCost(k), mortgagePct: +((100 * d.mortgageValue) / d.price).toFixed(1), position: positionOfProperty(k) };
+    if (d.kind !== 'CITY') return { ...base, rent: d.rent };
+    const invested = [d.price, d.price + d.houseCost, d.price + 2 * d.houseCost, d.price + 3 * d.houseCost, d.price + 3 * d.houseCost + d.hotelCost];
+    const rents = [...d.rent, d.hotelRent];
+    return {
+      ...base,
+      houseCost: d.houseCost,
+      hotelCost: d.hotelCost,
+      rents,
+      invested,
+      landingsToRecover: rents.map((r, i) => +(invested[i]! / r).toFixed(1)),
+      rentYieldPct: rents.map((r, i) => +((100 * r) / invested[i]!).toFixed(1)),
+      marginalYieldPct: rents.map((r, i) => (i === 0 ? +((100 * r) / d.price).toFixed(1) : +((100 * (r - rents[i - 1]!)) / (i === 4 ? d.hotelCost : d.houseCost)).toFixed(1))),
+    };
+  });
+  out.P14_deeds = rows;
+});
+
+it('P15 An auction won below the mortgage value can be sold straight back to the bank at a profit', () => {
+  const g = new TestGame(['Asha', 'Bilal']);
+  g.landOn('Asha', positionOfProperty('DELHI'), 8);
+  const cash0 = g.balance('Asha');
+  g.act('Asha', { type: 'DECLINE_PROPERTY' });
+  const auction = g.state.auction!;
+  g.act('Asha', { type: 'PLACE_BID', auctionId: auction.id, amount: 100 });
+  g.act('Bilal', { type: 'PASS_AUCTION', auctionId: auction.id });
+  const owner = g.state.properties.DELHI.ownerId === g.id('Asha');
+  g.act('Asha', { type: 'SELL_PROPERTY', propertyKey: 'DELHI' });
+  out.P15_auctionArbitrage = { deedPrice: 6000, wonFor: 100, wonByDecliner: owner, soldToBankFor: getDeed('DELHI').mortgageValue, profit: g.balance('Asha') - cash0, delhiOwnerAfter: g.state.properties.DELHI.ownerId };
+  expect(g.balance('Asha') - cash0).toBe(3900);
+});
+
+it('P16 Chance on a roll of 11 has no card: the player enters the amount, up to 10,000 from the bank', () => {
+  const g = new TestGame(['Asha', 'Bilal']);
+  g.placeAt('Asha', 9); // 9 + 11 = 20, a Chance square
+  g.roll('Asha', 5, 6);
+  const phase = g.state.turn.phase;
+  const card = g.state.turn.card;
+  const cash0 = g.balance('Asha');
+  const claim = tryAct(g, 'Asha', { type: 'RESOLVE_CARD', resolution: 'RECEIVE', amount: 10000 });
+  const top = g.state.undoStack[g.state.undoStack.length - 1];
+  const bilalUndo = top ? tryAct(g, 'Bilal', { type: 'REQUEST_UNDO', targetActionId: top.actionId }) : 'no undo entry';
+  out.P16_manualCard = { phaseAfterRoll: phase, card, claim, received: g.balance('Asha') - cash0, otherPlayerCanAskToUndo: bilalUndo };
+  expect(g.balance('Asha') - cash0).toBe(10000);
+});

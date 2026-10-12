@@ -34,6 +34,11 @@ export type GameConfig = {
   secretObjectives: boolean;
   /** Open or hidden finances. Chosen by the host when the game is created and fixed from then on — not even the lobby can change it. */
   financialPrivacy: FinancialPrivacy;
+  /**
+   * How many financial years the game runs before the players vote to finish it or play one more
+   * (gameEnd.ts). Only a hosted game has a duration; a matchmade game ignores this.
+   */
+  durationYears: number;
 };
 
 /** What a host can pick. Enforced by the server, offered by the Create Game screen. */
@@ -44,6 +49,13 @@ export const GAME_CONFIG_LIMITS = {
 
 export type GameConfigAmountKey = keyof typeof GAME_CONFIG_LIMITS;
 
+/** The game durations a host can pick, in financial years: every whole number from the shortest to the longest. */
+export const GAME_DURATION_YEARS = RULES.endGame.duration;
+export const GAME_DURATION_OPTIONS: readonly number[] = Array.from(
+  { length: GAME_DURATION_YEARS.maxYears - GAME_DURATION_YEARS.minYears + 1 },
+  (_, i) => GAME_DURATION_YEARS.minYears + i,
+);
+
 /** The config of a new game whose host changes nothing. */
 export function defaultGameConfig(mode: GameMode): GameConfig {
   const intermediate = mode === 'intermediate';
@@ -53,6 +65,7 @@ export function defaultGameConfig(mode: GameMode): GameConfig {
     marketVolatility: IR.market.defaultProfile,
     secretObjectives: intermediate,
     financialPrivacy: 'open',
+    durationYears: GAME_DURATION_YEARS.defaultYears,
   };
 }
 
@@ -82,6 +95,12 @@ const GameConfigInputSchema = z
     marketVolatility: z.enum(MARKET_VOLATILITIES, { error: 'Choose Stable, Balanced or Volatile for the property market.' }).optional(),
     secretObjectives: z.boolean({ error: 'Secret objectives must be on or off.' }).optional(),
     financialPrivacy: z.enum(FINANCIAL_PRIVACY_MODES, { error: 'Choose Open or Hidden finances.' }).optional(),
+    durationYears: z
+      .number({ error: 'The game duration must be a number of financial years.' })
+      .int('The game duration must be a whole number of financial years.')
+      .min(GAME_DURATION_YEARS.minYears, `A game lasts at least ${GAME_DURATION_YEARS.minYears} financial years.`)
+      .max(GAME_DURATION_YEARS.maxYears, `A game lasts at most ${GAME_DURATION_YEARS.maxYears} financial years.`)
+      .optional(),
   })
   .strict();
 
@@ -96,6 +115,7 @@ function build(mode: GameMode, input: GameConfigInput, base: GameConfig): GameCo
     marketVolatility: intermediate ? (input.marketVolatility ?? base.marketVolatility) : base.marketVolatility,
     secretObjectives: intermediate ? (input.secretObjectives ?? base.secretObjectives) : false,
     financialPrivacy: input.financialPrivacy ?? base.financialPrivacy,
+    durationYears: input.durationYears ?? base.durationYears,
   };
 }
 
@@ -152,7 +172,8 @@ export function isDefaultGameConfig(mode: GameMode, config: GameConfig): boolean
     config.loanLimit === d.loanLimit &&
     config.marketVolatility === d.marketVolatility &&
     config.secretObjectives === d.secretObjectives &&
-    config.financialPrivacy === d.financialPrivacy
+    config.financialPrivacy === d.financialPrivacy &&
+    config.durationYears === d.durationYears
   );
 }
 
@@ -179,8 +200,25 @@ export interface ConfigSummaryRow {
   value: string;
 }
 
-/** The rules of one game as players read them, before and after it starts. Classic lists only what applies to it. */
-export function gameConfigSummary(mode: GameMode, config: GameConfig): ConfigSummaryRow[] {
+/** "7 financial years" — the duration as players read it. */
+export function durationLabel(years: number): string {
+  return `${years} financial ${years === 1 ? 'year' : 'years'}`;
+}
+
+/**
+ * What a duration means at the table. A financial year passes each time the players have moved
+ * IR.year.spacesPerYear spaces by dice on average — one trip round the board each — so a game of N
+ * years is about N laps. An estimate for the players; the game itself counts dice movement, not laps.
+ */
+export function durationEstimate(years: number): string {
+  return `${durationLabel(years)} · Approximately ${years} ${years === 1 ? 'lap' : 'laps'}`;
+}
+
+/**
+ * The rules of one game as players read them, before and after it starts. Classic lists only what applies to it.
+ * `timed: false` leaves the duration out: a matchmade game has none.
+ */
+export function gameConfigSummary(mode: GameMode, config: GameConfig, { timed = true }: { timed?: boolean } = {}): ConfigSummaryRow[] {
   const rows: ConfigSummaryRow[] = [
     { key: 'mode', label: 'Mode', value: GAME_MODE_LABELS[mode] },
     { key: 'startingCash', label: 'Starting cash', value: formatINR(config.startingCash) },
@@ -193,5 +231,6 @@ export function gameConfigSummary(mode: GameMode, config: GameConfig): ConfigSum
     );
   }
   rows.push({ key: 'financialPrivacy', label: 'Finances', value: FINANCIAL_PRIVACY_LABELS[config.financialPrivacy].label });
+  if (timed) rows.push({ key: 'durationYears', label: 'Game duration', value: durationLabel(config.durationYears) });
   return rows;
 }

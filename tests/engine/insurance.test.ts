@@ -711,12 +711,14 @@ describe('bankruptcy over a crisis bill', () => {
 });
 
 describe('leaving or ending the game with a bill open', () => {
-  it('ending the game collects the bill before the winner is decided', () => {
+  it('the game ending collects the bill before the winner is decided', () => {
     const g = newGame();
     g.give('Asha', 'MUMBAI');
     rollTo(g, FIRST);
     const cash = g.balance('Asha');
-    const r = g.act('Asha', { type: 'END_GAME' });
+    // No vote can be asked for while a bill is open; the game ends here because the other player walks away.
+    expect(() => g.act('Asha', { type: 'REQUEST_END_VOTE' })).toThrow(/crisis bill/);
+    const r = g.act('Bilal', { type: 'LEAVE_GAME' });
     expect(types(r).indexOf('CRISIS_SETTLED')).toBeGreaterThanOrEqual(0);
     expect(types(r).indexOf('CRISIS_SETTLED')).toBeLessThan(types(r).indexOf('GAME_FINISHED'));
     expect(crisisAt(g, 1)).toMatchObject({ status: 'PAID', paid: BILL });
@@ -732,7 +734,7 @@ describe('leaving or ending the game with a bill open', () => {
     g.act('Asha', { type: 'END_TURN' });
     leaveWith(g, 'Asha', 400, 'Bilal');
     rollTo(g, FIRST);
-    const r = g.act('Asha', { type: 'END_GAME' });
+    const r = g.act('Asha', { type: 'LEAVE_GAME' });
     expect(crisisAt(g, 1)).toMatchObject({ status: 'UNPAID', paid: 400 });
     expect(types(r)).toContain('CRISIS_UNPAID');
     expect(g.balance('Asha')).toBe(0);

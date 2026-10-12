@@ -149,9 +149,10 @@ describe('Classic games show nothing of Capital Mode', () => {
     const f = new Fixture();
     await renderGame(f, 'Asha');
     await act(async () => {});
-    expect(within(screen.getByTestId('game-header')).getByText('Classic · India')).toBeTruthy();
+    // Classic counts years only to know when the game is over: a plain readout, none of Capital's.
+    expect(screen.getByTestId('duration-indicator')).toHaveTextContent('Classic · Year 1 of 5');
     for (const id of ['year-indicator', 'intermediate-intro', 'year-notice', 'payment-reminder', 'finance-hub']) expect(screen.queryByTestId(id)).toBeNull();
-    expect(SecureStore.getItemAsync).not.toHaveBeenCalled();
+    expect(SecureStore.getItemAsync).not.toHaveBeenCalledWith(INTRO_SEEN_KEY);
     await fireEvent.press(screen.getByTestId('open-loan'));
     expect(screen.getByTestId('loan-sheet')).toBeTruthy();
     expect(screen.queryByTestId('finance-tabs')).toBeNull();
@@ -171,7 +172,7 @@ describe('Capital: the game table', () => {
   it('shows a compact Year indicator and keeps the board and all six actions', async () => {
     const f = intermediate();
     await renderGame(f, 'Asha');
-    expect(screen.getByTestId('year-indicator')).toHaveTextContent('Capital · Year 1');
+    expect(screen.getByTestId('year-indicator')).toHaveTextContent('Capital · Year 1 of 5');
     expect(screen.getByTestId('classic-board')).toBeTruthy();
     for (const id of ['open-properties', 'open-trade', 'open-chat', 'open-loan', 'open-auction', 'open-more']) expect(screen.getByTestId(id)).toBeTruthy();
   });
@@ -179,7 +180,7 @@ describe('Capital: the game table', () => {
   it('the year indicator follows the server’s year', async () => {
     const f = jumpTo(intermediate(), YEAR * 2 + 4);
     await renderGame(f, 'Asha');
-    expect(screen.getByTestId('year-indicator')).toHaveTextContent('Capital · Year 3');
+    expect(screen.getByTestId('year-indicator')).toHaveTextContent('Capital · Year 3 of 5');
   });
 
   it('board tiles and the buy decision use the current market price', async () => {
@@ -424,7 +425,7 @@ describe('Capital: notices', () => {
     expect(within(notice).getByTestId('year-notice-summary')).toHaveTextContent(/26 went up · 0 went down/);
     expect(within(notice).getByTestId('year-mover-MUMBAI')).toHaveTextContent(/Mumbai \(yours\)/);
     expect(within(notice).getByText(/rose 5% again/)).toBeTruthy();
-    expect(screen.getByTestId('year-indicator')).toHaveTextContent('Capital · Year 2');
+    expect(screen.getByTestId('year-indicator')).toHaveTextContent('Capital · Year 2 of 5');
     await fireEvent.press(screen.getByTestId('year-notice-dismiss'));
     expect(screen.queryByTestId('year-notice')).toBeNull();
     // The same year arriving again (a refetch) is not announced twice.
@@ -436,7 +437,7 @@ describe('Capital: notices', () => {
     const f = jumpTo(intermediate(), YEAR + 6);
     await renderGame(f, 'Bilal');
     expect(screen.queryByTestId('year-notice')).toBeNull();
-    expect(screen.getByTestId('year-indicator')).toHaveTextContent('Capital · Year 2');
+    expect(screen.getByTestId('year-indicator')).toHaveTextContent('Capital · Year 2 of 5');
   });
 
   it('reminds only the borrower of a due payment; Later hides it but the obligation stays on the table', async () => {

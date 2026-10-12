@@ -124,7 +124,13 @@ export const GameActionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('REJECT_UNDO'), requestId: id }).strict(),
   bare('PAUSE_GAME'),
   bare('RESUME_GAME'),
-  bare('END_GAME'),
+  // ---- Ending the game (hosted games only; nobody ends a game alone — see gameEnd.ts) ----
+  /** Ask every active player to vote on ending the game early. Once per player per financial year, and only while the table is at rest. */
+  bare('REQUEST_END_VOTE'),
+  /** My ballot in the open vote: END the game, or CONTINUE (keep playing / play one more financial year). One per player, locked once cast. */
+  z.object({ type: z.literal('CAST_END_VOTE'), voteId: id, choice: z.enum(['END', 'CONTINUE']) }).strict(),
+  /** Settle the open vote once its deadline has passed on the server's clock. Any player's device may ask; the server's own timer does too. */
+  z.object({ type: z.literal('CLOSE_END_VOTE'), voteId: id }).strict(),
   /** Walk away from this game (any player, any time before it finishes). Never ends the game for the others by itself. */
   bare('LEAVE_GAME'),
 ]);

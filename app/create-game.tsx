@@ -24,10 +24,10 @@ export default function CreateGame() {
   const [config, setConfig] = useState<GameConfig>(() => defaultGameConfig('classic'));
   const { submit, busy, error } = useEnterGame();
   const create = () => submit({ kind: 'create', gameMode, config }, name);
-  // The money settings are the host's own choices, so they follow them to the other mode; everything else takes that mode's default.
+  // The money settings and the duration are the host's own choices, so they follow them to the other mode; everything else takes that mode's default.
   const chooseMode = (mode: GameMode) => {
     setGameMode(mode);
-    setConfig((c) => ({ ...defaultGameConfig(mode), startingCash: c.startingCash, loanLimit: c.loanLimit, financialPrivacy: c.financialPrivacy }));
+    setConfig((c) => ({ ...defaultGameConfig(mode), startingCash: c.startingCash, loanLimit: c.loanLimit, financialPrivacy: c.financialPrivacy, durationYears: c.durationYears }));
   };
 
   return (

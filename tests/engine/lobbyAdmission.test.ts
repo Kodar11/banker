@@ -73,7 +73,8 @@ describe('SET_LOBBY_LOCK: the host closes admission', () => {
     expect(codeOf(() => g.act('Tanmay', { type: 'SET_LOBBY_LOCK', locked: true }))).toBe('INVALID_PHASE');
     g.act('Tanmay', { type: 'PAUSE_GAME' });
     expect(codeOf(() => g.act('Tanmay', { type: 'SET_LOBBY_LOCK', locked: true }))).toBe('GAME_PAUSED');
-    g.act('Tanmay', { type: 'END_GAME' });
+    g.act('Tanmay', { type: 'RESUME_GAME' });
+    g.endByVote('Tanmay');
     expect(codeOf(() => g.act('Tanmay', { type: 'SET_LOBBY_LOCK', locked: true }))).toBe('GAME_FINISHED');
   });
 

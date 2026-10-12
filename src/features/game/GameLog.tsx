@@ -74,6 +74,16 @@ const EXACT: Readonly<Record<string, EventStyle>> = {
     color: PALETTE.amber,
     background: PALETTE.amberTint,
   },
+  END_VOTE_STARTED: {
+    icon: '?',
+    color: PALETTE.amber,
+    background: PALETTE.amberTint,
+  },
+  END_VOTE_CLOSED: {
+    icon: '✓',
+    color: PALETTE.amber,
+    background: PALETTE.amberTint,
+  },
   BID_PLACED: {
     icon: '↑',
     color: PALETTE.amber,

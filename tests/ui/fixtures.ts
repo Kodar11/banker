@@ -10,6 +10,8 @@ import {
   type TransactionRecord,
   type GameEventRecord,
 } from '@/engine/index.ts';
+import * as SecureStore from 'expo-secure-store';
+import { GAME_PLAN_SEEN_KEY, gamePlanSeenValue } from '@/features/game/GamePlanIntro';
 import { useGameStore } from '@/store/gameStore';
 import { useSessionStore } from '@/store/sessionStore';
 
@@ -77,6 +79,21 @@ export class Fixture {
     return this;
   }
 
+  /**
+   * Ends the game the only way players can end one early: `requester` asks for a vote (their own END
+   * ballot) and every other active player votes END. The table must be at rest.
+   */
+  endByVote(requester: string = Object.keys(this.ids)[0]!): this {
+    this.act(requester, { type: 'REQUEST_END_VOTE' });
+    for (const p of [...this.state.players]) {
+      const vote = this.state.endGame?.vote;
+      if (!vote) break;
+      if (p.status === 'ACTIVE' && !(p.id in vote.ballots)) this.act(p.name, { type: 'CAST_END_VOTE', voteId: vote.id, choice: 'END' });
+    }
+    if (this.state.status !== 'FINISHED') throw new Error('The vote did not end the game.');
+    return this;
+  }
+
   roll(name: string, a: number, b: number): this {
     this.faces.push(a, b);
     return this.act(name, { type: 'ROLL_DICE' });
@@ -86,8 +103,15 @@ export class Fixture {
     return { state: this.state, events: this.events, transactions: this.transactions, serverTime: new Date().toISOString() };
   }
 
-  /** Puts this snapshot in the stores as seen from `name`'s phone. */
-  loadAs(name: string): this {
+  /**
+   * Puts this snapshot in the stores as seen from `name`'s phone. That phone has already shown its
+   * player this game's plan ("Your Game Plan"), so the table is not covered by it — unless a test asks
+   * for a phone that has not (`planSeen: false`).
+   */
+  loadAs(name: string, { planSeen = true }: { planSeen?: boolean } = {}): this {
+    // The mock stores synchronously, so this is in place before the screen first asks.
+    if (planSeen) void SecureStore.setItemAsync(GAME_PLAN_SEEN_KEY, gamePlanSeenValue(this.state.id, this.ids[name]!));
+    else void SecureStore.deleteItemAsync(GAME_PLAN_SEEN_KEY);
     useSessionStore.setState({ session: { gameId: this.state.id, playerId: this.ids[name]!, token: TOKEN }, hydrated: true });
     useGameStore.getState().reset(this.state.id);
     useGameStore.getState().applySnapshot(this.snapshot());

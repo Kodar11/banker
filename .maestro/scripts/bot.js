@@ -74,6 +74,13 @@ if (OP === 'play') {
   }
 }
 
+// Votes END in the open end-game vote (the app player asked for it; with two players both must agree).
+if (OP === 'vote') {
+  var sv = state();
+  var vote = sv.endGame && sv.endGame.vote;
+  if (vote) act(sv, { type: 'CAST_END_VOTE', voteId: vote.id, choice: 'END' });
+}
+
 // Bids on the open auction (the app player then passes so the bot wins).
 if (OP === 'bid') {
   var st = state();

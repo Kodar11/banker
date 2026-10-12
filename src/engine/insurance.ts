@@ -334,7 +334,7 @@ export function pendingCrisisOf(state: InsuranceView, playerId: string): CrisisR
 /**
  * Why an action is refused while a crisis bill is unsettled, or null when it may go ahead.
  *
- * Everyone may still pause, resume, leave, end the game (host), decline an offer or request, and
+ * Everyone may still pause, resume, leave, vote in an open end-game vote, decline an offer or request, and
  * send money to the player who owes. The player who owes may also pay, and raise money the usual
  * ways: sell a building, sell a property to the bank, mortgage, or take a loan the bank offers.
  * Everything else — rolling, ending a turn, buying, building, trading, insuring — waits.
@@ -347,7 +347,8 @@ export function crisisGate(state: InsuranceView, actorId: string, action: GameAc
   switch (action.type) {
     case 'PAUSE_GAME':
     case 'RESUME_GAME':
-    case 'END_GAME':
+    case 'CAST_END_VOTE':
+    case 'CLOSE_END_VOTE':
     case 'LEAVE_GAME':
     case 'REJECT_TRADE':
     case 'CANCEL_TRADE':

@@ -164,17 +164,17 @@ describe('net worth — one calculation', () => {
     expect(netWorth(g.state, g.id('Asha'))).toBe(100 + R.start.passReward + 1000 - 2000 - 20000);
   });
 
-  it('host ends early: the winner and the published standings are that same calculation', () => {
+  it('the players vote to end early: the winner and the published standings are that same calculation', () => {
     const g = new TestGame();
     g.give('Bilal', 'MUMBAI', { hotel: true, mortgaged: true });
     g.give('Chitra', 'AIR_INDIA');
     g.act('Asha', { type: 'REQUEST_LOAN', amount: 10000 });
     const expected = ['Asha', 'Bilal', 'Chitra'].map((n) => ({ playerId: g.id(n), netWorth: netWorth(g.state, g.id(n)) })).sort((a, b) => b.netWorth - a.netWorth);
-    const r = g.act('Asha', { type: 'END_GAME' });
+    const r = g.endByVote('Asha');
     // Bilal: 25,000 + (8,500 − 4,250) + 30,000.
     expect(expected[0]).toEqual({ playerId: g.id('Bilal'), netWorth: START + 4250 + 30000 });
     expect(g.state).toMatchObject({ status: 'FINISHED', winnerId: g.id('Bilal') });
-    expect(r.events.find((e) => e.type === 'GAME_FINISHED')!.payload).toMatchObject({ reason: 'HOST_ENDED', winnerId: g.id('Bilal'), standings: expected });
+    expect(r.events.find((e) => e.type === 'GAME_FINISHED')!.payload).toMatchObject({ reason: 'VOTE', winnerId: g.id('Bilal'), standings: expected });
   });
 
   it('bankrupt players are not ranked; last player standing wins whatever the net worth', () => {

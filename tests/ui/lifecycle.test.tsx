@@ -29,7 +29,7 @@ function Table() {
 
 /** A game that Asha (host) ended, as seen from `name`'s phone. */
 function finishedGame(name: string, names = ['Asha', 'Bilal']): Fixture {
-  return new Fixture(names).act('Asha', { type: 'END_GAME' }).loadAs(name);
+  return new Fixture(names).endByVote('Asha').loadAs(name);
 }
 
 /** What the server answers to create/join: a brand-new lobby. */

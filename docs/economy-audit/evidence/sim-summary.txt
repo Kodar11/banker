@@ -1,0 +1,685 @@
+KEY | reasons | yr | turns/pl | created | sunk | p2p | endCash | endNW | endDebt | bk/game | gamesBk | winShare | top/med | houses | hotels | allOwnedYr(share) | short | assetRich | fatal | viol
+classic|5y|2p|mixed | {"DURATION_VOTE":30} | 5 | 26.6 | 89348 | 79855 | 14363 | 4747 | 61431 | 5892 | 0 | 0 | 0.72 | 3.95 | 3.8 | 1.5 | 0(0) | 2.7 | 2.67 | 0 | 0
+classic|5y|2p|uniform | {"DURATION_VOTE":30} | 5 | 26.8 | 73233 | 66238 | 12077 | 3498 | 59438 | 1883 | 0 | 0 | 0.667 | 2.28 | 3.1 | 1.1 | 0(0) | 2.1 | 2.1 | 0 | 0
+classic|5y|4p|mixed | {"DURATION_VOTE":30} | 5 | 26.6 | 192568 | 174979 | 67927 | 4629 | 43785 | 8110 | 0.2 | 0.17 | 0.481 | 10155.57 | 7.4 | 3 | 5(0.07) | 9.53 | 8.77 | 0.2 | 0
+classic|5y|4p|uniform | {"DURATION_VOTE":30} | 5 | 26.5 | 153925 | 138355 | 60703 | 3893 | 41417 | 4167 | 0 | 0 | 0.399 | 2.1 | 7.3 | 2.4 | 5(0.07) | 8.87 | 8.8 | 0 | 0
+classic|5y|8p|mixed | {"DURATION_VOTE":30} | 5 | 26 | 430580 | 385218 | 283013 | 7239 | 40126 | 11343 | 1.73 | 0.87 | 0.492 | 53515.52 | 8.5 | 8.6 | 4.3(0.67) | 28.87 | 22.83 | 1.73 | 0
+classic|5y|8p|uniform | {"DURATION_VOTE":30} | 5 | 25.9 | 343567 | 289702 | 255328 | 6995 | 34434 | 6838 | 0.3 | 0.23 | 0.37 | 7.98 | 11.5 | 7.4 | 4.13(0.77) | 26.07 | 21.7 | 0.3 | 0
+classic|7y|2p|mixed | {"DURATION_VOTE":28,"LAST_PLAYER_STANDING":2} | 7 | 37.6 | 100363 | 92570 | 24485 | 4031 | 68498 | 6698 | 0.07 | 0.07 | 0.734 | 13290.79 | 5.1 | 1.7 | 7(0.03) | 4.1 | 3.87 | 0.07 | 0
+classic|7y|2p|uniform | {"DURATION_VOTE":30} | 7 | 37.8 | 82300 | 74800 | 20003 | 3750 | 65592 | 2850 | 0 | 0 | 0.714 | 3.5 | 4.1 | 1.3 | 7(0.03) | 3.37 | 3.37 | 0 | 0
+classic|7y|4p|mixed | {"DURATION_VOTE":29,"LAST_PLAYER_STANDING":1} | 6.97 | 36.6 | 228408 | 215614 | 114999 | 3998 | 57239 | 9781 | 0.8 | 0.57 | 0.59 | 32541.81 | 9.8 | 4.1 | 5.9(0.33) | 15.73 | 13.6 | 0.8 | 0
+classic|7y|4p|uniform | {"DURATION_VOTE":30} | 7 | 36.9 | 196945 | 179280 | 112802 | 4608 | 46112 | 7852 | 0.17 | 0.13 | 0.529 | 10748.51 | 9.1 | 3.3 | 6.42(0.63) | 14.97 | 13.63 | 0.17 | 0
+classic|7y|8p|mixed | {"DURATION_VOTE":24,"LAST_PLAYER_STANDING":6} | 6.87 | 35.7 | 530640 | 493008 | 416371 | 9254 | 65894 | 12734 | 3.93 | 1 | 0.617 | 126487.9 | 5.9 | 9.9 | 4.91(0.73) | 46.5 | 34.7 | 3.93 | 0
+classic|7y|8p|uniform | {"DURATION_VOTE":29,"LAST_PLAYER_STANDING":1} | 6.97 | 36.5 | 434663 | 383704 | 409438 | 8446 | 49526 | 8116 | 1.97 | 0.77 | 0.431 | 46620.85 | 10 | 9.6 | 4.69(0.87) | 43.03 | 32.07 | 1.97 | 0
+classic|10y|2p|mixed | {"LAST_PLAYER_STANDING":10,"DURATION_REACHED":20} | 9.27 | 47.3 | 116793 | 109763 | 38451 | 4218 | 85982 | 8420 | 0.33 | 0.33 | 0.808 | 45573.98 | 5.5 | 2.4 | 10(0.03) | 6.87 | 6.2 | 0.33 | 0
+classic|10y|2p|uniform | {"DURATION_REACHED":28,"LAST_PLAYER_STANDING":2} | 9.97 | 52 | 104312 | 95885 | 39842 | 4359 | 74297 | 5543 | 0.07 | 0.07 | 0.719 | 9159.89 | 5.6 | 1.8 | 9.75(0.13) | 5.7 | 5.53 | 0.07 | 0
+classic|10y|4p|mixed | {"LAST_PLAYER_STANDING":10,"DURATION_REACHED":20} | 9.63 | 49.7 | 278473 | 264976 | 161543 | 5547 | 79983 | 10397 | 1.57 | 0.77 | 0.745 | 88672.88 | 8.3 | 5.2 | 6.91(0.73) | 22.1 | 18.43 | 1.57 | 0
+classic|10y|4p|uniform | {"DURATION_REACHED":27,"LAST_PLAYER_STANDING":3} | 9.87 | 51.6 | 241357 | 223897 | 163594 | 5085 | 57794 | 8646 | 0.57 | 0.3 | 0.628 | 53745.06 | 10.1 | 5.1 | 6.75(0.8) | 21.77 | 19.27 | 0.57 | 0
+classic|10y|8p|mixed | {"LAST_PLAYER_STANDING":20,"DURATION_REACHED":10} | 9.1 | 45.7 | 650257 | 630234 | 553732 | 12014 | 171796 | 13200 | 6.33 | 1 | 0.899 | 256967.67 | 2.1 | 11.6 | 4.96(0.8) | 63.03 | 46.07 | 6.33 | 0
+classic|10y|8p|uniform | {"DURATION_REACHED":25,"LAST_PLAYER_STANDING":5} | 9.7 | 49.7 | 547507 | 490391 | 588021 | 14399 | 83023 | 8697 | 4.03 | 1 | 0.621 | 165809.12 | 5.7 | 11.2 | 4.48(0.9) | 63.27 | 47.13 | 4.03 | 0
+intermediate|5y|2p|mixed | {"DURATION_VOTE":27,"LAST_PLAYER_STANDING":3} | 4.93 | 26.4 | 100570 | 91381 | 14138 | 4836 | 56521 | 8708 | 0.1 | 0.1 | 0.723 | 13043.82 | 2.7 | 1.5 | 0(0) | 5.87 | 5.67 | 0.1 | 0
+intermediate|5y|2p|uniform | {"DURATION_VOTE":30} | 5 | 27.3 | 81233 | 73794 | 12553 | 3720 | 59724 | 3002 | 0 | 0 | 0.688 | 3.53 | 2.6 | 1.2 | 0(0) | 4.83 | 4.77 | 0 | 0
+intermediate|5y|4p|mixed | {"DURATION_VOTE":30} | 5 | 26.4 | 216338 | 200114 | 74226 | 4466 | 45463 | 8777 | 0.37 | 0.33 | 0.52 | 5134.89 | 6.5 | 3 | 0(0) | 14.7 | 13.93 | 0.37 | 0
+intermediate|5y|4p|uniform | {"DURATION_VOTE":30} | 5 | 26.2 | 177558 | 159189 | 61591 | 4710 | 45243 | 3429 | 0.1 | 0.1 | 0.43 | 2.91 | 6.4 | 2.3 | 5(0.03) | 14.2 | 14.07 | 0.1 | 0
+intermediate|5y|8p|mixed | {"DURATION_VOTE":29,"LAST_PLAYER_STANDING":1} | 5 | 26 | 444870 | 415659 | 265302 | 5279 | 42119 | 10330 | 2.47 | 0.87 | 0.474 | 46511.72 | 9 | 7 | 4.13(0.5) | 33.1 | 25.83 | 2.47 | 0
+intermediate|5y|8p|uniform | {"DURATION_VOTE":30} | 5 | 25.9 | 360947 | 315376 | 237358 | 6329 | 37221 | 4748 | 0.8 | 0.63 | 0.364 | 6140.21 | 10.4 | 6.5 | 4.23(0.73) | 29.7 | 25.47 | 0.8 | 0
+intermediate|7y|2p|mixed | {"DURATION_VOTE":23,"LAST_PLAYER_STANDING":7} | 6.67 | 35.3 | 114342 | 107173 | 20689 | 4058 | 67511 | 7720 | 0.23 | 0.23 | 0.776 | 24219.49 | 2.4 | 1.5 | 0(0) | 9.03 | 8.57 | 0.23 | 0
+intermediate|7y|2p|uniform | {"LAST_PLAYER_STANDING":3,"DURATION_VOTE":27} | 6.93 | 37.5 | 96772 | 90019 | 20721 | 3554 | 68714 | 2765 | 0.1 | 0.1 | 0.733 | 14795.42 | 2.5 | 1.2 | 0(0) | 8.7 | 8.3 | 0.1 | 0
+intermediate|7y|4p|mixed | {"DURATION_VOTE":27,"LAST_PLAYER_STANDING":3} | 6.97 | 36.6 | 245813 | 232099 | 101173 | 4840 | 61996 | 8715 | 1.17 | 0.7 | 0.644 | 63018.95 | 6.9 | 3.2 | 6.09(0.37) | 19.93 | 17.73 | 1.17 | 0
+intermediate|7y|4p|uniform | {"DURATION_VOTE":30} | 7 | 37 | 209223 | 192187 | 94374 | 4914 | 54186 | 3363 | 0.53 | 0.43 | 0.526 | 15670.34 | 7.3 | 2.5 | 6.4(0.5) | 21.4 | 20.4 | 0.53 | 0
+intermediate|7y|8p|mixed | {"DURATION_VOTE":22,"LAST_PLAYER_STANDING":8} | 6.83 | 35.5 | 568752 | 554079 | 383347 | 5869 | 101442 | 14552 | 5.5 | 1 | 0.725 | 177776.09 | 5.7 | 9.1 | 4.33(0.7) | 53.7 | 39.13 | 5.5 | 0
+intermediate|7y|8p|uniform | {"DURATION_VOTE":29,"LAST_PLAYER_STANDING":1} | 6.97 | 36.6 | 460500 | 417295 | 370119 | 8641 | 59068 | 6187 | 3 | 0.97 | 0.477 | 81300.86 | 8.9 | 8.2 | 4.44(0.83) | 49.9 | 39.57 | 3 | 0
+intermediate|10y|2p|mixed | {"DURATION_REACHED":16,"LAST_PLAYER_STANDING":14} | 9 | 47 | 132448 | 124974 | 30464 | 4875 | 85050 | 7399 | 0.47 | 0.47 | 0.853 | 51296.51 | 2.6 | 1.5 | 8.5(0.07) | 12.77 | 12.53 | 0.47 | 0
+intermediate|10y|2p|uniform | {"DURATION_REACHED":25,"LAST_PLAYER_STANDING":5} | 9.7 | 52.6 | 118698 | 111381 | 30917 | 3991 | 80923 | 3263 | 0.17 | 0.17 | 0.707 | 19970.38 | 4.4 | 0.8 | 9(0.07) | 13.5 | 13.27 | 0.17 | 0
+intermediate|10y|4p|mixed | {"LAST_PLAYER_STANDING":15,"DURATION_REACHED":15} | 8.73 | 44.9 | 290578 | 279326 | 138938 | 5923 | 92416 | 10807 | 2.1 | 0.97 | 0.781 | 98023.41 | 6.3 | 3.6 | 7.33(0.6) | 27.23 | 23.77 | 2.1 | 0
+intermediate|10y|4p|uniform | {"LAST_PLAYER_STANDING":9,"DURATION_REACHED":21} | 9.93 | 51.9 | 267397 | 253759 | 145758 | 5682 | 85976 | 4352 | 1.6 | 0.77 | 0.711 | 95112.95 | 7 | 3.7 | 7.5(0.73) | 31.67 | 29.27 | 1.6 | 0
+intermediate|10y|8p|mixed | {"DURATION_REACHED":6,"LAST_PLAYER_STANDING":24} | 9.1 | 46.3 | 676143 | 661731 | 511327 | 11086 | 195503 | 14687 | 6.7 | 1 | 0.933 | 235875.83 | 4.6 | 8.4 | 5.13(0.77) | 71.67 | 55.57 | 6.7 | 0
+intermediate|10y|8p|uniform | {"LAST_PLAYER_STANDING":14,"DURATION_REACHED":16} | 9.63 | 49.7 | 594760 | 553883 | 556439 | 14955 | 119018 | 6530 | 5.27 | 1 | 0.722 | 214363.75 | 3.7 | 10.5 | 4.72(0.97) | 69.9 | 55.13 | 5.27 | 0
+classic|5y-early3|4p|mixed | {"VOTE":30} | 3 | 11 | 147898 | 126765 | 20220 | 5283 | 34278 | 4579 | 0 | 0 | 0.362 | 1.81 | 4.5 | 2.5 | 0(0) | 2.3 | 2.27 | 0 | 0
+intermediate|5y-early3|4p|mixed | {"VOTE":30} | 3 | 10.6 | 157688 | 134910 | 21858 | 5695 | 34600 | 7997 | 0 | 0 | 0.38 | 1.9 | 5 | 3 | 0(0) | 3.77 | 3.7 | 0 | 0
+
+CASH PER ACTIVE PLAYER BY YEAR
+classic|5y|2p|mixed {"1":25000,"2":7291,"3":5546,"4":5317,"5":4727} owned {"1":0,"2":6.8,"3":12,"4":15.7,"5":18.8} bld {"1":0,"2":3.2,"3":3.5,"4":3.7,"5":4.4}
+classic|5y|2p|uniform {"1":25000,"2":4627,"3":3057,"4":3410,"5":3133} owned {"1":0,"2":6.8,"3":11.9,"4":15.5,"5":18.5} bld {"1":0,"2":3.3,"3":3.5,"4":3.7,"5":4}
+classic|5y|4p|mixed {"1":25000,"2":6985,"3":5538,"4":4840,"5":4680} owned {"1":0,"2":11.2,"3":18.1,"4":21.5,"5":23.7} bld {"1":0,"2":6.6,"3":6.9,"4":8,"5":9}
+classic|5y|4p|uniform {"1":25000,"2":4910,"3":3058,"4":3197,"5":3713} owned {"1":0,"2":11.2,"3":18.3,"4":22,"5":24.2} bld {"1":0,"2":6.8,"3":7.4,"4":8,"5":8.5}
+classic|5y|8p|mixed {"1":25000,"2":7836,"3":5691,"4":5302,"5":5594} owned {"1":0,"2":18.4,"3":23.6,"4":25.1,"5":25.4} bld {"1":0,"2":12.1,"3":15,"4":16.8,"5":17.9}
+classic|5y|8p|uniform {"1":25000,"2":6213,"3":4887,"4":4849,"5":5652} owned {"1":0,"2":18.4,"3":23.6,"4":25.4,"5":25.7} bld {"1":0,"2":12.7,"3":14.4,"4":16.3,"5":17.3}
+classic|7y|2p|mixed {"1":25000,"2":7057,"3":5756,"4":5227,"5":5015,"6":5010,"7":4766} owned {"1":0,"2":6.7,"3":11.6,"4":15.6,"5":18.4,"6":20,"7":21.4} bld {"1":0,"2":3.4,"3":3.6,"4":3.9,"5":4.4,"6":5.2,"7":6}
+classic|7y|2p|uniform {"1":25000,"2":4338,"3":3253,"4":2967,"5":3421,"6":3546,"7":3758} owned {"1":0,"2":6.7,"3":11.7,"4":16,"5":18.8,"6":20.4,"7":21.9} bld {"1":0,"2":3.4,"3":3.5,"4":3.6,"5":3.8,"6":4.2,"7":4.6}
+classic|7y|4p|mixed {"1":25000,"2":6217,"3":5134,"4":4855,"5":4621,"6":4495,"7":4008} owned {"1":0,"2":12,"3":18.6,"4":22.5,"5":23.9,"6":24.3,"7":24.5} bld {"1":0,"2":7,"3":7.4,"4":8.6,"5":9.8,"6":11.7,"7":13.1}
+classic|7y|4p|uniform {"1":25000,"2":4037,"3":2941,"4":3073,"5":3634,"6":3915,"7":4280} owned {"1":0,"2":11.9,"3":18.4,"4":22.5,"5":24.1,"6":24.9,"7":25.2} bld {"1":0,"2":6.7,"3":7.2,"4":7.6,"5":8.6,"6":9.7,"7":11.1}
+classic|7y|8p|mixed {"1":25000,"2":8665,"3":5685,"4":5448,"5":6042,"6":6322,"7":8657} owned {"1":0,"2":17.5,"3":23.3,"4":24.8,"5":24.4,"6":24.7,"7":23.6} bld {"1":0,"2":12.7,"3":15.5,"4":17,"5":17.5,"6":17.9,"7":17.3}
+classic|7y|8p|uniform {"1":25000,"2":6611,"3":4229,"4":4507,"5":6145,"6":7138,"7":7844} owned {"1":0,"2":17.5,"3":23.3,"4":25.3,"5":25.2,"6":25.1,"7":24.9} bld {"1":0,"2":13.5,"3":15.9,"4":17.4,"5":18.9,"6":19.4,"7":20.5}
+classic|10y|2p|mixed {"1":25000,"2":7663,"3":5924,"4":5298,"5":5170,"6":4990,"7":4389,"8":4438,"9":4248,"10":4193} owned {"1":0,"2":6.7,"3":11.3,"4":15.4,"5":17.9,"6":20.3,"7":21.4,"8":22.8,"9":23.6,"10":24} bld {"1":0,"2":3.4,"3":3.7,"4":4.2,"5":4.8,"6":5.6,"7":6,"8":6.7,"9":7.4,"10":8}
+classic|10y|2p|uniform {"1":25000,"2":4538,"3":3452,"4":3184,"5":3681,"6":3792,"7":3553,"8":3938,"9":3958,"10":4282} owned {"1":0,"2":6.8,"3":11.5,"4":15.3,"5":18.2,"6":20.1,"7":21.5,"8":22.8,"9":23.6,"10":24.2} bld {"1":0,"2":3.4,"3":3.5,"4":3.6,"5":3.9,"6":4.4,"7":4.7,"8":5.1,"9":5.9,"10":6.6}
+classic|10y|4p|mixed {"1":25000,"2":6443,"3":5238,"4":4634,"5":4570,"6":4273,"7":4028,"8":3920,"9":4106,"10":4921} owned {"1":0,"2":11.5,"3":18.5,"4":21.9,"5":23.9,"6":24.6,"7":24.3,"8":24.8,"9":25.2,"10":24.6} bld {"1":0,"2":6.5,"3":7.2,"4":8.4,"5":10.1,"6":11.5,"7":11.9,"8":12.3,"9":12.9,"10":12.9}
+classic|10y|4p|uniform {"1":25000,"2":4713,"3":3078,"4":3306,"5":3697,"6":4063,"7":4274,"8":4041,"9":4400,"10":4975} owned {"1":0,"2":11.5,"3":18.3,"4":21.6,"5":23.8,"6":24.8,"7":25.3,"8":25.4,"9":25.5,"10":25.6} bld {"1":0,"2":6.7,"3":7.2,"4":7.9,"5":8.5,"6":10.1,"7":11.1,"8":12.9,"9":13.9,"10":14.8}
+classic|10y|8p|mixed {"1":25000,"2":7828,"3":5783,"4":5402,"5":5174,"6":6841,"7":7091,"8":9192,"9":9011,"10":11088} owned {"1":0,"2":17.7,"3":23.7,"4":25.1,"5":25,"6":24.1,"7":23.9,"8":23.2,"9":24.2,"10":22.3} bld {"1":0,"2":11.8,"3":15.3,"4":17,"5":18.7,"6":18.4,"7":17.7,"8":17.6,"9":16.2,"10":15.5}
+classic|10y|8p|uniform {"1":25000,"2":6029,"3":4303,"4":4730,"5":5179,"6":5775,"7":7630,"8":10281,"9":13604,"10":11523} owned {"1":0,"2":17.7,"3":23.7,"4":25.3,"5":25.7,"6":25.5,"7":25.1,"8":24.2,"9":23.8,"10":23.9} bld {"1":0,"2":12.5,"3":15.1,"4":16.3,"5":18.8,"6":19.5,"7":18.8,"8":17.9,"9":17.3,"10":18.6}
+intermediate|5y|2p|mixed {"1":25000,"2":6946,"3":4487,"4":4146,"5":3638} owned {"1":0,"2":6.3,"3":10.4,"4":13.6,"5":16.2} bld {"1":0,"2":3.4,"3":3.6,"4":3.8,"5":4}
+intermediate|5y|2p|uniform {"1":25000,"2":4090,"3":2817,"4":2525,"5":2205} owned {"1":0,"2":6.4,"3":10.7,"4":14,"5":16.9} bld {"1":0,"2":3.4,"3":3.5,"4":3.6,"5":3.7}
+intermediate|5y|4p|mixed {"1":25000,"2":6618,"3":4542,"4":4071,"5":3469} owned {"1":0,"2":10.8,"3":18,"4":21.6,"5":23.2} bld {"1":0,"2":7.4,"3":8,"4":8.5,"5":8.8}
+intermediate|5y|4p|uniform {"1":25000,"2":4042,"3":2844,"4":2902,"5":3013} owned {"1":0,"2":10.7,"3":18,"4":21.2,"5":23.2} bld {"1":0,"2":6.9,"3":7.3,"4":7.8,"5":8.5}
+intermediate|5y|8p|mixed {"1":25000,"2":9140,"3":5858,"4":4845,"5":4215} owned {"1":0,"2":18.1,"3":23.7,"4":25,"5":24.3} bld {"1":0,"2":13.4,"3":15.5,"4":16.5,"5":16.1}
+intermediate|5y|8p|uniform {"1":25000,"2":6341,"3":4546,"4":4373,"5":4709} owned {"1":0,"2":18.1,"3":23.7,"4":25.2,"5":25.4} bld {"1":0,"2":13,"3":14.9,"4":16.7,"5":17.1}
+intermediate|7y|2p|mixed {"1":25000,"2":7488,"3":4955,"4":3877,"5":3681,"6":3229,"7":2809} owned {"1":0,"2":5.9,"3":11.1,"4":14.4,"5":16.4,"6":18.5,"7":20.3} bld {"1":0,"2":3.2,"3":3.5,"4":3.8,"5":3.8,"6":3.7,"7":4.1}
+intermediate|7y|2p|uniform {"1":25000,"2":4445,"3":2769,"4":2490,"5":2494,"6":2460,"7":2249} owned {"1":0,"2":5.9,"3":11,"4":14.2,"5":17.1,"6":19.1,"7":20.6} bld {"1":0,"2":3.1,"3":3.3,"4":3.5,"5":3.6,"6":3.7,"7":3.7}
+intermediate|7y|4p|mixed {"1":25000,"2":7499,"3":4555,"4":3991,"5":3647,"6":3616,"7":3505} owned {"1":0,"2":10.9,"3":17.9,"4":21.4,"5":23.5,"6":23.9,"7":24.1} bld {"1":0,"2":6.5,"3":7.4,"4":7.4,"5":8.1,"6":8.7,"7":9}
+intermediate|7y|4p|uniform {"1":25000,"2":4559,"3":2697,"4":2813,"5":2826,"6":3021,"7":3414} owned {"1":0,"2":10.9,"3":18.1,"4":21.8,"5":23.7,"6":24.5,"7":24.5} bld {"1":0,"2":6.2,"3":6.7,"4":7.2,"5":8,"6":8.4,"7":9}
+intermediate|7y|8p|mixed {"1":25000,"2":8859,"3":4969,"4":4340,"5":4218,"6":4213,"7":3961} owned {"1":0,"2":17.5,"3":23.5,"4":24.7,"5":24.2,"6":23.3,"7":23.2} bld {"1":0,"2":13.2,"3":16,"4":16.8,"5":16.8,"6":16,"7":16.2}
+intermediate|7y|8p|uniform {"1":25000,"2":6237,"3":4096,"4":4326,"5":5494,"6":6419,"7":6897} owned {"1":0,"2":17.5,"3":23.8,"4":25.2,"5":25.7,"6":25.2,"7":23.9} bld {"1":0,"2":12.2,"3":14.9,"4":16.4,"5":16.4,"6":17.1,"7":17.3}
+intermediate|10y|2p|mixed {"1":25000,"2":8012,"3":4521,"4":3816,"5":3267,"6":3070,"7":3756,"8":3584,"9":3680,"10":4072} owned {"1":0,"2":6.5,"3":11.6,"4":15,"5":17.2,"6":19.1,"7":20.4,"8":21.5,"9":22.1,"10":22.7} bld {"1":0,"2":3.5,"3":4,"4":4.1,"5":4.4,"6":4.4,"7":4.5,"8":4.5,"9":4.4,"10":4.6}
+intermediate|10y|2p|uniform {"1":25000,"2":4595,"3":2540,"4":2193,"5":2255,"6":1957,"7":2147,"8":1944,"9":2257,"10":2177} owned {"1":0,"2":6.6,"3":11.8,"4":15.1,"5":17.4,"6":18.7,"7":19.6,"8":20.8,"9":21.4,"10":22.6} bld {"1":0,"2":3.6,"3":3.8,"4":4.1,"5":4.3,"6":4.3,"7":4.5,"8":4.7,"9":4.9,"10":4.9}
+intermediate|10y|4p|mixed {"1":25000,"2":7167,"3":5563,"4":4113,"5":3593,"6":3296,"7":2864,"8":2659,"9":2154,"10":2733} owned {"1":0,"2":11.6,"3":17.8,"4":21.5,"5":23,"6":23.4,"7":24.3,"8":24.3,"9":24.9,"10":24.2} bld {"1":0,"2":6.5,"3":7.2,"4":8.1,"5":9,"6":8.8,"7":9.3,"8":9,"9":9.4,"10":9.6}
+intermediate|10y|4p|uniform {"1":25000,"2":4063,"3":3111,"4":3016,"5":2937,"6":3186,"7":3721,"8":3547,"9":3738,"10":3624} owned {"1":0,"2":11.5,"3":17.7,"4":21.5,"5":23.4,"6":24.1,"7":24.2,"8":24.4,"9":24.1,"10":24.3} bld {"1":0,"2":6.8,"3":7.3,"4":7.7,"5":8.5,"6":8.7,"7":9.1,"8":9.9,"9":9.8,"10":10.3}
+intermediate|10y|8p|mixed {"1":25000,"2":8392,"3":5342,"4":4870,"5":4214,"6":4378,"7":4232,"8":4438,"9":3898,"10":4263} owned {"1":0,"2":18.6,"3":23.5,"4":24.8,"5":24.8,"6":23.1,"7":23.2,"8":23.5,"9":22.4,"10":23} bld {"1":0,"2":12.9,"3":16.3,"4":16.6,"5":16.3,"6":15.6,"7":16.2,"8":16.1,"9":14.7,"10":15.3}
+intermediate|10y|8p|uniform {"1":25000,"2":5804,"3":4482,"4":4398,"5":4914,"6":5880,"7":7038,"8":7148,"9":8222,"10":10138} owned {"1":0,"2":18.6,"3":23.6,"4":25.3,"5":25.4,"6":25.1,"7":24.6,"8":24.3,"9":24.1,"10":22.7} bld {"1":0,"2":12.5,"3":14.2,"4":16.1,"5":16.9,"6":17.6,"7":16.7,"8":16.8,"9":15.3,"10":15.9}
+classic|5y-early3|4p|mixed {"1":25000,"2":6985,"3":5538} owned {"1":0,"2":11.2,"3":18.1} bld {"1":0,"2":6.6,"3":6.9}
+intermediate|5y-early3|4p|mixed {"1":25000,"2":6618,"3":4542} owned {"1":0,"2":10.8,"3":18} bld {"1":0,"2":7.4,"3":8}
+
+FLOWS PER GAME
+classic|5y|2p|uniform
+    STARTING_FUNDS         created   50000 sunk       0 p2p       0
+    PROPERTY_PURCHASE      created       0 sunk   24790 p2p       0
+    JAIL_FINE              created       0 sunk     683 p2p       0
+    HOUSE_PURCHASE         created       0 sunk   23133 p2p       0
+    HOTEL_PURCHASE         created       0 sunk    3400 p2p       0
+    RENT_PAYMENT           created       0 sunk       0 p2p   11713
+    START_REWARD           created   14100 sunk       0 p2p       0
+    AUCTION_PAYMENT        created       0 sunk    8960 p2p       0
+    CLUB_PAYMENT           created       0 sunk       0 p2p     140
+    TAX_PAYMENT            created       0 sunk     687 p2p       0
+    CARD_REWARD            created    5367 sunk       0 p2p       0
+    REST_HOUSE_COLLECTION  created       0 sunk       0 p2p     123
+    CARD_PAYMENT           created       0 sunk    4273 p2p       0
+    LOAN_DISBURSEMENT      created    3767 sunk       0 p2p       0
+    LOAN_INTEREST          created       0 sunk     312 p2p       0
+    CARD_COLLECTION        created       0 sunk       0 p2p     100
+classic|5y|4p|mixed
+    STARTING_FUNDS         created  100000 sunk       0 p2p       0
+    PROPERTY_PURCHASE      created       0 sunk   35507 p2p       0
+    LOAN_DISBURSEMENT      created   45817 sunk       0 p2p       0
+    LOAN_REPAYMENT         created       0 sunk   13667 p2p       0
+    HOUSE_PURCHASE         created       0 sunk   71833 p2p       0
+    HOTEL_PURCHASE         created       0 sunk   12267 p2p       0
+    RENT_PAYMENT           created       0 sunk       0 p2p   65187
+    JAIL_FINE              created       0 sunk    1683 p2p       0
+    AUCTION_PAYMENT        created       0 sunk   26317 p2p       0
+    CLUB_PAYMENT           created       0 sunk       0 p2p     957
+    REST_HOUSE_COLLECTION  created       0 sunk       0 p2p     842
+    START_REWARD           created   27700 sunk       0 p2p       0
+    HOTEL_SALE             created    2400 sunk       0 p2p       0
+    LOAN_INTEREST          created       0 sunk    2878 p2p       0
+    CARD_COLLECTION        created       0 sunk       0 p2p     334
+    TAX_PAYMENT            created       0 sunk    1277 p2p       0
+    MORTGAGE               created    6410 sunk       0 p2p       0
+    HOUSE_SALE             created     958 sunk       0 p2p       0
+    CARD_REWARD            created    9283 sunk       0 p2p       0
+    CARD_PAYMENT           created       0 sunk    7050 p2p       0
+    UNMORTGAGE             created       0 sunk    2501 p2p       0
+    BANKRUPTCY_SETTLEMENT  created       0 sunk       0 p2p     608
+classic|5y|4p|uniform
+    STARTING_FUNDS         created  100000 sunk       0 p2p       0
+    PROPERTY_PURCHASE      created       0 sunk   37960 p2p       0
+    HOUSE_PURCHASE         created       0 sunk   52467 p2p       0
+    HOTEL_PURCHASE         created       0 sunk    7233 p2p       0
+    RENT_PAYMENT           created       0 sunk       0 p2p   58520
+    JAIL_FINE              created       0 sunk    1617 p2p       0
+    CLUB_PAYMENT           created       0 sunk       0 p2p    1000
+    REST_HOUSE_COLLECTION  created       0 sunk       0 p2p     722
+    AUCTION_PAYMENT        created       0 sunk   28373 p2p       0
+    START_REWARD           created   27550 sunk       0 p2p       0
+    TAX_PAYMENT            created       0 sunk    1467 p2p       0
+    LOAN_DISBURSEMENT      created   16950 sunk       0 p2p       0
+    CARD_COLLECTION        created       0 sunk       0 p2p     462
+    LOAN_INTEREST          created       0 sunk    1310 p2p       0
+    CARD_REWARD            created    9383 sunk       0 p2p       0
+    CARD_PAYMENT           created       0 sunk    7645 p2p       0
+    MORTGAGE               created      42 sunk       0 p2p       0
+    LOAN_REPAYMENT         created       0 sunk     283 p2p       0
+classic|7y|4p|mixed
+    STARTING_FUNDS         created  100000 sunk       0 p2p       0
+    AUCTION_PAYMENT        created       0 sunk   27957 p2p       0
+    CARD_REWARD            created   14717 sunk       0 p2p       0
+    LOAN_DISBURSEMENT      created   54867 sunk       0 p2p       0
+    PROPERTY_PURCHASE      created       0 sunk   36913 p2p       0
+    HOUSE_PURCHASE         created       0 sunk   97633 p2p       0
+    LOAN_REPAYMENT         created       0 sunk   14900 p2p       0
+    HOTEL_PURCHASE         created       0 sunk   15533 p2p       0
+    RENT_PAYMENT           created       0 sunk       0 p2p  108830
+    REST_HOUSE_COLLECTION  created       0 sunk       0 p2p     917
+    START_REWARD           created   39400 sunk       0 p2p       0
+    LOAN_INTEREST          created       0 sunk    3885 p2p       0
+    MORTGAGE               created   12475 sunk       0 p2p       0
+    TAX_PAYMENT            created       0 sunk    2018 p2p       0
+    CARD_PAYMENT           created       0 sunk   10310 p2p       0
+    CLUB_PAYMENT           created       0 sunk       0 p2p    1127
+    JAIL_FINE              created       0 sunk    2000 p2p       0
+    UNMORTGAGE             created       0 sunk    4464 p2p       0
+    BANKRUPTCY_SETTLEMENT  created       0 sunk       0 p2p    3767
+    HOTEL_SALE             created    3867 sunk       0 p2p       0
+    HOUSE_SALE             created    3083 sunk       0 p2p       0
+    CARD_COLLECTION        created       0 sunk       0 p2p     358
+classic|7y|4p|uniform
+    STARTING_FUNDS         created  100000 sunk       0 p2p       0
+    PROPERTY_PURCHASE      created       0 sunk   39073 p2p       0
+    CARD_REWARD            created   13000 sunk       0 p2p       0
+    HOUSE_PURCHASE         created       0 sunk   77017 p2p       0
+    HOTEL_PURCHASE         created       0 sunk   12133 p2p       0
+    RENT_PAYMENT           created       0 sunk       0 p2p  109278
+    AUCTION_PAYMENT        created       0 sunk   29573 p2p       0
+    REST_HOUSE_COLLECTION  created       0 sunk       0 p2p    1072
+    START_REWARD           created   40000 sunk       0 p2p       0
+    LOAN_DISBURSEMENT      created   35183 sunk       0 p2p       0
+    LOAN_INTEREST          created       0 sunk    3103 p2p       0
+    TAX_PAYMENT            created       0 sunk    1840 p2p       0
+    CARD_PAYMENT           created       0 sunk   11942 p2p       0
+    CLUB_PAYMENT           created       0 sunk       0 p2p    1157
+    JAIL_FINE              created       0 sunk    2150 p2p       0
+    MORTGAGE               created    6120 sunk       0 p2p       0
+    UNMORTGAGE             created       0 sunk     699 p2p       0
+    HOTEL_SALE             created    1933 sunk       0 p2p       0
+    LOAN_REPAYMENT         created       0 sunk    1750 p2p       0
+    HOUSE_SALE             created     708 sunk       0 p2p       0
+    BANKRUPTCY_SETTLEMENT  created       0 sunk       0 p2p     896
+    CARD_COLLECTION        created       0 sunk       0 p2p     400
+classic|10y|4p|mixed
+    STARTING_FUNDS         created  100000 sunk       0 p2p       0
+    PROPERTY_PURCHASE      created       0 sunk   38950 p2p       0
+    HOUSE_PURCHASE         created       0 sunk  123167 p2p       0
+    HOTEL_PURCHASE         created       0 sunk   23533 p2p       0
+    RENT_PAYMENT           created       0 sunk       0 p2p  151767
+    LOAN_DISBURSEMENT      created   61633 sunk       0 p2p       0
+    LOAN_REPAYMENT         created       0 sunk   15067 p2p       0
+    CARD_REWARD            created   20150 sunk       0 p2p       0
+    CARD_PAYMENT           created       0 sunk   15265 p2p       0
+    AUCTION_PAYMENT        created       0 sunk   28343 p2p       0
+    START_REWARD           created   54900 sunk       0 p2p       0
+    LOAN_INTEREST          created       0 sunk    4598 p2p       0
+    JAIL_FINE              created       0 sunk    3450 p2p       0
+    TAX_PAYMENT            created       0 sunk    3068 p2p       0
+    HOUSE_SALE             created    5983 sunk       0 p2p       0
+    MORTGAGE               created   26340 sunk       0 p2p       0
+    BANKRUPTCY_SETTLEMENT  created       0 sunk      63 p2p    6921
+    REST_HOUSE_COLLECTION  created       0 sunk       0 p2p    1243
+    CLUB_PAYMENT           created       0 sunk       0 p2p    1333
+    UNMORTGAGE             created       0 sunk    9471 p2p       0
+    HOTEL_SALE             created    9467 sunk       0 p2p       0
+    CARD_COLLECTION        created       0 sunk       0 p2p     279
+classic|10y|4p|uniform
+    STARTING_FUNDS         created  100000 sunk       0 p2p       0
+    PROPERTY_PURCHASE      created       0 sunk   40450 p2p       0
+    HOUSE_PURCHASE         created       0 sunk  105583 p2p       0
+    HOTEL_PURCHASE         created       0 sunk   17850 p2p       0
+    RENT_PAYMENT           created       0 sunk       0 p2p  157702
+    CARD_REWARD            created   22933 sunk       0 p2p       0
+    CARD_PAYMENT           created       0 sunk   15557 p2p       0
+    AUCTION_PAYMENT        created       0 sunk   29913 p2p       0
+    START_REWARD           created   57950 sunk       0 p2p       0
+    JAIL_FINE              created       0 sunk    3317 p2p       0
+    LOAN_DISBURSEMENT      created   42850 sunk       0 p2p       0
+    REST_HOUSE_COLLECTION  created       0 sunk       0 p2p    1410
+    TAX_PAYMENT            created       0 sunk    3422 p2p       0
+    LOAN_INTEREST          created       0 sunk    4143 p2p       0
+    CLUB_PAYMENT           created       0 sunk       0 p2p    1513
+    CARD_COLLECTION        created       0 sunk       0 p2p     568
+    LOAN_REPAYMENT         created       0 sunk    1867 p2p       0
+    MORTGAGE               created   11990 sunk       0 p2p       0
+    HOUSE_SALE             created    3200 sunk       0 p2p       0
+    HOTEL_SALE             created    2433 sunk       0 p2p       0
+    BANKRUPTCY_SETTLEMENT  created       0 sunk       0 p2p    2401
+    UNMORTGAGE             created       0 sunk    1795 p2p       0
+classic|10y|8p|uniform
+    STARTING_FUNDS         created  200000 sunk       0 p2p       0
+    PROPERTY_PURCHASE      created       0 sunk   86180 p2p       0
+    HOUSE_PURCHASE         created       0 sunk  227650 p2p       0
+    HOTEL_PURCHASE         created       0 sunk   57467 p2p       0
+    CARD_REWARD            created   34100 sunk       0 p2p       0
+    RENT_PAYMENT           created       0 sunk       0 p2p  558795
+    JAIL_FINE              created       0 sunk    6500 p2p       0
+    CARD_PAYMENT           created       0 sunk   28358 p2p       0
+    CLUB_PAYMENT           created       0 sunk       0 p2p    7597
+    AUCTION_PAYMENT        created       0 sunk   46393 p2p       0
+    REST_HOUSE_COLLECTION  created       0 sunk       0 p2p    6145
+    START_REWARD           created  111750 sunk       0 p2p       0
+    TAX_PAYMENT            created       0 sunk    5198 p2p       0
+    LOAN_DISBURSEMENT      created  130417 sunk       0 p2p       0
+    LOAN_INTEREST          created       0 sunk   12405 p2p       0
+    HOUSE_SALE             created   13683 sunk       0 p2p       0
+    LOAN_REPAYMENT         created       0 sunk   15517 p2p       0
+    MORTGAGE               created   35257 sunk       0 p2p       0
+    BANKRUPTCY_SETTLEMENT  created       0 sunk      66 p2p   14271
+    HOTEL_SALE             created   22300 sunk       0 p2p       0
+    UNMORTGAGE             created       0 sunk    4657 p2p       0
+    CARD_COLLECTION        created       0 sunk       0 p2p    1213
+intermediate|5y|2p|uniform
+    STARTING_FUNDS         created   50000 sunk       0 p2p       0
+    CARD_REWARD            created    4933 sunk       0 p2p       0
+    PROPERTY_PURCHASE      created       0 sunk   18173 p2p       0
+    HOUSE_PURCHASE         created       0 sunk   22300 p2p       0
+    HOTEL_PURCHASE         created       0 sunk    3500 p2p       0
+    CARD_PAYMENT           created       0 sunk    3680 p2p       0
+    CRISIS_PAYMENT         created       0 sunk   15000 p2p       0
+    AUCTION_PAYMENT        created       0 sunk    6913 p2p       0
+    START_REWARD           created   14450 sunk       0 p2p       0
+    LOAN_DISBURSEMENT      created    8300 sunk       0 p2p       0
+    TAX_PAYMENT            created       0 sunk     715 p2p       0
+    LOAN_REPAYMENT         created       0 sunk    2441 p2p       0
+    LOAN_INTEREST          created       0 sunk     358 p2p       0
+    RENT_PAYMENT           created       0 sunk       0 p2p   12160
+    REST_HOUSE_COLLECTION  created       0 sunk       0 p2p     133
+    OBJECTIVE_REWARD       created    2567 sunk       0 p2p       0
+    JAIL_FINE              created       0 sunk     667 p2p       0
+    CLUB_PAYMENT           created       0 sunk       0 p2p     193
+    MORTGAGE               created     683 sunk       0 p2p       0
+    CARD_COLLECTION        created       0 sunk       0 p2p      67
+    UNMORTGAGE             created       0 sunk      46 p2p       0
+    HOUSE_SALE             created     300 sunk       0 p2p       0
+intermediate|5y|4p|mixed
+    STARTING_FUNDS         created  100000 sunk       0 p2p       0
+    CARD_REWARD            created   10000 sunk       0 p2p       0
+    PROPERTY_PURCHASE      created       0 sunk   34000 p2p       0
+    LOAN_DISBURSEMENT      created   47133 sunk       0 p2p       0
+    HOUSE_PURCHASE         created       0 sunk   76867 p2p       0
+    HOTEL_PURCHASE         created       0 sunk   14283 p2p       0
+    INSURANCE_PREMIUM      created       0 sunk    3437 p2p       0
+    CLUB_PAYMENT           created       0 sunk       0 p2p     823
+    RENT_PAYMENT           created       0 sunk       0 p2p   70730
+    AUCTION_PAYMENT        created       0 sunk   22853 p2p       0
+    REST_HOUSE_COLLECTION  created       0 sunk       0 p2p     652
+    START_REWARD           created   27850 sunk       0 p2p       0
+    LOAN_REPAYMENT         created       0 sunk   17185 p2p       0
+    LOAN_INTEREST          created       0 sunk    2975 p2p       0
+    JAIL_FINE              created       0 sunk    1417 p2p       0
+    CARD_PAYMENT           created       0 sunk    7822 p2p       0
+    MORTGAGE               created   17480 sunk       0 p2p       0
+    CRISIS_PAYMENT         created       0 sunk   13600 p2p       0
+    TAX_PAYMENT            created       0 sunk    1195 p2p       0
+    UNMORTGAGE             created       0 sunk    4481 p2p       0
+    OBJECTIVE_REWARD       created    4533 sunk       0 p2p       0
+    HOTEL_SALE             created    6633 sunk       0 p2p       0
+    HOUSE_SALE             created    2708 sunk       0 p2p       0
+    CARD_COLLECTION        created       0 sunk       0 p2p     126
+    BANKRUPTCY_SETTLEMENT  created       0 sunk       0 p2p    1895
+intermediate|5y|4p|uniform
+    STARTING_FUNDS         created  100000 sunk       0 p2p       0
+    CARD_REWARD            created   11917 sunk       0 p2p       0
+    PROPERTY_PURCHASE      created       0 sunk   34940 p2p       0
+    HOUSE_PURCHASE         created       0 sunk   53433 p2p       0
+    HOTEL_PURCHASE         created       0 sunk    8117 p2p       0
+    CLUB_PAYMENT           created       0 sunk       0 p2p     890
+    RENT_PAYMENT           created       0 sunk       0 p2p   59692
+    AUCTION_PAYMENT        created       0 sunk   25047 p2p       0
+    REST_HOUSE_COLLECTION  created       0 sunk       0 p2p     777
+    CRISIS_PAYMENT         created       0 sunk   14900 p2p       0
+    TAX_PAYMENT            created       0 sunk    1247 p2p       0
+    START_REWARD           created   28100 sunk       0 p2p       0
+    JAIL_FINE              created       0 sunk    1467 p2p       0
+    CARD_PAYMENT           created       0 sunk    7590 p2p       0
+    LOAN_DISBURSEMENT      created   24217 sunk       0 p2p       0
+    LOAN_REPAYMENT         created       0 sunk   10666 p2p       0
+    LOAN_INTEREST          created       0 sunk    1552 p2p       0
+    OBJECTIVE_REWARD       created    5633 sunk       0 p2p       0
+    MORTGAGE               created    5542 sunk       0 p2p       0
+    HOUSE_SALE             created     850 sunk       0 p2p       0
+    HOTEL_SALE             created    1300 sunk       0 p2p       0
+    CARD_COLLECTION        created       0 sunk       0 p2p      88
+    UNMORTGAGE             created       0 sunk     105 p2p       0
+    BANKRUPTCY_SETTLEMENT  created       0 sunk     127 p2p     145
+intermediate|7y|4p|mixed
+    STARTING_FUNDS         created  100000 sunk       0 p2p       0
+    LOAN_DISBURSEMENT      created   52683 sunk       0 p2p       0
+    PROPERTY_PURCHASE      created       0 sunk   38873 p2p       0
+    HOUSE_PURCHASE         created       0 sunk   83450 p2p       0
+    HOTEL_PURCHASE         created       0 sunk   15150 p2p       0
+    RENT_PAYMENT           created       0 sunk       0 p2p   94255
+    JAIL_FINE              created       0 sunk    1733 p2p       0
+    CRISIS_PAYMENT         created       0 sunk   18500 p2p       0
+    CARD_REWARD            created   13883 sunk       0 p2p       0
+    AUCTION_PAYMENT        created       0 sunk   23297 p2p       0
+    START_REWARD           created   39500 sunk       0 p2p       0
+    INSURANCE_PREMIUM      created       0 sunk    5530 p2p       0
+    TAX_PAYMENT            created       0 sunk    1900 p2p       0
+    LOAN_REPAYMENT         created       0 sunk   21949 p2p       0
+    LOAN_INTEREST          created       0 sunk    3804 p2p       0
+    CARD_PAYMENT           created       0 sunk    9902 p2p       0
+    MORTGAGE               created   23872 sunk       0 p2p       0
+    HOUSE_SALE             created    3208 sunk       0 p2p       0
+    UNMORTGAGE             created       0 sunk    7865 p2p       0
+    CLUB_PAYMENT           created       0 sunk       0 p2p    1107
+    HOTEL_SALE             created    8167 sunk       0 p2p       0
+    BANKRUPTCY_SETTLEMENT  created       0 sunk     147 p2p    4406
+    REST_HOUSE_COLLECTION  created       0 sunk       0 p2p    1056
+    OBJECTIVE_REWARD       created    4500 sunk       0 p2p       0
+    CARD_COLLECTION        created       0 sunk       0 p2p     350
+intermediate|7y|4p|uniform
+    STARTING_FUNDS         created  100000 sunk       0 p2p       0
+    PROPERTY_PURCHASE      created       0 sunk   37560 p2p       0
+    HOUSE_PURCHASE         created       0 sunk   62267 p2p       0
+    HOTEL_PURCHASE         created       0 sunk    9017 p2p       0
+    RENT_PAYMENT           created       0 sunk       0 p2p   90948
+    JAIL_FINE              created       0 sunk    2200 p2p       0
+    CRISIS_PAYMENT         created       0 sunk   20800 p2p       0
+    CARD_REWARD            created   14950 sunk       0 p2p       0
+    AUCTION_PAYMENT        created       0 sunk   26490 p2p       0
+    TAX_PAYMENT            created       0 sunk    1952 p2p       0
+    START_REWARD           created   39800 sunk       0 p2p       0
+    CARD_PAYMENT           created       0 sunk   11778 p2p       0
+    CLUB_PAYMENT           created       0 sunk       0 p2p    1167
+    LOAN_DISBURSEMENT      created   32317 sunk       0 p2p       0
+    CARD_COLLECTION        created       0 sunk       0 p2p     389
+    REST_HOUSE_COLLECTION  created       0 sunk       0 p2p     857
+    LOAN_REPAYMENT         created       0 sunk   16725 p2p       0
+    LOAN_INTEREST          created       0 sunk    2236 p2p       0
+    MORTGAGE               created   11673 sunk       0 p2p       0
+    UNMORTGAGE             created       0 sunk    1067 p2p       0
+    OBJECTIVE_REWARD       created    5467 sunk       0 p2p       0
+    HOUSE_SALE             created    1917 sunk       0 p2p       0
+    HOTEL_SALE             created    3100 sunk       0 p2p       0
+    BANKRUPTCY_SETTLEMENT  created       0 sunk      95 p2p    1013
+intermediate|10y|4p|mixed
+    STARTING_FUNDS         created  100000 sunk       0 p2p       0
+    PROPERTY_PURCHASE      created       0 sunk   39877 p2p       0
+    INSURANCE_PREMIUM      created       0 sunk    5727 p2p       0
+    LOAN_DISBURSEMENT      created   66050 sunk       0 p2p       0
+    HOUSE_PURCHASE         created       0 sunk  102917 p2p       0
+    HOTEL_PURCHASE         created       0 sunk   19950 p2p       0
+    JAIL_FINE              created       0 sunk    2267 p2p       0
+    CARD_PAYMENT           created       0 sunk   11632 p2p       0
+    RENT_PAYMENT           created       0 sunk       0 p2p  128725
+    CRISIS_PAYMENT         created       0 sunk   23700 p2p       0
+    AUCTION_PAYMENT        created       0 sunk   24657 p2p       0
+    REST_HOUSE_COLLECTION  created       0 sunk       0 p2p    1128
+    START_REWARD           created   49300 sunk       0 p2p       0
+    MORTGAGE               created   36962 sunk       0 p2p       0
+    HOTEL_SALE             created   13033 sunk       0 p2p       0
+    LOAN_REPAYMENT         created       0 sunk   29109 p2p       0
+    LOAN_INTEREST          created       0 sunk    4502 p2p       0
+    CLUB_PAYMENT           created       0 sunk       0 p2p    1273
+    CARD_REWARD            created   15700 sunk       0 p2p       0
+    UNMORTGAGE             created       0 sunk   12190 p2p       0
+    TAX_PAYMENT            created       0 sunk    2525 p2p       0
+    BANKRUPTCY_SETTLEMENT  created       0 sunk     275 p2p    7630
+    HOUSE_SALE             created    6267 sunk       0 p2p       0
+    OBJECTIVE_REWARD       created    3267 sunk       0 p2p       0
+    CARD_COLLECTION        created       0 sunk       0 p2p     182
+intermediate|10y|4p|uniform
+    STARTING_FUNDS         created  100000 sunk       0 p2p       0
+    PROPERTY_PURCHASE      created       0 sunk   39750 p2p       0
+    HOUSE_PURCHASE         created       0 sunk   85767 p2p       0
+    HOTEL_PURCHASE         created       0 sunk   13900 p2p       0
+    JAIL_FINE              created       0 sunk    2733 p2p       0
+    CARD_PAYMENT           created       0 sunk   16727 p2p       0
+    AUCTION_PAYMENT        created       0 sunk   27987 p2p       0
+    RENT_PAYMENT           created       0 sunk       0 p2p  138388
+    LOAN_DISBURSEMENT      created   54300 sunk       0 p2p       0
+    CRISIS_PAYMENT         created       0 sunk   29100 p2p       0
+    REST_HOUSE_COLLECTION  created       0 sunk       0 p2p    1416
+    START_REWARD           created   57150 sunk       0 p2p       0
+    CLUB_PAYMENT           created       0 sunk       0 p2p    1317
+    LOAN_REPAYMENT         created       0 sunk   29132 p2p       0
+    LOAN_INTEREST          created       0 sunk    3580 p2p       0
+    MORTGAGE               created   21480 sunk       0 p2p       0
+    TAX_PAYMENT            created       0 sunk    3265 p2p       0
+    BANKRUPTCY_SETTLEMENT  created       0 sunk     153 p2p    4404
+    CARD_REWARD            created   19550 sunk       0 p2p       0
+    HOTEL_SALE             created    4633 sunk       0 p2p       0
+    HOUSE_SALE             created    6117 sunk       0 p2p       0
+    UNMORTGAGE             created       0 sunk    1667 p2p       0
+    OBJECTIVE_REWARD       created    4167 sunk       0 p2p       0
+    CARD_COLLECTION        created       0 sunk       0 p2p     233
+intermediate|10y|8p|uniform
+    STARTING_FUNDS         created  200000 sunk       0 p2p       0
+    CARD_REWARD            created   36667 sunk       0 p2p       0
+    PROPERTY_PURCHASE      created       0 sunk   83153 p2p       0
+    HOUSE_PURCHASE         created       0 sunk  223550 p2p       0
+    HOTEL_PURCHASE         created       0 sunk   57233 p2p       0
+    RENT_PAYMENT           created       0 sunk       0 p2p  523770
+    AUCTION_PAYMENT        created       0 sunk   53083 p2p       0
+    JAIL_FINE              created       0 sunk    6033 p2p       0
+    CLUB_PAYMENT           created       0 sunk       0 p2p    6500
+    CARD_PAYMENT           created       0 sunk   25475 p2p       0
+    CRISIS_PAYMENT         created       0 sunk   28300 p2p       0
+    START_REWARD           created  109500 sunk       0 p2p       0
+    REST_HOUSE_COLLECTION  created       0 sunk       0 p2p    6310
+    LOAN_DISBURSEMENT      created  152967 sunk       0 p2p       0
+    TAX_PAYMENT            created       0 sunk    4937 p2p       0
+    CARD_COLLECTION        created       0 sunk       0 p2p    1447
+    LOAN_REPAYMENT         created       0 sunk   58217 p2p       0
+    LOAN_INTEREST          created       0 sunk    8135 p2p       0
+    MORTGAGE               created   46102 sunk       0 p2p       0
+    HOTEL_SALE             created   27300 sunk       0 p2p       0
+    UNMORTGAGE             created       0 sunk    5476 p2p       0
+    BANKRUPTCY_SETTLEMENT  created       0 sunk     290 p2p   18412
+    HOUSE_SALE             created   17025 sunk       0 p2p       0
+    OBJECTIVE_REWARD       created    5200 sunk       0 p2p       0
+classic|5y-early3|4p|mixed
+    STARTING_FUNDS         created  100000 sunk       0 p2p       0
+    PROPERTY_PURCHASE      created       0 sunk   30377 p2p       0
+    LOAN_DISBURSEMENT      created   31650 sunk       0 p2p       0
+    LOAN_REPAYMENT         created       0 sunk   13333 p2p       0
+    HOUSE_PURCHASE         created       0 sunk   49467 p2p       0
+    HOTEL_PURCHASE         created       0 sunk    9400 p2p       0
+    RENT_PAYMENT           created       0 sunk       0 p2p   19232
+    JAIL_FINE              created       0 sunk     750 p2p       0
+    AUCTION_PAYMENT        created       0 sunk   19010 p2p       0
+    CLUB_PAYMENT           created       0 sunk       0 p2p     400
+    REST_HOUSE_COLLECTION  created       0 sunk       0 p2p     353
+    START_REWARD           created    9500 sunk       0 p2p       0
+    HOTEL_SALE             created     867 sunk       0 p2p       0
+    LOAN_INTEREST          created       0 sunk    1562 p2p       0
+    CARD_COLLECTION        created       0 sunk       0 p2p     235
+    TAX_PAYMENT            created       0 sunk     312 p2p       0
+    MORTGAGE               created    1107 sunk       0 p2p       0
+    HOUSE_SALE             created     125 sunk       0 p2p       0
+    CARD_PAYMENT           created       0 sunk    2283 p2p       0
+    CARD_REWARD            created    4650 sunk       0 p2p       0
+    UNMORTGAGE             created       0 sunk     271 p2p       0
+intermediate|5y-early3|4p|mixed
+    STARTING_FUNDS         created  100000 sunk       0 p2p       0
+    CARD_REWARD            created    5133 sunk       0 p2p       0
+    PROPERTY_PURCHASE      created       0 sunk   30770 p2p       0
+    LOAN_DISBURSEMENT      created   32350 sunk       0 p2p       0
+    HOUSE_PURCHASE         created       0 sunk   60133 p2p       0
+    HOTEL_PURCHASE         created       0 sunk   12183 p2p       0
+    INSURANCE_PREMIUM      created       0 sunk    2010 p2p       0
+    CLUB_PAYMENT           created       0 sunk       0 p2p     360
+    RENT_PAYMENT           created       0 sunk       0 p2p   21137
+    AUCTION_PAYMENT        created       0 sunk   17430 p2p       0
+    REST_HOUSE_COLLECTION  created       0 sunk       0 p2p     325
+    START_REWARD           created    9550 sunk       0 p2p       0
+    LOAN_REPAYMENT         created       0 sunk    2125 p2p       0
+    LOAN_INTEREST          created       0 sunk     971 p2p       0
+    JAIL_FINE              created       0 sunk     717 p2p       0
+    CARD_PAYMENT           created       0 sunk    2943 p2p       0
+    MORTGAGE               created    2613 sunk       0 p2p       0
+    CRISIS_PAYMENT         created       0 sunk    4900 p2p       0
+    TAX_PAYMENT            created       0 sunk     367 p2p       0
+    OBJECTIVE_REWARD       created    5067 sunk       0 p2p       0
+    HOTEL_SALE             created    2333 sunk       0 p2p       0
+    UNMORTGAGE             created       0 sunk     361 p2p       0
+    HOUSE_SALE             created     642 sunk       0 p2p       0
+    CARD_COLLECTION        created       0 sunk       0 p2p      37
+
+PROFILES (mixed)
+classic|5y|2p|mixed
+    LOW       {"n":10,"meanNetWorth":23735,"winRate":0,"bankruptRate":0,"meanCash":14160,"meanProps":4.2,"meanDebt":0,"meanRentIn":645,"meanRentOut":10675,"meanCredit":null}
+    BORROWER  {"n":10,"meanNetWorth":75185,"winRate":0.7,"bankruptRate":0,"meanCash":3255,"meanProps":13.1,"meanDebt":5250,"meanRentIn":8480,"meanRentOut":8790,"meanCredit":null}
+    DEADBEAT  {"n":10,"meanNetWorth":75664,"winRate":0.7,"bankruptRate":0,"meanCash":2934,"meanProps":12.7,"meanDebt":20000,"meanRentIn":12660,"meanRentOut":4765,"meanCredit":null}
+    INSURER   {"n":10,"meanNetWorth":45365,"winRate":0.3,"bankruptRate":0,"meanCash":2785,"meanProps":8.4,"meanDebt":3000,"meanRentIn":4970,"meanRentOut":9220,"meanCredit":null}
+    ALLIN     {"n":10,"meanNetWorth":57475,"winRate":0.4,"bankruptRate":0,"meanCash":655,"meanProps":10.5,"meanDebt":6450,"meanRentIn":6900,"meanRentOut":6525,"meanCredit":null}
+    INVESTOR  {"n":10,"meanNetWorth":91160,"winRate":0.9,"bankruptRate":0,"meanCash":4690,"meanProps":14.2,"meanDebt":650,"meanRentIn":8515,"meanRentOut":2195,"meanCredit":null}
+classic|5y|4p|mixed
+    LOW       {"n":20,"meanNetWorth":16333,"winRate":0,"bankruptRate":0.2,"meanCash":10658,"meanProps":2.5,"meanDebt":0,"meanRentIn":1148,"meanRentOut":15770,"meanCredit":null}
+    BORROWER  {"n":20,"meanNetWorth":40217,"winRate":0.05,"bankruptRate":0,"meanCash":3145,"meanProps":6.4,"meanDebt":5325,"meanRentIn":13313,"meanRentOut":16510,"meanCredit":null}
+    DEADBEAT  {"n":20,"meanNetWorth":52237,"winRate":0.5,"bankruptRate":0,"meanCash":2547,"meanProps":7.7,"meanDebt":20000,"meanRentIn":29548,"meanRentOut":15045,"meanCredit":null}
+    INSURER   {"n":20,"meanNetWorth":38615,"winRate":0.2,"bankruptRate":0.05,"meanCash":3748,"meanProps":6.3,"meanDebt":7350,"meanRentIn":13685,"meanRentOut":20218,"meanCredit":null}
+    ALLIN     {"n":20,"meanNetWorth":49290,"winRate":0.25,"bankruptRate":0,"meanCash":1368,"meanProps":6.1,"meanDebt":8850,"meanRentIn":21308,"meanRentOut":14280,"meanCredit":null}
+    INVESTOR  {"n":20,"meanNetWorth":52885,"winRate":0.5,"bankruptRate":0.05,"meanCash":4920,"meanProps":7.7,"meanDebt":4700,"meanRentIn":18780,"meanRentOut":15958,"meanCredit":null}
+classic|5y|8p|mixed
+    BORROWER  {"n":40,"meanNetWorth":32404,"winRate":0.1,"bankruptRate":0.075,"meanCash":4232,"meanProps":3.9,"meanDebt":9050,"meanRentIn":33083,"meanRentOut":34224,"meanCredit":null}
+    INVESTOR  {"n":40,"meanNetWorth":31980,"winRate":0.125,"bankruptRate":0.175,"meanCash":5235,"meanProps":3,"meanDebt":6475,"meanRentIn":33016,"meanRentOut":36648,"meanCredit":null}
+    INSURER   {"n":40,"meanNetWorth":22546,"winRate":0.05,"bankruptRate":0.125,"meanCash":4351,"meanProps":2.4,"meanDebt":7750,"meanRentIn":25930,"meanRentOut":36620,"meanCredit":null}
+    ALLIN     {"n":40,"meanNetWorth":27977,"winRate":0.075,"bankruptRate":0.175,"meanCash":3406,"meanProps":3.4,"meanDebt":11538,"meanRentIn":36621,"meanRentOut":39321,"meanCredit":null}
+    LOW       {"n":40,"meanNetWorth":2618,"winRate":0,"bankruptRate":0.675,"meanCash":1688,"meanProps":0.4,"meanDebt":0,"meanRentIn":819,"meanRentOut":26338,"meanCredit":null}
+    DEADBEAT  {"n":40,"meanNetWorth":71065,"winRate":0.4,"bankruptRate":0.075,"meanCash":15110,"meanProps":5.2,"meanDebt":18500,"meanRentIn":71090,"meanRentOut":27409,"meanCredit":null}
+classic|7y|2p|mixed
+    BORROWER  {"n":10,"meanNetWorth":84340,"winRate":0.8,"bankruptRate":0.1,"meanCash":3450,"meanProps":13.9,"meanDebt":2000,"meanRentIn":14335,"meanRentOut":10150,"meanCredit":null}
+    LOW       {"n":10,"meanNetWorth":18345,"winRate":0,"bankruptRate":0.1,"meanCash":8070,"meanProps":4.6,"meanDebt":0,"meanRentIn":790,"meanRentOut":19080,"meanCredit":null}
+    DEADBEAT  {"n":10,"meanNetWorth":74486,"winRate":0.5,"bankruptRate":0,"meanCash":2046,"meanProps":12,"meanDebt":20000,"meanRentIn":17035,"meanRentOut":9545,"meanCredit":null}
+    INSURER   {"n":10,"meanNetWorth":56235,"winRate":0.4,"bankruptRate":0,"meanCash":4005,"meanProps":11.9,"meanDebt":8350,"meanRentIn":8485,"meanRentOut":17095,"meanCredit":null}
+    ALLIN     {"n":10,"meanNetWorth":63755,"winRate":0.5,"bankruptRate":0,"meanCash":1265,"meanProps":9.5,"meanDebt":7200,"meanRentIn":14805,"meanRentOut":10690,"meanCredit":null}
+    INVESTOR  {"n":10,"meanNetWorth":100125,"winRate":0.8,"bankruptRate":0,"meanCash":4545,"meanProps":15.4,"meanDebt":1300,"meanRentIn":16495,"meanRentOut":5385,"meanCredit":null}
+classic|7y|4p|mixed
+    LOW       {"n":20,"meanNetWorth":6278,"winRate":0,"bankruptRate":0.55,"meanCash":3128,"meanProps":1.4,"meanDebt":0,"meanRentIn":1375,"meanRentOut":25243,"meanCredit":null}
+    DEADBEAT  {"n":20,"meanNetWorth":63002,"winRate":0.4,"bankruptRate":0.2,"meanCash":3005,"meanProps":7.2,"meanDebt":16000,"meanRentIn":44940,"meanRentOut":23945,"meanCredit":null}
+    INSURER   {"n":20,"meanNetWorth":42015,"winRate":0.2,"bankruptRate":0,"meanCash":4210,"meanProps":7.3,"meanDebt":10975,"meanRentIn":24725,"meanRentOut":31613,"meanCredit":null}
+    BORROWER  {"n":20,"meanNetWorth":58988,"winRate":0.4,"bankruptRate":0.1,"meanCash":3380,"meanProps":8.1,"meanDebt":7100,"meanRentIn":35345,"meanRentOut":28635,"meanCredit":null}
+    ALLIN     {"n":20,"meanNetWorth":45327,"winRate":0.25,"bankruptRate":0.2,"meanCash":2070,"meanProps":4.8,"meanDebt":7850,"meanRentIn":25780,"meanRentOut":24593,"meanCredit":null}
+    INVESTOR  {"n":20,"meanNetWorth":59140,"winRate":0.25,"bankruptRate":0.15,"meanCash":3400,"meanProps":8,"meanDebt":5025,"meanRentIn":31080,"meanRentOut":29218,"meanCredit":null}
+classic|7y|8p|mixed
+    BORROWER  {"n":40,"meanNetWorth":31163,"winRate":0.1,"bankruptRate":0.425,"meanCash":3257,"meanProps":3.1,"meanDebt":6588,"meanRentIn":49469,"meanRentOut":53819,"meanCredit":null}
+    INSURER   {"n":40,"meanNetWorth":26234,"winRate":0.1,"bankruptRate":0.475,"meanCash":3881,"meanProps":2.3,"meanDebt":4900,"meanRentIn":43564,"meanRentOut":53899,"meanCredit":null}
+    ALLIN     {"n":40,"meanNetWorth":39927,"winRate":0.15,"bankruptRate":0.35,"meanCash":3777,"meanProps":3.3,"meanDebt":8450,"meanRentIn":63723,"meanRentOut":53963,"meanCredit":null}
+    LOW       {"n":40,"meanNetWorth":483,"winRate":0,"bankruptRate":0.925,"meanCash":218,"meanProps":0.1,"meanDebt":0,"meanRentIn":1154,"meanRentOut":27890,"meanCredit":null}
+    DEADBEAT  {"n":40,"meanNetWorth":74005,"winRate":0.375,"bankruptRate":0.4,"meanCash":11917,"meanProps":4.7,"meanDebt":12000,"meanRentIn":89534,"meanRentOut":46815,"meanCredit":null}
+    INVESTOR  {"n":40,"meanNetWorth":29165,"winRate":0.025,"bankruptRate":0.375,"meanCash":5174,"meanProps":2.6,"meanDebt":6900,"meanRentIn":44341,"meanRentOut":55399,"meanCredit":null}
+classic|10y|2p|mixed
+    BORROWER  {"n":10,"meanNetWorth":98825,"winRate":0.8,"bankruptRate":0.1,"meanCash":4965,"meanProps":15,"meanDebt":2100,"meanRentIn":21815,"meanRentOut":10260,"meanCredit":null}
+    LOW       {"n":10,"meanNetWorth":7430,"winRate":0,"bankruptRate":0.6,"meanCash":3120,"meanProps":1.8,"meanDebt":0,"meanRentIn":875,"meanRentOut":28080,"meanCredit":null}
+    DEADBEAT  {"n":10,"meanNetWorth":83689,"winRate":0.6,"bankruptRate":0,"meanCash":2939,"meanProps":13.9,"meanDebt":20000,"meanRentIn":25200,"meanRentOut":12640,"meanCredit":null}
+    INSURER   {"n":10,"meanNetWorth":51665,"winRate":0.4,"bankruptRate":0.3,"meanCash":2845,"meanProps":8.5,"meanDebt":2050,"meanRentIn":12950,"meanRentOut":25660,"meanCredit":null}
+    ALLIN     {"n":10,"meanNetWorth":88718,"winRate":0.7,"bankruptRate":0,"meanCash":1558,"meanProps":12.5,"meanDebt":10050,"meanRentIn":26975,"meanRentOut":16710,"meanCredit":null}
+    INVESTOR  {"n":10,"meanNetWorth":99584,"winRate":0.5,"bankruptRate":0,"meanCash":5664,"meanProps":16.7,"meanDebt":7900,"meanRentIn":22665,"meanRentOut":17130,"meanCredit":null}
+classic|10y|4p|mixed
+    INSURER   {"n":20,"meanNetWorth":54887,"winRate":0.3,"bankruptRate":0.4,"meanCash":2847,"meanProps":6.3,"meanDebt":4300,"meanRentIn":42065,"meanRentOut":46130,"meanCredit":null}
+    LOW       {"n":20,"meanNetWorth":3300,"winRate":0,"bankruptRate":0.75,"meanCash":1265,"meanProps":1,"meanDebt":0,"meanRentIn":1440,"meanRentOut":29618,"meanCredit":null}
+    BORROWER  {"n":20,"meanNetWorth":36079,"winRate":0.2,"bankruptRate":0.4,"meanCash":3451,"meanProps":4.7,"meanDebt":5775,"meanRentIn":29828,"meanRentOut":41253,"meanCredit":null}
+    DEADBEAT  {"n":20,"meanNetWorth":85172,"winRate":0.5,"bankruptRate":0.25,"meanCash":6525,"meanProps":7.8,"meanDebt":15000,"meanRentIn":70928,"meanRentOut":32605,"meanCredit":null}
+    ALLIN     {"n":20,"meanNetWorth":57691,"winRate":0.2,"bankruptRate":0.3,"meanCash":2926,"meanProps":5.3,"meanDebt":7250,"meanRentIn":45165,"meanRentOut":37595,"meanCredit":null}
+    INVESTOR  {"n":20,"meanNetWorth":54810,"winRate":0.3,"bankruptRate":0.25,"meanCash":3233,"meanProps":7.5,"meanDebt":5625,"meanRentIn":38225,"meanRentOut":40450,"meanCredit":null}
+classic|10y|8p|mixed
+    BORROWER  {"n":40,"meanNetWorth":16906,"winRate":0.05,"bankruptRate":0.85,"meanCash":988,"meanProps":1.3,"meanDebt":1663,"meanRentIn":57964,"meanRentOut":77455,"meanCredit":null}
+    ALLIN     {"n":40,"meanNetWorth":54527,"winRate":0.175,"bankruptRate":0.675,"meanCash":3411,"meanProps":3.4,"meanDebt":2375,"meanRentIn":90701,"meanRentOut":71729,"meanCredit":null}
+    INSURER   {"n":40,"meanNetWorth":16134,"winRate":0.075,"bankruptRate":0.9,"meanCash":1614,"meanProps":1,"meanDebt":213,"meanRentIn":51830,"meanRentOut":73759,"meanCredit":null}
+    INVESTOR  {"n":40,"meanNetWorth":18449,"winRate":0.05,"bankruptRate":0.775,"meanCash":1001,"meanProps":1.8,"meanDebt":3250,"meanRentIn":53745,"meanRentOut":75328,"meanCredit":null}
+    DEADBEAT  {"n":40,"meanNetWorth":108728,"winRate":0.4,"bankruptRate":0.55,"meanCash":8003,"meanProps":6,"meanDebt":9000,"meanRentIn":132839,"meanRentOut":61800,"meanCredit":null}
+    LOW       {"n":40,"meanNetWorth":0,"winRate":0,"bankruptRate":1,"meanCash":0,"meanProps":0,"meanDebt":0,"meanRentIn":883,"meanRentOut":27891,"meanCredit":null}
+intermediate|5y|2p|mixed
+    LOW       {"n":10,"meanNetWorth":22945,"winRate":0,"bankruptRate":0.2,"meanCash":12105,"meanProps":4,"meanDebt":0,"meanRentIn":595,"meanRentOut":9010,"meanCredit":701}
+    BORROWER  {"n":10,"meanNetWorth":44086,"winRate":0.6,"bankruptRate":0.1,"meanCash":3308,"meanProps":7.4,"meanDebt":10962,"meanRentIn":6645,"meanRentOut":6845,"meanCredit":534}
+    DEADBEAT  {"n":10,"meanNetWorth":68088,"winRate":0.8,"bankruptRate":0,"meanCash":4380,"meanProps":12,"meanDebt":23723,"meanRentIn":11580,"meanRentOut":2800,"meanCredit":475}
+    INSURER   {"n":10,"meanNetWorth":42098,"winRate":0.2,"bankruptRate":0,"meanCash":2032,"meanProps":7.6,"meanDebt":7234,"meanRentIn":5230,"meanRentOut":10230,"meanCredit":702}
+    ALLIN     {"n":10,"meanNetWorth":78488,"winRate":0.8,"bankruptRate":0,"meanCash":1947,"meanProps":12.1,"meanDebt":4150,"meanRentIn":10070,"meanRentOut":5865,"meanCredit":700}
+    INVESTOR  {"n":10,"meanNetWorth":66466,"winRate":0.6,"bankruptRate":0,"meanCash":3795,"meanProps":10.5,"meanDebt":3569,"meanRentIn":5800,"meanRentOut":5170,"meanCredit":696}
+intermediate|5y|4p|mixed
+    LOW       {"n":20,"meanNetWorth":14118,"winRate":0,"bankruptRate":0.2,"meanCash":6763,"meanProps":2.6,"meanDebt":0,"meanRentIn":1450,"meanRentOut":18855,"meanCredit":700}
+    DEADBEAT  {"n":20,"meanNetWorth":64739,"winRate":0.45,"bankruptRate":0,"meanCash":4785,"meanProps":9.3,"meanDebt":23705,"meanRentIn":31090,"meanRentOut":15895,"meanCredit":475}
+    BORROWER  {"n":20,"meanNetWorth":42729,"winRate":0.3,"bankruptRate":0.1,"meanCash":4031,"meanProps":6,"meanDebt":6849,"meanRentIn":24815,"meanRentOut":14855,"meanCredit":550}
+    INSURER   {"n":20,"meanNetWorth":28846,"winRate":0.2,"bankruptRate":0.2,"meanCash":2920,"meanProps":4.9,"meanDebt":4849,"meanRentIn":13435,"meanRentOut":19905,"meanCredit":691}
+    ALLIN     {"n":20,"meanNetWorth":53023,"winRate":0.35,"bankruptRate":0.05,"meanCash":2371,"meanProps":6.4,"meanDebt":5937,"meanRentIn":21238,"meanRentOut":16073,"meanCredit":689}
+    INVESTOR  {"n":20,"meanNetWorth":44319,"winRate":0.2,"bankruptRate":0,"meanCash":3469,"meanProps":6.6,"meanDebt":6492,"meanRentIn":14068,"meanRentOut":20513,"meanCredit":718}
+intermediate|5y|8p|mixed
+    LOW       {"n":40,"meanNetWorth":2914,"winRate":0,"bankruptRate":0.7,"meanCash":1994,"meanProps":0.4,"meanDebt":0,"meanRentIn":1010,"meanRentOut":24384,"meanCredit":700}
+    BORROWER  {"n":40,"meanNetWorth":38204,"winRate":0.15,"bankruptRate":0.3,"meanCash":2885,"meanProps":3.9,"meanDebt":6525,"meanRentIn":44786,"meanRentOut":30948,"meanCredit":693}
+    INVESTOR  {"n":40,"meanNetWorth":20557,"winRate":0.05,"bankruptRate":0.25,"meanCash":3061,"meanProps":2.2,"meanDebt":4591,"meanRentIn":21981,"meanRentOut":34680,"meanCredit":712}
+    INSURER   {"n":40,"meanNetWorth":17663,"winRate":0,"bankruptRate":0.175,"meanCash":2515,"meanProps":2.5,"meanDebt":6408,"meanRentIn":21413,"meanRentOut":32813,"meanCredit":693}
+    DEADBEAT  {"n":40,"meanNetWorth":57764,"winRate":0.325,"bankruptRate":0.2,"meanCash":7949,"meanProps":5,"meanDebt":18954,"meanRentIn":58104,"meanRentOut":31216,"meanCredit":475}
+    ALLIN     {"n":40,"meanNetWorth":37694,"winRate":0.225,"bankruptRate":0.225,"meanCash":3504,"meanProps":3.4,"meanDebt":6391,"meanRentIn":39683,"meanRentOut":32936,"meanCredit":691}
+intermediate|7y|2p|mixed
+    LOW       {"n":10,"meanNetWorth":15398,"winRate":0,"bankruptRate":0.5,"meanCash":6065,"meanProps":3.3,"meanDebt":0,"meanRentIn":1170,"meanRentOut":17000,"meanCredit":699}
+    BORROWER  {"n":10,"meanNetWorth":53791,"winRate":0.6,"bankruptRate":0.1,"meanCash":2185,"meanProps":7.5,"meanDebt":5385,"meanRentIn":12635,"meanRentOut":4675,"meanCredit":530}
+    DEADBEAT  {"n":10,"meanNetWorth":82094,"winRate":0.8,"bankruptRate":0,"meanCash":2502,"meanProps":16.3,"meanDebt":23724,"meanRentIn":11745,"meanRentOut":7275,"meanCredit":475}
+    INSURER   {"n":10,"meanNetWorth":52918,"winRate":0.4,"bankruptRate":0.1,"meanCash":2055,"meanProps":8.4,"meanDebt":4755,"meanRentIn":10645,"meanRentOut":14395,"meanCredit":668}
+    ALLIN     {"n":10,"meanNetWorth":74997,"winRate":0.5,"bankruptRate":0,"meanCash":4174,"meanProps":12.6,"meanDebt":4797,"meanRentIn":12595,"meanRentOut":9490,"meanCredit":610}
+    INVESTOR  {"n":10,"meanNetWorth":78614,"winRate":0.7,"bankruptRate":0,"meanCash":4525,"meanProps":11.9,"meanDebt":2253,"meanRentIn":10485,"meanRentOut":6440,"meanCredit":699}
+intermediate|7y|4p|mixed
+    DEADBEAT  {"n":20,"meanNetWorth":81965,"winRate":0.5,"bankruptRate":0.1,"meanCash":5625,"meanProps":10.3,"meanDebt":21331,"meanRentIn":44175,"meanRentOut":20505,"meanCredit":475}
+    LOW       {"n":20,"meanNetWorth":7971,"winRate":0,"bankruptRate":0.5,"meanCash":3956,"meanProps":1.4,"meanDebt":0,"meanRentIn":1618,"meanRentOut":22305,"meanCredit":700}
+    BORROWER  {"n":20,"meanNetWorth":38833,"winRate":0.3,"bankruptRate":0.45,"meanCash":3089,"meanProps":4.3,"meanDebt":2422,"meanRentIn":27355,"meanRentOut":20103,"meanCredit":592}
+    INSURER   {"n":20,"meanNetWorth":37568,"winRate":0.15,"bankruptRate":0.2,"meanCash":3142,"meanProps":6,"meanDebt":4435,"meanRentIn":20488,"meanRentOut":26283,"meanCredit":718}
+    ALLIN     {"n":20,"meanNetWorth":56781,"winRate":0.35,"bankruptRate":0.25,"meanCash":2415,"meanProps":6.6,"meanDebt":4807,"meanRentIn":28340,"meanRentOut":24720,"meanCredit":681}
+    INVESTOR  {"n":20,"meanNetWorth":40365,"winRate":0.2,"bankruptRate":0.25,"meanCash":2343,"meanProps":6.2,"meanDebt":4044,"meanRentIn":19408,"meanRentOut":27468,"meanCredit":726}
+intermediate|7y|8p|mixed
+    DEADBEAT  {"n":40,"meanNetWorth":69606,"winRate":0.275,"bankruptRate":0.45,"meanCash":3880,"meanProps":5.7,"meanDebt":13033,"meanRentIn":83609,"meanRentOut":48653,"meanCredit":480}
+    BORROWER  {"n":40,"meanNetWorth":32150,"winRate":0.125,"bankruptRate":0.65,"meanCash":1348,"meanProps":2.7,"meanDebt":3219,"meanRentIn":50400,"meanRentOut":43300,"meanCredit":687}
+    INSURER   {"n":40,"meanNetWorth":8281,"winRate":0.025,"bankruptRate":0.825,"meanCash":974,"meanProps":1,"meanDebt":2019,"meanRentIn":27406,"meanRentOut":49390,"meanCredit":707}
+    ALLIN     {"n":40,"meanNetWorth":58208,"winRate":0.25,"bankruptRate":0.6,"meanCash":2823,"meanProps":3.9,"meanDebt":4302,"meanRentIn":69916,"meanRentOut":46636,"meanCredit":711}
+    LOW       {"n":40,"meanNetWorth":0,"winRate":0,"bankruptRate":1,"meanCash":0,"meanProps":0,"meanDebt":0,"meanRentIn":766,"meanRentOut":26551,"meanCredit":700}
+    INVESTOR  {"n":40,"meanNetWorth":21959,"winRate":0.075,"bankruptRate":0.6,"meanCash":1980,"meanProps":2.5,"meanDebt":4713,"meanRentIn":33698,"meanRentOut":51265,"meanCredit":700}
+intermediate|10y|2p|mixed
+    LOW       {"n":10,"meanNetWorth":15424,"winRate":0,"bankruptRate":0.4,"meanCash":7008,"meanProps":2.9,"meanDebt":69,"meanRentIn":850,"meanRentOut":14995,"meanCredit":703}
+    BORROWER  {"n":10,"meanNetWorth":53623,"winRate":0.6,"bankruptRate":0.4,"meanCash":3126,"meanProps":7.5,"meanDebt":3117,"meanRentIn":13365,"meanRentOut":9400,"meanCredit":539}
+    DEADBEAT  {"n":10,"meanNetWorth":94317,"winRate":0.8,"bankruptRate":0.1,"meanCash":5126,"meanProps":14.8,"meanDebt":21341,"meanRentIn":25990,"meanRentOut":13510,"meanCredit":475}
+    INSURER   {"n":10,"meanNetWorth":30621,"winRate":0.1,"bankruptRate":0.4,"meanCash":1557,"meanProps":5.6,"meanDebt":4639,"meanRentIn":11280,"meanRentOut":28065,"meanCredit":676}
+    ALLIN     {"n":10,"meanNetWorth":109047,"winRate":0.9,"bankruptRate":0,"meanCash":2029,"meanProps":15.7,"meanDebt":3899,"meanRentIn":21155,"meanRentOut":9750,"meanCredit":656}
+    INVESTOR  {"n":10,"meanNetWorth":88199,"winRate":0.6,"bankruptRate":0.1,"meanCash":3577,"meanProps":12.4,"meanDebt":969,"meanRentIn":13610,"meanRentOut":10530,"meanCredit":732}
+intermediate|10y|4p|mixed
+    INSURER   {"n":20,"meanNetWorth":29281,"winRate":0.2,"bankruptRate":0.55,"meanCash":2133,"meanProps":3.3,"meanDebt":3359,"meanRentIn":27535,"meanRentOut":38428,"meanCredit":677}
+    BORROWER  {"n":20,"meanNetWorth":41563,"winRate":0.15,"bankruptRate":0.5,"meanCash":2818,"meanProps":4.1,"meanDebt":2783,"meanRentIn":38390,"meanRentOut":28753,"meanCredit":589}
+    LOW       {"n":20,"meanNetWorth":502,"winRate":0,"bankruptRate":0.95,"meanCash":73,"meanProps":0.1,"meanDebt":0,"meanRentIn":1333,"meanRentOut":27440,"meanCredit":701}
+    DEADBEAT  {"n":20,"meanNetWorth":86404,"winRate":0.5,"bankruptRate":0.2,"meanCash":5360,"meanProps":10.5,"meanDebt":18965,"meanRentIn":53385,"meanRentOut":30403,"meanCredit":485}
+    ALLIN     {"n":20,"meanNetWorth":43178,"winRate":0.3,"bankruptRate":0.6,"meanCash":1819,"meanProps":4.2,"meanDebt":2019,"meanRentIn":34373,"meanRentOut":34955,"meanCredit":676}
+    INVESTOR  {"n":20,"meanNetWorth":62460,"winRate":0.35,"bankruptRate":0.35,"meanCash":4677,"meanProps":7.3,"meanDebt":3675,"meanRentIn":38073,"meanRentOut":33110,"meanCredit":713}
+intermediate|10y|8p|mixed
+    BORROWER  {"n":40,"meanNetWorth":47249,"winRate":0.175,"bankruptRate":0.725,"meanCash":3042,"meanProps":3.4,"meanDebt":2055,"meanRentIn":77658,"meanRentOut":61076,"meanCredit":689}
+    INSURER   {"n":40,"meanNetWorth":11159,"winRate":0.05,"bankruptRate":0.95,"meanCash":1062,"meanProps":0.7,"meanDebt":347,"meanRentIn":47891,"meanRentOut":66835,"meanCredit":709}
+    LOW       {"n":40,"meanNetWorth":0,"winRate":0,"bankruptRate":1,"meanCash":0,"meanProps":0,"meanDebt":0,"meanRentIn":1073,"meanRentOut":28563,"meanCredit":700}
+    ALLIN     {"n":40,"meanNetWorth":22464,"winRate":0.1,"bankruptRate":0.85,"meanCash":1506,"meanProps":1.6,"meanDebt":1656,"meanRentIn":73500,"meanRentOut":75111,"meanCredit":740}
+    DEADBEAT  {"n":40,"meanNetWorth":94331,"winRate":0.35,"bankruptRate":0.575,"meanCash":4376,"meanProps":6.2,"meanDebt":10068,"meanRentIn":112855,"meanRentOut":60593,"meanCredit":475}
+    INVESTOR  {"n":40,"meanNetWorth":15412,"winRate":0.075,"bankruptRate":0.925,"meanCash":823,"meanProps":0.9,"meanDebt":194,"meanRentIn":45796,"meanRentOut":66595,"meanCredit":723}
+classic|5y-early3|4p|mixed
+    LOW       {"n":20,"meanNetWorth":24385,"winRate":0,"bankruptRate":0,"meanCash":18660,"meanProps":2.5,"meanDebt":0,"meanRentIn":300,"meanRentOut":3720,"meanCredit":null}
+    BORROWER  {"n":20,"meanNetWorth":33630,"winRate":0.2,"bankruptRate":0,"meanCash":3250,"meanProps":4.6,"meanDebt":2175,"meanRentIn":4480,"meanRentOut":5715,"meanCredit":null}
+    DEADBEAT  {"n":20,"meanNetWorth":36716,"winRate":0.4,"bankruptRate":0,"meanCash":2946,"meanProps":5.4,"meanDebt":20000,"meanRentIn":9958,"meanRentOut":4358,"meanCredit":null}
+    INSURER   {"n":20,"meanNetWorth":35533,"winRate":0.3,"bankruptRate":0,"meanCash":2973,"meanProps":5.1,"meanDebt":1875,"meanRentIn":3865,"meanRentOut":5788,"meanCredit":null}
+    ALLIN     {"n":20,"meanNetWorth":35688,"winRate":0.15,"bankruptRate":0,"meanCash":1508,"meanProps":4.4,"meanDebt":1625,"meanRentIn":5898,"meanRentOut":4298,"meanCredit":null}
+    INVESTOR  {"n":20,"meanNetWorth":39720,"winRate":0.45,"bankruptRate":0,"meanCash":2365,"meanProps":5.5,"meanDebt":1800,"meanRentIn":4348,"meanRentOut":4970,"meanCredit":null}
+intermediate|5y-early3|4p|mixed
+    LOW       {"n":20,"meanNetWorth":22603,"winRate":0,"bankruptRate":0,"meanCash":16013,"meanProps":2.5,"meanDebt":0,"meanRentIn":303,"meanRentOut":7038,"meanCredit":700}
+    DEADBEAT  {"n":20,"meanNetWorth":34934,"winRate":0.35,"bankruptRate":0,"meanCash":3493,"meanProps":5.3,"meanDebt":21975,"meanRentIn":8445,"meanRentOut":5980,"meanCredit":665}
+    BORROWER  {"n":20,"meanNetWorth":39503,"winRate":0.4,"bankruptRate":0,"meanCash":4640,"meanProps":6,"meanDebt":18235,"meanRentIn":9085,"meanRentOut":3425,"meanCredit":692}
+    INSURER   {"n":20,"meanNetWorth":32851,"winRate":0.25,"bankruptRate":0,"meanCash":3967,"meanProps":4.5,"meanDebt":2606,"meanRentIn":4773,"meanRentOut":6008,"meanCredit":704}
+    ALLIN     {"n":20,"meanNetWorth":37677,"winRate":0.25,"bankruptRate":0,"meanCash":2160,"meanProps":4.3,"meanDebt":3858,"meanRentIn":5043,"meanRentOut":4575,"meanCredit":705}
+    INVESTOR  {"n":20,"meanNetWorth":40030,"winRate":0.25,"bankruptRate":0,"meanCash":3895,"meanProps":4.8,"meanDebt":1305,"meanRentIn":4058,"meanRentOut":4680,"meanCredit":702}
+
+EVENTS
+classic|5y|2p|mixed {"LOAN_TAKEN":2.83,"INTERMEDIATE_LOAN_TAKEN":0,"LOAN_DEFAULTED":0,"COLLATERAL_SEIZED":0,"LOAN_INSTALLMENT_OVERDUE":0,"INTERMEDIATE_LOAN_REPAID":0,"PLAYER_BANKRUPT":0,"CRISIS_STRUCK":0,"CRISIS_COVERED":0,"INSURANCE_PURCHASED":0,"INSURANCE_EXPIRED":0,"AUCTION_WON":13.93,"AUCTION_UNSOLD":0.2,"PROPERTY_MORTGAGED":0.97,"PROPERTY_UNMORTGAGED":0.23,"BUILDING_SOLD":0.03} {} {} {"RENT":54,"CARD":23,"TAX":3,"CLUB":1}
+classic|5y|2p|uniform {"LOAN_TAKEN":2.1,"INTERMEDIATE_LOAN_TAKEN":0,"LOAN_DEFAULTED":0,"COLLATERAL_SEIZED":0,"LOAN_INSTALLMENT_OVERDUE":0,"INTERMEDIATE_LOAN_REPAID":0,"PLAYER_BANKRUPT":0,"CRISIS_STRUCK":0,"CRISIS_COVERED":0,"INSURANCE_PURCHASED":0,"INSURANCE_EXPIRED":0,"AUCTION_WON":13.3,"AUCTION_UNSOLD":0.53,"PROPERTY_MORTGAGED":0,"PROPERTY_UNMORTGAGED":0,"BUILDING_SOLD":0} {} {} {"CARD":11,"RENT":52}
+classic|5y|4p|mixed {"LOAN_TAKEN":8.53,"INTERMEDIATE_LOAN_TAKEN":0,"LOAN_DEFAULTED":0,"COLLATERAL_SEIZED":0,"LOAN_INSTALLMENT_OVERDUE":0,"INTERMEDIATE_LOAN_REPAID":0,"PLAYER_BANKRUPT":0.2,"CRISIS_STRUCK":0,"CRISIS_COVERED":0,"INSURANCE_PURCHASED":0,"INSURANCE_EXPIRED":0,"AUCTION_WON":14.67,"AUCTION_UNSOLD":0,"PROPERTY_MORTGAGED":3.57,"PROPERTY_UNMORTGAGED":1.43,"BUILDING_SOLD":0.83} {} {} {"RENT":242,"LOAN_INTEREST":1,"CARD":38,"TAX":4,"CLUB":1}
+classic|5y|4p|uniform {"LOAN_TAKEN":8.87,"INTERMEDIATE_LOAN_TAKEN":0,"LOAN_DEFAULTED":0,"COLLATERAL_SEIZED":0,"LOAN_INSTALLMENT_OVERDUE":0,"INTERMEDIATE_LOAN_REPAID":0,"PLAYER_BANKRUPT":0,"CRISIS_STRUCK":0,"CRISIS_COVERED":0,"INSURANCE_PURCHASED":0,"INSURANCE_EXPIRED":0,"AUCTION_WON":14.23,"AUCTION_UNSOLD":0,"PROPERTY_MORTGAGED":0.03,"PROPERTY_UNMORTGAGED":0,"BUILDING_SOLD":0} {} {} {"RENT":238,"CLUB":4,"CARD":21,"TAX":3}
+classic|5y|8p|mixed {"LOAN_TAKEN":24.07,"INTERMEDIATE_LOAN_TAKEN":0,"LOAN_DEFAULTED":0,"COLLATERAL_SEIZED":0,"LOAN_INSTALLMENT_OVERDUE":0,"INTERMEDIATE_LOAN_REPAID":0,"PLAYER_BANKRUPT":1.73,"CRISIS_STRUCK":0,"CRISIS_COVERED":0,"INSURANCE_PURCHASED":0,"INSURANCE_EXPIRED":0,"AUCTION_WON":11.3,"AUCTION_UNSOLD":0,"PROPERTY_MORTGAGED":8.37,"PROPERTY_UNMORTGAGED":2.63,"BUILDING_SOLD":5.43} {} {} {"RENT":800,"CARD":41,"CLUB":14,"TAX":10,"LOAN_INTEREST":1}
+classic|5y|8p|uniform {"LOAN_TAKEN":25.37,"INTERMEDIATE_LOAN_TAKEN":0,"LOAN_DEFAULTED":0,"COLLATERAL_SEIZED":0,"LOAN_INSTALLMENT_OVERDUE":0,"INTERMEDIATE_LOAN_REPAID":0,"PLAYER_BANKRUPT":0.3,"CRISIS_STRUCK":0,"CRISIS_COVERED":0,"INSURANCE_PURCHASED":0,"INSURANCE_EXPIRED":0,"AUCTION_WON":8.07,"AUCTION_UNSOLD":0,"PROPERTY_MORTGAGED":1.67,"PROPERTY_UNMORTGAGED":0.03,"BUILDING_SOLD":0.5} {} {} {"RENT":729,"CLUB":16,"CARD":32,"LOAN_INTEREST":1,"TAX":4}
+classic|7y|2p|mixed {"LOAN_TAKEN":3.73,"INTERMEDIATE_LOAN_TAKEN":0,"LOAN_DEFAULTED":0,"COLLATERAL_SEIZED":0,"LOAN_INSTALLMENT_OVERDUE":0,"INTERMEDIATE_LOAN_REPAID":0,"PLAYER_BANKRUPT":0.07,"CRISIS_STRUCK":0,"CRISIS_COVERED":0,"INSURANCE_PURCHASED":0,"INSURANCE_EXPIRED":0,"AUCTION_WON":15.07,"AUCTION_UNSOLD":0.67,"PROPERTY_MORTGAGED":1.8,"PROPERTY_UNMORTGAGED":0.73,"BUILDING_SOLD":0.07} {} {} {"RENT":93,"TAX":7,"CARD":22,"CLUB":1}
+classic|7y|2p|uniform {"LOAN_TAKEN":3.37,"INTERMEDIATE_LOAN_TAKEN":0,"LOAN_DEFAULTED":0,"COLLATERAL_SEIZED":0,"LOAN_INSTALLMENT_OVERDUE":0,"INTERMEDIATE_LOAN_REPAID":0,"PLAYER_BANKRUPT":0,"CRISIS_STRUCK":0,"CRISIS_COVERED":0,"INSURANCE_PURCHASED":0,"INSURANCE_EXPIRED":0,"AUCTION_WON":15.43,"AUCTION_UNSOLD":0.1,"PROPERTY_MORTGAGED":0,"PROPERTY_UNMORTGAGED":0,"BUILDING_SOLD":0} {} {} {"RENT":85,"CARD":13,"CLUB":2,"TAX":1}
+classic|7y|4p|mixed {"LOAN_TAKEN":12.5,"INTERMEDIATE_LOAN_TAKEN":0,"LOAN_DEFAULTED":0,"COLLATERAL_SEIZED":0,"LOAN_INSTALLMENT_OVERDUE":0,"INTERMEDIATE_LOAN_REPAID":0,"PLAYER_BANKRUPT":0.8,"CRISIS_STRUCK":0,"CRISIS_COVERED":0,"INSURANCE_PURCHASED":0,"INSURANCE_EXPIRED":0,"AUCTION_WON":16,"AUCTION_UNSOLD":0,"PROPERTY_MORTGAGED":6.67,"PROPERTY_UNMORTGAGED":2.33,"BUILDING_SOLD":2} {} {} {"RENT":414,"CLUB":5,"CARD":46,"TAX":6,"LOAN_INTEREST":1}
+classic|7y|4p|uniform {"LOAN_TAKEN":13.67,"INTERMEDIATE_LOAN_TAKEN":0,"LOAN_DEFAULTED":0,"COLLATERAL_SEIZED":0,"LOAN_INSTALLMENT_OVERDUE":0,"INTERMEDIATE_LOAN_REPAID":0,"PLAYER_BANKRUPT":0.17,"CRISIS_STRUCK":0,"CRISIS_COVERED":0,"INSURANCE_PURCHASED":0,"INSURANCE_EXPIRED":0,"AUCTION_WON":14.93,"AUCTION_UNSOLD":0.03,"PROPERTY_MORTGAGED":2.8,"PROPERTY_UNMORTGAGED":0.33,"BUILDING_SOLD":0.67} {} {} {"RENT":401,"CLUB":9,"CARD":35,"TAX":4}
+classic|7y|8p|mixed {"LOAN_TAKEN":33.3,"INTERMEDIATE_LOAN_TAKEN":0,"LOAN_DEFAULTED":0,"COLLATERAL_SEIZED":0,"LOAN_INSTALLMENT_OVERDUE":0,"INTERMEDIATE_LOAN_REPAID":0,"PLAYER_BANKRUPT":3.93,"CRISIS_STRUCK":0,"CRISIS_COVERED":0,"INSURANCE_PURCHASED":0,"INSURANCE_EXPIRED":0,"AUCTION_WON":12.6,"AUCTION_UNSOLD":0,"PROPERTY_MORTGAGED":19.67,"PROPERTY_UNMORTGAGED":7.23,"BUILDING_SOLD":11.63} {} {} {"RENT":1274,"TAX":14,"CARD":76,"CLUB":30,"LOAN_INTEREST":1}
+classic|7y|8p|uniform {"LOAN_TAKEN":37.57,"INTERMEDIATE_LOAN_TAKEN":0,"LOAN_DEFAULTED":0,"COLLATERAL_SEIZED":0,"LOAN_INSTALLMENT_OVERDUE":0,"INTERMEDIATE_LOAN_REPAID":0,"PLAYER_BANKRUPT":1.97,"CRISIS_STRUCK":0,"CRISIS_COVERED":0,"INSURANCE_PURCHASED":0,"INSURANCE_EXPIRED":0,"AUCTION_WON":9.83,"AUCTION_UNSOLD":0,"PROPERTY_MORTGAGED":7.03,"PROPERTY_UNMORTGAGED":0.87,"BUILDING_SOLD":3.87} {} {} {"RENT":1189,"CLUB":21,"CARD":63,"TAX":16,"LOAN_INTEREST":2}
+classic|10y|2p|mixed {"LOAN_TAKEN":5.57,"INTERMEDIATE_LOAN_TAKEN":0,"LOAN_DEFAULTED":0,"COLLATERAL_SEIZED":0,"LOAN_INSTALLMENT_OVERDUE":0,"INTERMEDIATE_LOAN_REPAID":0,"PLAYER_BANKRUPT":0.33,"CRISIS_STRUCK":0,"CRISIS_COVERED":0,"INSURANCE_PURCHASED":0,"INSURANCE_EXPIRED":0,"AUCTION_WON":15.97,"AUCTION_UNSOLD":0.53,"PROPERTY_MORTGAGED":3.33,"PROPERTY_UNMORTGAGED":1.23,"BUILDING_SOLD":0.27} {} {} {"RENT":170,"TAX":6,"CARD":28,"LOAN_INTEREST":2}
+classic|10y|2p|uniform {"LOAN_TAKEN":5.1,"INTERMEDIATE_LOAN_TAKEN":0,"LOAN_DEFAULTED":0,"COLLATERAL_SEIZED":0,"LOAN_INSTALLMENT_OVERDUE":0,"INTERMEDIATE_LOAN_REPAID":0,"PLAYER_BANKRUPT":0.07,"CRISIS_STRUCK":0,"CRISIS_COVERED":0,"INSURANCE_PURCHASED":0,"INSURANCE_EXPIRED":0,"AUCTION_WON":16.17,"AUCTION_UNSOLD":0.37,"PROPERTY_MORTGAGED":1.47,"PROPERTY_UNMORTGAGED":0.1,"BUILDING_SOLD":0.13} {} {} {"RENT":144,"CARD":20,"TAX":3,"CLUB":4}
+classic|10y|4p|mixed {"LOAN_TAKEN":14.57,"INTERMEDIATE_LOAN_TAKEN":0,"LOAN_DEFAULTED":0,"COLLATERAL_SEIZED":0,"LOAN_INSTALLMENT_OVERDUE":0,"INTERMEDIATE_LOAN_REPAID":0,"PLAYER_BANKRUPT":1.57,"CRISIS_STRUCK":0,"CRISIS_COVERED":0,"INSURANCE_PURCHASED":0,"INSURANCE_EXPIRED":0,"AUCTION_WON":17.3,"AUCTION_UNSOLD":0.03,"PROPERTY_MORTGAGED":14.1,"PROPERTY_UNMORTGAGED":4.97,"BUILDING_SOLD":4.33} {} {} {"RENT":576,"CARD":68,"TAX":12,"CLUB":6,"LOAN_INTEREST":1}
+classic|10y|4p|uniform {"LOAN_TAKEN":18.97,"INTERMEDIATE_LOAN_TAKEN":0,"LOAN_DEFAULTED":0,"COLLATERAL_SEIZED":0,"LOAN_INSTALLMENT_OVERDUE":0,"INTERMEDIATE_LOAN_REPAID":0,"PLAYER_BANKRUPT":0.57,"CRISIS_STRUCK":0,"CRISIS_COVERED":0,"INSURANCE_PURCHASED":0,"INSURANCE_EXPIRED":0,"AUCTION_WON":15.13,"AUCTION_UNSOLD":0,"PROPERTY_MORTGAGED":5.23,"PROPERTY_UNMORTGAGED":0.97,"BUILDING_SOLD":1.73} {} {} {"RENT":578,"CARD":50,"TAX":16,"CLUB":9}
+classic|10y|8p|mixed {"LOAN_TAKEN":39.97,"INTERMEDIATE_LOAN_TAKEN":0,"LOAN_DEFAULTED":0,"COLLATERAL_SEIZED":0,"LOAN_INSTALLMENT_OVERDUE":0,"INTERMEDIATE_LOAN_REPAID":0,"PLAYER_BANKRUPT":6.33,"CRISIS_STRUCK":0,"CRISIS_COVERED":0,"INSURANCE_PURCHASED":0,"INSURANCE_EXPIRED":0,"AUCTION_WON":17.03,"AUCTION_UNSOLD":0,"PROPERTY_MORTGAGED":35.07,"PROPERTY_UNMORTGAGED":12.67,"BUILDING_SOLD":18.37} {} {} {"RENT":1741,"TAX":23,"CARD":105,"CLUB":19,"LOAN_INTEREST":3}
+classic|10y|8p|uniform {"LOAN_TAKEN":50.77,"INTERMEDIATE_LOAN_TAKEN":0,"LOAN_DEFAULTED":0,"COLLATERAL_SEIZED":0,"LOAN_INSTALLMENT_OVERDUE":0,"INTERMEDIATE_LOAN_REPAID":0,"PLAYER_BANKRUPT":4.03,"CRISIS_STRUCK":0,"CRISIS_COVERED":0,"INSURANCE_PURCHASED":0,"INSURANCE_EXPIRED":0,"AUCTION_WON":12.83,"AUCTION_UNSOLD":0,"PROPERTY_MORTGAGED":16.2,"PROPERTY_UNMORTGAGED":2.33,"BUILDING_SOLD":9.3} {} {} {"RENT":1770,"CLUB":32,"CARD":71,"TAX":25}
+intermediate|5y|2p|mixed {"LOAN_TAKEN":0,"INTERMEDIATE_LOAN_TAKEN":4.47,"LOAN_DEFAULTED":1.17,"COLLATERAL_SEIZED":0,"LOAN_INSTALLMENT_OVERDUE":4.43,"INTERMEDIATE_LOAN_REPAID":0.7,"PLAYER_BANKRUPT":0.1,"CRISIS_STRUCK":4.6,"CRISIS_COVERED":0.3,"INSURANCE_PURCHASED":2.07,"INSURANCE_EXPIRED":1.77,"AUCTION_WON":12.53,"AUCTION_UNSOLD":3.7,"PROPERTY_MORTGAGED":4,"PROPERTY_UNMORTGAGED":0.7,"BUILDING_SOLD":0.37} {"PAID":138,"COVERED":9} {"DEFAULTED":33,"REPAID":21,"ACTIVE":76,"SETTLED":1,"WRITTEN_OFF":3} {"CARD":30,"TAX":7,"CRISIS":74,"RENT":63,"CLUB":2}
+intermediate|5y|2p|uniform {"LOAN_TAKEN":0,"INTERMEDIATE_LOAN_TAKEN":4.33,"LOAN_DEFAULTED":0.13,"COLLATERAL_SEIZED":0,"LOAN_INSTALLMENT_OVERDUE":2.23,"INTERMEDIATE_LOAN_REPAID":0.83,"PLAYER_BANKRUPT":0,"CRISIS_STRUCK":5,"CRISIS_COVERED":0,"INSURANCE_PURCHASED":0,"INSURANCE_EXPIRED":0,"AUCTION_WON":13.37,"AUCTION_UNSOLD":2.63,"PROPERTY_MORTGAGED":0.5,"PROPERTY_UNMORTGAGED":0.03,"BUILDING_SOLD":0.13} {"PAID":150} {"REPAID":25,"ACTIVE":101,"DEFAULTED":4} {"CRISIS":53,"CARD":19,"TAX":5,"RENT":67,"CLUB":1}
+intermediate|5y|4p|mixed {"LOAN_TAKEN":0,"INTERMEDIATE_LOAN_TAKEN":10.77,"LOAN_DEFAULTED":2.43,"COLLATERAL_SEIZED":0,"LOAN_INSTALLMENT_OVERDUE":9.57,"INTERMEDIATE_LOAN_REPAID":2.03,"PLAYER_BANKRUPT":0.37,"CRISIS_STRUCK":4.53,"CRISIS_COVERED":0.47,"INSURANCE_PURCHASED":5.47,"INSURANCE_EXPIRED":4.53,"AUCTION_WON":15.37,"AUCTION_UNSOLD":0.07,"PROPERTY_MORTGAGED":8.33,"PROPERTY_UNMORTGAGED":2.1,"BUILDING_SOLD":2.1} {"COVERED":14,"PAID":136} {"DEFAULTED":65,"ACTIVE":171,"REPAID":61,"SETTLED":3,"WRITTEN_OFF":23} {"CRISIS":78,"RENT":309,"CARD":42,"TAX":10,"CLUB":2}
+intermediate|5y|4p|uniform {"LOAN_TAKEN":0,"INTERMEDIATE_LOAN_TAKEN":11.97,"LOAN_DEFAULTED":0.17,"COLLATERAL_SEIZED":0,"LOAN_INSTALLMENT_OVERDUE":5.43,"INTERMEDIATE_LOAN_REPAID":3.27,"PLAYER_BANKRUPT":0.1,"CRISIS_STRUCK":5,"CRISIS_COVERED":0,"INSURANCE_PURCHASED":0,"INSURANCE_EXPIRED":0,"AUCTION_WON":14.93,"AUCTION_UNSOLD":0.13,"PROPERTY_MORTGAGED":2.63,"PROPERTY_UNMORTGAGED":0.07,"BUILDING_SOLD":0.5} {"PAID":149,"BANKRUPT":1} {"REPAID":98,"ACTIVE":247,"DEFAULTED":4,"WRITTEN_OFF":10} {"RENT":311,"CRISIS":67,"CARD":32,"TAX":6,"CLUB":10}
+intermediate|5y|8p|mixed {"LOAN_TAKEN":0,"INTERMEDIATE_LOAN_TAKEN":26.1,"LOAN_DEFAULTED":3.13,"COLLATERAL_SEIZED":0,"LOAN_INSTALLMENT_OVERDUE":17.13,"INTERMEDIATE_LOAN_REPAID":3.73,"PLAYER_BANKRUPT":2.47,"CRISIS_STRUCK":4.5,"CRISIS_COVERED":0.47,"INSURANCE_PURCHASED":9.77,"INSURANCE_EXPIRED":8.27,"AUCTION_WON":11.43,"AUCTION_UNSOLD":0,"PROPERTY_MORTGAGED":12.83,"PROPERTY_UNMORTGAGED":3.83,"BUILDING_SOLD":6.67} {"PAID":135,"COVERED":14} {"ACTIVE":405,"REPAID":112,"WRITTEN_OFF":193,"DEFAULTED":68,"SETTLED":5} {"CRISIS":57,"RENT":846,"CARD":57,"CLUB":23,"TAX":10}
+intermediate|5y|8p|uniform {"LOAN_TAKEN":0,"INTERMEDIATE_LOAN_TAKEN":25.43,"LOAN_DEFAULTED":0.13,"COLLATERAL_SEIZED":0,"LOAN_INSTALLMENT_OVERDUE":8.8,"INTERMEDIATE_LOAN_REPAID":3.77,"PLAYER_BANKRUPT":0.8,"CRISIS_STRUCK":5,"CRISIS_COVERED":0,"INSURANCE_PURCHASED":0,"INSURANCE_EXPIRED":0,"AUCTION_WON":9.5,"AUCTION_UNSOLD":0,"PROPERTY_MORTGAGED":4.1,"PROPERTY_UNMORTGAGED":0.17,"BUILDING_SOLD":2.2} {"PAID":150} {"REPAID":113,"ACTIVE":521,"WRITTEN_OFF":127,"DEFAULTED":2} {"RENT":755,"CRISIS":46,"CARD":51,"CLUB":28,"TAX":11}
+intermediate|7y|2p|mixed {"LOAN_TAKEN":0,"INTERMEDIATE_LOAN_TAKEN":5.43,"LOAN_DEFAULTED":1.53,"COLLATERAL_SEIZED":0,"LOAN_INSTALLMENT_OVERDUE":6.63,"INTERMEDIATE_LOAN_REPAID":1.5,"PLAYER_BANKRUPT":0.23,"CRISIS_STRUCK":6.33,"CRISIS_COVERED":0.3,"INSURANCE_PURCHASED":2.8,"INSURANCE_EXPIRED":2.03,"AUCTION_WON":14.6,"AUCTION_UNSOLD":4.1,"PROPERTY_MORTGAGED":7.3,"PROPERTY_UNMORTGAGED":2,"BUILDING_SOLD":0.47} {"PAID":190,"SKIPPED":1,"COVERED":9} {"SETTLED":11,"REPAID":45,"ACTIVE":67,"DEFAULTED":33,"WRITTEN_OFF":7} {"CRISIS":122,"RENT":102,"CARD":36,"TAX":9,"CLUB":2}
+intermediate|7y|2p|uniform {"LOAN_TAKEN":0,"INTERMEDIATE_LOAN_TAKEN":6.5,"LOAN_DEFAULTED":0.23,"COLLATERAL_SEIZED":0,"LOAN_INSTALLMENT_OVERDUE":4.73,"INTERMEDIATE_LOAN_REPAID":2.87,"PLAYER_BANKRUPT":0.1,"CRISIS_STRUCK":6.83,"CRISIS_COVERED":0,"INSURANCE_PURCHASED":0,"INSURANCE_EXPIRED":0,"AUCTION_WON":15.1,"AUCTION_UNSOLD":3.7,"PROPERTY_MORTGAGED":2.7,"PROPERTY_UNMORTGAGED":0.07,"BUILDING_SOLD":0.5} {"PAID":205,"SKIPPED":1} {"REPAID":86,"ACTIVE":96,"WRITTEN_OFF":8,"DEFAULTED":3,"SETTLED":2} {"RENT":133,"CRISIS":97,"TAX":6,"CARD":23,"CLUB":2}
+intermediate|7y|4p|mixed {"LOAN_TAKEN":0,"INTERMEDIATE_LOAN_TAKEN":13.43,"LOAN_DEFAULTED":2.5,"COLLATERAL_SEIZED":0,"LOAN_INSTALLMENT_OVERDUE":10.97,"INTERMEDIATE_LOAN_REPAID":4.53,"PLAYER_BANKRUPT":1.17,"CRISIS_STRUCK":6.27,"CRISIS_COVERED":0.67,"INSURANCE_PURCHASED":7.77,"INSURANCE_EXPIRED":6.03,"AUCTION_WON":17.27,"AUCTION_UNSOLD":0.1,"PROPERTY_MORTGAGED":12.23,"PROPERTY_UNMORTGAGED":4.2,"BUILDING_SOLD":2.8} {"PAID":185,"COVERED":20,"BANKRUPT":3} {"DEFAULTED":46,"WRITTEN_OFF":76,"REPAID":136,"ACTIVE":136,"SETTLED":9} {"CRISIS":103,"RENT":423,"CARD":56,"TAX":10,"CLUB":6}
+intermediate|7y|4p|uniform {"LOAN_TAKEN":0,"INTERMEDIATE_LOAN_TAKEN":16.3,"LOAN_DEFAULTED":0.47,"COLLATERAL_SEIZED":0,"LOAN_INSTALLMENT_OVERDUE":9.63,"INTERMEDIATE_LOAN_REPAID":6.57,"PLAYER_BANKRUPT":0.53,"CRISIS_STRUCK":7,"CRISIS_COVERED":0,"INSURANCE_PURCHASED":0,"INSURANCE_EXPIRED":0,"AUCTION_WON":16.23,"AUCTION_UNSOLD":0.07,"PROPERTY_MORTGAGED":5.87,"PROPERTY_UNMORTGAGED":0.63,"BUILDING_SOLD":1.3} {"PAID":208,"BANKRUPT":2} {"REPAID":197,"ACTIVE":219,"SETTLED":2,"DEFAULTED":7,"WRITTEN_OFF":64} {"CRISIS":91,"CARD":50,"RENT":479,"CLUB":10,"TAX":12}
+intermediate|7y|8p|mixed {"LOAN_TAKEN":0,"INTERMEDIATE_LOAN_TAKEN":37.13,"LOAN_DEFAULTED":3.57,"COLLATERAL_SEIZED":0,"LOAN_INSTALLMENT_OVERDUE":22.3,"INTERMEDIATE_LOAN_REPAID":8.3,"PLAYER_BANKRUPT":5.5,"CRISIS_STRUCK":6.13,"CRISIS_COVERED":0.63,"INSURANCE_PURCHASED":12.27,"INSURANCE_EXPIRED":10.73,"AUCTION_WON":17,"AUCTION_UNSOLD":0,"PROPERTY_MORTGAGED":26.53,"PROPERTY_UNMORTGAGED":8.43,"BUILDING_SOLD":14.83} {"COVERED":19,"PAID":180,"BANKRUPT":4} {"DEFAULTED":44,"REPAID":249,"WRITTEN_OFF":570,"ACTIVE":247,"SETTLED":4} {"RENT":1344,"CLUB":40,"CRISIS":103,"CARD":98,"TAX":26}
+intermediate|7y|8p|uniform {"LOAN_TAKEN":0,"INTERMEDIATE_LOAN_TAKEN":39.77,"LOAN_DEFAULTED":1.1,"COLLATERAL_SEIZED":0,"LOAN_INSTALLMENT_OVERDUE":20.3,"INTERMEDIATE_LOAN_REPAID":10.93,"PLAYER_BANKRUPT":3,"CRISIS_STRUCK":6.97,"CRISIS_COVERED":0,"INSURANCE_PURCHASED":0,"INSURANCE_EXPIRED":0,"AUCTION_WON":12.8,"AUCTION_UNSOLD":0,"PROPERTY_MORTGAGED":10.5,"PROPERTY_UNMORTGAGED":0.77,"BUILDING_SOLD":5.4} {"PAID":207,"BANKRUPT":2} {"REPAID":328,"WRITTEN_OFF":451,"ACTIVE":406,"SETTLED":3,"DEFAULTED":5} {"RENT":1275,"CLUB":41,"CRISIS":67,"CARD":98,"TAX":16}
+intermediate|10y|2p|mixed {"LOAN_TAKEN":0,"INTERMEDIATE_LOAN_TAKEN":7.3,"LOAN_DEFAULTED":1.6,"COLLATERAL_SEIZED":0,"LOAN_INSTALLMENT_OVERDUE":7.73,"INTERMEDIATE_LOAN_REPAID":3.4,"PLAYER_BANKRUPT":0.47,"CRISIS_STRUCK":8.37,"CRISIS_COVERED":0.47,"INSURANCE_PURCHASED":2.27,"INSURANCE_EXPIRED":1.8,"AUCTION_WON":16,"AUCTION_UNSOLD":4.8,"PROPERTY_MORTGAGED":8.9,"PROPERTY_UNMORTGAGED":2.9,"BUILDING_SOLD":1.23} {"PAID":250,"COVERED":14,"BANKRUPT":1} {"SETTLED":16,"REPAID":102,"DEFAULTED":23,"WRITTEN_OFF":22,"ACTIVE":56} {"RENT":168,"CRISIS":147,"CARD":48,"CLUB":3,"TAX":17}
+intermediate|10y|2p|uniform {"LOAN_TAKEN":0,"INTERMEDIATE_LOAN_TAKEN":9.77,"LOAN_DEFAULTED":0.67,"COLLATERAL_SEIZED":0,"LOAN_INSTALLMENT_OVERDUE":8.3,"INTERMEDIATE_LOAN_REPAID":6.17,"PLAYER_BANKRUPT":0.17,"CRISIS_STRUCK":9.67,"CRISIS_COVERED":0,"INSURANCE_PURCHASED":0,"INSURANCE_EXPIRED":0,"AUCTION_WON":17.13,"AUCTION_UNSOLD":5.2,"PROPERTY_MORTGAGED":4.77,"PROPERTY_UNMORTGAGED":0.63,"BUILDING_SOLD":0.4} {"PAID":287,"BANKRUPT":3} {"REPAID":185,"ACTIVE":74,"DEFAULTED":13,"SETTLED":6,"WRITTEN_OFF":15} {"CRISIS":140,"CARD":63,"RENT":185,"CLUB":6,"TAX":11}
+intermediate|10y|4p|mixed {"LOAN_TAKEN":0,"INTERMEDIATE_LOAN_TAKEN":16.13,"LOAN_DEFAULTED":2.53,"COLLATERAL_SEIZED":0,"LOAN_INSTALLMENT_OVERDUE":14.53,"INTERMEDIATE_LOAN_REPAID":5.6,"PLAYER_BANKRUPT":2.1,"CRISIS_STRUCK":8,"CRISIS_COVERED":0.5,"INSURANCE_PURCHASED":7.9,"INSURANCE_EXPIRED":6.97,"AUCTION_WON":17.83,"AUCTION_UNSOLD":0.2,"PROPERTY_MORTGAGED":19.4,"PROPERTY_UNMORTGAGED":6.07,"BUILDING_SOLD":4.9} {"PAID":237,"COVERED":15,"BANKRUPT":3} {"REPAID":168,"SETTLED":18,"WRITTEN_OFF":161,"ACTIVE":105,"DEFAULTED":32} {"RENT":599,"CRISIS":129,"CARD":64,"CLUB":12,"TAX":13}
+intermediate|10y|4p|uniform {"LOAN_TAKEN":0,"INTERMEDIATE_LOAN_TAKEN":23.07,"LOAN_DEFAULTED":1.1,"COLLATERAL_SEIZED":0,"LOAN_INSTALLMENT_OVERDUE":13.67,"INTERMEDIATE_LOAN_REPAID":11.37,"PLAYER_BANKRUPT":1.6,"CRISIS_STRUCK":9.77,"CRISIS_COVERED":0,"INSURANCE_PURCHASED":0,"INSURANCE_EXPIRED":0,"AUCTION_WON":18.5,"AUCTION_UNSOLD":0.23,"PROPERTY_MORTGAGED":10.27,"PROPERTY_UNMORTGAGED":1.07,"BUILDING_SOLD":3.53} {"PAID":291,"BANKRUPT":2} {"REPAID":341,"WRITTEN_OFF":176,"ACTIVE":169,"SETTLED":6} {"CRISIS":128,"RENT":706,"CLUB":15,"CARD":82,"TAX":19}
+intermediate|10y|8p|mixed {"LOAN_TAKEN":0,"INTERMEDIATE_LOAN_TAKEN":45.93,"LOAN_DEFAULTED":3.67,"COLLATERAL_SEIZED":0,"LOAN_INSTALLMENT_OVERDUE":26.53,"INTERMEDIATE_LOAN_REPAID":13.9,"PLAYER_BANKRUPT":6.7,"CRISIS_STRUCK":8.03,"CRISIS_COVERED":0.87,"INSURANCE_PURCHASED":17.13,"INSURANCE_EXPIRED":15.33,"AUCTION_WON":20,"AUCTION_UNSOLD":0.03,"PROPERTY_MORTGAGED":39.6,"PROPERTY_UNMORTGAGED":14.03,"BUILDING_SOLD":20.43} {"PAID":238,"COVERED":26,"BANKRUPT":3} {"REPAID":417,"WRITTEN_OFF":838,"ACTIVE":83,"DEFAULTED":34,"SETTLED":6} {"CRISIS":123,"RENT":1831,"TAX":32,"CARD":128,"CLUB":36}
+intermediate|10y|8p|uniform {"LOAN_TAKEN":0,"INTERMEDIATE_LOAN_TAKEN":53.03,"LOAN_DEFAULTED":0.57,"COLLATERAL_SEIZED":0,"LOAN_INSTALLMENT_OVERDUE":23.7,"INTERMEDIATE_LOAN_REPAID":18.93,"PLAYER_BANKRUPT":5.27,"CRISIS_STRUCK":9.47,"CRISIS_COVERED":0,"INSURANCE_PURCHASED":0,"INSURANCE_EXPIRED":0,"AUCTION_WON":15.57,"AUCTION_UNSOLD":0,"PROPERTY_MORTGAGED":21.73,"PROPERTY_UNMORTGAGED":2.8,"BUILDING_SOLD":11.43} {"PAID":283,"BANKRUPT":1} {"REPAID":568,"WRITTEN_OFF":816,"ACTIVE":206,"SETTLED":1} {"RENT":1815,"TAX":19,"CARD":108,"CRISIS":107,"CLUB":48}
+classic|5y-early3|4p|mixed {"LOAN_TAKEN":3.13,"INTERMEDIATE_LOAN_TAKEN":0,"LOAN_DEFAULTED":0,"COLLATERAL_SEIZED":0,"LOAN_INSTALLMENT_OVERDUE":0,"INTERMEDIATE_LOAN_REPAID":0,"PLAYER_BANKRUPT":0,"CRISIS_STRUCK":0,"CRISIS_COVERED":0,"INSURANCE_PURCHASED":0,"INSURANCE_EXPIRED":0,"AUCTION_WON":9.57,"AUCTION_UNSOLD":0,"PROPERTY_MORTGAGED":0.6,"PROPERTY_UNMORTGAGED":0.17,"BUILDING_SOLD":0.2} {} {} {"RENT":60,"LOAN_INTEREST":1,"CARD":7,"CLUB":1}
+intermediate|5y-early3|4p|mixed {"LOAN_TAKEN":0,"INTERMEDIATE_LOAN_TAKEN":5.23,"LOAN_DEFAULTED":0,"COLLATERAL_SEIZED":0,"LOAN_INSTALLMENT_OVERDUE":2.07,"INTERMEDIATE_LOAN_REPAID":0,"PLAYER_BANKRUPT":0,"CRISIS_STRUCK":1.63,"CRISIS_COVERED":0.37,"INSURANCE_PURCHASED":3.67,"INSURANCE_EXPIRED":1.7,"AUCTION_WON":9.37,"AUCTION_UNSOLD":0,"PROPERTY_MORTGAGED":1.17,"PROPERTY_UNMORTGAGED":0.13,"BUILDING_SOLD":0.57} {"COVERED":11,"PAID":49} {"ACTIVE":157} {"CRISIS":22,"RENT":75,"CARD":13,"CLUB":2,"TAX":1}

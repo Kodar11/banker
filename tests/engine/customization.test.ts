@@ -58,13 +58,13 @@ function borrow(g: TestGame, name: string, product: LoanProductKey, amount: numb
 
 describe('defaults reproduce the game as it was', () => {
   it('Classic: ₹25,000 starting cash, ₹20,000 loan limit, nothing from Capital', () => {
-    expect(defaultGameConfig('classic')).toEqual({ startingCash: 25000, loanLimit: 20000, marketVolatility: 'balanced', secretObjectives: false, financialPrivacy: 'open' });
+    expect(defaultGameConfig('classic')).toEqual({ startingCash: 25000, loanLimit: 20000, marketVolatility: 'balanced', secretObjectives: false, financialPrivacy: 'open', durationYears: 5 });
     expect(defaultGameConfig('classic').startingCash).toBe(R.startingCash);
     expect(defaultGameConfig('classic').loanLimit).toBe(R.loans.maxOutstandingPrincipal);
   });
 
   it('Capital: the same money rules, the Balanced market, objectives on', () => {
-    expect(defaultGameConfig('intermediate')).toEqual({ startingCash: 25000, loanLimit: 20000, marketVolatility: 'balanced', secretObjectives: true, financialPrivacy: 'open' });
+    expect(defaultGameConfig('intermediate')).toEqual({ startingCash: 25000, loanLimit: 20000, marketVolatility: 'balanced', secretObjectives: true, financialPrivacy: 'open', durationYears: 5 });
     expect(defaultGameConfig('intermediate').loanLimit).toBe(IR.loans.maxOutstandingPrincipal);
     expect(IR.market.defaultProfile).toBe('balanced');
   });
@@ -101,7 +101,7 @@ describe('defaults reproduce the game as it was', () => {
 
   it('a stored config that is missing or unreadable falls back to the old rules — and an old Capital game has no objectives', () => {
     expect(normalizeGameConfig('classic', null)).toEqual(legacyGameConfig('classic'));
-    expect(normalizeGameConfig('intermediate', undefined)).toEqual({ startingCash: 25000, loanLimit: 20000, marketVolatility: 'balanced', secretObjectives: false, financialPrivacy: 'open' });
+    expect(normalizeGameConfig('intermediate', undefined)).toEqual({ startingCash: 25000, loanLimit: 20000, marketVolatility: 'balanced', secretObjectives: false, financialPrivacy: 'open', durationYears: 5 });
     expect(normalizeGameConfig('intermediate', { startingCash: 'lots' })).toEqual(legacyGameConfig('intermediate'));
     expect(normalizeGameConfig('intermediate', { startingCash: 40000, loanLimit: 5000, marketVolatility: 'volatile', secretObjectives: true })).toEqual({
       startingCash: 40000,
@@ -109,6 +109,7 @@ describe('defaults reproduce the game as it was', () => {
       marketVolatility: 'volatile',
       secretObjectives: true,
       financialPrivacy: 'open',
+      durationYears: 5,
     });
   });
 });
@@ -280,7 +281,7 @@ describe('Classic takes nothing from Capital', () => {
     }
     expect(g.state.intermediate).toBeNull();
     expect(g.state.objectives).toBeNull();
-    const end = g.act('Asha', { type: 'END_GAME' });
+    const end = g.endByVote('Asha');
     expect(g.state.objectives).toBeNull();
     expect(g.ledger.some((t) => t.type === 'OBJECTIVE_REWARD')).toBe(false);
     expect(g.results.flatMap((r) => r.events).some((e) => e.type === 'OBJECTIVE_RESULT' || e.type === 'FINANCIAL_YEAR_STARTED')).toBe(false);
@@ -297,20 +298,24 @@ describe('Classic takes nothing from Capital', () => {
       { key: 'startingCash', label: 'Starting cash', value: '₹25,000' },
       { key: 'loanLimit', label: 'Maximum outstanding loans', value: '₹20,000' },
       { key: 'financialPrivacy', label: 'Finances', value: 'Open' },
+      { key: 'durationYears', label: 'Game duration', value: '5 financial years' },
     ]);
-    expect(gameConfigSummary('intermediate', { startingCash: 30000, loanLimit: 25000, marketVolatility: 'balanced', secretObjectives: true, financialPrivacy: 'open' }).map((r) => `${r.label}: ${r.value}`)).toEqual([
+    expect(gameConfigSummary('intermediate', { startingCash: 30000, loanLimit: 25000, marketVolatility: 'balanced', secretObjectives: true, financialPrivacy: 'open', durationYears: 8 }).map((r) => `${r.label}: ${r.value}`)).toEqual([
       'Mode: Capital',
       'Starting cash: ₹30,000',
       'Maximum outstanding loans: ₹25,000',
       'Market volatility: Balanced',
       'Secret objectives: Enabled',
       'Finances: Open',
+      'Game duration: 8 financial years',
     ]);
+    // A matchmade game has no duration to list.
+    expect(gameConfigSummary('classic', defaultGameConfig('classic'), { timed: false }).map((r) => r.key)).not.toContain('durationYears');
   });
 });
 
 describe('the settings belong to the host until the game starts, then to nobody', () => {
-  const custom: GameConfig = { startingCash: 40000, loanLimit: 10000, marketVolatility: 'volatile', secretObjectives: false, financialPrivacy: 'open' };
+  const custom: GameConfig = { startingCash: 40000, loanLimit: 10000, marketVolatility: 'volatile', secretObjectives: false, financialPrivacy: 'open', durationYears: 5 };
 
   it('the host can change them in the lobby; everyone gets the new values', () => {
     const g = new TestGame(['Asha', 'Bilal'], { start: false, mode: 'intermediate' });
@@ -356,7 +361,7 @@ describe('the settings belong to the host until the game starts, then to nobody'
     g.act('Asha', { type: 'PAUSE_GAME' });
     expect(refusal(() => g.act('Asha', { type: 'UPDATE_CONFIG', config: custom }))).toEqual(locked);
     g.act('Asha', { type: 'RESUME_GAME' });
-    g.act('Asha', { type: 'END_GAME' });
+    g.endByVote('Asha');
     expect(refusal(() => g.act('Asha', { type: 'UPDATE_CONFIG', config: custom })).code).toBe('GAME_FINISHED');
     expect(g.state.config).toEqual(before);
   });
@@ -485,7 +490,7 @@ describe('the rulebook quotes the game being played', () => {
   });
 
   it('Capital rules name the game’s market, its loan limit, and objectives only when they are on', () => {
-    const on = intermediateRuleEntries({ startingCash: 50000, loanLimit: 30000, marketVolatility: 'stable', secretObjectives: true, financialPrivacy: 'open' });
+    const on = intermediateRuleEntries({ startingCash: 50000, loanLimit: 30000, marketVolatility: 'stable', secretObjectives: true, financialPrivacy: 'open', durationYears: 5 });
     expect(text(on)).toContain('changes on its own: -10%, 0%, +10%, +20%');
     expect(text(on)).toContain('This game’s market is Stable.'.replace('’', "'"));
     expect(text(on)).toContain('at most ₹30,000 owed in total');

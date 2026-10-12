@@ -285,8 +285,75 @@ export interface GameState {
   undoRequest: UndoRequest | null;
   /** Open trade offers plus recently resolved ones. */
   trades: TradeOffer[];
+  /**
+   * How a hosted game ends: its duration, the vote in progress and the last result (gameEnd.ts).
+   * Null or missing in the lobby, in a matchmade game (no duration, no votes) and in a game stored
+   * before votes existed — a hosted one of those gets it the first time it is needed.
+   */
+  endGame?: GameEndState | null;
   createdAt: string;
   expiresAt: string;
+}
+
+/**
+ * EARLY: asked for by a player before the game's last financial year; a strict majority ends the game.
+ * DURATION: opened by the server when the agreed duration is over; finish, or play one more year.
+ */
+export type EndVoteKind = 'EARLY' | 'DURATION';
+
+/** END the game now, or CONTINUE (an early vote: keep playing; a duration vote: one more financial year). */
+export type EndVoteChoice = 'END' | 'CONTINUE';
+
+/** ENDED the game · CONTINUED after a failed early vote · EXTENDED by one financial year. */
+export type EndVoteOutcome = 'ENDED' | 'CONTINUED' | 'EXTENDED';
+
+/** One vote on ending the game. At most one is open per game, and while it is open nothing else is played. */
+export interface EndVote {
+  id: string;
+  kind: EndVoteKind;
+  /** The financial year it was opened in. */
+  year: number;
+  /** The player who asked for an early vote; null for a duration vote (nobody asks for that one). */
+  requestedBy: string | null;
+  /**
+   * The players who may vote: everyone ACTIVE when the vote opened. Fixed for the whole vote — a
+   * player who disconnects or leaves meanwhile still counts towards `required`.
+   */
+  electorate: string[];
+  /** END ballots needed to end the game, worked out once from the electorate when the vote opened. */
+  required: number;
+  /**
+   * One locked ballot per player. Secret: a device is only ever sent its own (redactEndVote), and no
+   * event or result says who voted for what, or how many did.
+   */
+  ballots: Record<string, EndVoteChoice>;
+  /** ISO timestamp on the server's clock: no ballot counts from this instant on. Never set by a client. */
+  endsAt: string;
+  createdAt: string;
+  /** DURATION only: the player whose turn had just ended. If the game goes on, the next player after them plays. */
+  resumeAfterPlayerId: string | null;
+}
+
+/** How the last vote ended. Deliberately without a tally. */
+export interface EndVoteResult {
+  id: string;
+  kind: EndVoteKind;
+  outcome: EndVoteOutcome;
+  closedAt: string;
+}
+
+export interface GameEndState {
+  /** Financial years added by duration votes. The game's limit is config.durationYears plus this, never past the maximum. */
+  extraYears: number;
+  /**
+   * Classic only — a Capital game already keeps the calendar in its economy, and that one is used.
+   * The same clock: spaces each starting player has moved by dice. Null in a Capital game.
+   */
+  calendar: { playerCount: number; movement: Record<string, number> } | null;
+  /** Per player: the financial year in which they last asked for an early vote (once a year each). */
+  requestedIn: Record<string, number>;
+  vote: EndVote | null;
+  lastResult: EndVoteResult | null;
 }
 
 export type TransactionType =

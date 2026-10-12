@@ -186,7 +186,7 @@ describe('a new game is a new game', () => {
     old.placeBefore('Tanmay', 'MUMBAI', 3);
     old.roll('Tanmay', 1, 2);
     old.act('Tanmay', { type: 'BUY_PROPERTY' });
-    old.act('Tanmay', { type: 'END_GAME' });
+    old.endByVote('Tanmay');
     expect(old.state.status).toBe('FINISHED');
     expect(() => old.act('Shamin', { type: 'ROLL_DICE' })).toThrow('This game has finished.');
     expect(() => old.act('Tanmay', { type: 'START_GAME' })).toThrow('This game has finished.');

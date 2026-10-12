@@ -1,0 +1,57 @@
+// TEMPORARY AUDIT EXPERIMENT - not part of the repository's test suite.
+// One deviating strategy at a table of otherwise identical INVESTOR players, so a strategy is
+// compared against the same opposition every time. Control = the all-INVESTOR table.
+import { writeFileSync } from 'node:fs';
+import { expect, it } from 'vitest';
+import type { GameMode } from '@/engine/index.ts';
+import { P, runGame, type Result } from './simcore.ts';
+
+const OUT = process.env.AUDIT_DIR!;
+const SEEDS = Number(process.env.DEV_SEEDS ?? 60);
+const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
+const se = (xs: number[]) => {
+  if (xs.length < 2) return 0;
+  const m = mean(xs);
+  return Math.sqrt(xs.reduce((s, x) => s + (x - m) ** 2, 0) / (xs.length - 1) / xs.length);
+};
+
+function row(results: Result[], profile: string) {
+  const ps = results.flatMap((r) => r.players.filter((p) => p.profile === profile));
+  const flows = (type: string, kind: 'created' | 'sunk') => Math.round(mean(results.map((r) => r.flows[type]?.[kind] ?? 0)));
+  return {
+    n: ps.length,
+    meanNetWorth: Math.round(mean(ps.map((p) => p.netWorth))),
+    seNetWorth: Math.round(se(ps.map((p) => p.netWorth))),
+    winRate: +(ps.filter((p) => p.winner).length / ps.length).toFixed(3),
+    bankruptRate: +(ps.filter((p) => p.status === 'BANKRUPT').length / ps.length).toFixed(3),
+    meanCash: Math.round(mean(ps.map((p) => p.cash))),
+    meanDebt: Math.round(mean(ps.map((p) => p.debt))),
+    meanProps: +mean(ps.map((p) => p.properties)).toFixed(1),
+    meanRentIn: Math.round(mean(ps.map((p) => p.rentIn))),
+    meanRentOut: Math.round(mean(ps.map((p) => p.rentOut))),
+    meanCredit: ps[0]?.credit == null ? null : Math.round(mean(ps.map((p) => p.credit ?? 0))),
+    tablePremiumsPerGame: flows('INSURANCE_PREMIUM', 'sunk'),
+    tableCrisisPaidPerGame: flows('CRISIS_PAYMENT', 'sunk'),
+    coveredCrisesPerGame: +mean(results.map((r) => r.crises.COVERED ?? 0)).toFixed(2),
+  };
+}
+
+it('one deviating strategy against a table of INVESTORs (4 players)', () => {
+  const out: Record<string, unknown> = {};
+  for (const mode of ['classic', 'intermediate'] as GameMode[]) {
+    for (const years of [5, 10]) {
+      const control: Result[] = [];
+      for (let seed = 1; seed <= SEEDS; seed += 1) control.push(runGame({ mode, players: 4, years, seed, set: 'uniform' }));
+      out[`${mode}|${years}y|control INVESTOR`] = row(control, 'INVESTOR');
+      for (const deviant of Object.keys(P) as (keyof typeof P)[]) {
+        if (deviant === 'INVESTOR') continue;
+        if (deviant === 'INSURER' && mode === 'classic') continue;
+        const results: Result[] = [];
+        for (let seed = 1; seed <= SEEDS; seed += 1) results.push(runGame({ mode, players: 4, years, seed, set: 'deviant', deviant }));
+        out[`${mode}|${years}y|${deviant}`] = row(results, P[deviant].name);
+        expect(results.reduce((s, r) => s + r.violations.length, 0)).toBe(0);
+      }
+    }
+  }
+  writeFileSync(`${OUT}/deviant-results.json`, JSON.stringify(out, null, 1));
+});

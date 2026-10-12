@@ -37,6 +37,12 @@ const nameOf = (f: Fixture, id: string | null) => f.state.players.find((p) => p.
 function nextMove(f: Fixture, rnd: () => number): { who: string; action: GameAction } | 'roll' | null {
   const { state } = f;
   if (state.status !== 'ACTIVE') return null;
+  // A vote on ending the game (the duration ran out): everyone at the table votes to play on.
+  const vote = state.endGame?.vote;
+  if (vote) {
+    const voter = state.players.find((p) => p.status === 'ACTIVE' && vote.electorate.includes(p.id) && !(p.id in vote.ballots));
+    return voter ? { who: voter.name, action: { type: 'CAST_END_VOTE', voteId: vote.id, choice: 'CONTINUE' } } : null;
+  }
   const { turn } = state;
   const current = state.players.find((p) => p.id === turn.playerId)!;
   const who = current.name;

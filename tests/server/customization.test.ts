@@ -11,6 +11,7 @@
  */
 import { randomBytes, randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { endByVote } from './endByVote.ts';
 import { createSql, type Sql } from '../../supabase/functions/game-action/db.ts';
 import { handleRequest, type HandlerDeps } from '../../supabase/functions/game-action/handler.ts';
 import {
@@ -131,14 +132,14 @@ describe.skipIf(!DATABASE_URL)('game customization and secret objectives (Postgr
   describe('the server owns the configuration', () => {
     it('a game created with no settings stores the defaults of its mode', async () => {
       const classic = await setupGame({ start: false });
-      expect(await storedConfig(classic)).toEqual({ startingCash: 25000, loanLimit: 20000, marketVolatility: 'balanced', secretObjectives: false, financialPrivacy: 'open' });
+      expect(await storedConfig(classic)).toEqual({ startingCash: 25000, loanLimit: 20000, marketVolatility: 'balanced', secretObjectives: false, financialPrivacy: 'open', durationYears: 5 });
       const intermediate = await setupGame({ mode: 'intermediate', start: false });
-      expect(await storedConfig(intermediate)).toEqual({ startingCash: 25000, loanLimit: 20000, marketVolatility: 'balanced', secretObjectives: true, financialPrivacy: 'open' });
+      expect(await storedConfig(intermediate)).toEqual({ startingCash: 25000, loanLimit: 20000, marketVolatility: 'balanced', secretObjectives: true, financialPrivacy: 'open', durationYears: 5 });
     });
 
     it('normalises what it is sent: missing settings take defaults, Classic never keeps Capital ones', async () => {
       const g = await setupGame({ config: { startingCash: 40000, marketVolatility: 'volatile', secretObjectives: true }, start: false });
-      expect(await storedConfig(g)).toEqual({ startingCash: 40000, loanLimit: 20000, marketVolatility: 'balanced', secretObjectives: false, financialPrivacy: 'open' });
+      expect(await storedConfig(g)).toEqual({ startingCash: 40000, loanLimit: 20000, marketVolatility: 'balanced', secretObjectives: false, financialPrivacy: 'open', durationYears: 5 });
       expect((await g.view('Asha')).state.config).toEqual(await storedConfig(g));
     });
 
@@ -164,7 +165,7 @@ describe.skipIf(!DATABASE_URL)('game customization and secret objectives (Postgr
     });
 
     it('every player — host, joiner, and anyone reconnecting — receives the same configuration', async () => {
-      const config = { startingCash: 35000, loanLimit: 15000, marketVolatility: 'stable', secretObjectives: false, financialPrivacy: 'open' };
+      const config = { startingCash: 35000, loanLimit: 15000, marketVolatility: 'stable', secretObjectives: false, financialPrivacy: 'open', durationYears: 5 };
       const g = await setupGame({ mode: 'intermediate', config, names: ['Asha', 'Bilal', 'Chitra'], start: false });
       // What each of them was handed when they entered…
       for (const name of g.names) expect(g.joinedSnapshots[name]!.state.config).toEqual(config);
@@ -205,7 +206,7 @@ describe.skipIf(!DATABASE_URL)('game customization and secret objectives (Postgr
       const g = await setupGame({ mode: 'intermediate', start: false });
       await sql`update public.games set config = null where id = ${g.gameId}`;
       const lobby = await g.view('Bilal');
-      expect(lobby.state.config).toEqual({ startingCash: 25000, loanLimit: 20000, marketVolatility: 'balanced', secretObjectives: false, financialPrivacy: 'open' });
+      expect(lobby.state.config).toEqual({ startingCash: 25000, loanLimit: 20000, marketVolatility: 'balanced', secretObjectives: false, financialPrivacy: 'open', durationYears: 5 });
       ok(await g.act('Asha', { type: 'START_GAME' }));
       const s = await g.view('Asha');
       expect(s.state.players.every((p) => p.balance === 25000)).toBe(true);
@@ -220,7 +221,7 @@ describe.skipIf(!DATABASE_URL)('game customization and secret objectives (Postgr
   describe('the configuration is the host’s until the game starts, then locked', () => {
     it('the host changes it in the lobby and everyone sees the change', async () => {
       const g = await setupGame({ mode: 'intermediate', start: false });
-      const next = { startingCash: 45000, loanLimit: 30000, marketVolatility: 'volatile', secretObjectives: false, financialPrivacy: 'open' };
+      const next = { startingCash: 45000, loanLimit: 30000, marketVolatility: 'volatile', secretObjectives: false, financialPrivacy: 'open', durationYears: 5 };
       ok(await g.act('Asha', { type: 'UPDATE_CONFIG', config: next }));
       expect(await storedConfig(g)).toEqual(next);
       for (const name of g.names) expect((await g.view(name)).state.config).toEqual(next);
@@ -247,7 +248,7 @@ describe.skipIf(!DATABASE_URL)('game customization and secret objectives (Postgr
       ok(await g.act('Asha', { type: 'PAUSE_GAME' }));
       expect(refused(await g.act('Asha', change))).toEqual(locked);
       ok(await g.act('Asha', { type: 'RESUME_GAME' }));
-      ok(await g.act('Asha', { type: 'END_GAME' }));
+      ok(await endByVote(g.act, Object.keys(g.seats), 'Asha'));
       expect(refused(await g.act('Asha', change)).code).toBe('GAME_FINISHED');
       expect(await storedConfig(g)).toEqual(before);
     });
@@ -288,7 +289,7 @@ describe.skipIf(!DATABASE_URL)('game customization and secret objectives (Postgr
     });
 
     it('survives the host leaving and every reconnect', async () => {
-      const config = { startingCash: 20000, loanLimit: 10000, marketVolatility: 'balanced', secretObjectives: false, financialPrivacy: 'open' };
+      const config = { startingCash: 20000, loanLimit: 10000, marketVolatility: 'balanced', secretObjectives: false, financialPrivacy: 'open', durationYears: 5 };
       const g = await setupGame({ config, names: ['Asha', 'Bilal', 'Chitra'] });
       ok(await g.act('Asha', { type: 'LEAVE_GAME' }));
       for (let i = 0; i < 3; i += 1) expect((await g.view('Bilal')).state.config).toEqual(config);
@@ -456,7 +457,7 @@ describe.skipIf(!DATABASE_URL)('game customization and secret objectives (Postgr
       await forceObjectives(g, { Asha: 'CASH_GUARDIAN', Bilal: 'BUILDER', Chitra: 'CASH_GUARDIAN' });
       // Chitra drops ₹100 below the threshold.
       ok(await g.act('Chitra', { type: 'TRANSFER_MONEY', toPlayerId: g.seats.Bilal!.playerId, amount: 13100 }));
-      const ended = ok(await g.act('Asha', { type: 'END_GAME' }));
+      const ended = ok(await endByVote(g.act, Object.keys(g.seats), 'Asha'));
 
       expect((await rewardRows(g)).map((r) => [r.to_player_id, Number(r.amount), r.memo])).toEqual([[g.seats.Asha!.playerId, 4000, 'Secret objective bonus: Cash Guardian']]);
       const rows = Object.fromEntries((await objectiveRows(g)).map((r) => [r.player_id as string, r]));
@@ -486,15 +487,19 @@ describe.skipIf(!DATABASE_URL)('game customization and secret objectives (Postgr
       expect(types.at(-1)).toBe('GAME_FINISHED');
     });
 
-    it('a retried END_GAME, a second END_GAME and a late action pay nothing more', async () => {
+    it('a retried final ballot, a second one and a late action pay nothing more', async () => {
       const g = await setupGame({ mode: 'intermediate' });
       await forceObjectives(g, { Asha: 'CASH_GUARDIAN', Bilal: 'CASH_GUARDIAN' });
+      const asked = ok(await g.act('Asha', { type: 'REQUEST_END_VOTE' }));
+      // Bilal's END ballot is the action that finishes the game.
+      const cast = { type: 'CAST_END_VOTE', voteId: asked.snapshot.state.endGame!.vote!.id, choice: 'END' } as const;
       const actionId = randomUUID();
-      const version = (await g.view('Asha')).state.version;
-      ok(await g.act('Asha', { type: 'END_GAME' }, { actionId, expectedVersion: version }));
-      const retried = ok(await g.act('Asha', { type: 'END_GAME' }, { actionId, expectedVersion: version }));
+      const version = asked.snapshot.state.version;
+      ok(await g.act('Bilal', cast, { actionId, expectedVersion: version }));
+      const retried = ok(await g.act('Bilal', cast, { actionId, expectedVersion: version }));
       expect(retried.duplicate).toBe(true);
-      expect(refused(await g.act('Asha', { type: 'END_GAME' })).code).toBe('GAME_FINISHED');
+      expect(refused(await g.act('Bilal', cast)).code).toBe('GAME_FINISHED');
+      expect(refused(await g.act('Asha', { type: 'REQUEST_END_VOTE' })).code).toBe('GAME_FINISHED');
       expect(refused(await g.act('Bilal', { type: 'LEAVE_GAME' })).code).toBe('GAME_FINISHED');
       expect(await rewardRows(g)).toHaveLength(2);
       expect((await sql`select balance from public.players where game_id = ${g.gameId}`).map((p) => Number(p.balance))).toEqual([29000, 29000]);
@@ -504,12 +509,14 @@ describe.skipIf(!DATABASE_URL)('game customization and secret objectives (Postgr
     it('two requests finishing the game at the same moment: it is finished once', async () => {
       const g = await setupGame({ mode: 'intermediate', names: ['Asha', 'Bilal', 'Chitra'] });
       await forceObjectives(g, { Asha: 'CASH_GUARDIAN', Bilal: 'CASH_GUARDIAN', Chitra: 'CASH_GUARDIAN' });
-      const version = (await g.view('Asha')).state.version;
-      // The host ends the game twice at once (two taps, two action ids) while another player leaves.
+      const asked = ok(await g.act('Asha', { type: 'REQUEST_END_VOTE' }));
+      const cast = { type: 'CAST_END_VOTE', voteId: asked.snapshot.state.endGame!.vote!.id, choice: 'END' } as const;
+      const version = ok(await g.act('Bilal', cast)).snapshot.state.version;
+      // The last ballot arrives twice at once (two taps, two action ids) while another player leaves.
       const results = await Promise.all([
-        g.act('Asha', { type: 'END_GAME' }, { expectedVersion: version }),
-        g.act('Asha', { type: 'END_GAME' }, { expectedVersion: version }),
-        g.act('Chitra', { type: 'LEAVE_GAME' }, { expectedVersion: version }),
+        g.act('Chitra', cast, { expectedVersion: version }),
+        g.act('Chitra', cast, { expectedVersion: version }),
+        g.act('Bilal', { type: 'LEAVE_GAME' }, { expectedVersion: version }),
       ]);
       expect(results.slice(0, 2).filter((r) => r.ok)).toHaveLength(1);
       const rewards = await rewardRows(g);
@@ -525,7 +532,7 @@ describe.skipIf(!DATABASE_URL)('game customization and secret objectives (Postgr
     it('the database refuses a second bonus and a rewritten result', async () => {
       const g = await setupGame({ mode: 'intermediate' });
       await forceObjectives(g, { Asha: 'CASH_GUARDIAN', Bilal: 'BUILDER' });
-      ok(await g.act('Asha', { type: 'END_GAME' }));
+      ok(await endByVote(g.act, Object.keys(g.seats), 'Asha'));
       const asha = g.seats.Asha!.playerId;
       const bilal = g.seats.Bilal!.playerId;
       await expect(
@@ -541,7 +548,7 @@ describe.skipIf(!DATABASE_URL)('game customization and secret objectives (Postgr
       await forceObjectives(g, { Asha: 'CASH_GUARDIAN', Bilal: 'CASH_GUARDIAN' });
       // Sabotage: a result already written for one player makes the result write fail mid-transaction.
       await sql`update public.player_objectives set completed = false, reward = 0, detail = 'x', evaluated_at = now() where game_id = ${g.gameId} and player_id = ${g.seats.Bilal!.playerId}`;
-      const res = await g.act('Asha', { type: 'END_GAME' });
+      const res = await endByVote(g.act, Object.keys(g.seats));
       expect(res.ok).toBe(false);
       expect((await sql`select status from public.games where id = ${g.gameId}`)[0]!.status).toBe('ACTIVE');
       expect(await rewardRows(g)).toHaveLength(0);
@@ -576,7 +583,7 @@ describe.skipIf(!DATABASE_URL)('game customization and secret objectives (Postgr
       await tradeOnce('MUMBAI');
       await tradeOnce('INDORE');
       expect(await counted()).toBe(2);
-      ok(await g.act('Asha', { type: 'END_GAME' }));
+      ok(await endByVote(g.act, Object.keys(g.seats), 'Asha'));
       const row = (await sql`select completed, reward, detail from public.player_objectives where game_id = ${g.gameId} and player_id = ${asha}`)[0]!;
       expect([row.completed, Number(row.reward), row.detail]).toEqual([true, 4000, 'Finished with 2 trades completed (needs 2).']);
     });
@@ -584,7 +591,7 @@ describe.skipIf(!DATABASE_URL)('game customization and secret objectives (Postgr
     it('Classic and objectives-off games finish with no objective rows, results or bonus', async () => {
       for (const options of [{}, { mode: 'intermediate' as const, config: { secretObjectives: false } }]) {
         const g = await setupGame(options);
-        const ended = ok(await g.act('Asha', { type: 'END_GAME' }));
+        const ended = ok(await endByVote(g.act, Object.keys(g.seats), 'Asha'));
         expect(ended.snapshot.state.objectives).toBeNull();
         expect(await objectiveRows(g)).toHaveLength(0);
         expect(await rewardRows(g)).toHaveLength(0);

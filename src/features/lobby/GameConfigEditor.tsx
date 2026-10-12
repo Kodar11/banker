@@ -1,9 +1,12 @@
 import { Pressable, Text, View } from 'react-native';
 import {
   defaultGameConfig,
+  durationEstimate,
+  durationLabel,
   FINANCIAL_PRIVACY_LABELS,
   FINANCIAL_PRIVACY_MODES,
   GAME_CONFIG_LIMITS,
+  GAME_DURATION_OPTIONS,
   gameConfigSummary,
   isDefaultGameConfig,
   MARKET_VOLATILITIES,
@@ -54,7 +57,7 @@ function AmountRow({ field, label, hint, value, onChange }: { field: GameConfigA
 }
 
 /** A row of mutually exclusive choices (same look as the mode cards: saffron edge on the chosen one). */
-function Choice<T extends string>({ value, options, onChange, testID }: { value: T; options: { value: T; label: string }[]; onChange: (next: T) => void; testID: string }) {
+function Choice<T extends string>({ value, options, onChange, testID }: { value: T; options: { value: T; label: string; accessibilityLabel?: string }[]; onChange: (next: T) => void; testID: string }) {
   return (
     <View className="flex-row gap-2" accessibilityRole="radiogroup" testID={testID}>
       {options.map((o) => {
@@ -65,7 +68,7 @@ function Choice<T extends string>({ value, options, onChange, testID }: { value:
             onPress={() => onChange(o.value)}
             accessibilityRole="radio"
             accessibilityState={{ selected }}
-            accessibilityLabel={o.label}
+            accessibilityLabel={o.accessibilityLabel ?? o.label}
             testID={`${testID}-${o.value}`}
             className={`min-h-[44px] flex-1 items-center justify-center rounded-2xl border-2 bg-white px-2 active:opacity-70 ${selected ? 'border-saffron' : 'border-transparent'}`}
           >
@@ -98,6 +101,21 @@ export function GameConfigEditor({ mode, value, onChange, privacyEditable = fals
     <View className="gap-4" testID="config-editor">
       <AmountRow field="startingCash" label="Starting cash" hint="Each player, from the bank" value={value.startingCash} onChange={(startingCash) => set({ startingCash })} />
       <AmountRow field="loanLimit" label="Loan limit" hint="Most a player can owe the bank in loans" value={value.loanLimit} onChange={(loanLimit) => set({ loanLimit })} />
+      <View className="gap-1.5">
+        <Text className="text-base font-extrabold text-ink">Game duration</Text>
+        <Choice
+          testID="config-duration"
+          value={String(value.durationYears)}
+          options={GAME_DURATION_OPTIONS.map((years) => ({ value: String(years), label: String(years), accessibilityLabel: durationLabel(years) }))}
+          onChange={(years) => set({ durationYears: Number(years) })}
+        />
+        <Text className="text-sm font-extrabold text-ink" testID="config-duration-value">
+          {durationEstimate(value.durationYears)}
+        </Text>
+        <Text className="text-xs text-stone-500" testID="config-duration-hint">
+          Choose how many financial years the game will run before players vote to finish or extend it.
+        </Text>
+      </View>
       {mode === 'intermediate' ? (
         <>
           <View className="gap-1.5">
@@ -159,11 +177,26 @@ export function GameConfigEditor({ mode, value, onChange, privacyEditable = fals
 }
 
 /** The rules of this game, as every player reads them. Classic lists only what applies to Classic. */
-export function GameConfigSummary({ mode, config, title = 'Game rules', note, testID = 'config-summary' }: { mode: GameMode; config: GameConfig; title?: string; note?: string; testID?: string }) {
+export function GameConfigSummary({
+  mode,
+  config,
+  title = 'Game rules',
+  note,
+  testID = 'config-summary',
+  timed = true,
+}: {
+  mode: GameMode;
+  config: GameConfig;
+  title?: string;
+  note?: string;
+  testID?: string;
+  /** False for a matchmade game, which has no duration to list. */
+  timed?: boolean;
+}) {
   return (
     <View testID={testID} className="gap-1">
       <Label>{title}</Label>
-      {gameConfigSummary(mode, config).map((row) => (
+      {gameConfigSummary(mode, config, { timed }).map((row) => (
         <View key={row.key} className="flex-row items-center justify-between gap-3 py-0.5" testID={`${testID}-${row.key}`} accessible accessibilityLabel={`${row.label}: ${row.value}`}>
           <Text className="flex-1 text-base text-stone-600">{row.label}</Text>
           <Text className="text-base font-extrabold text-ink">{row.value}</Text>

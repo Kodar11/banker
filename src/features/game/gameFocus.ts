@@ -192,6 +192,9 @@ const ROUTINE_EVENTS: ReadonlySet<string> = new Set([
   'GAME_PAUSED',
   'GAME_RESUMED',
   'GAME_FINISHED',
+  // The vote has its own card over the table while it is open.
+  'END_VOTE_STARTED',
+  'GAME_YEAR_STARTED',
   'TURN_STARTED',
   'DICE_ROLLED',
   'MOVED',
@@ -211,6 +214,7 @@ const IMPORTANT_EVENTS: Readonly<Record<string, { icon: string; label: string }>
   PLAYER_BANKRUPT: { icon: '💥', label: 'Bankrupt' },
   PLAYER_LEFT: { icon: '🚪', label: 'Left the game' },
   HOST_CHANGED: { icon: '👑', label: 'New host' },
+  END_VOTE_CLOSED: { icon: '🗳️', label: 'Vote result' },
   AUCTION_WON: { icon: '🔨', label: 'Auction result' },
   AUCTION_UNSOLD: { icon: '🔨', label: 'Auction result' },
   AUCTION_CANCELLED: { icon: '🔨', label: 'Auction cancelled' },

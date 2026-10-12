@@ -116,18 +116,20 @@ describe('bankruptcy and game end', () => {
     expect(() => g.act('Bilal', { type: 'ROLL_DICE' })).toThrow('This game has finished.');
   });
 
-  it('host can end a paused game; pause markers are cleared', () => {
+  it('a paused game takes no vote — not even from the host; resumed and voted over, the pause markers are cleared', () => {
     const g = new TestGame();
     g.act('Bilal', { type: 'PAUSE_GAME' });
-    g.act('Asha', { type: 'END_GAME' });
+    expect(() => g.act('Asha', { type: 'REQUEST_END_VOTE' })).toThrow('Game is paused.');
+    expect(g.state.status).toBe('PAUSED');
+    g.act('Bilal', { type: 'RESUME_GAME' });
+    g.endByVote('Asha');
     expect(g.state).toMatchObject({ status: 'FINISHED', pausedAt: null, pausedFrom: null });
   });
 
-  it('host can end the game; highest net worth wins', () => {
+  it('the players can vote to end the game, whoever asks; highest net worth wins', () => {
     const g = new TestGame();
     g.give('Chitra', 'AIR_INDIA');
-    expect(() => g.act('Bilal', { type: 'END_GAME' })).toThrow('Only the host can end the game.');
-    g.act('Asha', { type: 'END_GAME' });
+    g.endByVote('Bilal');
     expect(g.state.status).toBe('FINISHED');
     expect(g.state.winnerId).toBe(g.id('Chitra'));
   });

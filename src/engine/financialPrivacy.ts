@@ -81,6 +81,11 @@ export const EVENT_PRIVACY: Readonly<Record<string, typeof PUBLIC | EventRule>> 
   PLAYER_LEFT: PUBLIC,
   HOST_CHANGED: PUBLIC,
   PLAYER_BANKRUPT: PUBLIC,
+  // Votes on ending the game: that one opened and how it ended. Never who voted for what, or how many.
+  // Classic's count of financial years (Capital announces its own, with the market, below).
+  GAME_YEAR_STARTED: PUBLIC,
+  END_VOTE_STARTED: PUBLIC,
+  END_VOTE_CLOSED: PUBLIC,
   // Movement and the board
   DICE_ROLLED: PUBLIC,
   MOVED: PUBLIC,

@@ -1,0 +1,9390 @@
+{
+ "classic|5y|2p|mixed": {
+  "games": 30,
+  "reasons": {
+   "DURATION_VOTE": 30
+  },
+  "meanYearReached": 5,
+  "meanTurnsPerPlayer": 26.6,
+  "ledgerViolations": 0,
+  "moneyCreatedPerGame": 89348,
+  "moneySunkPerGame": 79855,
+  "p2pPerGame": 14363,
+  "flowsPerGame": {
+   "STARTING_FUNDS": {
+    "created": 50000,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "PROPERTY_PURCHASE": {
+    "created": 0,
+    "sunk": 22677,
+    "p2p": 0
+   },
+   "LOAN_DISBURSEMENT": {
+    "created": 18450,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "LOAN_REPAYMENT": {
+    "created": 0,
+    "sunk": 6667,
+    "p2p": 0
+   },
+   "HOUSE_PURCHASE": {
+    "created": 0,
+    "sunk": 30683,
+    "p2p": 0
+   },
+   "JAIL_FINE": {
+    "created": 0,
+    "sunk": 783,
+    "p2p": 0
+   },
+   "RENT_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 14057
+   },
+   "AUCTION_PAYMENT": {
+    "created": 0,
+    "sunk": 7327,
+    "p2p": 0
+   },
+   "START_REWARD": {
+    "created": 14100,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "CLUB_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 143
+   },
+   "CARD_REWARD": {
+    "created": 5300,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "CARD_PAYMENT": {
+    "created": 0,
+    "sunk": 4587,
+    "p2p": 0
+   },
+   "HOTEL_PURCHASE": {
+    "created": 0,
+    "sunk": 5083,
+    "p2p": 0
+   },
+   "LOAN_INTEREST": {
+    "created": 0,
+    "sunk": 1025,
+    "p2p": 0
+   },
+   "TAX_PAYMENT": {
+    "created": 0,
+    "sunk": 708,
+    "p2p": 0
+   },
+   "REST_HOUSE_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 113
+   },
+   "MORTGAGE": {
+    "created": 1448,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "UNMORTGAGE": {
+    "created": 0,
+    "sunk": 315,
+    "p2p": 0
+   },
+   "CARD_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 50
+   },
+   "HOUSE_SALE": {
+    "created": 50,
+    "sunk": 0,
+    "p2p": 0
+   }
+  },
+  "endCashPerActivePlayer": 4747,
+  "endNetWorthPerActivePlayer": 61431,
+  "endDebtPerActivePlayer": 5892,
+  "bankruptciesPerGame": 0,
+  "gamesWithBankruptcy": 0,
+  "winnerShareOfNetWorth": 0.72,
+  "topToMedianNetWorth": 3.95,
+  "developedPropertiesAtEnd": 2.8,
+  "housesAtEnd": 3.8,
+  "hotelsAtEnd": 1.5,
+  "allOwnedYear": 0,
+  "allOwnedShare": 0,
+  "shortagesPerGame": 2.7,
+  "shortagesAssetRichPerGame": 2.67,
+  "shortagesFatalPerGame": 0,
+  "shortageReasons": {
+   "RENT": 54,
+   "CARD": 23,
+   "TAX": 3,
+   "CLUB": 1
+  },
+  "cashPerActivePlayerByYear": {
+   "1": 25000,
+   "2": 7291,
+   "3": 5546,
+   "4": 5317,
+   "5": 4727
+  },
+  "ownedByYear": {
+   "1": 0,
+   "2": 6.8,
+   "3": 12,
+   "4": 15.7,
+   "5": 18.8
+  },
+  "buildingsByYear": {
+   "1": 0,
+   "2": 3.2,
+   "3": 3.5,
+   "4": 3.7,
+   "5": 4.4
+  },
+  "byProfile": {
+   "LOW": {
+    "n": 10,
+    "meanNetWorth": 23735,
+    "winRate": 0,
+    "bankruptRate": 0,
+    "meanCash": 14160,
+    "meanProps": 4.2,
+    "meanDebt": 0,
+    "meanRentIn": 645,
+    "meanRentOut": 10675,
+    "meanCredit": null
+   },
+   "BORROWER": {
+    "n": 10,
+    "meanNetWorth": 75185,
+    "winRate": 0.7,
+    "bankruptRate": 0,
+    "meanCash": 3255,
+    "meanProps": 13.1,
+    "meanDebt": 5250,
+    "meanRentIn": 8480,
+    "meanRentOut": 8790,
+    "meanCredit": null
+   },
+   "DEADBEAT": {
+    "n": 10,
+    "meanNetWorth": 75664,
+    "winRate": 0.7,
+    "bankruptRate": 0,
+    "meanCash": 2934,
+    "meanProps": 12.7,
+    "meanDebt": 20000,
+    "meanRentIn": 12660,
+    "meanRentOut": 4765,
+    "meanCredit": null
+   },
+   "INSURER": {
+    "n": 10,
+    "meanNetWorth": 45365,
+    "winRate": 0.3,
+    "bankruptRate": 0,
+    "meanCash": 2785,
+    "meanProps": 8.4,
+    "meanDebt": 3000,
+    "meanRentIn": 4970,
+    "meanRentOut": 9220,
+    "meanCredit": null
+   },
+   "ALLIN": {
+    "n": 10,
+    "meanNetWorth": 57475,
+    "winRate": 0.4,
+    "bankruptRate": 0,
+    "meanCash": 655,
+    "meanProps": 10.5,
+    "meanDebt": 6450,
+    "meanRentIn": 6900,
+    "meanRentOut": 6525,
+    "meanCredit": null
+   },
+   "INVESTOR": {
+    "n": 10,
+    "meanNetWorth": 91160,
+    "winRate": 0.9,
+    "bankruptRate": 0,
+    "meanCash": 4690,
+    "meanProps": 14.2,
+    "meanDebt": 650,
+    "meanRentIn": 8515,
+    "meanRentOut": 2195,
+    "meanCredit": null
+   }
+  },
+  "events": {
+   "LOAN_TAKEN": 2.83,
+   "INTERMEDIATE_LOAN_TAKEN": 0,
+   "LOAN_DEFAULTED": 0,
+   "COLLATERAL_SEIZED": 0,
+   "LOAN_INSTALLMENT_OVERDUE": 0,
+   "INTERMEDIATE_LOAN_REPAID": 0,
+   "PLAYER_BANKRUPT": 0,
+   "CRISIS_STRUCK": 0,
+   "CRISIS_COVERED": 0,
+   "INSURANCE_PURCHASED": 0,
+   "INSURANCE_EXPIRED": 0,
+   "AUCTION_WON": 13.93,
+   "AUCTION_UNSOLD": 0.2,
+   "PROPERTY_MORTGAGED": 0.97,
+   "PROPERTY_UNMORTGAGED": 0.23,
+   "BUILDING_SOLD": 0.03
+  },
+  "crises": {},
+  "capitalLoans": {}
+ },
+ "classic|5y|2p|uniform": {
+  "games": 30,
+  "reasons": {
+   "DURATION_VOTE": 30
+  },
+  "meanYearReached": 5,
+  "meanTurnsPerPlayer": 26.8,
+  "ledgerViolations": 0,
+  "moneyCreatedPerGame": 73233,
+  "moneySunkPerGame": 66238,
+  "p2pPerGame": 12077,
+  "flowsPerGame": {
+   "STARTING_FUNDS": {
+    "created": 50000,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "PROPERTY_PURCHASE": {
+    "created": 0,
+    "sunk": 24790,
+    "p2p": 0
+   },
+   "JAIL_FINE": {
+    "created": 0,
+    "sunk": 683,
+    "p2p": 0
+   },
+   "HOUSE_PURCHASE": {
+    "created": 0,
+    "sunk": 23133,
+    "p2p": 0
+   },
+   "HOTEL_PURCHASE": {
+    "created": 0,
+    "sunk": 3400,
+    "p2p": 0
+   },
+   "RENT_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 11713
+   },
+   "START_REWARD": {
+    "created": 14100,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "AUCTION_PAYMENT": {
+    "created": 0,
+    "sunk": 8960,
+    "p2p": 0
+   },
+   "CLUB_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 140
+   },
+   "TAX_PAYMENT": {
+    "created": 0,
+    "sunk": 687,
+    "p2p": 0
+   },
+   "CARD_REWARD": {
+    "created": 5367,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "REST_HOUSE_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 123
+   },
+   "CARD_PAYMENT": {
+    "created": 0,
+    "sunk": 4273,
+    "p2p": 0
+   },
+   "LOAN_DISBURSEMENT": {
+    "created": 3767,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "LOAN_INTEREST": {
+    "created": 0,
+    "sunk": 312,
+    "p2p": 0
+   },
+   "CARD_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 100
+   }
+  },
+  "endCashPerActivePlayer": 3498,
+  "endNetWorthPerActivePlayer": 59438,
+  "endDebtPerActivePlayer": 1883,
+  "bankruptciesPerGame": 0,
+  "gamesWithBankruptcy": 0,
+  "winnerShareOfNetWorth": 0.667,
+  "topToMedianNetWorth": 2.28,
+  "developedPropertiesAtEnd": 2.5,
+  "housesAtEnd": 3.1,
+  "hotelsAtEnd": 1.1,
+  "allOwnedYear": 0,
+  "allOwnedShare": 0,
+  "shortagesPerGame": 2.1,
+  "shortagesAssetRichPerGame": 2.1,
+  "shortagesFatalPerGame": 0,
+  "shortageReasons": {
+   "CARD": 11,
+   "RENT": 52
+  },
+  "cashPerActivePlayerByYear": {
+   "1": 25000,
+   "2": 4627,
+   "3": 3057,
+   "4": 3410,
+   "5": 3133
+  },
+  "ownedByYear": {
+   "1": 0,
+   "2": 6.8,
+   "3": 11.9,
+   "4": 15.5,
+   "5": 18.5
+  },
+  "buildingsByYear": {
+   "1": 0,
+   "2": 3.3,
+   "3": 3.5,
+   "4": 3.7,
+   "5": 4
+  },
+  "byProfile": {
+   "INVESTOR": {
+    "n": 60,
+    "meanNetWorth": 59438,
+    "winRate": 0.5,
+    "bankruptRate": 0,
+    "meanCash": 3498,
+    "meanProps": 10.3,
+    "meanDebt": 1883,
+    "meanRentIn": 5857,
+    "meanRentOut": 5857,
+    "meanCredit": null
+   }
+  },
+  "events": {
+   "LOAN_TAKEN": 2.1,
+   "INTERMEDIATE_LOAN_TAKEN": 0,
+   "LOAN_DEFAULTED": 0,
+   "COLLATERAL_SEIZED": 0,
+   "LOAN_INSTALLMENT_OVERDUE": 0,
+   "INTERMEDIATE_LOAN_REPAID": 0,
+   "PLAYER_BANKRUPT": 0,
+   "CRISIS_STRUCK": 0,
+   "CRISIS_COVERED": 0,
+   "INSURANCE_PURCHASED": 0,
+   "INSURANCE_EXPIRED": 0,
+   "AUCTION_WON": 13.3,
+   "AUCTION_UNSOLD": 0.53,
+   "PROPERTY_MORTGAGED": 0,
+   "PROPERTY_UNMORTGAGED": 0,
+   "BUILDING_SOLD": 0
+  },
+  "crises": {},
+  "capitalLoans": {}
+ },
+ "classic|5y|4p|mixed": {
+  "games": 30,
+  "reasons": {
+   "DURATION_VOTE": 30
+  },
+  "meanYearReached": 5,
+  "meanTurnsPerPlayer": 26.6,
+  "ledgerViolations": 0,
+  "moneyCreatedPerGame": 192568,
+  "moneySunkPerGame": 174979,
+  "p2pPerGame": 67927,
+  "flowsPerGame": {
+   "STARTING_FUNDS": {
+    "created": 100000,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "PROPERTY_PURCHASE": {
+    "created": 0,
+    "sunk": 35507,
+    "p2p": 0
+   },
+   "LOAN_DISBURSEMENT": {
+    "created": 45817,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "LOAN_REPAYMENT": {
+    "created": 0,
+    "sunk": 13667,
+    "p2p": 0
+   },
+   "HOUSE_PURCHASE": {
+    "created": 0,
+    "sunk": 71833,
+    "p2p": 0
+   },
+   "HOTEL_PURCHASE": {
+    "created": 0,
+    "sunk": 12267,
+    "p2p": 0
+   },
+   "RENT_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 65187
+   },
+   "JAIL_FINE": {
+    "created": 0,
+    "sunk": 1683,
+    "p2p": 0
+   },
+   "AUCTION_PAYMENT": {
+    "created": 0,
+    "sunk": 26317,
+    "p2p": 0
+   },
+   "CLUB_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 957
+   },
+   "REST_HOUSE_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 842
+   },
+   "START_REWARD": {
+    "created": 27700,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "HOTEL_SALE": {
+    "created": 2400,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "LOAN_INTEREST": {
+    "created": 0,
+    "sunk": 2878,
+    "p2p": 0
+   },
+   "CARD_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 334
+   },
+   "TAX_PAYMENT": {
+    "created": 0,
+    "sunk": 1277,
+    "p2p": 0
+   },
+   "MORTGAGE": {
+    "created": 6410,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "HOUSE_SALE": {
+    "created": 958,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "CARD_REWARD": {
+    "created": 9283,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "CARD_PAYMENT": {
+    "created": 0,
+    "sunk": 7050,
+    "p2p": 0
+   },
+   "UNMORTGAGE": {
+    "created": 0,
+    "sunk": 2501,
+    "p2p": 0
+   },
+   "BANKRUPTCY_SETTLEMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 608
+   }
+  },
+  "endCashPerActivePlayer": 4629,
+  "endNetWorthPerActivePlayer": 43785,
+  "endDebtPerActivePlayer": 8110,
+  "bankruptciesPerGame": 0.2,
+  "gamesWithBankruptcy": 0.17,
+  "winnerShareOfNetWorth": 0.481,
+  "topToMedianNetWorth": 10155.57,
+  "developedPropertiesAtEnd": 5.7,
+  "housesAtEnd": 7.4,
+  "hotelsAtEnd": 3,
+  "allOwnedYear": 5,
+  "allOwnedShare": 0.07,
+  "shortagesPerGame": 9.53,
+  "shortagesAssetRichPerGame": 8.77,
+  "shortagesFatalPerGame": 0.2,
+  "shortageReasons": {
+   "RENT": 242,
+   "LOAN_INTEREST": 1,
+   "CARD": 38,
+   "TAX": 4,
+   "CLUB": 1
+  },
+  "cashPerActivePlayerByYear": {
+   "1": 25000,
+   "2": 6985,
+   "3": 5538,
+   "4": 4840,
+   "5": 4680
+  },
+  "ownedByYear": {
+   "1": 0,
+   "2": 11.2,
+   "3": 18.1,
+   "4": 21.5,
+   "5": 23.7
+  },
+  "buildingsByYear": {
+   "1": 0,
+   "2": 6.6,
+   "3": 6.9,
+   "4": 8,
+   "5": 9
+  },
+  "byProfile": {
+   "LOW": {
+    "n": 20,
+    "meanNetWorth": 16333,
+    "winRate": 0,
+    "bankruptRate": 0.2,
+    "meanCash": 10658,
+    "meanProps": 2.5,
+    "meanDebt": 0,
+    "meanRentIn": 1148,
+    "meanRentOut": 15770,
+    "meanCredit": null
+   },
+   "BORROWER": {
+    "n": 20,
+    "meanNetWorth": 40217,
+    "winRate": 0.05,
+    "bankruptRate": 0,
+    "meanCash": 3145,
+    "meanProps": 6.4,
+    "meanDebt": 5325,
+    "meanRentIn": 13313,
+    "meanRentOut": 16510,
+    "meanCredit": null
+   },
+   "DEADBEAT": {
+    "n": 20,
+    "meanNetWorth": 52237,
+    "winRate": 0.5,
+    "bankruptRate": 0,
+    "meanCash": 2547,
+    "meanProps": 7.7,
+    "meanDebt": 20000,
+    "meanRentIn": 29548,
+    "meanRentOut": 15045,
+    "meanCredit": null
+   },
+   "INSURER": {
+    "n": 20,
+    "meanNetWorth": 38615,
+    "winRate": 0.2,
+    "bankruptRate": 0.05,
+    "meanCash": 3748,
+    "meanProps": 6.3,
+    "meanDebt": 7350,
+    "meanRentIn": 13685,
+    "meanRentOut": 20218,
+    "meanCredit": null
+   },
+   "ALLIN": {
+    "n": 20,
+    "meanNetWorth": 49290,
+    "winRate": 0.25,
+    "bankruptRate": 0,
+    "meanCash": 1368,
+    "meanProps": 6.1,
+    "meanDebt": 8850,
+    "meanRentIn": 21308,
+    "meanRentOut": 14280,
+    "meanCredit": null
+   },
+   "INVESTOR": {
+    "n": 20,
+    "meanNetWorth": 52885,
+    "winRate": 0.5,
+    "bankruptRate": 0.05,
+    "meanCash": 4920,
+    "meanProps": 7.7,
+    "meanDebt": 4700,
+    "meanRentIn": 18780,
+    "meanRentOut": 15958,
+    "meanCredit": null
+   }
+  },
+  "events": {
+   "LOAN_TAKEN": 8.53,
+   "INTERMEDIATE_LOAN_TAKEN": 0,
+   "LOAN_DEFAULTED": 0,
+   "COLLATERAL_SEIZED": 0,
+   "LOAN_INSTALLMENT_OVERDUE": 0,
+   "INTERMEDIATE_LOAN_REPAID": 0,
+   "PLAYER_BANKRUPT": 0.2,
+   "CRISIS_STRUCK": 0,
+   "CRISIS_COVERED": 0,
+   "INSURANCE_PURCHASED": 0,
+   "INSURANCE_EXPIRED": 0,
+   "AUCTION_WON": 14.67,
+   "AUCTION_UNSOLD": 0,
+   "PROPERTY_MORTGAGED": 3.57,
+   "PROPERTY_UNMORTGAGED": 1.43,
+   "BUILDING_SOLD": 0.83
+  },
+  "crises": {},
+  "capitalLoans": {}
+ },
+ "classic|5y|4p|uniform": {
+  "games": 30,
+  "reasons": {
+   "DURATION_VOTE": 30
+  },
+  "meanYearReached": 5,
+  "meanTurnsPerPlayer": 26.5,
+  "ledgerViolations": 0,
+  "moneyCreatedPerGame": 153925,
+  "moneySunkPerGame": 138355,
+  "p2pPerGame": 60703,
+  "flowsPerGame": {
+   "STARTING_FUNDS": {
+    "created": 100000,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "PROPERTY_PURCHASE": {
+    "created": 0,
+    "sunk": 37960,
+    "p2p": 0
+   },
+   "HOUSE_PURCHASE": {
+    "created": 0,
+    "sunk": 52467,
+    "p2p": 0
+   },
+   "HOTEL_PURCHASE": {
+    "created": 0,
+    "sunk": 7233,
+    "p2p": 0
+   },
+   "RENT_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 58520
+   },
+   "JAIL_FINE": {
+    "created": 0,
+    "sunk": 1617,
+    "p2p": 0
+   },
+   "CLUB_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 1000
+   },
+   "REST_HOUSE_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 722
+   },
+   "AUCTION_PAYMENT": {
+    "created": 0,
+    "sunk": 28373,
+    "p2p": 0
+   },
+   "START_REWARD": {
+    "created": 27550,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "TAX_PAYMENT": {
+    "created": 0,
+    "sunk": 1467,
+    "p2p": 0
+   },
+   "LOAN_DISBURSEMENT": {
+    "created": 16950,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "CARD_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 462
+   },
+   "LOAN_INTEREST": {
+    "created": 0,
+    "sunk": 1310,
+    "p2p": 0
+   },
+   "CARD_REWARD": {
+    "created": 9383,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "CARD_PAYMENT": {
+    "created": 0,
+    "sunk": 7645,
+    "p2p": 0
+   },
+   "MORTGAGE": {
+    "created": 42,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "LOAN_REPAYMENT": {
+    "created": 0,
+    "sunk": 283,
+    "p2p": 0
+   }
+  },
+  "endCashPerActivePlayer": 3893,
+  "endNetWorthPerActivePlayer": 41417,
+  "endDebtPerActivePlayer": 4167,
+  "bankruptciesPerGame": 0,
+  "gamesWithBankruptcy": 0,
+  "winnerShareOfNetWorth": 0.399,
+  "topToMedianNetWorth": 2.1,
+  "developedPropertiesAtEnd": 5.3,
+  "housesAtEnd": 7.3,
+  "hotelsAtEnd": 2.4,
+  "allOwnedYear": 5,
+  "allOwnedShare": 0.07,
+  "shortagesPerGame": 8.87,
+  "shortagesAssetRichPerGame": 8.8,
+  "shortagesFatalPerGame": 0,
+  "shortageReasons": {
+   "RENT": 238,
+   "CLUB": 4,
+   "CARD": 21,
+   "TAX": 3
+  },
+  "cashPerActivePlayerByYear": {
+   "1": 25000,
+   "2": 4910,
+   "3": 3058,
+   "4": 3197,
+   "5": 3713
+  },
+  "ownedByYear": {
+   "1": 0,
+   "2": 11.2,
+   "3": 18.3,
+   "4": 22,
+   "5": 24.2
+  },
+  "buildingsByYear": {
+   "1": 0,
+   "2": 6.8,
+   "3": 7.4,
+   "4": 8,
+   "5": 8.5
+  },
+  "byProfile": {
+   "INVESTOR": {
+    "n": 120,
+    "meanNetWorth": 41417,
+    "winRate": 0.25,
+    "bankruptRate": 0,
+    "meanCash": 3893,
+    "meanProps": 6.3,
+    "meanDebt": 4167,
+    "meanRentIn": 14630,
+    "meanRentOut": 14630,
+    "meanCredit": null
+   }
+  },
+  "events": {
+   "LOAN_TAKEN": 8.87,
+   "INTERMEDIATE_LOAN_TAKEN": 0,
+   "LOAN_DEFAULTED": 0,
+   "COLLATERAL_SEIZED": 0,
+   "LOAN_INSTALLMENT_OVERDUE": 0,
+   "INTERMEDIATE_LOAN_REPAID": 0,
+   "PLAYER_BANKRUPT": 0,
+   "CRISIS_STRUCK": 0,
+   "CRISIS_COVERED": 0,
+   "INSURANCE_PURCHASED": 0,
+   "INSURANCE_EXPIRED": 0,
+   "AUCTION_WON": 14.23,
+   "AUCTION_UNSOLD": 0,
+   "PROPERTY_MORTGAGED": 0.03,
+   "PROPERTY_UNMORTGAGED": 0,
+   "BUILDING_SOLD": 0
+  },
+  "crises": {},
+  "capitalLoans": {}
+ },
+ "classic|5y|8p|mixed": {
+  "games": 30,
+  "reasons": {
+   "DURATION_VOTE": 30
+  },
+  "meanYearReached": 5,
+  "meanTurnsPerPlayer": 26,
+  "ledgerViolations": 0,
+  "moneyCreatedPerGame": 430580,
+  "moneySunkPerGame": 385218,
+  "p2pPerGame": 283013,
+  "flowsPerGame": {
+   "STARTING_FUNDS": {
+    "created": 200000,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "PROPERTY_PURCHASE": {
+    "created": 0,
+    "sunk": 60473,
+    "p2p": 0
+   },
+   "LOAN_DISBURSEMENT": {
+    "created": 117967,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "LOAN_REPAYMENT": {
+    "created": 0,
+    "sunk": 30250,
+    "p2p": 0
+   },
+   "HOUSE_PURCHASE": {
+    "created": 0,
+    "sunk": 177017,
+    "p2p": 0
+   },
+   "CARD_REWARD": {
+    "created": 19550,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "HOTEL_PURCHASE": {
+    "created": 0,
+    "sunk": 40733,
+    "p2p": 0
+   },
+   "RENT_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 267412
+   },
+   "JAIL_FINE": {
+    "created": 0,
+    "sunk": 3917,
+    "p2p": 0
+   },
+   "CARD_PAYMENT": {
+    "created": 0,
+    "sunk": 14218,
+    "p2p": 0
+   },
+   "CLUB_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 3963
+   },
+   "AUCTION_PAYMENT": {
+    "created": 0,
+    "sunk": 42377,
+    "p2p": 0
+   },
+   "START_REWARD": {
+    "created": 55250,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "LOAN_INTEREST": {
+    "created": 0,
+    "sunk": 8343,
+    "p2p": 0
+   },
+   "TAX_PAYMENT": {
+    "created": 0,
+    "sunk": 2080,
+    "p2p": 0
+   },
+   "REST_HOUSE_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 3557
+   },
+   "MORTGAGE": {
+    "created": 17030,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "UNMORTGAGE": {
+    "created": 0,
+    "sunk": 5755,
+    "p2p": 0
+   },
+   "CARD_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 957
+   },
+   "HOTEL_SALE": {
+    "created": 13133,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "HOUSE_SALE": {
+    "created": 7650,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "BANKRUPTCY_SETTLEMENT": {
+    "created": 0,
+    "sunk": 55,
+    "p2p": 7125
+   }
+  },
+  "endCashPerActivePlayer": 7239,
+  "endNetWorthPerActivePlayer": 40126,
+  "endDebtPerActivePlayer": 11343,
+  "bankruptciesPerGame": 1.73,
+  "gamesWithBankruptcy": 0.87,
+  "winnerShareOfNetWorth": 0.492,
+  "topToMedianNetWorth": 53515.52,
+  "developedPropertiesAtEnd": 11.9,
+  "housesAtEnd": 8.5,
+  "hotelsAtEnd": 8.6,
+  "allOwnedYear": 4.3,
+  "allOwnedShare": 0.67,
+  "shortagesPerGame": 28.87,
+  "shortagesAssetRichPerGame": 22.83,
+  "shortagesFatalPerGame": 1.73,
+  "shortageReasons": {
+   "RENT": 800,
+   "CARD": 41,
+   "CLUB": 14,
+   "TAX": 10,
+   "LOAN_INTEREST": 1
+  },
+  "cashPerActivePlayerByYear": {
+   "1": 25000,
+   "2": 7836,
+   "3": 5691,
+   "4": 5302,
+   "5": 5594
+  },
+  "ownedByYear": {
+   "1": 0,
+   "2": 18.4,
+   "3": 23.6,
+   "4": 25.1,
+   "5": 25.4
+  },
+  "buildingsByYear": {
+   "1": 0,
+   "2": 12.1,
+   "3": 15,
+   "4": 16.8,
+   "5": 17.9
+  },
+  "byProfile": {
+   "BORROWER": {
+    "n": 40,
+    "meanNetWorth": 32404,
+    "winRate": 0.1,
+    "bankruptRate": 0.075,
+    "meanCash": 4232,
+    "meanProps": 3.9,
+    "meanDebt": 9050,
+    "meanRentIn": 33083,
+    "meanRentOut": 34224,
+    "meanCredit": null
+   },
+   "INVESTOR": {
+    "n": 40,
+    "meanNetWorth": 31980,
+    "winRate": 0.125,
+    "bankruptRate": 0.175,
+    "meanCash": 5235,
+    "meanProps": 3,
+    "meanDebt": 6475,
+    "meanRentIn": 33016,
+    "meanRentOut": 36648,
+    "meanCredit": null
+   },
+   "INSURER": {
+    "n": 40,
+    "meanNetWorth": 22546,
+    "winRate": 0.05,
+    "bankruptRate": 0.125,
+    "meanCash": 4351,
+    "meanProps": 2.4,
+    "meanDebt": 7750,
+    "meanRentIn": 25930,
+    "meanRentOut": 36620,
+    "meanCredit": null
+   },
+   "ALLIN": {
+    "n": 40,
+    "meanNetWorth": 27977,
+    "winRate": 0.075,
+    "bankruptRate": 0.175,
+    "meanCash": 3406,
+    "meanProps": 3.4,
+    "meanDebt": 11538,
+    "meanRentIn": 36621,
+    "meanRentOut": 39321,
+    "meanCredit": null
+   },
+   "LOW": {
+    "n": 40,
+    "meanNetWorth": 2618,
+    "winRate": 0,
+    "bankruptRate": 0.675,
+    "meanCash": 1688,
+    "meanProps": 0.4,
+    "meanDebt": 0,
+    "meanRentIn": 819,
+    "meanRentOut": 26338,
+    "meanCredit": null
+   },
+   "DEADBEAT": {
+    "n": 40,
+    "meanNetWorth": 71065,
+    "winRate": 0.4,
+    "bankruptRate": 0.075,
+    "meanCash": 15110,
+    "meanProps": 5.2,
+    "meanDebt": 18500,
+    "meanRentIn": 71090,
+    "meanRentOut": 27409,
+    "meanCredit": null
+   }
+  },
+  "events": {
+   "LOAN_TAKEN": 24.07,
+   "INTERMEDIATE_LOAN_TAKEN": 0,
+   "LOAN_DEFAULTED": 0,
+   "COLLATERAL_SEIZED": 0,
+   "LOAN_INSTALLMENT_OVERDUE": 0,
+   "INTERMEDIATE_LOAN_REPAID": 0,
+   "PLAYER_BANKRUPT": 1.73,
+   "CRISIS_STRUCK": 0,
+   "CRISIS_COVERED": 0,
+   "INSURANCE_PURCHASED": 0,
+   "INSURANCE_EXPIRED": 0,
+   "AUCTION_WON": 11.3,
+   "AUCTION_UNSOLD": 0,
+   "PROPERTY_MORTGAGED": 8.37,
+   "PROPERTY_UNMORTGAGED": 2.63,
+   "BUILDING_SOLD": 5.43
+  },
+  "crises": {},
+  "capitalLoans": {}
+ },
+ "classic|5y|8p|uniform": {
+  "games": 30,
+  "reasons": {
+   "DURATION_VOTE": 30
+  },
+  "meanYearReached": 5,
+  "meanTurnsPerPlayer": 25.9,
+  "ledgerViolations": 0,
+  "moneyCreatedPerGame": 343567,
+  "moneySunkPerGame": 289702,
+  "p2pPerGame": 255328,
+  "flowsPerGame": {
+   "STARTING_FUNDS": {
+    "created": 200000,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "PROPERTY_PURCHASE": {
+    "created": 0,
+    "sunk": 66733,
+    "p2p": 0
+   },
+   "HOUSE_PURCHASE": {
+    "created": 0,
+    "sunk": 134217,
+    "p2p": 0
+   },
+   "CARD_REWARD": {
+    "created": 20167,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "HOTEL_PURCHASE": {
+    "created": 0,
+    "sunk": 26250,
+    "p2p": 0
+   },
+   "RENT_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 246150
+   },
+   "JAIL_FINE": {
+    "created": 0,
+    "sunk": 3783,
+    "p2p": 0
+   },
+   "CARD_PAYMENT": {
+    "created": 0,
+    "sunk": 14748,
+    "p2p": 0
+   },
+   "CLUB_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 4103
+   },
+   "AUCTION_PAYMENT": {
+    "created": 0,
+    "sunk": 33253,
+    "p2p": 0
+   },
+   "START_REWARD": {
+    "created": 55300,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "TAX_PAYMENT": {
+    "created": 0,
+    "sunk": 1852,
+    "p2p": 0
+   },
+   "REST_HOUSE_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 3840
+   },
+   "LOAN_DISBURSEMENT": {
+    "created": 62417,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "LOAN_INTEREST": {
+    "created": 0,
+    "sunk": 5010,
+    "p2p": 0
+   },
+   "MORTGAGE": {
+    "created": 4275,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "LOAN_REPAYMENT": {
+    "created": 0,
+    "sunk": 3767,
+    "p2p": 0
+   },
+   "BANKRUPTCY_SETTLEMENT": {
+    "created": 0,
+    "sunk": 15,
+    "p2p": 797
+   },
+   "HOUSE_SALE": {
+    "created": 1075,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "CARD_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 438
+   },
+   "HOTEL_SALE": {
+    "created": 333,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "UNMORTGAGE": {
+    "created": 0,
+    "sunk": 73,
+    "p2p": 0
+   }
+  },
+  "endCashPerActivePlayer": 6995,
+  "endNetWorthPerActivePlayer": 34434,
+  "endDebtPerActivePlayer": 6838,
+  "bankruptciesPerGame": 0.3,
+  "gamesWithBankruptcy": 0.23,
+  "winnerShareOfNetWorth": 0.37,
+  "topToMedianNetWorth": 7.98,
+  "developedPropertiesAtEnd": 12,
+  "housesAtEnd": 11.5,
+  "hotelsAtEnd": 7.4,
+  "allOwnedYear": 4.13,
+  "allOwnedShare": 0.77,
+  "shortagesPerGame": 26.07,
+  "shortagesAssetRichPerGame": 21.7,
+  "shortagesFatalPerGame": 0.3,
+  "shortageReasons": {
+   "RENT": 729,
+   "CLUB": 16,
+   "CARD": 32,
+   "LOAN_INTEREST": 1,
+   "TAX": 4
+  },
+  "cashPerActivePlayerByYear": {
+   "1": 25000,
+   "2": 6213,
+   "3": 4887,
+   "4": 4849,
+   "5": 5652
+  },
+  "ownedByYear": {
+   "1": 0,
+   "2": 18.4,
+   "3": 23.6,
+   "4": 25.4,
+   "5": 25.7
+  },
+  "buildingsByYear": {
+   "1": 0,
+   "2": 12.7,
+   "3": 14.4,
+   "4": 16.3,
+   "5": 17.3
+  },
+  "byProfile": {
+   "INVESTOR": {
+    "n": 240,
+    "meanNetWorth": 33143,
+    "winRate": 0.125,
+    "bankruptRate": 0.037,
+    "meanCash": 6733,
+    "meanProps": 3.2,
+    "meanDebt": 6581,
+    "meanRentIn": 30769,
+    "meanRentOut": 30769,
+    "meanCredit": null
+   }
+  },
+  "events": {
+   "LOAN_TAKEN": 25.37,
+   "INTERMEDIATE_LOAN_TAKEN": 0,
+   "LOAN_DEFAULTED": 0,
+   "COLLATERAL_SEIZED": 0,
+   "LOAN_INSTALLMENT_OVERDUE": 0,
+   "INTERMEDIATE_LOAN_REPAID": 0,
+   "PLAYER_BANKRUPT": 0.3,
+   "CRISIS_STRUCK": 0,
+   "CRISIS_COVERED": 0,
+   "INSURANCE_PURCHASED": 0,
+   "INSURANCE_EXPIRED": 0,
+   "AUCTION_WON": 8.07,
+   "AUCTION_UNSOLD": 0,
+   "PROPERTY_MORTGAGED": 1.67,
+   "PROPERTY_UNMORTGAGED": 0.03,
+   "BUILDING_SOLD": 0.5
+  },
+  "crises": {},
+  "capitalLoans": {}
+ },
+ "classic|7y|2p|mixed": {
+  "games": 30,
+  "reasons": {
+   "DURATION_VOTE": 28,
+   "LAST_PLAYER_STANDING": 2
+  },
+  "meanYearReached": 7,
+  "meanTurnsPerPlayer": 37.6,
+  "ledgerViolations": 0,
+  "moneyCreatedPerGame": 100363,
+  "moneySunkPerGame": 92570,
+  "p2pPerGame": 24485,
+  "flowsPerGame": {
+   "STARTING_FUNDS": {
+    "created": 50000,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "LOAN_DISBURSEMENT": {
+    "created": 20317,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "LOAN_REPAYMENT": {
+    "created": 0,
+    "sunk": 6700,
+    "p2p": 0
+   },
+   "PROPERTY_PURCHASE": {
+    "created": 0,
+    "sunk": 24160,
+    "p2p": 0
+   },
+   "JAIL_FINE": {
+    "created": 0,
+    "sunk": 1217,
+    "p2p": 0
+   },
+   "HOUSE_PURCHASE": {
+    "created": 0,
+    "sunk": 37633,
+    "p2p": 0
+   },
+   "HOTEL_PURCHASE": {
+    "created": 0,
+    "sunk": 5483,
+    "p2p": 0
+   },
+   "CLUB_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 197
+   },
+   "AUCTION_PAYMENT": {
+    "created": 0,
+    "sunk": 8513,
+    "p2p": 0
+   },
+   "CARD_PAYMENT": {
+    "created": 0,
+    "sunk": 5110,
+    "p2p": 0
+   },
+   "REST_HOUSE_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 155
+   },
+   "START_REWARD": {
+    "created": 19800,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "RENT_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 23982
+   },
+   "TAX_PAYMENT": {
+    "created": 0,
+    "sunk": 1137,
+    "p2p": 0
+   },
+   "CARD_REWARD": {
+    "created": 6767,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "LOAN_INTEREST": {
+    "created": 0,
+    "sunk": 1263,
+    "p2p": 0
+   },
+   "MORTGAGE": {
+    "created": 3138,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "UNMORTGAGE": {
+    "created": 0,
+    "sunk": 1353,
+    "p2p": 0
+   },
+   "CARD_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 47
+   },
+   "HOTEL_SALE": {
+    "created": 267,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "BANKRUPTCY_SETTLEMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 105
+   },
+   "HOUSE_SALE": {
+    "created": 75,
+    "sunk": 0,
+    "p2p": 0
+   }
+  },
+  "endCashPerActivePlayer": 4031,
+  "endNetWorthPerActivePlayer": 68498,
+  "endDebtPerActivePlayer": 6698,
+  "bankruptciesPerGame": 0.07,
+  "gamesWithBankruptcy": 0.07,
+  "winnerShareOfNetWorth": 0.734,
+  "topToMedianNetWorth": 13290.79,
+  "developedPropertiesAtEnd": 3.2,
+  "housesAtEnd": 5.1,
+  "hotelsAtEnd": 1.7,
+  "allOwnedYear": 7,
+  "allOwnedShare": 0.03,
+  "shortagesPerGame": 4.1,
+  "shortagesAssetRichPerGame": 3.87,
+  "shortagesFatalPerGame": 0.07,
+  "shortageReasons": {
+   "RENT": 93,
+   "TAX": 7,
+   "CARD": 22,
+   "CLUB": 1
+  },
+  "cashPerActivePlayerByYear": {
+   "1": 25000,
+   "2": 7057,
+   "3": 5756,
+   "4": 5227,
+   "5": 5015,
+   "6": 5010,
+   "7": 4766
+  },
+  "ownedByYear": {
+   "1": 0,
+   "2": 6.7,
+   "3": 11.6,
+   "4": 15.6,
+   "5": 18.4,
+   "6": 20,
+   "7": 21.4
+  },
+  "buildingsByYear": {
+   "1": 0,
+   "2": 3.4,
+   "3": 3.6,
+   "4": 3.9,
+   "5": 4.4,
+   "6": 5.2,
+   "7": 6
+  },
+  "byProfile": {
+   "BORROWER": {
+    "n": 10,
+    "meanNetWorth": 84340,
+    "winRate": 0.8,
+    "bankruptRate": 0.1,
+    "meanCash": 3450,
+    "meanProps": 13.9,
+    "meanDebt": 2000,
+    "meanRentIn": 14335,
+    "meanRentOut": 10150,
+    "meanCredit": null
+   },
+   "LOW": {
+    "n": 10,
+    "meanNetWorth": 18345,
+    "winRate": 0,
+    "bankruptRate": 0.1,
+    "meanCash": 8070,
+    "meanProps": 4.6,
+    "meanDebt": 0,
+    "meanRentIn": 790,
+    "meanRentOut": 19080,
+    "meanCredit": null
+   },
+   "DEADBEAT": {
+    "n": 10,
+    "meanNetWorth": 74486,
+    "winRate": 0.5,
+    "bankruptRate": 0,
+    "meanCash": 2046,
+    "meanProps": 12,
+    "meanDebt": 20000,
+    "meanRentIn": 17035,
+    "meanRentOut": 9545,
+    "meanCredit": null
+   },
+   "INSURER": {
+    "n": 10,
+    "meanNetWorth": 56235,
+    "winRate": 0.4,
+    "bankruptRate": 0,
+    "meanCash": 4005,
+    "meanProps": 11.9,
+    "meanDebt": 8350,
+    "meanRentIn": 8485,
+    "meanRentOut": 17095,
+    "meanCredit": null
+   },
+   "ALLIN": {
+    "n": 10,
+    "meanNetWorth": 63755,
+    "winRate": 0.5,
+    "bankruptRate": 0,
+    "meanCash": 1265,
+    "meanProps": 9.5,
+    "meanDebt": 7200,
+    "meanRentIn": 14805,
+    "meanRentOut": 10690,
+    "meanCredit": null
+   },
+   "INVESTOR": {
+    "n": 10,
+    "meanNetWorth": 100125,
+    "winRate": 0.8,
+    "bankruptRate": 0,
+    "meanCash": 4545,
+    "meanProps": 15.4,
+    "meanDebt": 1300,
+    "meanRentIn": 16495,
+    "meanRentOut": 5385,
+    "meanCredit": null
+   }
+  },
+  "events": {
+   "LOAN_TAKEN": 3.73,
+   "INTERMEDIATE_LOAN_TAKEN": 0,
+   "LOAN_DEFAULTED": 0,
+   "COLLATERAL_SEIZED": 0,
+   "LOAN_INSTALLMENT_OVERDUE": 0,
+   "INTERMEDIATE_LOAN_REPAID": 0,
+   "PLAYER_BANKRUPT": 0.07,
+   "CRISIS_STRUCK": 0,
+   "CRISIS_COVERED": 0,
+   "INSURANCE_PURCHASED": 0,
+   "INSURANCE_EXPIRED": 0,
+   "AUCTION_WON": 15.07,
+   "AUCTION_UNSOLD": 0.67,
+   "PROPERTY_MORTGAGED": 1.8,
+   "PROPERTY_UNMORTGAGED": 0.73,
+   "BUILDING_SOLD": 0.07
+  },
+  "crises": {},
+  "capitalLoans": {}
+ },
+ "classic|7y|2p|uniform": {
+  "games": 30,
+  "reasons": {
+   "DURATION_VOTE": 30
+  },
+  "meanYearReached": 7,
+  "meanTurnsPerPlayer": 37.8,
+  "ledgerViolations": 0,
+  "moneyCreatedPerGame": 82300,
+  "moneySunkPerGame": 74800,
+  "p2pPerGame": 20003,
+  "flowsPerGame": {
+   "STARTING_FUNDS": {
+    "created": 50000,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "PROPERTY_PURCHASE": {
+    "created": 0,
+    "sunk": 24910,
+    "p2p": 0
+   },
+   "HOUSE_PURCHASE": {
+    "created": 0,
+    "sunk": 27100,
+    "p2p": 0
+   },
+   "HOTEL_PURCHASE": {
+    "created": 0,
+    "sunk": 3750,
+    "p2p": 0
+   },
+   "JAIL_FINE": {
+    "created": 0,
+    "sunk": 1217,
+    "p2p": 0
+   },
+   "CLUB_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 200
+   },
+   "AUCTION_PAYMENT": {
+    "created": 0,
+    "sunk": 10583,
+    "p2p": 0
+   },
+   "CARD_PAYMENT": {
+    "created": 0,
+    "sunk": 5617,
+    "p2p": 0
+   },
+   "REST_HOUSE_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 187
+   },
+   "TAX_PAYMENT": {
+    "created": 0,
+    "sunk": 1080,
+    "p2p": 0
+   },
+   "START_REWARD": {
+    "created": 20000,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "LOAN_DISBURSEMENT": {
+    "created": 5733,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "RENT_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 19547
+   },
+   "LOAN_INTEREST": {
+    "created": 0,
+    "sunk": 510,
+    "p2p": 0
+   },
+   "CARD_REWARD": {
+    "created": 6567,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "CARD_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 70
+   },
+   "LOAN_REPAYMENT": {
+    "created": 0,
+    "sunk": 33,
+    "p2p": 0
+   }
+  },
+  "endCashPerActivePlayer": 3750,
+  "endNetWorthPerActivePlayer": 65592,
+  "endDebtPerActivePlayer": 2850,
+  "bankruptciesPerGame": 0,
+  "gamesWithBankruptcy": 0,
+  "winnerShareOfNetWorth": 0.714,
+  "topToMedianNetWorth": 3.5,
+  "developedPropertiesAtEnd": 2.9,
+  "housesAtEnd": 4.1,
+  "hotelsAtEnd": 1.3,
+  "allOwnedYear": 7,
+  "allOwnedShare": 0.03,
+  "shortagesPerGame": 3.37,
+  "shortagesAssetRichPerGame": 3.37,
+  "shortagesFatalPerGame": 0,
+  "shortageReasons": {
+   "RENT": 85,
+   "CARD": 13,
+   "CLUB": 2,
+   "TAX": 1
+  },
+  "cashPerActivePlayerByYear": {
+   "1": 25000,
+   "2": 4338,
+   "3": 3253,
+   "4": 2967,
+   "5": 3421,
+   "6": 3546,
+   "7": 3758
+  },
+  "ownedByYear": {
+   "1": 0,
+   "2": 6.7,
+   "3": 11.7,
+   "4": 16,
+   "5": 18.8,
+   "6": 20.4,
+   "7": 21.9
+  },
+  "buildingsByYear": {
+   "1": 0,
+   "2": 3.4,
+   "3": 3.5,
+   "4": 3.6,
+   "5": 3.8,
+   "6": 4.2,
+   "7": 4.6
+  },
+  "byProfile": {
+   "INVESTOR": {
+    "n": 60,
+    "meanNetWorth": 65592,
+    "winRate": 0.5,
+    "bankruptRate": 0,
+    "meanCash": 3750,
+    "meanProps": 11.5,
+    "meanDebt": 2850,
+    "meanRentIn": 9773,
+    "meanRentOut": 9773,
+    "meanCredit": null
+   }
+  },
+  "events": {
+   "LOAN_TAKEN": 3.37,
+   "INTERMEDIATE_LOAN_TAKEN": 0,
+   "LOAN_DEFAULTED": 0,
+   "COLLATERAL_SEIZED": 0,
+   "LOAN_INSTALLMENT_OVERDUE": 0,
+   "INTERMEDIATE_LOAN_REPAID": 0,
+   "PLAYER_BANKRUPT": 0,
+   "CRISIS_STRUCK": 0,
+   "CRISIS_COVERED": 0,
+   "INSURANCE_PURCHASED": 0,
+   "INSURANCE_EXPIRED": 0,
+   "AUCTION_WON": 15.43,
+   "AUCTION_UNSOLD": 0.1,
+   "PROPERTY_MORTGAGED": 0,
+   "PROPERTY_UNMORTGAGED": 0,
+   "BUILDING_SOLD": 0
+  },
+  "crises": {},
+  "capitalLoans": {}
+ },
+ "classic|7y|4p|mixed": {
+  "games": 30,
+  "reasons": {
+   "DURATION_VOTE": 29,
+   "LAST_PLAYER_STANDING": 1
+  },
+  "meanYearReached": 6.97,
+  "meanTurnsPerPlayer": 36.6,
+  "ledgerViolations": 0,
+  "moneyCreatedPerGame": 228408,
+  "moneySunkPerGame": 215614,
+  "p2pPerGame": 114999,
+  "flowsPerGame": {
+   "STARTING_FUNDS": {
+    "created": 100000,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "AUCTION_PAYMENT": {
+    "created": 0,
+    "sunk": 27957,
+    "p2p": 0
+   },
+   "CARD_REWARD": {
+    "created": 14717,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "LOAN_DISBURSEMENT": {
+    "created": 54867,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "PROPERTY_PURCHASE": {
+    "created": 0,
+    "sunk": 36913,
+    "p2p": 0
+   },
+   "HOUSE_PURCHASE": {
+    "created": 0,
+    "sunk": 97633,
+    "p2p": 0
+   },
+   "LOAN_REPAYMENT": {
+    "created": 0,
+    "sunk": 14900,
+    "p2p": 0
+   },
+   "HOTEL_PURCHASE": {
+    "created": 0,
+    "sunk": 15533,
+    "p2p": 0
+   },
+   "RENT_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 108830
+   },
+   "REST_HOUSE_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 917
+   },
+   "START_REWARD": {
+    "created": 39400,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "LOAN_INTEREST": {
+    "created": 0,
+    "sunk": 3885,
+    "p2p": 0
+   },
+   "MORTGAGE": {
+    "created": 12475,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "TAX_PAYMENT": {
+    "created": 0,
+    "sunk": 2018,
+    "p2p": 0
+   },
+   "CARD_PAYMENT": {
+    "created": 0,
+    "sunk": 10310,
+    "p2p": 0
+   },
+   "CLUB_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 1127
+   },
+   "JAIL_FINE": {
+    "created": 0,
+    "sunk": 2000,
+    "p2p": 0
+   },
+   "UNMORTGAGE": {
+    "created": 0,
+    "sunk": 4464,
+    "p2p": 0
+   },
+   "BANKRUPTCY_SETTLEMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 3767
+   },
+   "HOTEL_SALE": {
+    "created": 3867,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "HOUSE_SALE": {
+    "created": 3083,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "CARD_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 358
+   }
+  },
+  "endCashPerActivePlayer": 3998,
+  "endNetWorthPerActivePlayer": 57239,
+  "endDebtPerActivePlayer": 9781,
+  "bankruptciesPerGame": 0.8,
+  "gamesWithBankruptcy": 0.57,
+  "winnerShareOfNetWorth": 0.59,
+  "topToMedianNetWorth": 32541.81,
+  "developedPropertiesAtEnd": 6.7,
+  "housesAtEnd": 9.8,
+  "hotelsAtEnd": 4.1,
+  "allOwnedYear": 5.9,
+  "allOwnedShare": 0.33,
+  "shortagesPerGame": 15.73,
+  "shortagesAssetRichPerGame": 13.6,
+  "shortagesFatalPerGame": 0.8,
+  "shortageReasons": {
+   "RENT": 414,
+   "CLUB": 5,
+   "CARD": 46,
+   "TAX": 6,
+   "LOAN_INTEREST": 1
+  },
+  "cashPerActivePlayerByYear": {
+   "1": 25000,
+   "2": 6217,
+   "3": 5134,
+   "4": 4855,
+   "5": 4621,
+   "6": 4495,
+   "7": 4008
+  },
+  "ownedByYear": {
+   "1": 0,
+   "2": 12,
+   "3": 18.6,
+   "4": 22.5,
+   "5": 23.9,
+   "6": 24.3,
+   "7": 24.5
+  },
+  "buildingsByYear": {
+   "1": 0,
+   "2": 7,
+   "3": 7.4,
+   "4": 8.6,
+   "5": 9.8,
+   "6": 11.7,
+   "7": 13.1
+  },
+  "byProfile": {
+   "LOW": {
+    "n": 20,
+    "meanNetWorth": 6278,
+    "winRate": 0,
+    "bankruptRate": 0.55,
+    "meanCash": 3128,
+    "meanProps": 1.4,
+    "meanDebt": 0,
+    "meanRentIn": 1375,
+    "meanRentOut": 25243,
+    "meanCredit": null
+   },
+   "DEADBEAT": {
+    "n": 20,
+    "meanNetWorth": 63002,
+    "winRate": 0.4,
+    "bankruptRate": 0.2,
+    "meanCash": 3005,
+    "meanProps": 7.2,
+    "meanDebt": 16000,
+    "meanRentIn": 44940,
+    "meanRentOut": 23945,
+    "meanCredit": null
+   },
+   "INSURER": {
+    "n": 20,
+    "meanNetWorth": 42015,
+    "winRate": 0.2,
+    "bankruptRate": 0,
+    "meanCash": 4210,
+    "meanProps": 7.3,
+    "meanDebt": 10975,
+    "meanRentIn": 24725,
+    "meanRentOut": 31613,
+    "meanCredit": null
+   },
+   "BORROWER": {
+    "n": 20,
+    "meanNetWorth": 58988,
+    "winRate": 0.4,
+    "bankruptRate": 0.1,
+    "meanCash": 3380,
+    "meanProps": 8.1,
+    "meanDebt": 7100,
+    "meanRentIn": 35345,
+    "meanRentOut": 28635,
+    "meanCredit": null
+   },
+   "ALLIN": {
+    "n": 20,
+    "meanNetWorth": 45327,
+    "winRate": 0.25,
+    "bankruptRate": 0.2,
+    "meanCash": 2070,
+    "meanProps": 4.8,
+    "meanDebt": 7850,
+    "meanRentIn": 25780,
+    "meanRentOut": 24593,
+    "meanCredit": null
+   },
+   "INVESTOR": {
+    "n": 20,
+    "meanNetWorth": 59140,
+    "winRate": 0.25,
+    "bankruptRate": 0.15,
+    "meanCash": 3400,
+    "meanProps": 8,
+    "meanDebt": 5025,
+    "meanRentIn": 31080,
+    "meanRentOut": 29218,
+    "meanCredit": null
+   }
+  },
+  "events": {
+   "LOAN_TAKEN": 12.5,
+   "INTERMEDIATE_LOAN_TAKEN": 0,
+   "LOAN_DEFAULTED": 0,
+   "COLLATERAL_SEIZED": 0,
+   "LOAN_INSTALLMENT_OVERDUE": 0,
+   "INTERMEDIATE_LOAN_REPAID": 0,
+   "PLAYER_BANKRUPT": 0.8,
+   "CRISIS_STRUCK": 0,
+   "CRISIS_COVERED": 0,
+   "INSURANCE_PURCHASED": 0,
+   "INSURANCE_EXPIRED": 0,
+   "AUCTION_WON": 16,
+   "AUCTION_UNSOLD": 0,
+   "PROPERTY_MORTGAGED": 6.67,
+   "PROPERTY_UNMORTGAGED": 2.33,
+   "BUILDING_SOLD": 2
+  },
+  "crises": {},
+  "capitalLoans": {}
+ },
+ "classic|7y|4p|uniform": {
+  "games": 30,
+  "reasons": {
+   "DURATION_VOTE": 30
+  },
+  "meanYearReached": 7,
+  "meanTurnsPerPlayer": 36.9,
+  "ledgerViolations": 0,
+  "moneyCreatedPerGame": 196945,
+  "moneySunkPerGame": 179280,
+  "p2pPerGame": 112802,
+  "flowsPerGame": {
+   "STARTING_FUNDS": {
+    "created": 100000,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "PROPERTY_PURCHASE": {
+    "created": 0,
+    "sunk": 39073,
+    "p2p": 0
+   },
+   "CARD_REWARD": {
+    "created": 13000,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "HOUSE_PURCHASE": {
+    "created": 0,
+    "sunk": 77017,
+    "p2p": 0
+   },
+   "HOTEL_PURCHASE": {
+    "created": 0,
+    "sunk": 12133,
+    "p2p": 0
+   },
+   "RENT_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 109278
+   },
+   "AUCTION_PAYMENT": {
+    "created": 0,
+    "sunk": 29573,
+    "p2p": 0
+   },
+   "REST_HOUSE_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 1072
+   },
+   "START_REWARD": {
+    "created": 40000,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "LOAN_DISBURSEMENT": {
+    "created": 35183,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "LOAN_INTEREST": {
+    "created": 0,
+    "sunk": 3103,
+    "p2p": 0
+   },
+   "TAX_PAYMENT": {
+    "created": 0,
+    "sunk": 1840,
+    "p2p": 0
+   },
+   "CARD_PAYMENT": {
+    "created": 0,
+    "sunk": 11942,
+    "p2p": 0
+   },
+   "CLUB_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 1157
+   },
+   "JAIL_FINE": {
+    "created": 0,
+    "sunk": 2150,
+    "p2p": 0
+   },
+   "MORTGAGE": {
+    "created": 6120,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "UNMORTGAGE": {
+    "created": 0,
+    "sunk": 699,
+    "p2p": 0
+   },
+   "HOTEL_SALE": {
+    "created": 1933,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "LOAN_REPAYMENT": {
+    "created": 0,
+    "sunk": 1750,
+    "p2p": 0
+   },
+   "HOUSE_SALE": {
+    "created": 708,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "BANKRUPTCY_SETTLEMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 896
+   },
+   "CARD_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 400
+   }
+  },
+  "endCashPerActivePlayer": 4608,
+  "endNetWorthPerActivePlayer": 46112,
+  "endDebtPerActivePlayer": 7852,
+  "bankruptciesPerGame": 0.17,
+  "gamesWithBankruptcy": 0.13,
+  "winnerShareOfNetWorth": 0.529,
+  "topToMedianNetWorth": 10748.51,
+  "developedPropertiesAtEnd": 6.1,
+  "housesAtEnd": 9.1,
+  "hotelsAtEnd": 3.3,
+  "allOwnedYear": 6.42,
+  "allOwnedShare": 0.63,
+  "shortagesPerGame": 14.97,
+  "shortagesAssetRichPerGame": 13.63,
+  "shortagesFatalPerGame": 0.17,
+  "shortageReasons": {
+   "RENT": 401,
+   "CLUB": 9,
+   "CARD": 35,
+   "TAX": 4
+  },
+  "cashPerActivePlayerByYear": {
+   "1": 25000,
+   "2": 4037,
+   "3": 2941,
+   "4": 3073,
+   "5": 3634,
+   "6": 3915,
+   "7": 4280
+  },
+  "ownedByYear": {
+   "1": 0,
+   "2": 11.9,
+   "3": 18.4,
+   "4": 22.5,
+   "5": 24.1,
+   "6": 24.9,
+   "7": 25.2
+  },
+  "buildingsByYear": {
+   "1": 0,
+   "2": 6.7,
+   "3": 7.2,
+   "4": 7.6,
+   "5": 8.6,
+   "6": 9.7,
+   "7": 11.1
+  },
+  "byProfile": {
+   "INVESTOR": {
+    "n": 120,
+    "meanNetWorth": 44190,
+    "winRate": 0.25,
+    "bankruptRate": 0.042,
+    "meanCash": 4416,
+    "meanProps": 6.3,
+    "meanDebt": 7525,
+    "meanRentIn": 27320,
+    "meanRentOut": 27320,
+    "meanCredit": null
+   }
+  },
+  "events": {
+   "LOAN_TAKEN": 13.67,
+   "INTERMEDIATE_LOAN_TAKEN": 0,
+   "LOAN_DEFAULTED": 0,
+   "COLLATERAL_SEIZED": 0,
+   "LOAN_INSTALLMENT_OVERDUE": 0,
+   "INTERMEDIATE_LOAN_REPAID": 0,
+   "PLAYER_BANKRUPT": 0.17,
+   "CRISIS_STRUCK": 0,
+   "CRISIS_COVERED": 0,
+   "INSURANCE_PURCHASED": 0,
+   "INSURANCE_EXPIRED": 0,
+   "AUCTION_WON": 14.93,
+   "AUCTION_UNSOLD": 0.03,
+   "PROPERTY_MORTGAGED": 2.8,
+   "PROPERTY_UNMORTGAGED": 0.33,
+   "BUILDING_SOLD": 0.67
+  },
+  "crises": {},
+  "capitalLoans": {}
+ },
+ "classic|7y|8p|mixed": {
+  "games": 30,
+  "reasons": {
+   "DURATION_VOTE": 24,
+   "LAST_PLAYER_STANDING": 6
+  },
+  "meanYearReached": 6.87,
+  "meanTurnsPerPlayer": 35.7,
+  "ledgerViolations": 0,
+  "moneyCreatedPerGame": 530640,
+  "moneySunkPerGame": 493008,
+  "p2pPerGame": 416371,
+  "flowsPerGame": {
+   "STARTING_FUNDS": {
+    "created": 200000,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "LOAN_DISBURSEMENT": {
+    "created": 141900,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "LOAN_REPAYMENT": {
+    "created": 0,
+    "sunk": 36183,
+    "p2p": 0
+   },
+   "PROPERTY_PURCHASE": {
+    "created": 0,
+    "sunk": 68993,
+    "p2p": 0
+   },
+   "HOUSE_PURCHASE": {
+    "created": 0,
+    "sunk": 228083,
+    "p2p": 0
+   },
+   "HOTEL_PURCHASE": {
+    "created": 0,
+    "sunk": 56567,
+    "p2p": 0
+   },
+   "JAIL_FINE": {
+    "created": 0,
+    "sunk": 4533,
+    "p2p": 0
+   },
+   "RENT_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 389045
+   },
+   "CARD_PAYMENT": {
+    "created": 0,
+    "sunk": 21178,
+    "p2p": 0
+   },
+   "AUCTION_PAYMENT": {
+    "created": 0,
+    "sunk": 47070,
+    "p2p": 0
+   },
+   "HOTEL_SALE": {
+    "created": 30433,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "START_REWARD": {
+    "created": 76750,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "REST_HOUSE_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 4223
+   },
+   "CLUB_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 4763
+   },
+   "CARD_REWARD": {
+    "created": 25983,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "HOUSE_SALE": {
+    "created": 15467,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "CARD_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 1585
+   },
+   "TAX_PAYMENT": {
+    "created": 0,
+    "sunk": 3442,
+    "p2p": 0
+   },
+   "LOAN_INTEREST": {
+    "created": 0,
+    "sunk": 10838,
+    "p2p": 0
+   },
+   "MORTGAGE": {
+    "created": 40107,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "BANKRUPTCY_SETTLEMENT": {
+    "created": 0,
+    "sunk": 25,
+    "p2p": 16755
+   },
+   "UNMORTGAGE": {
+    "created": 0,
+    "sunk": 16095,
+    "p2p": 0
+   }
+  },
+  "endCashPerActivePlayer": 9254,
+  "endNetWorthPerActivePlayer": 65894,
+  "endDebtPerActivePlayer": 12734,
+  "bankruptciesPerGame": 3.93,
+  "gamesWithBankruptcy": 1,
+  "winnerShareOfNetWorth": 0.617,
+  "topToMedianNetWorth": 126487.9,
+  "developedPropertiesAtEnd": 11.8,
+  "housesAtEnd": 5.9,
+  "hotelsAtEnd": 9.9,
+  "allOwnedYear": 4.91,
+  "allOwnedShare": 0.73,
+  "shortagesPerGame": 46.5,
+  "shortagesAssetRichPerGame": 34.7,
+  "shortagesFatalPerGame": 3.93,
+  "shortageReasons": {
+   "RENT": 1274,
+   "TAX": 14,
+   "CARD": 76,
+   "CLUB": 30,
+   "LOAN_INTEREST": 1
+  },
+  "cashPerActivePlayerByYear": {
+   "1": 25000,
+   "2": 8665,
+   "3": 5685,
+   "4": 5448,
+   "5": 6042,
+   "6": 6322,
+   "7": 8657
+  },
+  "ownedByYear": {
+   "1": 0,
+   "2": 17.5,
+   "3": 23.3,
+   "4": 24.8,
+   "5": 24.4,
+   "6": 24.7,
+   "7": 23.6
+  },
+  "buildingsByYear": {
+   "1": 0,
+   "2": 12.7,
+   "3": 15.5,
+   "4": 17,
+   "5": 17.5,
+   "6": 17.9,
+   "7": 17.3
+  },
+  "byProfile": {
+   "BORROWER": {
+    "n": 40,
+    "meanNetWorth": 31163,
+    "winRate": 0.1,
+    "bankruptRate": 0.425,
+    "meanCash": 3257,
+    "meanProps": 3.1,
+    "meanDebt": 6588,
+    "meanRentIn": 49469,
+    "meanRentOut": 53819,
+    "meanCredit": null
+   },
+   "INSURER": {
+    "n": 40,
+    "meanNetWorth": 26234,
+    "winRate": 0.1,
+    "bankruptRate": 0.475,
+    "meanCash": 3881,
+    "meanProps": 2.3,
+    "meanDebt": 4900,
+    "meanRentIn": 43564,
+    "meanRentOut": 53899,
+    "meanCredit": null
+   },
+   "ALLIN": {
+    "n": 40,
+    "meanNetWorth": 39927,
+    "winRate": 0.15,
+    "bankruptRate": 0.35,
+    "meanCash": 3777,
+    "meanProps": 3.3,
+    "meanDebt": 8450,
+    "meanRentIn": 63723,
+    "meanRentOut": 53963,
+    "meanCredit": null
+   },
+   "LOW": {
+    "n": 40,
+    "meanNetWorth": 483,
+    "winRate": 0,
+    "bankruptRate": 0.925,
+    "meanCash": 218,
+    "meanProps": 0.1,
+    "meanDebt": 0,
+    "meanRentIn": 1154,
+    "meanRentOut": 27890,
+    "meanCredit": null
+   },
+   "DEADBEAT": {
+    "n": 40,
+    "meanNetWorth": 74005,
+    "winRate": 0.375,
+    "bankruptRate": 0.4,
+    "meanCash": 11917,
+    "meanProps": 4.7,
+    "meanDebt": 12000,
+    "meanRentIn": 89534,
+    "meanRentOut": 46815,
+    "meanCredit": null
+   },
+   "INVESTOR": {
+    "n": 40,
+    "meanNetWorth": 29165,
+    "winRate": 0.025,
+    "bankruptRate": 0.375,
+    "meanCash": 5174,
+    "meanProps": 2.6,
+    "meanDebt": 6900,
+    "meanRentIn": 44341,
+    "meanRentOut": 55399,
+    "meanCredit": null
+   }
+  },
+  "events": {
+   "LOAN_TAKEN": 33.3,
+   "INTERMEDIATE_LOAN_TAKEN": 0,
+   "LOAN_DEFAULTED": 0,
+   "COLLATERAL_SEIZED": 0,
+   "LOAN_INSTALLMENT_OVERDUE": 0,
+   "INTERMEDIATE_LOAN_REPAID": 0,
+   "PLAYER_BANKRUPT": 3.93,
+   "CRISIS_STRUCK": 0,
+   "CRISIS_COVERED": 0,
+   "INSURANCE_PURCHASED": 0,
+   "INSURANCE_EXPIRED": 0,
+   "AUCTION_WON": 12.6,
+   "AUCTION_UNSOLD": 0,
+   "PROPERTY_MORTGAGED": 19.67,
+   "PROPERTY_UNMORTGAGED": 7.23,
+   "BUILDING_SOLD": 11.63
+  },
+  "crises": {},
+  "capitalLoans": {}
+ },
+ "classic|7y|8p|uniform": {
+  "games": 30,
+  "reasons": {
+   "DURATION_VOTE": 29,
+   "LAST_PLAYER_STANDING": 1
+  },
+  "meanYearReached": 6.97,
+  "meanTurnsPerPlayer": 36.5,
+  "ledgerViolations": 0,
+  "moneyCreatedPerGame": 434663,
+  "moneySunkPerGame": 383704,
+  "p2pPerGame": 409438,
+  "flowsPerGame": {
+   "STARTING_FUNDS": {
+    "created": 200000,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "PROPERTY_PURCHASE": {
+    "created": 0,
+    "sunk": 70927,
+    "p2p": 0
+   },
+   "HOUSE_PURCHASE": {
+    "created": 0,
+    "sunk": 181467,
+    "p2p": 0
+   },
+   "HOTEL_PURCHASE": {
+    "created": 0,
+    "sunk": 40467,
+    "p2p": 0
+   },
+   "JAIL_FINE": {
+    "created": 0,
+    "sunk": 5167,
+    "p2p": 0
+   },
+   "RENT_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 389350
+   },
+   "CARD_PAYMENT": {
+    "created": 0,
+    "sunk": 21945,
+    "p2p": 0
+   },
+   "AUCTION_PAYMENT": {
+    "created": 0,
+    "sunk": 39247,
+    "p2p": 0
+   },
+   "LOAN_DISBURSEMENT": {
+    "created": 97833,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "START_REWARD": {
+    "created": 79250,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "REST_HOUSE_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 4903
+   },
+   "CLUB_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 5053
+   },
+   "CARD_REWARD": {
+    "created": 27833,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "CARD_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 1725
+   },
+   "TAX_PAYMENT": {
+    "created": 0,
+    "sunk": 3765,
+    "p2p": 0
+   },
+   "LOAN_INTEREST": {
+    "created": 0,
+    "sunk": 8765,
+    "p2p": 0
+   },
+   "LOAN_REPAYMENT": {
+    "created": 0,
+    "sunk": 9683,
+    "p2p": 0
+   },
+   "MORTGAGE": {
+    "created": 16172,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "UNMORTGAGE": {
+    "created": 0,
+    "sunk": 2163,
+    "p2p": 0
+   },
+   "HOUSE_SALE": {
+    "created": 6075,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "BANKRUPTCY_SETTLEMENT": {
+    "created": 0,
+    "sunk": 109,
+    "p2p": 8406
+   },
+   "HOTEL_SALE": {
+    "created": 7500,
+    "sunk": 0,
+    "p2p": 0
+   }
+  },
+  "endCashPerActivePlayer": 8446,
+  "endNetWorthPerActivePlayer": 49526,
+  "endDebtPerActivePlayer": 8116,
+  "bankruptciesPerGame": 1.97,
+  "gamesWithBankruptcy": 0.77,
+  "winnerShareOfNetWorth": 0.431,
+  "topToMedianNetWorth": 46620.85,
+  "developedPropertiesAtEnd": 13,
+  "housesAtEnd": 10,
+  "hotelsAtEnd": 9.6,
+  "allOwnedYear": 4.69,
+  "allOwnedShare": 0.87,
+  "shortagesPerGame": 43.03,
+  "shortagesAssetRichPerGame": 32.07,
+  "shortagesFatalPerGame": 1.97,
+  "shortageReasons": {
+   "RENT": 1189,
+   "CLUB": 21,
+   "CARD": 63,
+   "TAX": 16,
+   "LOAN_INTEREST": 2
+  },
+  "cashPerActivePlayerByYear": {
+   "1": 25000,
+   "2": 6611,
+   "3": 4229,
+   "4": 4507,
+   "5": 6145,
+   "6": 7138,
+   "7": 7844
+  },
+  "ownedByYear": {
+   "1": 0,
+   "2": 17.5,
+   "3": 23.3,
+   "4": 25.3,
+   "5": 25.2,
+   "6": 25.1,
+   "7": 24.9
+  },
+  "buildingsByYear": {
+   "1": 0,
+   "2": 13.5,
+   "3": 15.9,
+   "4": 17.4,
+   "5": 18.9,
+   "6": 19.4,
+   "7": 20.5
+  },
+  "byProfile": {
+   "INVESTOR": {
+    "n": 240,
+    "meanNetWorth": 37351,
+    "winRate": 0.125,
+    "bankruptRate": 0.246,
+    "meanCash": 6370,
+    "meanProps": 3.1,
+    "meanDebt": 6121,
+    "meanRentIn": 48669,
+    "meanRentOut": 48669,
+    "meanCredit": null
+   }
+  },
+  "events": {
+   "LOAN_TAKEN": 37.57,
+   "INTERMEDIATE_LOAN_TAKEN": 0,
+   "LOAN_DEFAULTED": 0,
+   "COLLATERAL_SEIZED": 0,
+   "LOAN_INSTALLMENT_OVERDUE": 0,
+   "INTERMEDIATE_LOAN_REPAID": 0,
+   "PLAYER_BANKRUPT": 1.97,
+   "CRISIS_STRUCK": 0,
+   "CRISIS_COVERED": 0,
+   "INSURANCE_PURCHASED": 0,
+   "INSURANCE_EXPIRED": 0,
+   "AUCTION_WON": 9.83,
+   "AUCTION_UNSOLD": 0,
+   "PROPERTY_MORTGAGED": 7.03,
+   "PROPERTY_UNMORTGAGED": 0.87,
+   "BUILDING_SOLD": 3.87
+  },
+  "crises": {},
+  "capitalLoans": {}
+ },
+ "classic|10y|2p|mixed": {
+  "games": 30,
+  "reasons": {
+   "LAST_PLAYER_STANDING": 10,
+   "DURATION_REACHED": 20
+  },
+  "meanYearReached": 9.27,
+  "meanTurnsPerPlayer": 47.3,
+  "ledgerViolations": 0,
+  "moneyCreatedPerGame": 116793,
+  "moneySunkPerGame": 109763,
+  "p2pPerGame": 38451,
+  "flowsPerGame": {
+   "STARTING_FUNDS": {
+    "created": 50000,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "PROPERTY_PURCHASE": {
+    "created": 0,
+    "sunk": 26003,
+    "p2p": 0
+   },
+   "LOAN_DISBURSEMENT": {
+    "created": 23767,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "LOAN_REPAYMENT": {
+    "created": 0,
+    "sunk": 7083,
+    "p2p": 0
+   },
+   "HOUSE_PURCHASE": {
+    "created": 0,
+    "sunk": 46583,
+    "p2p": 0
+   },
+   "HOTEL_PURCHASE": {
+    "created": 0,
+    "sunk": 8033,
+    "p2p": 0
+   },
+   "CARD_REWARD": {
+    "created": 9867,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "START_REWARD": {
+    "created": 26400,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "AUCTION_PAYMENT": {
+    "created": 0,
+    "sunk": 7760,
+    "p2p": 0
+   },
+   "CLUB_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 230
+   },
+   "REST_HOUSE_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 227
+   },
+   "CARD_PAYMENT": {
+    "created": 0,
+    "sunk": 7978,
+    "p2p": 0
+   },
+   "RENT_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 36827
+   },
+   "TAX_PAYMENT": {
+    "created": 0,
+    "sunk": 1418,
+    "p2p": 0
+   },
+   "MORTGAGE": {
+    "created": 5435,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "BANKRUPTCY_SETTLEMENT": {
+    "created": 0,
+    "sunk": 23,
+    "p2p": 1103
+   },
+   "LOAN_INTEREST": {
+    "created": 0,
+    "sunk": 1607,
+    "p2p": 0
+   },
+   "CARD_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 65
+   },
+   "UNMORTGAGE": {
+    "created": 0,
+    "sunk": 1923,
+    "p2p": 0
+   },
+   "JAIL_FINE": {
+    "created": 0,
+    "sunk": 1350,
+    "p2p": 0
+   },
+   "HOTEL_SALE": {
+    "created": 1100,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "HOUSE_SALE": {
+    "created": 225,
+    "sunk": 0,
+    "p2p": 0
+   }
+  },
+  "endCashPerActivePlayer": 4218,
+  "endNetWorthPerActivePlayer": 85982,
+  "endDebtPerActivePlayer": 8420,
+  "bankruptciesPerGame": 0.33,
+  "gamesWithBankruptcy": 0.33,
+  "winnerShareOfNetWorth": 0.808,
+  "topToMedianNetWorth": 45573.98,
+  "developedPropertiesAtEnd": 3.9,
+  "housesAtEnd": 5.5,
+  "hotelsAtEnd": 2.4,
+  "allOwnedYear": 10,
+  "allOwnedShare": 0.03,
+  "shortagesPerGame": 6.87,
+  "shortagesAssetRichPerGame": 6.2,
+  "shortagesFatalPerGame": 0.33,
+  "shortageReasons": {
+   "RENT": 170,
+   "TAX": 6,
+   "CARD": 28,
+   "LOAN_INTEREST": 2
+  },
+  "cashPerActivePlayerByYear": {
+   "1": 25000,
+   "2": 7663,
+   "3": 5924,
+   "4": 5298,
+   "5": 5170,
+   "6": 4990,
+   "7": 4389,
+   "8": 4438,
+   "9": 4248,
+   "10": 4193
+  },
+  "ownedByYear": {
+   "1": 0,
+   "2": 6.7,
+   "3": 11.3,
+   "4": 15.4,
+   "5": 17.9,
+   "6": 20.3,
+   "7": 21.4,
+   "8": 22.8,
+   "9": 23.6,
+   "10": 24
+  },
+  "buildingsByYear": {
+   "1": 0,
+   "2": 3.4,
+   "3": 3.7,
+   "4": 4.2,
+   "5": 4.8,
+   "6": 5.6,
+   "7": 6,
+   "8": 6.7,
+   "9": 7.4,
+   "10": 8
+  },
+  "byProfile": {
+   "BORROWER": {
+    "n": 10,
+    "meanNetWorth": 98825,
+    "winRate": 0.8,
+    "bankruptRate": 0.1,
+    "meanCash": 4965,
+    "meanProps": 15,
+    "meanDebt": 2100,
+    "meanRentIn": 21815,
+    "meanRentOut": 10260,
+    "meanCredit": null
+   },
+   "LOW": {
+    "n": 10,
+    "meanNetWorth": 7430,
+    "winRate": 0,
+    "bankruptRate": 0.6,
+    "meanCash": 3120,
+    "meanProps": 1.8,
+    "meanDebt": 0,
+    "meanRentIn": 875,
+    "meanRentOut": 28080,
+    "meanCredit": null
+   },
+   "DEADBEAT": {
+    "n": 10,
+    "meanNetWorth": 83689,
+    "winRate": 0.6,
+    "bankruptRate": 0,
+    "meanCash": 2939,
+    "meanProps": 13.9,
+    "meanDebt": 20000,
+    "meanRentIn": 25200,
+    "meanRentOut": 12640,
+    "meanCredit": null
+   },
+   "INSURER": {
+    "n": 10,
+    "meanNetWorth": 51665,
+    "winRate": 0.4,
+    "bankruptRate": 0.3,
+    "meanCash": 2845,
+    "meanProps": 8.5,
+    "meanDebt": 2050,
+    "meanRentIn": 12950,
+    "meanRentOut": 25660,
+    "meanCredit": null
+   },
+   "ALLIN": {
+    "n": 10,
+    "meanNetWorth": 88718,
+    "winRate": 0.7,
+    "bankruptRate": 0,
+    "meanCash": 1558,
+    "meanProps": 12.5,
+    "meanDebt": 10050,
+    "meanRentIn": 26975,
+    "meanRentOut": 16710,
+    "meanCredit": null
+   },
+   "INVESTOR": {
+    "n": 10,
+    "meanNetWorth": 99584,
+    "winRate": 0.5,
+    "bankruptRate": 0,
+    "meanCash": 5664,
+    "meanProps": 16.7,
+    "meanDebt": 7900,
+    "meanRentIn": 22665,
+    "meanRentOut": 17130,
+    "meanCredit": null
+   }
+  },
+  "events": {
+   "LOAN_TAKEN": 5.57,
+   "INTERMEDIATE_LOAN_TAKEN": 0,
+   "LOAN_DEFAULTED": 0,
+   "COLLATERAL_SEIZED": 0,
+   "LOAN_INSTALLMENT_OVERDUE": 0,
+   "INTERMEDIATE_LOAN_REPAID": 0,
+   "PLAYER_BANKRUPT": 0.33,
+   "CRISIS_STRUCK": 0,
+   "CRISIS_COVERED": 0,
+   "INSURANCE_PURCHASED": 0,
+   "INSURANCE_EXPIRED": 0,
+   "AUCTION_WON": 15.97,
+   "AUCTION_UNSOLD": 0.53,
+   "PROPERTY_MORTGAGED": 3.33,
+   "PROPERTY_UNMORTGAGED": 1.23,
+   "BUILDING_SOLD": 0.27
+  },
+  "crises": {},
+  "capitalLoans": {}
+ },
+ "classic|10y|2p|uniform": {
+  "games": 30,
+  "reasons": {
+   "DURATION_REACHED": 28,
+   "LAST_PLAYER_STANDING": 2
+  },
+  "meanYearReached": 9.97,
+  "meanTurnsPerPlayer": 52,
+  "ledgerViolations": 0,
+  "moneyCreatedPerGame": 104312,
+  "moneySunkPerGame": 95885,
+  "p2pPerGame": 39842,
+  "flowsPerGame": {
+   "STARTING_FUNDS": {
+    "created": 50000,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "PROPERTY_PURCHASE": {
+    "created": 0,
+    "sunk": 27633,
+    "p2p": 0
+   },
+   "HOUSE_PURCHASE": {
+    "created": 0,
+    "sunk": 38533,
+    "p2p": 0
+   },
+   "HOTEL_PURCHASE": {
+    "created": 0,
+    "sunk": 5400,
+    "p2p": 0
+   },
+   "CARD_REWARD": {
+    "created": 9750,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "START_REWARD": {
+    "created": 28700,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "AUCTION_PAYMENT": {
+    "created": 0,
+    "sunk": 11347,
+    "p2p": 0
+   },
+   "CLUB_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 270
+   },
+   "REST_HOUSE_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 243
+   },
+   "TAX_PAYMENT": {
+    "created": 0,
+    "sunk": 1685,
+    "p2p": 0
+   },
+   "CARD_PAYMENT": {
+    "created": 0,
+    "sunk": 7903,
+    "p2p": 0
+   },
+   "RENT_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 38895
+   },
+   "LOAN_DISBURSEMENT": {
+    "created": 12700,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "LOAN_INTEREST": {
+    "created": 0,
+    "sunk": 1122,
+    "p2p": 0
+   },
+   "MORTGAGE": {
+    "created": 2803,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "CARD_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 88
+   },
+   "JAIL_FINE": {
+    "created": 0,
+    "sunk": 1483,
+    "p2p": 0
+   },
+   "UNMORTGAGE": {
+    "created": 0,
+    "sunk": 112,
+    "p2p": 0
+   },
+   "LOAN_REPAYMENT": {
+    "created": 0,
+    "sunk": 667,
+    "p2p": 0
+   },
+   "HOUSE_SALE": {
+    "created": 225,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "BANKRUPTCY_SETTLEMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 345
+   },
+   "HOTEL_SALE": {
+    "created": 133,
+    "sunk": 0,
+    "p2p": 0
+   }
+  },
+  "endCashPerActivePlayer": 4359,
+  "endNetWorthPerActivePlayer": 74297,
+  "endDebtPerActivePlayer": 5543,
+  "bankruptciesPerGame": 0.07,
+  "gamesWithBankruptcy": 0.07,
+  "winnerShareOfNetWorth": 0.719,
+  "topToMedianNetWorth": 9159.89,
+  "developedPropertiesAtEnd": 3.5,
+  "housesAtEnd": 5.6,
+  "hotelsAtEnd": 1.8,
+  "allOwnedYear": 9.75,
+  "allOwnedShare": 0.13,
+  "shortagesPerGame": 5.7,
+  "shortagesAssetRichPerGame": 5.53,
+  "shortagesFatalPerGame": 0.07,
+  "shortageReasons": {
+   "RENT": 144,
+   "CARD": 20,
+   "TAX": 3,
+   "CLUB": 4
+  },
+  "cashPerActivePlayerByYear": {
+   "1": 25000,
+   "2": 4538,
+   "3": 3452,
+   "4": 3184,
+   "5": 3681,
+   "6": 3792,
+   "7": 3553,
+   "8": 3938,
+   "9": 3958,
+   "10": 4282
+  },
+  "ownedByYear": {
+   "1": 0,
+   "2": 6.8,
+   "3": 11.5,
+   "4": 15.3,
+   "5": 18.2,
+   "6": 20.1,
+   "7": 21.5,
+   "8": 22.8,
+   "9": 23.6,
+   "10": 24.2
+  },
+  "buildingsByYear": {
+   "1": 0,
+   "2": 3.4,
+   "3": 3.5,
+   "4": 3.6,
+   "5": 3.9,
+   "6": 4.4,
+   "7": 4.7,
+   "8": 5.1,
+   "9": 5.9,
+   "10": 6.6
+  },
+  "byProfile": {
+   "INVESTOR": {
+    "n": 60,
+    "meanNetWorth": 71821,
+    "winRate": 0.5,
+    "bankruptRate": 0.033,
+    "meanCash": 4213,
+    "meanProps": 12.1,
+    "meanDebt": 5358,
+    "meanRentIn": 19448,
+    "meanRentOut": 19448,
+    "meanCredit": null
+   }
+  },
+  "events": {
+   "LOAN_TAKEN": 5.1,
+   "INTERMEDIATE_LOAN_TAKEN": 0,
+   "LOAN_DEFAULTED": 0,
+   "COLLATERAL_SEIZED": 0,
+   "LOAN_INSTALLMENT_OVERDUE": 0,
+   "INTERMEDIATE_LOAN_REPAID": 0,
+   "PLAYER_BANKRUPT": 0.07,
+   "CRISIS_STRUCK": 0,
+   "CRISIS_COVERED": 0,
+   "INSURANCE_PURCHASED": 0,
+   "INSURANCE_EXPIRED": 0,
+   "AUCTION_WON": 16.17,
+   "AUCTION_UNSOLD": 0.37,
+   "PROPERTY_MORTGAGED": 1.47,
+   "PROPERTY_UNMORTGAGED": 0.1,
+   "BUILDING_SOLD": 0.13
+  },
+  "crises": {},
+  "capitalLoans": {}
+ },
+ "classic|10y|4p|mixed": {
+  "games": 30,
+  "reasons": {
+   "LAST_PLAYER_STANDING": 10,
+   "DURATION_REACHED": 20
+  },
+  "meanYearReached": 9.63,
+  "meanTurnsPerPlayer": 49.7,
+  "ledgerViolations": 0,
+  "moneyCreatedPerGame": 278473,
+  "moneySunkPerGame": 264976,
+  "p2pPerGame": 161543,
+  "flowsPerGame": {
+   "STARTING_FUNDS": {
+    "created": 100000,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "PROPERTY_PURCHASE": {
+    "created": 0,
+    "sunk": 38950,
+    "p2p": 0
+   },
+   "HOUSE_PURCHASE": {
+    "created": 0,
+    "sunk": 123167,
+    "p2p": 0
+   },
+   "HOTEL_PURCHASE": {
+    "created": 0,
+    "sunk": 23533,
+    "p2p": 0
+   },
+   "RENT_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 151767
+   },
+   "LOAN_DISBURSEMENT": {
+    "created": 61633,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "LOAN_REPAYMENT": {
+    "created": 0,
+    "sunk": 15067,
+    "p2p": 0
+   },
+   "CARD_REWARD": {
+    "created": 20150,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "CARD_PAYMENT": {
+    "created": 0,
+    "sunk": 15265,
+    "p2p": 0
+   },
+   "AUCTION_PAYMENT": {
+    "created": 0,
+    "sunk": 28343,
+    "p2p": 0
+   },
+   "START_REWARD": {
+    "created": 54900,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "LOAN_INTEREST": {
+    "created": 0,
+    "sunk": 4598,
+    "p2p": 0
+   },
+   "JAIL_FINE": {
+    "created": 0,
+    "sunk": 3450,
+    "p2p": 0
+   },
+   "TAX_PAYMENT": {
+    "created": 0,
+    "sunk": 3068,
+    "p2p": 0
+   },
+   "HOUSE_SALE": {
+    "created": 5983,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "MORTGAGE": {
+    "created": 26340,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "BANKRUPTCY_SETTLEMENT": {
+    "created": 0,
+    "sunk": 63,
+    "p2p": 6921
+   },
+   "REST_HOUSE_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 1243
+   },
+   "CLUB_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 1333
+   },
+   "UNMORTGAGE": {
+    "created": 0,
+    "sunk": 9471,
+    "p2p": 0
+   },
+   "HOTEL_SALE": {
+    "created": 9467,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "CARD_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 279
+   }
+  },
+  "endCashPerActivePlayer": 5547,
+  "endNetWorthPerActivePlayer": 79983,
+  "endDebtPerActivePlayer": 10397,
+  "bankruptciesPerGame": 1.57,
+  "gamesWithBankruptcy": 0.77,
+  "winnerShareOfNetWorth": 0.745,
+  "topToMedianNetWorth": 88672.88,
+  "developedPropertiesAtEnd": 7.2,
+  "housesAtEnd": 8.3,
+  "hotelsAtEnd": 5.2,
+  "allOwnedYear": 6.91,
+  "allOwnedShare": 0.73,
+  "shortagesPerGame": 22.1,
+  "shortagesAssetRichPerGame": 18.43,
+  "shortagesFatalPerGame": 1.57,
+  "shortageReasons": {
+   "RENT": 576,
+   "CARD": 68,
+   "TAX": 12,
+   "CLUB": 6,
+   "LOAN_INTEREST": 1
+  },
+  "cashPerActivePlayerByYear": {
+   "1": 25000,
+   "2": 6443,
+   "3": 5238,
+   "4": 4634,
+   "5": 4570,
+   "6": 4273,
+   "7": 4028,
+   "8": 3920,
+   "9": 4106,
+   "10": 4921
+  },
+  "ownedByYear": {
+   "1": 0,
+   "2": 11.5,
+   "3": 18.5,
+   "4": 21.9,
+   "5": 23.9,
+   "6": 24.6,
+   "7": 24.3,
+   "8": 24.8,
+   "9": 25.2,
+   "10": 24.6
+  },
+  "buildingsByYear": {
+   "1": 0,
+   "2": 6.5,
+   "3": 7.2,
+   "4": 8.4,
+   "5": 10.1,
+   "6": 11.5,
+   "7": 11.9,
+   "8": 12.3,
+   "9": 12.9,
+   "10": 12.9
+  },
+  "byProfile": {
+   "INSURER": {
+    "n": 20,
+    "meanNetWorth": 54887,
+    "winRate": 0.3,
+    "bankruptRate": 0.4,
+    "meanCash": 2847,
+    "meanProps": 6.3,
+    "meanDebt": 4300,
+    "meanRentIn": 42065,
+    "meanRentOut": 46130,
+    "meanCredit": null
+   },
+   "LOW": {
+    "n": 20,
+    "meanNetWorth": 3300,
+    "winRate": 0,
+    "bankruptRate": 0.75,
+    "meanCash": 1265,
+    "meanProps": 1,
+    "meanDebt": 0,
+    "meanRentIn": 1440,
+    "meanRentOut": 29618,
+    "meanCredit": null
+   },
+   "BORROWER": {
+    "n": 20,
+    "meanNetWorth": 36079,
+    "winRate": 0.2,
+    "bankruptRate": 0.4,
+    "meanCash": 3451,
+    "meanProps": 4.7,
+    "meanDebt": 5775,
+    "meanRentIn": 29828,
+    "meanRentOut": 41253,
+    "meanCredit": null
+   },
+   "DEADBEAT": {
+    "n": 20,
+    "meanNetWorth": 85172,
+    "winRate": 0.5,
+    "bankruptRate": 0.25,
+    "meanCash": 6525,
+    "meanProps": 7.8,
+    "meanDebt": 15000,
+    "meanRentIn": 70928,
+    "meanRentOut": 32605,
+    "meanCredit": null
+   },
+   "ALLIN": {
+    "n": 20,
+    "meanNetWorth": 57691,
+    "winRate": 0.2,
+    "bankruptRate": 0.3,
+    "meanCash": 2926,
+    "meanProps": 5.3,
+    "meanDebt": 7250,
+    "meanRentIn": 45165,
+    "meanRentOut": 37595,
+    "meanCredit": null
+   },
+   "INVESTOR": {
+    "n": 20,
+    "meanNetWorth": 54810,
+    "winRate": 0.3,
+    "bankruptRate": 0.25,
+    "meanCash": 3233,
+    "meanProps": 7.5,
+    "meanDebt": 5625,
+    "meanRentIn": 38225,
+    "meanRentOut": 40450,
+    "meanCredit": null
+   }
+  },
+  "events": {
+   "LOAN_TAKEN": 14.57,
+   "INTERMEDIATE_LOAN_TAKEN": 0,
+   "LOAN_DEFAULTED": 0,
+   "COLLATERAL_SEIZED": 0,
+   "LOAN_INSTALLMENT_OVERDUE": 0,
+   "INTERMEDIATE_LOAN_REPAID": 0,
+   "PLAYER_BANKRUPT": 1.57,
+   "CRISIS_STRUCK": 0,
+   "CRISIS_COVERED": 0,
+   "INSURANCE_PURCHASED": 0,
+   "INSURANCE_EXPIRED": 0,
+   "AUCTION_WON": 17.3,
+   "AUCTION_UNSOLD": 0.03,
+   "PROPERTY_MORTGAGED": 14.1,
+   "PROPERTY_UNMORTGAGED": 4.97,
+   "BUILDING_SOLD": 4.33
+  },
+  "crises": {},
+  "capitalLoans": {}
+ },
+ "classic|10y|4p|uniform": {
+  "games": 30,
+  "reasons": {
+   "DURATION_REACHED": 27,
+   "LAST_PLAYER_STANDING": 3
+  },
+  "meanYearReached": 9.87,
+  "meanTurnsPerPlayer": 51.6,
+  "ledgerViolations": 0,
+  "moneyCreatedPerGame": 241357,
+  "moneySunkPerGame": 223897,
+  "p2pPerGame": 163594,
+  "flowsPerGame": {
+   "STARTING_FUNDS": {
+    "created": 100000,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "PROPERTY_PURCHASE": {
+    "created": 0,
+    "sunk": 40450,
+    "p2p": 0
+   },
+   "HOUSE_PURCHASE": {
+    "created": 0,
+    "sunk": 105583,
+    "p2p": 0
+   },
+   "HOTEL_PURCHASE": {
+    "created": 0,
+    "sunk": 17850,
+    "p2p": 0
+   },
+   "RENT_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 157702
+   },
+   "CARD_REWARD": {
+    "created": 22933,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "CARD_PAYMENT": {
+    "created": 0,
+    "sunk": 15557,
+    "p2p": 0
+   },
+   "AUCTION_PAYMENT": {
+    "created": 0,
+    "sunk": 29913,
+    "p2p": 0
+   },
+   "START_REWARD": {
+    "created": 57950,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "JAIL_FINE": {
+    "created": 0,
+    "sunk": 3317,
+    "p2p": 0
+   },
+   "LOAN_DISBURSEMENT": {
+    "created": 42850,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "REST_HOUSE_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 1410
+   },
+   "TAX_PAYMENT": {
+    "created": 0,
+    "sunk": 3422,
+    "p2p": 0
+   },
+   "LOAN_INTEREST": {
+    "created": 0,
+    "sunk": 4143,
+    "p2p": 0
+   },
+   "CLUB_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 1513
+   },
+   "CARD_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 568
+   },
+   "LOAN_REPAYMENT": {
+    "created": 0,
+    "sunk": 1867,
+    "p2p": 0
+   },
+   "MORTGAGE": {
+    "created": 11990,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "HOUSE_SALE": {
+    "created": 3200,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "HOTEL_SALE": {
+    "created": 2433,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "BANKRUPTCY_SETTLEMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 2401
+   },
+   "UNMORTGAGE": {
+    "created": 0,
+    "sunk": 1795,
+    "p2p": 0
+   }
+  },
+  "endCashPerActivePlayer": 5085,
+  "endNetWorthPerActivePlayer": 57794,
+  "endDebtPerActivePlayer": 8646,
+  "bankruptciesPerGame": 0.57,
+  "gamesWithBankruptcy": 0.3,
+  "winnerShareOfNetWorth": 0.628,
+  "topToMedianNetWorth": 53745.06,
+  "developedPropertiesAtEnd": 7.7,
+  "housesAtEnd": 10.1,
+  "hotelsAtEnd": 5.1,
+  "allOwnedYear": 6.75,
+  "allOwnedShare": 0.8,
+  "shortagesPerGame": 21.77,
+  "shortagesAssetRichPerGame": 19.27,
+  "shortagesFatalPerGame": 0.57,
+  "shortageReasons": {
+   "RENT": 578,
+   "CARD": 50,
+   "TAX": 16,
+   "CLUB": 9
+  },
+  "cashPerActivePlayerByYear": {
+   "1": 25000,
+   "2": 4713,
+   "3": 3078,
+   "4": 3306,
+   "5": 3697,
+   "6": 4063,
+   "7": 4274,
+   "8": 4041,
+   "9": 4400,
+   "10": 4975
+  },
+  "ownedByYear": {
+   "1": 0,
+   "2": 11.5,
+   "3": 18.3,
+   "4": 21.6,
+   "5": 23.8,
+   "6": 24.8,
+   "7": 25.3,
+   "8": 25.4,
+   "9": 25.5,
+   "10": 25.6
+  },
+  "buildingsByYear": {
+   "1": 0,
+   "2": 6.7,
+   "3": 7.2,
+   "4": 7.9,
+   "5": 8.5,
+   "6": 10.1,
+   "7": 11.1,
+   "8": 12.9,
+   "9": 13.9,
+   "10": 14.8
+  },
+  "byProfile": {
+   "INVESTOR": {
+    "n": 120,
+    "meanNetWorth": 49606,
+    "winRate": 0.25,
+    "bankruptRate": 0.142,
+    "meanCash": 4365,
+    "meanProps": 6,
+    "meanDebt": 7421,
+    "meanRentIn": 39425,
+    "meanRentOut": 39425,
+    "meanCredit": null
+   }
+  },
+  "events": {
+   "LOAN_TAKEN": 18.97,
+   "INTERMEDIATE_LOAN_TAKEN": 0,
+   "LOAN_DEFAULTED": 0,
+   "COLLATERAL_SEIZED": 0,
+   "LOAN_INSTALLMENT_OVERDUE": 0,
+   "INTERMEDIATE_LOAN_REPAID": 0,
+   "PLAYER_BANKRUPT": 0.57,
+   "CRISIS_STRUCK": 0,
+   "CRISIS_COVERED": 0,
+   "INSURANCE_PURCHASED": 0,
+   "INSURANCE_EXPIRED": 0,
+   "AUCTION_WON": 15.13,
+   "AUCTION_UNSOLD": 0,
+   "PROPERTY_MORTGAGED": 5.23,
+   "PROPERTY_UNMORTGAGED": 0.97,
+   "BUILDING_SOLD": 1.73
+  },
+  "crises": {},
+  "capitalLoans": {}
+ },
+ "classic|10y|8p|mixed": {
+  "games": 30,
+  "reasons": {
+   "LAST_PLAYER_STANDING": 20,
+   "DURATION_REACHED": 10
+  },
+  "meanYearReached": 9.1,
+  "meanTurnsPerPlayer": 45.7,
+  "ledgerViolations": 0,
+  "moneyCreatedPerGame": 650257,
+  "moneySunkPerGame": 630234,
+  "p2pPerGame": 553732,
+  "flowsPerGame": {
+   "STARTING_FUNDS": {
+    "created": 200000,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "PROPERTY_PURCHASE": {
+    "created": 0,
+    "sunk": 83513,
+    "p2p": 0
+   },
+   "LOAN_DISBURSEMENT": {
+    "created": 161550,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "LOAN_REPAYMENT": {
+    "created": 0,
+    "sunk": 39850,
+    "p2p": 0
+   },
+   "HOUSE_PURCHASE": {
+    "created": 0,
+    "sunk": 293683,
+    "p2p": 0
+   },
+   "HOTEL_PURCHASE": {
+    "created": 0,
+    "sunk": 79633,
+    "p2p": 0
+   },
+   "CARD_REWARD": {
+    "created": 33700,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "RENT_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 517282
+   },
+   "JAIL_FINE": {
+    "created": 0,
+    "sunk": 5917,
+    "p2p": 0
+   },
+   "CARD_PAYMENT": {
+    "created": 0,
+    "sunk": 26267,
+    "p2p": 0
+   },
+   "CLUB_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 5820
+   },
+   "AUCTION_PAYMENT": {
+    "created": 0,
+    "sunk": 54210,
+    "p2p": 0
+   },
+   "REST_HOUSE_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 4997
+   },
+   "START_REWARD": {
+    "created": 102000,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "TAX_PAYMENT": {
+    "created": 0,
+    "sunk": 5088,
+    "p2p": 0
+   },
+   "LOAN_INTEREST": {
+    "created": 0,
+    "sunk": 13037,
+    "p2p": 0
+   },
+   "MORTGAGE": {
+    "created": 72982,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "UNMORTGAGE": {
+    "created": 0,
+    "sunk": 28965,
+    "p2p": 0
+   },
+   "HOUSE_SALE": {
+    "created": 22525,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "BANKRUPTCY_SETTLEMENT": {
+    "created": 0,
+    "sunk": 71,
+    "p2p": 24784
+   },
+   "HOTEL_SALE": {
+    "created": 57500,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "CARD_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 849
+   }
+  },
+  "endCashPerActivePlayer": 12014,
+  "endNetWorthPerActivePlayer": 171796,
+  "endDebtPerActivePlayer": 13200,
+  "bankruptciesPerGame": 6.33,
+  "gamesWithBankruptcy": 1,
+  "winnerShareOfNetWorth": 0.899,
+  "topToMedianNetWorth": 256967.67,
+  "developedPropertiesAtEnd": 12.4,
+  "housesAtEnd": 2.1,
+  "hotelsAtEnd": 11.6,
+  "allOwnedYear": 4.96,
+  "allOwnedShare": 0.8,
+  "shortagesPerGame": 63.03,
+  "shortagesAssetRichPerGame": 46.07,
+  "shortagesFatalPerGame": 6.33,
+  "shortageReasons": {
+   "RENT": 1741,
+   "TAX": 23,
+   "CARD": 105,
+   "CLUB": 19,
+   "LOAN_INTEREST": 3
+  },
+  "cashPerActivePlayerByYear": {
+   "1": 25000,
+   "2": 7828,
+   "3": 5783,
+   "4": 5402,
+   "5": 5174,
+   "6": 6841,
+   "7": 7091,
+   "8": 9192,
+   "9": 9011,
+   "10": 11088
+  },
+  "ownedByYear": {
+   "1": 0,
+   "2": 17.7,
+   "3": 23.7,
+   "4": 25.1,
+   "5": 25,
+   "6": 24.1,
+   "7": 23.9,
+   "8": 23.2,
+   "9": 24.2,
+   "10": 22.3
+  },
+  "buildingsByYear": {
+   "1": 0,
+   "2": 11.8,
+   "3": 15.3,
+   "4": 17,
+   "5": 18.7,
+   "6": 18.4,
+   "7": 17.7,
+   "8": 17.6,
+   "9": 16.2,
+   "10": 15.5
+  },
+  "byProfile": {
+   "BORROWER": {
+    "n": 40,
+    "meanNetWorth": 16906,
+    "winRate": 0.05,
+    "bankruptRate": 0.85,
+    "meanCash": 988,
+    "meanProps": 1.3,
+    "meanDebt": 1663,
+    "meanRentIn": 57964,
+    "meanRentOut": 77455,
+    "meanCredit": null
+   },
+   "ALLIN": {
+    "n": 40,
+    "meanNetWorth": 54527,
+    "winRate": 0.175,
+    "bankruptRate": 0.675,
+    "meanCash": 3411,
+    "meanProps": 3.4,
+    "meanDebt": 2375,
+    "meanRentIn": 90701,
+    "meanRentOut": 71729,
+    "meanCredit": null
+   },
+   "INSURER": {
+    "n": 40,
+    "meanNetWorth": 16134,
+    "winRate": 0.075,
+    "bankruptRate": 0.9,
+    "meanCash": 1614,
+    "meanProps": 1,
+    "meanDebt": 213,
+    "meanRentIn": 51830,
+    "meanRentOut": 73759,
+    "meanCredit": null
+   },
+   "INVESTOR": {
+    "n": 40,
+    "meanNetWorth": 18449,
+    "winRate": 0.05,
+    "bankruptRate": 0.775,
+    "meanCash": 1001,
+    "meanProps": 1.8,
+    "meanDebt": 3250,
+    "meanRentIn": 53745,
+    "meanRentOut": 75328,
+    "meanCredit": null
+   },
+   "DEADBEAT": {
+    "n": 40,
+    "meanNetWorth": 108728,
+    "winRate": 0.4,
+    "bankruptRate": 0.55,
+    "meanCash": 8003,
+    "meanProps": 6,
+    "meanDebt": 9000,
+    "meanRentIn": 132839,
+    "meanRentOut": 61800,
+    "meanCredit": null
+   },
+   "LOW": {
+    "n": 40,
+    "meanNetWorth": 0,
+    "winRate": 0,
+    "bankruptRate": 1,
+    "meanCash": 0,
+    "meanProps": 0,
+    "meanDebt": 0,
+    "meanRentIn": 883,
+    "meanRentOut": 27891,
+    "meanCredit": null
+   }
+  },
+  "events": {
+   "LOAN_TAKEN": 39.97,
+   "INTERMEDIATE_LOAN_TAKEN": 0,
+   "LOAN_DEFAULTED": 0,
+   "COLLATERAL_SEIZED": 0,
+   "LOAN_INSTALLMENT_OVERDUE": 0,
+   "INTERMEDIATE_LOAN_REPAID": 0,
+   "PLAYER_BANKRUPT": 6.33,
+   "CRISIS_STRUCK": 0,
+   "CRISIS_COVERED": 0,
+   "INSURANCE_PURCHASED": 0,
+   "INSURANCE_EXPIRED": 0,
+   "AUCTION_WON": 17.03,
+   "AUCTION_UNSOLD": 0,
+   "PROPERTY_MORTGAGED": 35.07,
+   "PROPERTY_UNMORTGAGED": 12.67,
+   "BUILDING_SOLD": 18.37
+  },
+  "crises": {},
+  "capitalLoans": {}
+ },
+ "classic|10y|8p|uniform": {
+  "games": 30,
+  "reasons": {
+   "DURATION_REACHED": 25,
+   "LAST_PLAYER_STANDING": 5
+  },
+  "meanYearReached": 9.7,
+  "meanTurnsPerPlayer": 49.7,
+  "ledgerViolations": 0,
+  "moneyCreatedPerGame": 547507,
+  "moneySunkPerGame": 490391,
+  "p2pPerGame": 588021,
+  "flowsPerGame": {
+   "STARTING_FUNDS": {
+    "created": 200000,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "PROPERTY_PURCHASE": {
+    "created": 0,
+    "sunk": 86180,
+    "p2p": 0
+   },
+   "HOUSE_PURCHASE": {
+    "created": 0,
+    "sunk": 227650,
+    "p2p": 0
+   },
+   "HOTEL_PURCHASE": {
+    "created": 0,
+    "sunk": 57467,
+    "p2p": 0
+   },
+   "CARD_REWARD": {
+    "created": 34100,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "RENT_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 558795
+   },
+   "JAIL_FINE": {
+    "created": 0,
+    "sunk": 6500,
+    "p2p": 0
+   },
+   "CARD_PAYMENT": {
+    "created": 0,
+    "sunk": 28358,
+    "p2p": 0
+   },
+   "CLUB_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 7597
+   },
+   "AUCTION_PAYMENT": {
+    "created": 0,
+    "sunk": 46393,
+    "p2p": 0
+   },
+   "REST_HOUSE_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 6145
+   },
+   "START_REWARD": {
+    "created": 111750,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "TAX_PAYMENT": {
+    "created": 0,
+    "sunk": 5198,
+    "p2p": 0
+   },
+   "LOAN_DISBURSEMENT": {
+    "created": 130417,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "LOAN_INTEREST": {
+    "created": 0,
+    "sunk": 12405,
+    "p2p": 0
+   },
+   "HOUSE_SALE": {
+    "created": 13683,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "LOAN_REPAYMENT": {
+    "created": 0,
+    "sunk": 15517,
+    "p2p": 0
+   },
+   "MORTGAGE": {
+    "created": 35257,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "BANKRUPTCY_SETTLEMENT": {
+    "created": 0,
+    "sunk": 66,
+    "p2p": 14271
+   },
+   "HOTEL_SALE": {
+    "created": 22300,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "UNMORTGAGE": {
+    "created": 0,
+    "sunk": 4657,
+    "p2p": 0
+   },
+   "CARD_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 1213
+   }
+  },
+  "endCashPerActivePlayer": 14399,
+  "endNetWorthPerActivePlayer": 83023,
+  "endDebtPerActivePlayer": 8697,
+  "bankruptciesPerGame": 4.03,
+  "gamesWithBankruptcy": 1,
+  "winnerShareOfNetWorth": 0.621,
+  "topToMedianNetWorth": 165809.12,
+  "developedPropertiesAtEnd": 13,
+  "housesAtEnd": 5.7,
+  "hotelsAtEnd": 11.2,
+  "allOwnedYear": 4.48,
+  "allOwnedShare": 0.9,
+  "shortagesPerGame": 63.27,
+  "shortagesAssetRichPerGame": 47.13,
+  "shortagesFatalPerGame": 4.03,
+  "shortageReasons": {
+   "RENT": 1770,
+   "CLUB": 32,
+   "CARD": 71,
+   "TAX": 25
+  },
+  "cashPerActivePlayerByYear": {
+   "1": 25000,
+   "2": 6029,
+   "3": 4303,
+   "4": 4730,
+   "5": 5179,
+   "6": 5775,
+   "7": 7630,
+   "8": 10281,
+   "9": 13604,
+   "10": 11523
+  },
+  "ownedByYear": {
+   "1": 0,
+   "2": 17.7,
+   "3": 23.7,
+   "4": 25.3,
+   "5": 25.7,
+   "6": 25.5,
+   "7": 25.1,
+   "8": 24.2,
+   "9": 23.8,
+   "10": 23.9
+  },
+  "buildingsByYear": {
+   "1": 0,
+   "2": 12.5,
+   "3": 15.1,
+   "4": 16.3,
+   "5": 18.8,
+   "6": 19.5,
+   "7": 18.8,
+   "8": 17.9,
+   "9": 17.3,
+   "10": 18.6
+  },
+  "byProfile": {
+   "INVESTOR": {
+    "n": 240,
+    "meanNetWorth": 41166,
+    "winRate": 0.125,
+    "bankruptRate": 0.504,
+    "meanCash": 7139,
+    "meanProps": 2.8,
+    "meanDebt": 4313,
+    "meanRentIn": 69849,
+    "meanRentOut": 69849,
+    "meanCredit": null
+   }
+  },
+  "events": {
+   "LOAN_TAKEN": 50.77,
+   "INTERMEDIATE_LOAN_TAKEN": 0,
+   "LOAN_DEFAULTED": 0,
+   "COLLATERAL_SEIZED": 0,
+   "LOAN_INSTALLMENT_OVERDUE": 0,
+   "INTERMEDIATE_LOAN_REPAID": 0,
+   "PLAYER_BANKRUPT": 4.03,
+   "CRISIS_STRUCK": 0,
+   "CRISIS_COVERED": 0,
+   "INSURANCE_PURCHASED": 0,
+   "INSURANCE_EXPIRED": 0,
+   "AUCTION_WON": 12.83,
+   "AUCTION_UNSOLD": 0,
+   "PROPERTY_MORTGAGED": 16.2,
+   "PROPERTY_UNMORTGAGED": 2.33,
+   "BUILDING_SOLD": 9.3
+  },
+  "crises": {},
+  "capitalLoans": {}
+ },
+ "intermediate|5y|2p|mixed": {
+  "games": 30,
+  "reasons": {
+   "DURATION_VOTE": 27,
+   "LAST_PLAYER_STANDING": 3
+  },
+  "meanYearReached": 4.93,
+  "meanTurnsPerPlayer": 26.4,
+  "ledgerViolations": 0,
+  "moneyCreatedPerGame": 100570,
+  "moneySunkPerGame": 91381,
+  "p2pPerGame": 14138,
+  "flowsPerGame": {
+   "STARTING_FUNDS": {
+    "created": 50000,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "CARD_REWARD": {
+    "created": 4817,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "LOAN_DISBURSEMENT": {
+    "created": 20567,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "PROPERTY_PURCHASE": {
+    "created": 0,
+    "sunk": 19150,
+    "p2p": 0
+   },
+   "HOUSE_PURCHASE": {
+    "created": 0,
+    "sunk": 31033,
+    "p2p": 0
+   },
+   "HOTEL_PURCHASE": {
+    "created": 0,
+    "sunk": 6183,
+    "p2p": 0
+   },
+   "CARD_PAYMENT": {
+    "created": 0,
+    "sunk": 4038,
+    "p2p": 0
+   },
+   "CRISIS_PAYMENT": {
+    "created": 0,
+    "sunk": 13800,
+    "p2p": 0
+   },
+   "START_REWARD": {
+    "created": 13650,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "AUCTION_PAYMENT": {
+    "created": 0,
+    "sunk": 6603,
+    "p2p": 0
+   },
+   "LOAN_REPAYMENT": {
+    "created": 0,
+    "sunk": 5452,
+    "p2p": 0
+   },
+   "LOAN_INTEREST": {
+    "created": 0,
+    "sunk": 1134,
+    "p2p": 0
+   },
+   "MORTGAGE": {
+    "created": 7162,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "TAX_PAYMENT": {
+    "created": 0,
+    "sunk": 848,
+    "p2p": 0
+   },
+   "RENT_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 13307
+   },
+   "OBJECTIVE_REWARD": {
+    "created": 2533,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "JAIL_FINE": {
+    "created": 0,
+    "sunk": 717,
+    "p2p": 0
+   },
+   "CLUB_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 147
+   },
+   "REST_HOUSE_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 107
+   },
+   "UNMORTGAGE": {
+    "created": 0,
+    "sunk": 1210,
+    "p2p": 0
+   },
+   "HOTEL_SALE": {
+    "created": 1500,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "INSURANCE_PREMIUM": {
+    "created": 0,
+    "sunk": 1170,
+    "p2p": 0
+   },
+   "CARD_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 50
+   },
+   "BANKRUPTCY_SETTLEMENT": {
+    "created": 0,
+    "sunk": 42,
+    "p2p": 528
+   },
+   "HOUSE_SALE": {
+    "created": 342,
+    "sunk": 0,
+    "p2p": 0
+   }
+  },
+  "endCashPerActivePlayer": 4836,
+  "endNetWorthPerActivePlayer": 56521,
+  "endDebtPerActivePlayer": 8708,
+  "bankruptciesPerGame": 0.1,
+  "gamesWithBankruptcy": 0.1,
+  "winnerShareOfNetWorth": 0.723,
+  "topToMedianNetWorth": 13043.82,
+  "developedPropertiesAtEnd": 2.7,
+  "housesAtEnd": 2.7,
+  "hotelsAtEnd": 1.5,
+  "allOwnedYear": 0,
+  "allOwnedShare": 0,
+  "shortagesPerGame": 5.87,
+  "shortagesAssetRichPerGame": 5.67,
+  "shortagesFatalPerGame": 0.1,
+  "shortageReasons": {
+   "CARD": 30,
+   "TAX": 7,
+   "CRISIS": 74,
+   "RENT": 63,
+   "CLUB": 2
+  },
+  "cashPerActivePlayerByYear": {
+   "1": 25000,
+   "2": 6946,
+   "3": 4487,
+   "4": 4146,
+   "5": 3638
+  },
+  "ownedByYear": {
+   "1": 0,
+   "2": 6.3,
+   "3": 10.4,
+   "4": 13.6,
+   "5": 16.2
+  },
+  "buildingsByYear": {
+   "1": 0,
+   "2": 3.4,
+   "3": 3.6,
+   "4": 3.8,
+   "5": 4
+  },
+  "byProfile": {
+   "LOW": {
+    "n": 10,
+    "meanNetWorth": 22945,
+    "winRate": 0,
+    "bankruptRate": 0.2,
+    "meanCash": 12105,
+    "meanProps": 4,
+    "meanDebt": 0,
+    "meanRentIn": 595,
+    "meanRentOut": 9010,
+    "meanCredit": 701
+   },
+   "BORROWER": {
+    "n": 10,
+    "meanNetWorth": 44086,
+    "winRate": 0.6,
+    "bankruptRate": 0.1,
+    "meanCash": 3308,
+    "meanProps": 7.4,
+    "meanDebt": 10962,
+    "meanRentIn": 6645,
+    "meanRentOut": 6845,
+    "meanCredit": 534
+   },
+   "DEADBEAT": {
+    "n": 10,
+    "meanNetWorth": 68088,
+    "winRate": 0.8,
+    "bankruptRate": 0,
+    "meanCash": 4380,
+    "meanProps": 12,
+    "meanDebt": 23723,
+    "meanRentIn": 11580,
+    "meanRentOut": 2800,
+    "meanCredit": 475
+   },
+   "INSURER": {
+    "n": 10,
+    "meanNetWorth": 42098,
+    "winRate": 0.2,
+    "bankruptRate": 0,
+    "meanCash": 2032,
+    "meanProps": 7.6,
+    "meanDebt": 7234,
+    "meanRentIn": 5230,
+    "meanRentOut": 10230,
+    "meanCredit": 702
+   },
+   "ALLIN": {
+    "n": 10,
+    "meanNetWorth": 78488,
+    "winRate": 0.8,
+    "bankruptRate": 0,
+    "meanCash": 1947,
+    "meanProps": 12.1,
+    "meanDebt": 4150,
+    "meanRentIn": 10070,
+    "meanRentOut": 5865,
+    "meanCredit": 700
+   },
+   "INVESTOR": {
+    "n": 10,
+    "meanNetWorth": 66466,
+    "winRate": 0.6,
+    "bankruptRate": 0,
+    "meanCash": 3795,
+    "meanProps": 10.5,
+    "meanDebt": 3569,
+    "meanRentIn": 5800,
+    "meanRentOut": 5170,
+    "meanCredit": 696
+   }
+  },
+  "events": {
+   "LOAN_TAKEN": 0,
+   "INTERMEDIATE_LOAN_TAKEN": 4.47,
+   "LOAN_DEFAULTED": 1.17,
+   "COLLATERAL_SEIZED": 0,
+   "LOAN_INSTALLMENT_OVERDUE": 4.43,
+   "INTERMEDIATE_LOAN_REPAID": 0.7,
+   "PLAYER_BANKRUPT": 0.1,
+   "CRISIS_STRUCK": 4.6,
+   "CRISIS_COVERED": 0.3,
+   "INSURANCE_PURCHASED": 2.07,
+   "INSURANCE_EXPIRED": 1.77,
+   "AUCTION_WON": 12.53,
+   "AUCTION_UNSOLD": 3.7,
+   "PROPERTY_MORTGAGED": 4,
+   "PROPERTY_UNMORTGAGED": 0.7,
+   "BUILDING_SOLD": 0.37
+  },
+  "crises": {
+   "PAID": 138,
+   "COVERED": 9
+  },
+  "capitalLoans": {
+   "DEFAULTED": 33,
+   "REPAID": 21,
+   "ACTIVE": 76,
+   "SETTLED": 1,
+   "WRITTEN_OFF": 3
+  }
+ },
+ "intermediate|5y|2p|uniform": {
+  "games": 30,
+  "reasons": {
+   "DURATION_VOTE": 30
+  },
+  "meanYearReached": 5,
+  "meanTurnsPerPlayer": 27.3,
+  "ledgerViolations": 0,
+  "moneyCreatedPerGame": 81233,
+  "moneySunkPerGame": 73794,
+  "p2pPerGame": 12553,
+  "flowsPerGame": {
+   "STARTING_FUNDS": {
+    "created": 50000,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "CARD_REWARD": {
+    "created": 4933,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "PROPERTY_PURCHASE": {
+    "created": 0,
+    "sunk": 18173,
+    "p2p": 0
+   },
+   "HOUSE_PURCHASE": {
+    "created": 0,
+    "sunk": 22300,
+    "p2p": 0
+   },
+   "HOTEL_PURCHASE": {
+    "created": 0,
+    "sunk": 3500,
+    "p2p": 0
+   },
+   "CARD_PAYMENT": {
+    "created": 0,
+    "sunk": 3680,
+    "p2p": 0
+   },
+   "CRISIS_PAYMENT": {
+    "created": 0,
+    "sunk": 15000,
+    "p2p": 0
+   },
+   "AUCTION_PAYMENT": {
+    "created": 0,
+    "sunk": 6913,
+    "p2p": 0
+   },
+   "START_REWARD": {
+    "created": 14450,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "LOAN_DISBURSEMENT": {
+    "created": 8300,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "TAX_PAYMENT": {
+    "created": 0,
+    "sunk": 715,
+    "p2p": 0
+   },
+   "LOAN_REPAYMENT": {
+    "created": 0,
+    "sunk": 2441,
+    "p2p": 0
+   },
+   "LOAN_INTEREST": {
+    "created": 0,
+    "sunk": 358,
+    "p2p": 0
+   },
+   "RENT_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 12160
+   },
+   "REST_HOUSE_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 133
+   },
+   "OBJECTIVE_REWARD": {
+    "created": 2567,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "JAIL_FINE": {
+    "created": 0,
+    "sunk": 667,
+    "p2p": 0
+   },
+   "CLUB_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 193
+   },
+   "MORTGAGE": {
+    "created": 683,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "CARD_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 67
+   },
+   "UNMORTGAGE": {
+    "created": 0,
+    "sunk": 46,
+    "p2p": 0
+   },
+   "HOUSE_SALE": {
+    "created": 300,
+    "sunk": 0,
+    "p2p": 0
+   }
+  },
+  "endCashPerActivePlayer": 3720,
+  "endNetWorthPerActivePlayer": 59724,
+  "endDebtPerActivePlayer": 3002,
+  "bankruptciesPerGame": 0,
+  "gamesWithBankruptcy": 0,
+  "winnerShareOfNetWorth": 0.688,
+  "topToMedianNetWorth": 3.53,
+  "developedPropertiesAtEnd": 2.4,
+  "housesAtEnd": 2.6,
+  "hotelsAtEnd": 1.2,
+  "allOwnedYear": 0,
+  "allOwnedShare": 0,
+  "shortagesPerGame": 4.83,
+  "shortagesAssetRichPerGame": 4.77,
+  "shortagesFatalPerGame": 0,
+  "shortageReasons": {
+   "CRISIS": 53,
+   "CARD": 19,
+   "TAX": 5,
+   "RENT": 67,
+   "CLUB": 1
+  },
+  "cashPerActivePlayerByYear": {
+   "1": 25000,
+   "2": 4090,
+   "3": 2817,
+   "4": 2525,
+   "5": 2205
+  },
+  "ownedByYear": {
+   "1": 0,
+   "2": 6.4,
+   "3": 10.7,
+   "4": 14,
+   "5": 16.9
+  },
+  "buildingsByYear": {
+   "1": 0,
+   "2": 3.4,
+   "3": 3.5,
+   "4": 3.6,
+   "5": 3.7
+  },
+  "byProfile": {
+   "INVESTOR": {
+    "n": 60,
+    "meanNetWorth": 59724,
+    "winRate": 0.5,
+    "bankruptRate": 0,
+    "meanCash": 3720,
+    "meanProps": 9.4,
+    "meanDebt": 3002,
+    "meanRentIn": 6080,
+    "meanRentOut": 6080,
+    "meanCredit": 699
+   }
+  },
+  "events": {
+   "LOAN_TAKEN": 0,
+   "INTERMEDIATE_LOAN_TAKEN": 4.33,
+   "LOAN_DEFAULTED": 0.13,
+   "COLLATERAL_SEIZED": 0,
+   "LOAN_INSTALLMENT_OVERDUE": 2.23,
+   "INTERMEDIATE_LOAN_REPAID": 0.83,
+   "PLAYER_BANKRUPT": 0,
+   "CRISIS_STRUCK": 5,
+   "CRISIS_COVERED": 0,
+   "INSURANCE_PURCHASED": 0,
+   "INSURANCE_EXPIRED": 0,
+   "AUCTION_WON": 13.37,
+   "AUCTION_UNSOLD": 2.63,
+   "PROPERTY_MORTGAGED": 0.5,
+   "PROPERTY_UNMORTGAGED": 0.03,
+   "BUILDING_SOLD": 0.13
+  },
+  "crises": {
+   "PAID": 150
+  },
+  "capitalLoans": {
+   "REPAID": 25,
+   "ACTIVE": 101,
+   "DEFAULTED": 4
+  }
+ },
+ "intermediate|5y|4p|mixed": {
+  "games": 30,
+  "reasons": {
+   "DURATION_VOTE": 30
+  },
+  "meanYearReached": 5,
+  "meanTurnsPerPlayer": 26.4,
+  "ledgerViolations": 0,
+  "moneyCreatedPerGame": 216338,
+  "moneySunkPerGame": 200114,
+  "p2pPerGame": 74226,
+  "flowsPerGame": {
+   "STARTING_FUNDS": {
+    "created": 100000,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "CARD_REWARD": {
+    "created": 10000,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "PROPERTY_PURCHASE": {
+    "created": 0,
+    "sunk": 34000,
+    "p2p": 0
+   },
+   "LOAN_DISBURSEMENT": {
+    "created": 47133,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "HOUSE_PURCHASE": {
+    "created": 0,
+    "sunk": 76867,
+    "p2p": 0
+   },
+   "HOTEL_PURCHASE": {
+    "created": 0,
+    "sunk": 14283,
+    "p2p": 0
+   },
+   "INSURANCE_PREMIUM": {
+    "created": 0,
+    "sunk": 3437,
+    "p2p": 0
+   },
+   "CLUB_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 823
+   },
+   "RENT_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 70730
+   },
+   "AUCTION_PAYMENT": {
+    "created": 0,
+    "sunk": 22853,
+    "p2p": 0
+   },
+   "REST_HOUSE_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 652
+   },
+   "START_REWARD": {
+    "created": 27850,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "LOAN_REPAYMENT": {
+    "created": 0,
+    "sunk": 17185,
+    "p2p": 0
+   },
+   "LOAN_INTEREST": {
+    "created": 0,
+    "sunk": 2975,
+    "p2p": 0
+   },
+   "JAIL_FINE": {
+    "created": 0,
+    "sunk": 1417,
+    "p2p": 0
+   },
+   "CARD_PAYMENT": {
+    "created": 0,
+    "sunk": 7822,
+    "p2p": 0
+   },
+   "MORTGAGE": {
+    "created": 17480,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "CRISIS_PAYMENT": {
+    "created": 0,
+    "sunk": 13600,
+    "p2p": 0
+   },
+   "TAX_PAYMENT": {
+    "created": 0,
+    "sunk": 1195,
+    "p2p": 0
+   },
+   "UNMORTGAGE": {
+    "created": 0,
+    "sunk": 4481,
+    "p2p": 0
+   },
+   "OBJECTIVE_REWARD": {
+    "created": 4533,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "HOTEL_SALE": {
+    "created": 6633,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "HOUSE_SALE": {
+    "created": 2708,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "CARD_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 126
+   },
+   "BANKRUPTCY_SETTLEMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 1895
+   }
+  },
+  "endCashPerActivePlayer": 4466,
+  "endNetWorthPerActivePlayer": 45463,
+  "endDebtPerActivePlayer": 8777,
+  "bankruptciesPerGame": 0.37,
+  "gamesWithBankruptcy": 0.33,
+  "winnerShareOfNetWorth": 0.52,
+  "topToMedianNetWorth": 5134.89,
+  "developedPropertiesAtEnd": 5,
+  "housesAtEnd": 6.5,
+  "hotelsAtEnd": 3,
+  "allOwnedYear": 0,
+  "allOwnedShare": 0,
+  "shortagesPerGame": 14.7,
+  "shortagesAssetRichPerGame": 13.93,
+  "shortagesFatalPerGame": 0.37,
+  "shortageReasons": {
+   "CRISIS": 78,
+   "RENT": 309,
+   "CARD": 42,
+   "TAX": 10,
+   "CLUB": 2
+  },
+  "cashPerActivePlayerByYear": {
+   "1": 25000,
+   "2": 6618,
+   "3": 4542,
+   "4": 4071,
+   "5": 3469
+  },
+  "ownedByYear": {
+   "1": 0,
+   "2": 10.8,
+   "3": 18,
+   "4": 21.6,
+   "5": 23.2
+  },
+  "buildingsByYear": {
+   "1": 0,
+   "2": 7.4,
+   "3": 8,
+   "4": 8.5,
+   "5": 8.8
+  },
+  "byProfile": {
+   "LOW": {
+    "n": 20,
+    "meanNetWorth": 14118,
+    "winRate": 0,
+    "bankruptRate": 0.2,
+    "meanCash": 6763,
+    "meanProps": 2.6,
+    "meanDebt": 0,
+    "meanRentIn": 1450,
+    "meanRentOut": 18855,
+    "meanCredit": 700
+   },
+   "DEADBEAT": {
+    "n": 20,
+    "meanNetWorth": 64739,
+    "winRate": 0.45,
+    "bankruptRate": 0,
+    "meanCash": 4785,
+    "meanProps": 9.3,
+    "meanDebt": 23705,
+    "meanRentIn": 31090,
+    "meanRentOut": 15895,
+    "meanCredit": 475
+   },
+   "BORROWER": {
+    "n": 20,
+    "meanNetWorth": 42729,
+    "winRate": 0.3,
+    "bankruptRate": 0.1,
+    "meanCash": 4031,
+    "meanProps": 6,
+    "meanDebt": 6849,
+    "meanRentIn": 24815,
+    "meanRentOut": 14855,
+    "meanCredit": 550
+   },
+   "INSURER": {
+    "n": 20,
+    "meanNetWorth": 28846,
+    "winRate": 0.2,
+    "bankruptRate": 0.2,
+    "meanCash": 2920,
+    "meanProps": 4.9,
+    "meanDebt": 4849,
+    "meanRentIn": 13435,
+    "meanRentOut": 19905,
+    "meanCredit": 691
+   },
+   "ALLIN": {
+    "n": 20,
+    "meanNetWorth": 53023,
+    "winRate": 0.35,
+    "bankruptRate": 0.05,
+    "meanCash": 2371,
+    "meanProps": 6.4,
+    "meanDebt": 5937,
+    "meanRentIn": 21238,
+    "meanRentOut": 16073,
+    "meanCredit": 689
+   },
+   "INVESTOR": {
+    "n": 20,
+    "meanNetWorth": 44319,
+    "winRate": 0.2,
+    "bankruptRate": 0,
+    "meanCash": 3469,
+    "meanProps": 6.6,
+    "meanDebt": 6492,
+    "meanRentIn": 14068,
+    "meanRentOut": 20513,
+    "meanCredit": 718
+   }
+  },
+  "events": {
+   "LOAN_TAKEN": 0,
+   "INTERMEDIATE_LOAN_TAKEN": 10.77,
+   "LOAN_DEFAULTED": 2.43,
+   "COLLATERAL_SEIZED": 0,
+   "LOAN_INSTALLMENT_OVERDUE": 9.57,
+   "INTERMEDIATE_LOAN_REPAID": 2.03,
+   "PLAYER_BANKRUPT": 0.37,
+   "CRISIS_STRUCK": 4.53,
+   "CRISIS_COVERED": 0.47,
+   "INSURANCE_PURCHASED": 5.47,
+   "INSURANCE_EXPIRED": 4.53,
+   "AUCTION_WON": 15.37,
+   "AUCTION_UNSOLD": 0.07,
+   "PROPERTY_MORTGAGED": 8.33,
+   "PROPERTY_UNMORTGAGED": 2.1,
+   "BUILDING_SOLD": 2.1
+  },
+  "crises": {
+   "COVERED": 14,
+   "PAID": 136
+  },
+  "capitalLoans": {
+   "DEFAULTED": 65,
+   "ACTIVE": 171,
+   "REPAID": 61,
+   "SETTLED": 3,
+   "WRITTEN_OFF": 23
+  }
+ },
+ "intermediate|5y|4p|uniform": {
+  "games": 30,
+  "reasons": {
+   "DURATION_VOTE": 30
+  },
+  "meanYearReached": 5,
+  "meanTurnsPerPlayer": 26.2,
+  "ledgerViolations": 0,
+  "moneyCreatedPerGame": 177558,
+  "moneySunkPerGame": 159189,
+  "p2pPerGame": 61591,
+  "flowsPerGame": {
+   "STARTING_FUNDS": {
+    "created": 100000,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "CARD_REWARD": {
+    "created": 11917,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "PROPERTY_PURCHASE": {
+    "created": 0,
+    "sunk": 34940,
+    "p2p": 0
+   },
+   "HOUSE_PURCHASE": {
+    "created": 0,
+    "sunk": 53433,
+    "p2p": 0
+   },
+   "HOTEL_PURCHASE": {
+    "created": 0,
+    "sunk": 8117,
+    "p2p": 0
+   },
+   "CLUB_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 890
+   },
+   "RENT_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 59692
+   },
+   "AUCTION_PAYMENT": {
+    "created": 0,
+    "sunk": 25047,
+    "p2p": 0
+   },
+   "REST_HOUSE_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 777
+   },
+   "CRISIS_PAYMENT": {
+    "created": 0,
+    "sunk": 14900,
+    "p2p": 0
+   },
+   "TAX_PAYMENT": {
+    "created": 0,
+    "sunk": 1247,
+    "p2p": 0
+   },
+   "START_REWARD": {
+    "created": 28100,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "JAIL_FINE": {
+    "created": 0,
+    "sunk": 1467,
+    "p2p": 0
+   },
+   "CARD_PAYMENT": {
+    "created": 0,
+    "sunk": 7590,
+    "p2p": 0
+   },
+   "LOAN_DISBURSEMENT": {
+    "created": 24217,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "LOAN_REPAYMENT": {
+    "created": 0,
+    "sunk": 10666,
+    "p2p": 0
+   },
+   "LOAN_INTEREST": {
+    "created": 0,
+    "sunk": 1552,
+    "p2p": 0
+   },
+   "OBJECTIVE_REWARD": {
+    "created": 5633,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "MORTGAGE": {
+    "created": 5542,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "HOUSE_SALE": {
+    "created": 850,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "HOTEL_SALE": {
+    "created": 1300,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "CARD_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 88
+   },
+   "UNMORTGAGE": {
+    "created": 0,
+    "sunk": 105,
+    "p2p": 0
+   },
+   "BANKRUPTCY_SETTLEMENT": {
+    "created": 0,
+    "sunk": 127,
+    "p2p": 145
+   }
+  },
+  "endCashPerActivePlayer": 4710,
+  "endNetWorthPerActivePlayer": 45243,
+  "endDebtPerActivePlayer": 3429,
+  "bankruptciesPerGame": 0.1,
+  "gamesWithBankruptcy": 0.1,
+  "winnerShareOfNetWorth": 0.43,
+  "topToMedianNetWorth": 2.91,
+  "developedPropertiesAtEnd": 4.8,
+  "housesAtEnd": 6.4,
+  "hotelsAtEnd": 2.3,
+  "allOwnedYear": 5,
+  "allOwnedShare": 0.03,
+  "shortagesPerGame": 14.2,
+  "shortagesAssetRichPerGame": 14.07,
+  "shortagesFatalPerGame": 0.1,
+  "shortageReasons": {
+   "RENT": 311,
+   "CRISIS": 67,
+   "CARD": 32,
+   "TAX": 6,
+   "CLUB": 10
+  },
+  "cashPerActivePlayerByYear": {
+   "1": 25000,
+   "2": 4042,
+   "3": 2844,
+   "4": 2902,
+   "5": 3013
+  },
+  "ownedByYear": {
+   "1": 0,
+   "2": 10.7,
+   "3": 18,
+   "4": 21.2,
+   "5": 23.2
+  },
+  "buildingsByYear": {
+   "1": 0,
+   "2": 6.9,
+   "3": 7.3,
+   "4": 7.8,
+   "5": 8.5
+  },
+  "byProfile": {
+   "INVESTOR": {
+    "n": 120,
+    "meanNetWorth": 44112,
+    "winRate": 0.25,
+    "bankruptRate": 0.025,
+    "meanCash": 4592,
+    "meanProps": 6.1,
+    "meanDebt": 3343,
+    "meanRentIn": 14923,
+    "meanRentOut": 14923,
+    "meanCredit": 712
+   }
+  },
+  "events": {
+   "LOAN_TAKEN": 0,
+   "INTERMEDIATE_LOAN_TAKEN": 11.97,
+   "LOAN_DEFAULTED": 0.17,
+   "COLLATERAL_SEIZED": 0,
+   "LOAN_INSTALLMENT_OVERDUE": 5.43,
+   "INTERMEDIATE_LOAN_REPAID": 3.27,
+   "PLAYER_BANKRUPT": 0.1,
+   "CRISIS_STRUCK": 5,
+   "CRISIS_COVERED": 0,
+   "INSURANCE_PURCHASED": 0,
+   "INSURANCE_EXPIRED": 0,
+   "AUCTION_WON": 14.93,
+   "AUCTION_UNSOLD": 0.13,
+   "PROPERTY_MORTGAGED": 2.63,
+   "PROPERTY_UNMORTGAGED": 0.07,
+   "BUILDING_SOLD": 0.5
+  },
+  "crises": {
+   "PAID": 149,
+   "BANKRUPT": 1
+  },
+  "capitalLoans": {
+   "REPAID": 98,
+   "ACTIVE": 247,
+   "DEFAULTED": 4,
+   "WRITTEN_OFF": 10
+  }
+ },
+ "intermediate|5y|8p|mixed": {
+  "games": 30,
+  "reasons": {
+   "DURATION_VOTE": 29,
+   "LAST_PLAYER_STANDING": 1
+  },
+  "meanYearReached": 5,
+  "meanTurnsPerPlayer": 26,
+  "ledgerViolations": 0,
+  "moneyCreatedPerGame": 444870,
+  "moneySunkPerGame": 415659,
+  "p2pPerGame": 265302,
+  "flowsPerGame": {
+   "STARTING_FUNDS": {
+    "created": 200000,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "PROPERTY_PURCHASE": {
+    "created": 0,
+    "sunk": 66660,
+    "p2p": 0
+   },
+   "LOAN_DISBURSEMENT": {
+    "created": 110900,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "HOUSE_PURCHASE": {
+    "created": 0,
+    "sunk": 174500,
+    "p2p": 0
+   },
+   "HOTEL_PURCHASE": {
+    "created": 0,
+    "sunk": 37133,
+    "p2p": 0
+   },
+   "CARD_REWARD": {
+    "created": 19400,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "RENT_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 249302
+   },
+   "INSURANCE_PREMIUM": {
+    "created": 0,
+    "sunk": 6423,
+    "p2p": 0
+   },
+   "CLUB_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 3707
+   },
+   "CRISIS_PAYMENT": {
+    "created": 0,
+    "sunk": 13500,
+    "p2p": 0
+   },
+   "AUCTION_PAYMENT": {
+    "created": 0,
+    "sunk": 44127,
+    "p2p": 0
+   },
+   "REST_HOUSE_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 3731
+   },
+   "TAX_PAYMENT": {
+    "created": 0,
+    "sunk": 1943,
+    "p2p": 0
+   },
+   "CARD_PAYMENT": {
+    "created": 0,
+    "sunk": 15102,
+    "p2p": 0
+   },
+   "START_REWARD": {
+    "created": 54850,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "LOAN_REPAYMENT": {
+    "created": 0,
+    "sunk": 36029,
+    "p2p": 0
+   },
+   "LOAN_INTEREST": {
+    "created": 0,
+    "sunk": 8563,
+    "p2p": 0
+   },
+   "MORTGAGE": {
+    "created": 26445,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "JAIL_FINE": {
+    "created": 0,
+    "sunk": 3167,
+    "p2p": 0
+   },
+   "HOTEL_SALE": {
+    "created": 18300,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "UNMORTGAGE": {
+    "created": 0,
+    "sunk": 8483,
+    "p2p": 0
+   },
+   "HOUSE_SALE": {
+    "created": 9508,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "BANKRUPTCY_SETTLEMENT": {
+    "created": 0,
+    "sunk": 30,
+    "p2p": 7907
+   },
+   "OBJECTIVE_REWARD": {
+    "created": 5467,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "CARD_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 657
+   }
+  },
+  "endCashPerActivePlayer": 5279,
+  "endNetWorthPerActivePlayer": 42119,
+  "endDebtPerActivePlayer": 10330,
+  "bankruptciesPerGame": 2.47,
+  "gamesWithBankruptcy": 0.87,
+  "winnerShareOfNetWorth": 0.474,
+  "topToMedianNetWorth": 46511.72,
+  "developedPropertiesAtEnd": 10.1,
+  "housesAtEnd": 9,
+  "hotelsAtEnd": 7,
+  "allOwnedYear": 4.13,
+  "allOwnedShare": 0.5,
+  "shortagesPerGame": 33.1,
+  "shortagesAssetRichPerGame": 25.83,
+  "shortagesFatalPerGame": 2.47,
+  "shortageReasons": {
+   "CRISIS": 57,
+   "RENT": 846,
+   "CARD": 57,
+   "CLUB": 23,
+   "TAX": 10
+  },
+  "cashPerActivePlayerByYear": {
+   "1": 25000,
+   "2": 9140,
+   "3": 5858,
+   "4": 4845,
+   "5": 4215
+  },
+  "ownedByYear": {
+   "1": 0,
+   "2": 18.1,
+   "3": 23.7,
+   "4": 25,
+   "5": 24.3
+  },
+  "buildingsByYear": {
+   "1": 0,
+   "2": 13.4,
+   "3": 15.5,
+   "4": 16.5,
+   "5": 16.1
+  },
+  "byProfile": {
+   "LOW": {
+    "n": 40,
+    "meanNetWorth": 2914,
+    "winRate": 0,
+    "bankruptRate": 0.7,
+    "meanCash": 1994,
+    "meanProps": 0.4,
+    "meanDebt": 0,
+    "meanRentIn": 1010,
+    "meanRentOut": 24384,
+    "meanCredit": 700
+   },
+   "BORROWER": {
+    "n": 40,
+    "meanNetWorth": 38204,
+    "winRate": 0.15,
+    "bankruptRate": 0.3,
+    "meanCash": 2885,
+    "meanProps": 3.9,
+    "meanDebt": 6525,
+    "meanRentIn": 44786,
+    "meanRentOut": 30948,
+    "meanCredit": 693
+   },
+   "INVESTOR": {
+    "n": 40,
+    "meanNetWorth": 20557,
+    "winRate": 0.05,
+    "bankruptRate": 0.25,
+    "meanCash": 3061,
+    "meanProps": 2.2,
+    "meanDebt": 4591,
+    "meanRentIn": 21981,
+    "meanRentOut": 34680,
+    "meanCredit": 712
+   },
+   "INSURER": {
+    "n": 40,
+    "meanNetWorth": 17663,
+    "winRate": 0,
+    "bankruptRate": 0.175,
+    "meanCash": 2515,
+    "meanProps": 2.5,
+    "meanDebt": 6408,
+    "meanRentIn": 21413,
+    "meanRentOut": 32813,
+    "meanCredit": 693
+   },
+   "DEADBEAT": {
+    "n": 40,
+    "meanNetWorth": 57764,
+    "winRate": 0.325,
+    "bankruptRate": 0.2,
+    "meanCash": 7949,
+    "meanProps": 5,
+    "meanDebt": 18954,
+    "meanRentIn": 58104,
+    "meanRentOut": 31216,
+    "meanCredit": 475
+   },
+   "ALLIN": {
+    "n": 40,
+    "meanNetWorth": 37694,
+    "winRate": 0.225,
+    "bankruptRate": 0.225,
+    "meanCash": 3504,
+    "meanProps": 3.4,
+    "meanDebt": 6391,
+    "meanRentIn": 39683,
+    "meanRentOut": 32936,
+    "meanCredit": 691
+   }
+  },
+  "events": {
+   "LOAN_TAKEN": 0,
+   "INTERMEDIATE_LOAN_TAKEN": 26.1,
+   "LOAN_DEFAULTED": 3.13,
+   "COLLATERAL_SEIZED": 0,
+   "LOAN_INSTALLMENT_OVERDUE": 17.13,
+   "INTERMEDIATE_LOAN_REPAID": 3.73,
+   "PLAYER_BANKRUPT": 2.47,
+   "CRISIS_STRUCK": 4.5,
+   "CRISIS_COVERED": 0.47,
+   "INSURANCE_PURCHASED": 9.77,
+   "INSURANCE_EXPIRED": 8.27,
+   "AUCTION_WON": 11.43,
+   "AUCTION_UNSOLD": 0,
+   "PROPERTY_MORTGAGED": 12.83,
+   "PROPERTY_UNMORTGAGED": 3.83,
+   "BUILDING_SOLD": 6.67
+  },
+  "crises": {
+   "PAID": 135,
+   "COVERED": 14
+  },
+  "capitalLoans": {
+   "ACTIVE": 405,
+   "REPAID": 112,
+   "WRITTEN_OFF": 193,
+   "DEFAULTED": 68,
+   "SETTLED": 5
+  }
+ },
+ "intermediate|5y|8p|uniform": {
+  "games": 30,
+  "reasons": {
+   "DURATION_VOTE": 30
+  },
+  "meanYearReached": 5,
+  "meanTurnsPerPlayer": 25.9,
+  "ledgerViolations": 0,
+  "moneyCreatedPerGame": 360947,
+  "moneySunkPerGame": 315376,
+  "p2pPerGame": 237358,
+  "flowsPerGame": {
+   "STARTING_FUNDS": {
+    "created": 200000,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "PROPERTY_PURCHASE": {
+    "created": 0,
+    "sunk": 64610,
+    "p2p": 0
+   },
+   "HOUSE_PURCHASE": {
+    "created": 0,
+    "sunk": 131717,
+    "p2p": 0
+   },
+   "HOTEL_PURCHASE": {
+    "created": 0,
+    "sunk": 25467,
+    "p2p": 0
+   },
+   "CARD_REWARD": {
+    "created": 21350,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "RENT_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 226848
+   },
+   "AUCTION_PAYMENT": {
+    "created": 0,
+    "sunk": 38070,
+    "p2p": 0
+   },
+   "CLUB_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 3817
+   },
+   "CRISIS_PAYMENT": {
+    "created": 0,
+    "sunk": 15000,
+    "p2p": 0
+   },
+   "REST_HOUSE_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 3587
+   },
+   "TAX_PAYMENT": {
+    "created": 0,
+    "sunk": 1955,
+    "p2p": 0
+   },
+   "CARD_PAYMENT": {
+    "created": 0,
+    "sunk": 15147,
+    "p2p": 0
+   },
+   "START_REWARD": {
+    "created": 55450,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "JAIL_FINE": {
+    "created": 0,
+    "sunk": 3333,
+    "p2p": 0
+   },
+   "LOAN_DISBURSEMENT": {
+    "created": 60233,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "LOAN_REPAYMENT": {
+    "created": 0,
+    "sunk": 17154,
+    "p2p": 0
+   },
+   "LOAN_INTEREST": {
+    "created": 0,
+    "sunk": 2636,
+    "p2p": 0
+   },
+   "CARD_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 1073
+   },
+   "MORTGAGE": {
+    "created": 9213,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "OBJECTIVE_REWARD": {
+    "created": 7967,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "HOUSE_SALE": {
+    "created": 3900,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "BANKRUPTCY_SETTLEMENT": {
+    "created": 0,
+    "sunk": 9,
+    "p2p": 2033
+   },
+   "UNMORTGAGE": {
+    "created": 0,
+    "sunk": 279,
+    "p2p": 0
+   },
+   "HOTEL_SALE": {
+    "created": 2833,
+    "sunk": 0,
+    "p2p": 0
+   }
+  },
+  "endCashPerActivePlayer": 6329,
+  "endNetWorthPerActivePlayer": 37221,
+  "endDebtPerActivePlayer": 4748,
+  "bankruptciesPerGame": 0.8,
+  "gamesWithBankruptcy": 0.63,
+  "winnerShareOfNetWorth": 0.364,
+  "topToMedianNetWorth": 6140.21,
+  "developedPropertiesAtEnd": 10.9,
+  "housesAtEnd": 10.4,
+  "hotelsAtEnd": 6.5,
+  "allOwnedYear": 4.23,
+  "allOwnedShare": 0.73,
+  "shortagesPerGame": 29.7,
+  "shortagesAssetRichPerGame": 25.47,
+  "shortagesFatalPerGame": 0.8,
+  "shortageReasons": {
+   "RENT": 755,
+   "CRISIS": 46,
+   "CARD": 51,
+   "CLUB": 28,
+   "TAX": 11
+  },
+  "cashPerActivePlayerByYear": {
+   "1": 25000,
+   "2": 6341,
+   "3": 4546,
+   "4": 4373,
+   "5": 4709
+  },
+  "ownedByYear": {
+   "1": 0,
+   "2": 18.1,
+   "3": 23.7,
+   "4": 25.2,
+   "5": 25.4
+  },
+  "buildingsByYear": {
+   "1": 0,
+   "2": 13,
+   "3": 14.9,
+   "4": 16.7,
+   "5": 17.1
+  },
+  "byProfile": {
+   "INVESTOR": {
+    "n": 240,
+    "meanNetWorth": 33499,
+    "winRate": 0.125,
+    "bankruptRate": 0.1,
+    "meanCash": 5696,
+    "meanProps": 3.1,
+    "meanDebt": 4273,
+    "meanRentIn": 28356,
+    "meanRentOut": 28356,
+    "meanCredit": 708
+   }
+  },
+  "events": {
+   "LOAN_TAKEN": 0,
+   "INTERMEDIATE_LOAN_TAKEN": 25.43,
+   "LOAN_DEFAULTED": 0.13,
+   "COLLATERAL_SEIZED": 0,
+   "LOAN_INSTALLMENT_OVERDUE": 8.8,
+   "INTERMEDIATE_LOAN_REPAID": 3.77,
+   "PLAYER_BANKRUPT": 0.8,
+   "CRISIS_STRUCK": 5,
+   "CRISIS_COVERED": 0,
+   "INSURANCE_PURCHASED": 0,
+   "INSURANCE_EXPIRED": 0,
+   "AUCTION_WON": 9.5,
+   "AUCTION_UNSOLD": 0,
+   "PROPERTY_MORTGAGED": 4.1,
+   "PROPERTY_UNMORTGAGED": 0.17,
+   "BUILDING_SOLD": 2.2
+  },
+  "crises": {
+   "PAID": 150
+  },
+  "capitalLoans": {
+   "REPAID": 113,
+   "ACTIVE": 521,
+   "WRITTEN_OFF": 127,
+   "DEFAULTED": 2
+  }
+ },
+ "intermediate|7y|2p|mixed": {
+  "games": 30,
+  "reasons": {
+   "DURATION_VOTE": 23,
+   "LAST_PLAYER_STANDING": 7
+  },
+  "meanYearReached": 6.67,
+  "meanTurnsPerPlayer": 35.3,
+  "ledgerViolations": 0,
+  "moneyCreatedPerGame": 114342,
+  "moneySunkPerGame": 107173,
+  "p2pPerGame": 20689,
+  "flowsPerGame": {
+   "STARTING_FUNDS": {
+    "created": 50000,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "PROPERTY_PURCHASE": {
+    "created": 0,
+    "sunk": 21480,
+    "p2p": 0
+   },
+   "LOAN_DISBURSEMENT": {
+    "created": 22750,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "JAIL_FINE": {
+    "created": 0,
+    "sunk": 833,
+    "p2p": 0
+   },
+   "CRISIS_PAYMENT": {
+    "created": 0,
+    "sunk": 19000,
+    "p2p": 0
+   },
+   "HOUSE_PURCHASE": {
+    "created": 0,
+    "sunk": 30817,
+    "p2p": 0
+   },
+   "HOTEL_PURCHASE": {
+    "created": 0,
+    "sunk": 6633,
+    "p2p": 0
+   },
+   "AUCTION_PAYMENT": {
+    "created": 0,
+    "sunk": 5033,
+    "p2p": 0
+   },
+   "START_REWARD": {
+    "created": 18750,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "TAX_PAYMENT": {
+    "created": 0,
+    "sunk": 1035,
+    "p2p": 0
+   },
+   "CARD_REWARD": {
+    "created": 6300,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "RENT_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 19758
+   },
+   "CLUB_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 197
+   },
+   "LOAN_REPAYMENT": {
+    "created": 0,
+    "sunk": 10328,
+    "p2p": 0
+   },
+   "LOAN_INTEREST": {
+    "created": 0,
+    "sunk": 1491,
+    "p2p": 0
+   },
+   "MORTGAGE": {
+    "created": 12042,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "REST_HOUSE_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 206
+   },
+   "CARD_PAYMENT": {
+    "created": 0,
+    "sunk": 5392,
+    "p2p": 0
+   },
+   "OBJECTIVE_REWARD": {
+    "created": 2133,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "HOTEL_SALE": {
+    "created": 2067,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "UNMORTGAGE": {
+    "created": 0,
+    "sunk": 3324,
+    "p2p": 0
+   },
+   "CARD_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 13
+   },
+   "HOUSE_SALE": {
+    "created": 300,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "INSURANCE_PREMIUM": {
+    "created": 0,
+    "sunk": 1807,
+    "p2p": 0
+   },
+   "BANKRUPTCY_SETTLEMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 515
+   }
+  },
+  "endCashPerActivePlayer": 4058,
+  "endNetWorthPerActivePlayer": 67511,
+  "endDebtPerActivePlayer": 7720,
+  "bankruptciesPerGame": 0.23,
+  "gamesWithBankruptcy": 0.23,
+  "winnerShareOfNetWorth": 0.776,
+  "topToMedianNetWorth": 24219.49,
+  "developedPropertiesAtEnd": 2.6,
+  "housesAtEnd": 2.4,
+  "hotelsAtEnd": 1.5,
+  "allOwnedYear": 0,
+  "allOwnedShare": 0,
+  "shortagesPerGame": 9.03,
+  "shortagesAssetRichPerGame": 8.57,
+  "shortagesFatalPerGame": 0.23,
+  "shortageReasons": {
+   "CRISIS": 122,
+   "RENT": 102,
+   "CARD": 36,
+   "TAX": 9,
+   "CLUB": 2
+  },
+  "cashPerActivePlayerByYear": {
+   "1": 25000,
+   "2": 7488,
+   "3": 4955,
+   "4": 3877,
+   "5": 3681,
+   "6": 3229,
+   "7": 2809
+  },
+  "ownedByYear": {
+   "1": 0,
+   "2": 5.9,
+   "3": 11.1,
+   "4": 14.4,
+   "5": 16.4,
+   "6": 18.5,
+   "7": 20.3
+  },
+  "buildingsByYear": {
+   "1": 0,
+   "2": 3.2,
+   "3": 3.5,
+   "4": 3.8,
+   "5": 3.8,
+   "6": 3.7,
+   "7": 4.1
+  },
+  "byProfile": {
+   "LOW": {
+    "n": 10,
+    "meanNetWorth": 15398,
+    "winRate": 0,
+    "bankruptRate": 0.5,
+    "meanCash": 6065,
+    "meanProps": 3.3,
+    "meanDebt": 0,
+    "meanRentIn": 1170,
+    "meanRentOut": 17000,
+    "meanCredit": 699
+   },
+   "BORROWER": {
+    "n": 10,
+    "meanNetWorth": 53791,
+    "winRate": 0.6,
+    "bankruptRate": 0.1,
+    "meanCash": 2185,
+    "meanProps": 7.5,
+    "meanDebt": 5385,
+    "meanRentIn": 12635,
+    "meanRentOut": 4675,
+    "meanCredit": 530
+   },
+   "DEADBEAT": {
+    "n": 10,
+    "meanNetWorth": 82094,
+    "winRate": 0.8,
+    "bankruptRate": 0,
+    "meanCash": 2502,
+    "meanProps": 16.3,
+    "meanDebt": 23724,
+    "meanRentIn": 11745,
+    "meanRentOut": 7275,
+    "meanCredit": 475
+   },
+   "INSURER": {
+    "n": 10,
+    "meanNetWorth": 52918,
+    "winRate": 0.4,
+    "bankruptRate": 0.1,
+    "meanCash": 2055,
+    "meanProps": 8.4,
+    "meanDebt": 4755,
+    "meanRentIn": 10645,
+    "meanRentOut": 14395,
+    "meanCredit": 668
+   },
+   "ALLIN": {
+    "n": 10,
+    "meanNetWorth": 74997,
+    "winRate": 0.5,
+    "bankruptRate": 0,
+    "meanCash": 4174,
+    "meanProps": 12.6,
+    "meanDebt": 4797,
+    "meanRentIn": 12595,
+    "meanRentOut": 9490,
+    "meanCredit": 610
+   },
+   "INVESTOR": {
+    "n": 10,
+    "meanNetWorth": 78614,
+    "winRate": 0.7,
+    "bankruptRate": 0,
+    "meanCash": 4525,
+    "meanProps": 11.9,
+    "meanDebt": 2253,
+    "meanRentIn": 10485,
+    "meanRentOut": 6440,
+    "meanCredit": 699
+   }
+  },
+  "events": {
+   "LOAN_TAKEN": 0,
+   "INTERMEDIATE_LOAN_TAKEN": 5.43,
+   "LOAN_DEFAULTED": 1.53,
+   "COLLATERAL_SEIZED": 0,
+   "LOAN_INSTALLMENT_OVERDUE": 6.63,
+   "INTERMEDIATE_LOAN_REPAID": 1.5,
+   "PLAYER_BANKRUPT": 0.23,
+   "CRISIS_STRUCK": 6.33,
+   "CRISIS_COVERED": 0.3,
+   "INSURANCE_PURCHASED": 2.8,
+   "INSURANCE_EXPIRED": 2.03,
+   "AUCTION_WON": 14.6,
+   "AUCTION_UNSOLD": 4.1,
+   "PROPERTY_MORTGAGED": 7.3,
+   "PROPERTY_UNMORTGAGED": 2,
+   "BUILDING_SOLD": 0.47
+  },
+  "crises": {
+   "PAID": 190,
+   "SKIPPED": 1,
+   "COVERED": 9
+  },
+  "capitalLoans": {
+   "SETTLED": 11,
+   "REPAID": 45,
+   "ACTIVE": 67,
+   "DEFAULTED": 33,
+   "WRITTEN_OFF": 7
+  }
+ },
+ "intermediate|7y|2p|uniform": {
+  "games": 30,
+  "reasons": {
+   "LAST_PLAYER_STANDING": 3,
+   "DURATION_VOTE": 27
+  },
+  "meanYearReached": 6.93,
+  "meanTurnsPerPlayer": 37.5,
+  "ledgerViolations": 0,
+  "moneyCreatedPerGame": 96772,
+  "moneySunkPerGame": 90019,
+  "p2pPerGame": 20721,
+  "flowsPerGame": {
+   "STARTING_FUNDS": {
+    "created": 50000,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "PROPERTY_PURCHASE": {
+    "created": 0,
+    "sunk": 21903,
+    "p2p": 0
+   },
+   "HOUSE_PURCHASE": {
+    "created": 0,
+    "sunk": 23767,
+    "p2p": 0
+   },
+   "HOTEL_PURCHASE": {
+    "created": 0,
+    "sunk": 3933,
+    "p2p": 0
+   },
+   "JAIL_FINE": {
+    "created": 0,
+    "sunk": 867,
+    "p2p": 0
+   },
+   "CRISIS_PAYMENT": {
+    "created": 0,
+    "sunk": 20500,
+    "p2p": 0
+   },
+   "AUCTION_PAYMENT": {
+    "created": 0,
+    "sunk": 5963,
+    "p2p": 0
+   },
+   "START_REWARD": {
+    "created": 19500,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "TAX_PAYMENT": {
+    "created": 0,
+    "sunk": 1067,
+    "p2p": 0
+   },
+   "CARD_REWARD": {
+    "created": 6050,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "LOAN_DISBURSEMENT": {
+    "created": 12500,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "RENT_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 20128
+   },
+   "CLUB_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 223
+   },
+   "LOAN_REPAYMENT": {
+    "created": 0,
+    "sunk": 6418,
+    "p2p": 0
+   },
+   "LOAN_INTEREST": {
+    "created": 0,
+    "sunk": 855,
+    "p2p": 0
+   },
+   "CARD_PAYMENT": {
+    "created": 0,
+    "sunk": 4503,
+    "p2p": 0
+   },
+   "MORTGAGE": {
+    "created": 4972,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "HOUSE_SALE": {
+    "created": 983,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "REST_HOUSE_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 183
+   },
+   "BANKRUPTCY_SETTLEMENT": {
+    "created": 0,
+    "sunk": 5,
+    "p2p": 169
+   },
+   "OBJECTIVE_REWARD": {
+    "created": 2433,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "HOTEL_SALE": {
+    "created": 333,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "UNMORTGAGE": {
+    "created": 0,
+    "sunk": 238,
+    "p2p": 0
+   },
+   "CARD_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 17
+   }
+  },
+  "endCashPerActivePlayer": 3554,
+  "endNetWorthPerActivePlayer": 68714,
+  "endDebtPerActivePlayer": 2765,
+  "bankruptciesPerGame": 0.1,
+  "gamesWithBankruptcy": 0.1,
+  "winnerShareOfNetWorth": 0.733,
+  "topToMedianNetWorth": 14795.42,
+  "developedPropertiesAtEnd": 2.3,
+  "housesAtEnd": 2.5,
+  "hotelsAtEnd": 1.2,
+  "allOwnedYear": 0,
+  "allOwnedShare": 0,
+  "shortagesPerGame": 8.7,
+  "shortagesAssetRichPerGame": 8.3,
+  "shortagesFatalPerGame": 0.1,
+  "shortageReasons": {
+   "RENT": 133,
+   "CRISIS": 97,
+   "TAX": 6,
+   "CARD": 23,
+   "CLUB": 2
+  },
+  "cashPerActivePlayerByYear": {
+   "1": 25000,
+   "2": 4445,
+   "3": 2769,
+   "4": 2490,
+   "5": 2494,
+   "6": 2460,
+   "7": 2249
+  },
+  "ownedByYear": {
+   "1": 0,
+   "2": 5.9,
+   "3": 11,
+   "4": 14.2,
+   "5": 17.1,
+   "6": 19.1,
+   "7": 20.6
+  },
+  "buildingsByYear": {
+   "1": 0,
+   "2": 3.1,
+   "3": 3.3,
+   "4": 3.5,
+   "5": 3.6,
+   "6": 3.7,
+   "7": 3.7
+  },
+  "byProfile": {
+   "INVESTOR": {
+    "n": 60,
+    "meanNetWorth": 65279,
+    "winRate": 0.5,
+    "bankruptRate": 0.05,
+    "meanCash": 3376,
+    "meanProps": 10.6,
+    "meanDebt": 2627,
+    "meanRentIn": 10064,
+    "meanRentOut": 10064,
+    "meanCredit": 706
+   }
+  },
+  "events": {
+   "LOAN_TAKEN": 0,
+   "INTERMEDIATE_LOAN_TAKEN": 6.5,
+   "LOAN_DEFAULTED": 0.23,
+   "COLLATERAL_SEIZED": 0,
+   "LOAN_INSTALLMENT_OVERDUE": 4.73,
+   "INTERMEDIATE_LOAN_REPAID": 2.87,
+   "PLAYER_BANKRUPT": 0.1,
+   "CRISIS_STRUCK": 6.83,
+   "CRISIS_COVERED": 0,
+   "INSURANCE_PURCHASED": 0,
+   "INSURANCE_EXPIRED": 0,
+   "AUCTION_WON": 15.1,
+   "AUCTION_UNSOLD": 3.7,
+   "PROPERTY_MORTGAGED": 2.7,
+   "PROPERTY_UNMORTGAGED": 0.07,
+   "BUILDING_SOLD": 0.5
+  },
+  "crises": {
+   "PAID": 205,
+   "SKIPPED": 1
+  },
+  "capitalLoans": {
+   "REPAID": 86,
+   "ACTIVE": 96,
+   "WRITTEN_OFF": 8,
+   "DEFAULTED": 3,
+   "SETTLED": 2
+  }
+ },
+ "intermediate|7y|4p|mixed": {
+  "games": 30,
+  "reasons": {
+   "DURATION_VOTE": 27,
+   "LAST_PLAYER_STANDING": 3
+  },
+  "meanYearReached": 6.97,
+  "meanTurnsPerPlayer": 36.6,
+  "ledgerViolations": 0,
+  "moneyCreatedPerGame": 245813,
+  "moneySunkPerGame": 232099,
+  "p2pPerGame": 101173,
+  "flowsPerGame": {
+   "STARTING_FUNDS": {
+    "created": 100000,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "LOAN_DISBURSEMENT": {
+    "created": 52683,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "PROPERTY_PURCHASE": {
+    "created": 0,
+    "sunk": 38873,
+    "p2p": 0
+   },
+   "HOUSE_PURCHASE": {
+    "created": 0,
+    "sunk": 83450,
+    "p2p": 0
+   },
+   "HOTEL_PURCHASE": {
+    "created": 0,
+    "sunk": 15150,
+    "p2p": 0
+   },
+   "RENT_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 94255
+   },
+   "JAIL_FINE": {
+    "created": 0,
+    "sunk": 1733,
+    "p2p": 0
+   },
+   "CRISIS_PAYMENT": {
+    "created": 0,
+    "sunk": 18500,
+    "p2p": 0
+   },
+   "CARD_REWARD": {
+    "created": 13883,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "AUCTION_PAYMENT": {
+    "created": 0,
+    "sunk": 23297,
+    "p2p": 0
+   },
+   "START_REWARD": {
+    "created": 39500,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "INSURANCE_PREMIUM": {
+    "created": 0,
+    "sunk": 5530,
+    "p2p": 0
+   },
+   "TAX_PAYMENT": {
+    "created": 0,
+    "sunk": 1900,
+    "p2p": 0
+   },
+   "LOAN_REPAYMENT": {
+    "created": 0,
+    "sunk": 21949,
+    "p2p": 0
+   },
+   "LOAN_INTEREST": {
+    "created": 0,
+    "sunk": 3804,
+    "p2p": 0
+   },
+   "CARD_PAYMENT": {
+    "created": 0,
+    "sunk": 9902,
+    "p2p": 0
+   },
+   "MORTGAGE": {
+    "created": 23872,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "HOUSE_SALE": {
+    "created": 3208,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "UNMORTGAGE": {
+    "created": 0,
+    "sunk": 7865,
+    "p2p": 0
+   },
+   "CLUB_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 1107
+   },
+   "HOTEL_SALE": {
+    "created": 8167,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "BANKRUPTCY_SETTLEMENT": {
+    "created": 0,
+    "sunk": 147,
+    "p2p": 4406
+   },
+   "REST_HOUSE_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 1056
+   },
+   "OBJECTIVE_REWARD": {
+    "created": 4500,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "CARD_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 350
+   }
+  },
+  "endCashPerActivePlayer": 4840,
+  "endNetWorthPerActivePlayer": 61996,
+  "endDebtPerActivePlayer": 8715,
+  "bankruptciesPerGame": 1.17,
+  "gamesWithBankruptcy": 0.7,
+  "winnerShareOfNetWorth": 0.644,
+  "topToMedianNetWorth": 63018.95,
+  "developedPropertiesAtEnd": 5.1,
+  "housesAtEnd": 6.9,
+  "hotelsAtEnd": 3.2,
+  "allOwnedYear": 6.09,
+  "allOwnedShare": 0.37,
+  "shortagesPerGame": 19.93,
+  "shortagesAssetRichPerGame": 17.73,
+  "shortagesFatalPerGame": 1.17,
+  "shortageReasons": {
+   "CRISIS": 103,
+   "RENT": 423,
+   "CARD": 56,
+   "TAX": 10,
+   "CLUB": 6
+  },
+  "cashPerActivePlayerByYear": {
+   "1": 25000,
+   "2": 7499,
+   "3": 4555,
+   "4": 3991,
+   "5": 3647,
+   "6": 3616,
+   "7": 3505
+  },
+  "ownedByYear": {
+   "1": 0,
+   "2": 10.9,
+   "3": 17.9,
+   "4": 21.4,
+   "5": 23.5,
+   "6": 23.9,
+   "7": 24.1
+  },
+  "buildingsByYear": {
+   "1": 0,
+   "2": 6.5,
+   "3": 7.4,
+   "4": 7.4,
+   "5": 8.1,
+   "6": 8.7,
+   "7": 9
+  },
+  "byProfile": {
+   "DEADBEAT": {
+    "n": 20,
+    "meanNetWorth": 81965,
+    "winRate": 0.5,
+    "bankruptRate": 0.1,
+    "meanCash": 5625,
+    "meanProps": 10.3,
+    "meanDebt": 21331,
+    "meanRentIn": 44175,
+    "meanRentOut": 20505,
+    "meanCredit": 475
+   },
+   "LOW": {
+    "n": 20,
+    "meanNetWorth": 7971,
+    "winRate": 0,
+    "bankruptRate": 0.5,
+    "meanCash": 3956,
+    "meanProps": 1.4,
+    "meanDebt": 0,
+    "meanRentIn": 1618,
+    "meanRentOut": 22305,
+    "meanCredit": 700
+   },
+   "BORROWER": {
+    "n": 20,
+    "meanNetWorth": 38833,
+    "winRate": 0.3,
+    "bankruptRate": 0.45,
+    "meanCash": 3089,
+    "meanProps": 4.3,
+    "meanDebt": 2422,
+    "meanRentIn": 27355,
+    "meanRentOut": 20103,
+    "meanCredit": 592
+   },
+   "INSURER": {
+    "n": 20,
+    "meanNetWorth": 37568,
+    "winRate": 0.15,
+    "bankruptRate": 0.2,
+    "meanCash": 3142,
+    "meanProps": 6,
+    "meanDebt": 4435,
+    "meanRentIn": 20488,
+    "meanRentOut": 26283,
+    "meanCredit": 718
+   },
+   "ALLIN": {
+    "n": 20,
+    "meanNetWorth": 56781,
+    "winRate": 0.35,
+    "bankruptRate": 0.25,
+    "meanCash": 2415,
+    "meanProps": 6.6,
+    "meanDebt": 4807,
+    "meanRentIn": 28340,
+    "meanRentOut": 24720,
+    "meanCredit": 681
+   },
+   "INVESTOR": {
+    "n": 20,
+    "meanNetWorth": 40365,
+    "winRate": 0.2,
+    "bankruptRate": 0.25,
+    "meanCash": 2343,
+    "meanProps": 6.2,
+    "meanDebt": 4044,
+    "meanRentIn": 19408,
+    "meanRentOut": 27468,
+    "meanCredit": 726
+   }
+  },
+  "events": {
+   "LOAN_TAKEN": 0,
+   "INTERMEDIATE_LOAN_TAKEN": 13.43,
+   "LOAN_DEFAULTED": 2.5,
+   "COLLATERAL_SEIZED": 0,
+   "LOAN_INSTALLMENT_OVERDUE": 10.97,
+   "INTERMEDIATE_LOAN_REPAID": 4.53,
+   "PLAYER_BANKRUPT": 1.17,
+   "CRISIS_STRUCK": 6.27,
+   "CRISIS_COVERED": 0.67,
+   "INSURANCE_PURCHASED": 7.77,
+   "INSURANCE_EXPIRED": 6.03,
+   "AUCTION_WON": 17.27,
+   "AUCTION_UNSOLD": 0.1,
+   "PROPERTY_MORTGAGED": 12.23,
+   "PROPERTY_UNMORTGAGED": 4.2,
+   "BUILDING_SOLD": 2.8
+  },
+  "crises": {
+   "PAID": 185,
+   "COVERED": 20,
+   "BANKRUPT": 3
+  },
+  "capitalLoans": {
+   "DEFAULTED": 46,
+   "WRITTEN_OFF": 76,
+   "REPAID": 136,
+   "ACTIVE": 136,
+   "SETTLED": 9
+  }
+ },
+ "intermediate|7y|4p|uniform": {
+  "games": 30,
+  "reasons": {
+   "DURATION_VOTE": 30
+  },
+  "meanYearReached": 7,
+  "meanTurnsPerPlayer": 37,
+  "ledgerViolations": 0,
+  "moneyCreatedPerGame": 209223,
+  "moneySunkPerGame": 192187,
+  "p2pPerGame": 94374,
+  "flowsPerGame": {
+   "STARTING_FUNDS": {
+    "created": 100000,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "PROPERTY_PURCHASE": {
+    "created": 0,
+    "sunk": 37560,
+    "p2p": 0
+   },
+   "HOUSE_PURCHASE": {
+    "created": 0,
+    "sunk": 62267,
+    "p2p": 0
+   },
+   "HOTEL_PURCHASE": {
+    "created": 0,
+    "sunk": 9017,
+    "p2p": 0
+   },
+   "RENT_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 90948
+   },
+   "JAIL_FINE": {
+    "created": 0,
+    "sunk": 2200,
+    "p2p": 0
+   },
+   "CRISIS_PAYMENT": {
+    "created": 0,
+    "sunk": 20800,
+    "p2p": 0
+   },
+   "CARD_REWARD": {
+    "created": 14950,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "AUCTION_PAYMENT": {
+    "created": 0,
+    "sunk": 26490,
+    "p2p": 0
+   },
+   "TAX_PAYMENT": {
+    "created": 0,
+    "sunk": 1952,
+    "p2p": 0
+   },
+   "START_REWARD": {
+    "created": 39800,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "CARD_PAYMENT": {
+    "created": 0,
+    "sunk": 11778,
+    "p2p": 0
+   },
+   "CLUB_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 1167
+   },
+   "LOAN_DISBURSEMENT": {
+    "created": 32317,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "CARD_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 389
+   },
+   "REST_HOUSE_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 857
+   },
+   "LOAN_REPAYMENT": {
+    "created": 0,
+    "sunk": 16725,
+    "p2p": 0
+   },
+   "LOAN_INTEREST": {
+    "created": 0,
+    "sunk": 2236,
+    "p2p": 0
+   },
+   "MORTGAGE": {
+    "created": 11673,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "UNMORTGAGE": {
+    "created": 0,
+    "sunk": 1067,
+    "p2p": 0
+   },
+   "OBJECTIVE_REWARD": {
+    "created": 5467,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "HOUSE_SALE": {
+    "created": 1917,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "HOTEL_SALE": {
+    "created": 3100,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "BANKRUPTCY_SETTLEMENT": {
+    "created": 0,
+    "sunk": 95,
+    "p2p": 1013
+   }
+  },
+  "endCashPerActivePlayer": 4914,
+  "endNetWorthPerActivePlayer": 54186,
+  "endDebtPerActivePlayer": 3363,
+  "bankruptciesPerGame": 0.53,
+  "gamesWithBankruptcy": 0.43,
+  "winnerShareOfNetWorth": 0.526,
+  "topToMedianNetWorth": 15670.34,
+  "developedPropertiesAtEnd": 5.1,
+  "housesAtEnd": 7.3,
+  "hotelsAtEnd": 2.5,
+  "allOwnedYear": 6.4,
+  "allOwnedShare": 0.5,
+  "shortagesPerGame": 21.4,
+  "shortagesAssetRichPerGame": 20.4,
+  "shortagesFatalPerGame": 0.53,
+  "shortageReasons": {
+   "CRISIS": 91,
+   "CARD": 50,
+   "RENT": 479,
+   "CLUB": 10,
+   "TAX": 12
+  },
+  "cashPerActivePlayerByYear": {
+   "1": 25000,
+   "2": 4559,
+   "3": 2697,
+   "4": 2813,
+   "5": 2826,
+   "6": 3021,
+   "7": 3414
+  },
+  "ownedByYear": {
+   "1": 0,
+   "2": 10.9,
+   "3": 18.1,
+   "4": 21.8,
+   "5": 23.7,
+   "6": 24.5,
+   "7": 24.5
+  },
+  "buildingsByYear": {
+   "1": 0,
+   "2": 6.2,
+   "3": 6.7,
+   "4": 7.2,
+   "5": 8,
+   "6": 8.4,
+   "7": 9
+  },
+  "byProfile": {
+   "INVESTOR": {
+    "n": 120,
+    "meanNetWorth": 46961,
+    "winRate": 0.25,
+    "bankruptRate": 0.133,
+    "meanCash": 4259,
+    "meanProps": 6.2,
+    "meanDebt": 2915,
+    "meanRentIn": 22737,
+    "meanRentOut": 22737,
+    "meanCredit": 715
+   }
+  },
+  "events": {
+   "LOAN_TAKEN": 0,
+   "INTERMEDIATE_LOAN_TAKEN": 16.3,
+   "LOAN_DEFAULTED": 0.47,
+   "COLLATERAL_SEIZED": 0,
+   "LOAN_INSTALLMENT_OVERDUE": 9.63,
+   "INTERMEDIATE_LOAN_REPAID": 6.57,
+   "PLAYER_BANKRUPT": 0.53,
+   "CRISIS_STRUCK": 7,
+   "CRISIS_COVERED": 0,
+   "INSURANCE_PURCHASED": 0,
+   "INSURANCE_EXPIRED": 0,
+   "AUCTION_WON": 16.23,
+   "AUCTION_UNSOLD": 0.07,
+   "PROPERTY_MORTGAGED": 5.87,
+   "PROPERTY_UNMORTGAGED": 0.63,
+   "BUILDING_SOLD": 1.3
+  },
+  "crises": {
+   "PAID": 208,
+   "BANKRUPT": 2
+  },
+  "capitalLoans": {
+   "REPAID": 197,
+   "ACTIVE": 219,
+   "SETTLED": 2,
+   "DEFAULTED": 7,
+   "WRITTEN_OFF": 64
+  }
+ },
+ "intermediate|7y|8p|mixed": {
+  "games": 30,
+  "reasons": {
+   "DURATION_VOTE": 22,
+   "LAST_PLAYER_STANDING": 8
+  },
+  "meanYearReached": 6.83,
+  "meanTurnsPerPlayer": 35.5,
+  "ledgerViolations": 0,
+  "moneyCreatedPerGame": 568752,
+  "moneySunkPerGame": 554079,
+  "p2pPerGame": 383347,
+  "flowsPerGame": {
+   "STARTING_FUNDS": {
+    "created": 200000,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "CARD_REWARD": {
+    "created": 25683,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "LOAN_DISBURSEMENT": {
+    "created": 149733,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "PROPERTY_PURCHASE": {
+    "created": 0,
+    "sunk": 71120,
+    "p2p": 0
+   },
+   "HOUSE_PURCHASE": {
+    "created": 0,
+    "sunk": 236967,
+    "p2p": 0
+   },
+   "HOTEL_PURCHASE": {
+    "created": 0,
+    "sunk": 55150,
+    "p2p": 0
+   },
+   "INSURANCE_PREMIUM": {
+    "created": 0,
+    "sunk": 8497,
+    "p2p": 0
+   },
+   "JAIL_FINE": {
+    "created": 0,
+    "sunk": 4350,
+    "p2p": 0
+   },
+   "CARD_PAYMENT": {
+    "created": 0,
+    "sunk": 20762,
+    "p2p": 0
+   },
+   "AUCTION_PAYMENT": {
+    "created": 0,
+    "sunk": 54217,
+    "p2p": 0
+   },
+   "RENT_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 354393
+   },
+   "START_REWARD": {
+    "created": 76050,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "LOAN_REPAYMENT": {
+    "created": 0,
+    "sunk": 51380,
+    "p2p": 0
+   },
+   "LOAN_INTEREST": {
+    "created": 0,
+    "sunk": 10455,
+    "p2p": 0
+   },
+   "CLUB_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 4327
+   },
+   "REST_HOUSE_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 3724
+   },
+   "CRISIS_PAYMENT": {
+    "created": 0,
+    "sunk": 18000,
+    "p2p": 0
+   },
+   "TAX_PAYMENT": {
+    "created": 0,
+    "sunk": 3375,
+    "p2p": 0
+   },
+   "MORTGAGE": {
+    "created": 54927,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "UNMORTGAGE": {
+    "created": 0,
+    "sunk": 19551,
+    "p2p": 0
+   },
+   "BANKRUPTCY_SETTLEMENT": {
+    "created": 0,
+    "sunk": 256,
+    "p2p": 19880
+   },
+   "HOUSE_SALE": {
+    "created": 21558,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "HOTEL_SALE": {
+    "created": 37167,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "OBJECTIVE_REWARD": {
+    "created": 3633,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "CARD_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 1023
+   }
+  },
+  "endCashPerActivePlayer": 5869,
+  "endNetWorthPerActivePlayer": 101442,
+  "endDebtPerActivePlayer": 14552,
+  "bankruptciesPerGame": 5.5,
+  "gamesWithBankruptcy": 1,
+  "winnerShareOfNetWorth": 0.725,
+  "topToMedianNetWorth": 177776.09,
+  "developedPropertiesAtEnd": 10.7,
+  "housesAtEnd": 5.7,
+  "hotelsAtEnd": 9.1,
+  "allOwnedYear": 4.33,
+  "allOwnedShare": 0.7,
+  "shortagesPerGame": 53.7,
+  "shortagesAssetRichPerGame": 39.13,
+  "shortagesFatalPerGame": 5.5,
+  "shortageReasons": {
+   "RENT": 1344,
+   "CLUB": 40,
+   "CRISIS": 103,
+   "CARD": 98,
+   "TAX": 26
+  },
+  "cashPerActivePlayerByYear": {
+   "1": 25000,
+   "2": 8859,
+   "3": 4969,
+   "4": 4340,
+   "5": 4218,
+   "6": 4213,
+   "7": 3961
+  },
+  "ownedByYear": {
+   "1": 0,
+   "2": 17.5,
+   "3": 23.5,
+   "4": 24.7,
+   "5": 24.2,
+   "6": 23.3,
+   "7": 23.2
+  },
+  "buildingsByYear": {
+   "1": 0,
+   "2": 13.2,
+   "3": 16,
+   "4": 16.8,
+   "5": 16.8,
+   "6": 16,
+   "7": 16.2
+  },
+  "byProfile": {
+   "DEADBEAT": {
+    "n": 40,
+    "meanNetWorth": 69606,
+    "winRate": 0.275,
+    "bankruptRate": 0.45,
+    "meanCash": 3880,
+    "meanProps": 5.7,
+    "meanDebt": 13033,
+    "meanRentIn": 83609,
+    "meanRentOut": 48653,
+    "meanCredit": 480
+   },
+   "BORROWER": {
+    "n": 40,
+    "meanNetWorth": 32150,
+    "winRate": 0.125,
+    "bankruptRate": 0.65,
+    "meanCash": 1348,
+    "meanProps": 2.7,
+    "meanDebt": 3219,
+    "meanRentIn": 50400,
+    "meanRentOut": 43300,
+    "meanCredit": 687
+   },
+   "INSURER": {
+    "n": 40,
+    "meanNetWorth": 8281,
+    "winRate": 0.025,
+    "bankruptRate": 0.825,
+    "meanCash": 974,
+    "meanProps": 1,
+    "meanDebt": 2019,
+    "meanRentIn": 27406,
+    "meanRentOut": 49390,
+    "meanCredit": 707
+   },
+   "ALLIN": {
+    "n": 40,
+    "meanNetWorth": 58208,
+    "winRate": 0.25,
+    "bankruptRate": 0.6,
+    "meanCash": 2823,
+    "meanProps": 3.9,
+    "meanDebt": 4302,
+    "meanRentIn": 69916,
+    "meanRentOut": 46636,
+    "meanCredit": 711
+   },
+   "LOW": {
+    "n": 40,
+    "meanNetWorth": 0,
+    "winRate": 0,
+    "bankruptRate": 1,
+    "meanCash": 0,
+    "meanProps": 0,
+    "meanDebt": 0,
+    "meanRentIn": 766,
+    "meanRentOut": 26551,
+    "meanCredit": 700
+   },
+   "INVESTOR": {
+    "n": 40,
+    "meanNetWorth": 21959,
+    "winRate": 0.075,
+    "bankruptRate": 0.6,
+    "meanCash": 1980,
+    "meanProps": 2.5,
+    "meanDebt": 4713,
+    "meanRentIn": 33698,
+    "meanRentOut": 51265,
+    "meanCredit": 700
+   }
+  },
+  "events": {
+   "LOAN_TAKEN": 0,
+   "INTERMEDIATE_LOAN_TAKEN": 37.13,
+   "LOAN_DEFAULTED": 3.57,
+   "COLLATERAL_SEIZED": 0,
+   "LOAN_INSTALLMENT_OVERDUE": 22.3,
+   "INTERMEDIATE_LOAN_REPAID": 8.3,
+   "PLAYER_BANKRUPT": 5.5,
+   "CRISIS_STRUCK": 6.13,
+   "CRISIS_COVERED": 0.63,
+   "INSURANCE_PURCHASED": 12.27,
+   "INSURANCE_EXPIRED": 10.73,
+   "AUCTION_WON": 17,
+   "AUCTION_UNSOLD": 0,
+   "PROPERTY_MORTGAGED": 26.53,
+   "PROPERTY_UNMORTGAGED": 8.43,
+   "BUILDING_SOLD": 14.83
+  },
+  "crises": {
+   "COVERED": 19,
+   "PAID": 180,
+   "BANKRUPT": 4
+  },
+  "capitalLoans": {
+   "DEFAULTED": 44,
+   "REPAID": 249,
+   "WRITTEN_OFF": 570,
+   "ACTIVE": 247,
+   "SETTLED": 4
+  }
+ },
+ "intermediate|7y|8p|uniform": {
+  "games": 30,
+  "reasons": {
+   "DURATION_VOTE": 29,
+   "LAST_PLAYER_STANDING": 1
+  },
+  "meanYearReached": 6.97,
+  "meanTurnsPerPlayer": 36.6,
+  "ledgerViolations": 0,
+  "moneyCreatedPerGame": 460500,
+  "moneySunkPerGame": 417295,
+  "p2pPerGame": 370119,
+  "flowsPerGame": {
+   "STARTING_FUNDS": {
+    "created": 200000,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "CARD_REWARD": {
+    "created": 27850,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "PROPERTY_PURCHASE": {
+    "created": 0,
+    "sunk": 65200,
+    "p2p": 0
+   },
+   "HOUSE_PURCHASE": {
+    "created": 0,
+    "sunk": 170683,
+    "p2p": 0
+   },
+   "HOTEL_PURCHASE": {
+    "created": 0,
+    "sunk": 36967,
+    "p2p": 0
+   },
+   "JAIL_FINE": {
+    "created": 0,
+    "sunk": 4300,
+    "p2p": 0
+   },
+   "CARD_PAYMENT": {
+    "created": 0,
+    "sunk": 22022,
+    "p2p": 0
+   },
+   "AUCTION_PAYMENT": {
+    "created": 0,
+    "sunk": 48927,
+    "p2p": 0
+   },
+   "CRISIS_PAYMENT": {
+    "created": 0,
+    "sunk": 20700,
+    "p2p": 0
+   },
+   "RENT_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 353303
+   },
+   "START_REWARD": {
+    "created": 78550,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "LOAN_DISBURSEMENT": {
+    "created": 105317,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "CLUB_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 5087
+   },
+   "REST_HOUSE_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 4169
+   },
+   "TAX_PAYMENT": {
+    "created": 0,
+    "sunk": 3162,
+    "p2p": 0
+   },
+   "LOAN_REPAYMENT": {
+    "created": 0,
+    "sunk": 38286,
+    "p2p": 0
+   },
+   "LOAN_INTEREST": {
+    "created": 0,
+    "sunk": 5538,
+    "p2p": 0
+   },
+   "MORTGAGE": {
+    "created": 22833,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "HOUSE_SALE": {
+    "created": 8650,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "HOTEL_SALE": {
+    "created": 10733,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "CARD_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 1253
+   },
+   "BANKRUPTCY_SETTLEMENT": {
+    "created": 0,
+    "sunk": 138,
+    "p2p": 6307
+   },
+   "OBJECTIVE_REWARD": {
+    "created": 6567,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "UNMORTGAGE": {
+    "created": 0,
+    "sunk": 1373,
+    "p2p": 0
+   }
+  },
+  "endCashPerActivePlayer": 8641,
+  "endNetWorthPerActivePlayer": 59068,
+  "endDebtPerActivePlayer": 6187,
+  "bankruptciesPerGame": 3,
+  "gamesWithBankruptcy": 0.97,
+  "winnerShareOfNetWorth": 0.477,
+  "topToMedianNetWorth": 81300.86,
+  "developedPropertiesAtEnd": 11.3,
+  "housesAtEnd": 8.9,
+  "hotelsAtEnd": 8.2,
+  "allOwnedYear": 4.44,
+  "allOwnedShare": 0.83,
+  "shortagesPerGame": 49.9,
+  "shortagesAssetRichPerGame": 39.57,
+  "shortagesFatalPerGame": 3,
+  "shortageReasons": {
+   "RENT": 1275,
+   "CLUB": 41,
+   "CRISIS": 67,
+   "CARD": 98,
+   "TAX": 16
+  },
+  "cashPerActivePlayerByYear": {
+   "1": 25000,
+   "2": 6237,
+   "3": 4096,
+   "4": 4326,
+   "5": 5494,
+   "6": 6419,
+   "7": 6897
+  },
+  "ownedByYear": {
+   "1": 0,
+   "2": 17.5,
+   "3": 23.8,
+   "4": 25.2,
+   "5": 25.7,
+   "6": 25.2,
+   "7": 23.9
+  },
+  "buildingsByYear": {
+   "1": 0,
+   "2": 12.2,
+   "3": 14.9,
+   "4": 16.4,
+   "5": 16.4,
+   "6": 17.1,
+   "7": 17.3
+  },
+  "byProfile": {
+   "INVESTOR": {
+    "n": 240,
+    "meanNetWorth": 36918,
+    "winRate": 0.125,
+    "bankruptRate": 0.375,
+    "meanCash": 5401,
+    "meanProps": 3,
+    "meanDebt": 3867,
+    "meanRentIn": 44163,
+    "meanRentOut": 44163,
+    "meanCredit": 704
+   }
+  },
+  "events": {
+   "LOAN_TAKEN": 0,
+   "INTERMEDIATE_LOAN_TAKEN": 39.77,
+   "LOAN_DEFAULTED": 1.1,
+   "COLLATERAL_SEIZED": 0,
+   "LOAN_INSTALLMENT_OVERDUE": 20.3,
+   "INTERMEDIATE_LOAN_REPAID": 10.93,
+   "PLAYER_BANKRUPT": 3,
+   "CRISIS_STRUCK": 6.97,
+   "CRISIS_COVERED": 0,
+   "INSURANCE_PURCHASED": 0,
+   "INSURANCE_EXPIRED": 0,
+   "AUCTION_WON": 12.8,
+   "AUCTION_UNSOLD": 0,
+   "PROPERTY_MORTGAGED": 10.5,
+   "PROPERTY_UNMORTGAGED": 0.77,
+   "BUILDING_SOLD": 5.4
+  },
+  "crises": {
+   "PAID": 207,
+   "BANKRUPT": 2
+  },
+  "capitalLoans": {
+   "REPAID": 328,
+   "WRITTEN_OFF": 451,
+   "ACTIVE": 406,
+   "SETTLED": 3,
+   "DEFAULTED": 5
+  }
+ },
+ "intermediate|10y|2p|mixed": {
+  "games": 30,
+  "reasons": {
+   "DURATION_REACHED": 16,
+   "LAST_PLAYER_STANDING": 14
+  },
+  "meanYearReached": 9,
+  "meanTurnsPerPlayer": 47,
+  "ledgerViolations": 0,
+  "moneyCreatedPerGame": 132448,
+  "moneySunkPerGame": 124974,
+  "p2pPerGame": 30464,
+  "flowsPerGame": {
+   "STARTING_FUNDS": {
+    "created": 50000,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "PROPERTY_PURCHASE": {
+    "created": 0,
+    "sunk": 21967,
+    "p2p": 0
+   },
+   "LOAN_DISBURSEMENT": {
+    "created": 25567,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "HOUSE_PURCHASE": {
+    "created": 0,
+    "sunk": 33850,
+    "p2p": 0
+   },
+   "HOTEL_PURCHASE": {
+    "created": 0,
+    "sunk": 6517,
+    "p2p": 0
+   },
+   "JAIL_FINE": {
+    "created": 0,
+    "sunk": 1250,
+    "p2p": 0
+   },
+   "AUCTION_PAYMENT": {
+    "created": 0,
+    "sunk": 5513,
+    "p2p": 0
+   },
+   "CRISIS_PAYMENT": {
+    "created": 0,
+    "sunk": 25000,
+    "p2p": 0
+   },
+   "CLUB_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 283
+   },
+   "START_REWARD": {
+    "created": 25900,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "LOAN_REPAYMENT": {
+    "created": 0,
+    "sunk": 13763,
+    "p2p": 0
+   },
+   "LOAN_INTEREST": {
+    "created": 0,
+    "sunk": 1997,
+    "p2p": 0
+   },
+   "RENT_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 28750
+   },
+   "MORTGAGE": {
+    "created": 16423,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "CARD_PAYMENT": {
+    "created": 0,
+    "sunk": 7257,
+    "p2p": 0
+   },
+   "TAX_PAYMENT": {
+    "created": 0,
+    "sunk": 1297,
+    "p2p": 0
+   },
+   "REST_HOUSE_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 228
+   },
+   "CARD_REWARD": {
+    "created": 8667,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "OBJECTIVE_REWARD": {
+    "created": 1500,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "HOTEL_SALE": {
+    "created": 2667,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "UNMORTGAGE": {
+    "created": 0,
+    "sunk": 5242,
+    "p2p": 0
+   },
+   "HOUSE_SALE": {
+    "created": 1725,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "BANKRUPTCY_SETTLEMENT": {
+    "created": 0,
+    "sunk": 68,
+    "p2p": 1152
+   },
+   "INSURANCE_PREMIUM": {
+    "created": 0,
+    "sunk": 1253,
+    "p2p": 0
+   },
+   "CARD_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 50
+   }
+  },
+  "endCashPerActivePlayer": 4875,
+  "endNetWorthPerActivePlayer": 85050,
+  "endDebtPerActivePlayer": 7399,
+  "bankruptciesPerGame": 0.47,
+  "gamesWithBankruptcy": 0.47,
+  "winnerShareOfNetWorth": 0.853,
+  "topToMedianNetWorth": 51296.51,
+  "developedPropertiesAtEnd": 2.5,
+  "housesAtEnd": 2.6,
+  "hotelsAtEnd": 1.5,
+  "allOwnedYear": 8.5,
+  "allOwnedShare": 0.07,
+  "shortagesPerGame": 12.77,
+  "shortagesAssetRichPerGame": 12.53,
+  "shortagesFatalPerGame": 0.47,
+  "shortageReasons": {
+   "RENT": 168,
+   "CRISIS": 147,
+   "CARD": 48,
+   "CLUB": 3,
+   "TAX": 17
+  },
+  "cashPerActivePlayerByYear": {
+   "1": 25000,
+   "2": 8012,
+   "3": 4521,
+   "4": 3816,
+   "5": 3267,
+   "6": 3070,
+   "7": 3756,
+   "8": 3584,
+   "9": 3680,
+   "10": 4072
+  },
+  "ownedByYear": {
+   "1": 0,
+   "2": 6.5,
+   "3": 11.6,
+   "4": 15,
+   "5": 17.2,
+   "6": 19.1,
+   "7": 20.4,
+   "8": 21.5,
+   "9": 22.1,
+   "10": 22.7
+  },
+  "buildingsByYear": {
+   "1": 0,
+   "2": 3.5,
+   "3": 4,
+   "4": 4.1,
+   "5": 4.4,
+   "6": 4.4,
+   "7": 4.5,
+   "8": 4.5,
+   "9": 4.4,
+   "10": 4.6
+  },
+  "byProfile": {
+   "LOW": {
+    "n": 10,
+    "meanNetWorth": 15424,
+    "winRate": 0,
+    "bankruptRate": 0.4,
+    "meanCash": 7008,
+    "meanProps": 2.9,
+    "meanDebt": 69,
+    "meanRentIn": 850,
+    "meanRentOut": 14995,
+    "meanCredit": 703
+   },
+   "BORROWER": {
+    "n": 10,
+    "meanNetWorth": 53623,
+    "winRate": 0.6,
+    "bankruptRate": 0.4,
+    "meanCash": 3126,
+    "meanProps": 7.5,
+    "meanDebt": 3117,
+    "meanRentIn": 13365,
+    "meanRentOut": 9400,
+    "meanCredit": 539
+   },
+   "DEADBEAT": {
+    "n": 10,
+    "meanNetWorth": 94317,
+    "winRate": 0.8,
+    "bankruptRate": 0.1,
+    "meanCash": 5126,
+    "meanProps": 14.8,
+    "meanDebt": 21341,
+    "meanRentIn": 25990,
+    "meanRentOut": 13510,
+    "meanCredit": 475
+   },
+   "INSURER": {
+    "n": 10,
+    "meanNetWorth": 30621,
+    "winRate": 0.1,
+    "bankruptRate": 0.4,
+    "meanCash": 1557,
+    "meanProps": 5.6,
+    "meanDebt": 4639,
+    "meanRentIn": 11280,
+    "meanRentOut": 28065,
+    "meanCredit": 676
+   },
+   "ALLIN": {
+    "n": 10,
+    "meanNetWorth": 109047,
+    "winRate": 0.9,
+    "bankruptRate": 0,
+    "meanCash": 2029,
+    "meanProps": 15.7,
+    "meanDebt": 3899,
+    "meanRentIn": 21155,
+    "meanRentOut": 9750,
+    "meanCredit": 656
+   },
+   "INVESTOR": {
+    "n": 10,
+    "meanNetWorth": 88199,
+    "winRate": 0.6,
+    "bankruptRate": 0.1,
+    "meanCash": 3577,
+    "meanProps": 12.4,
+    "meanDebt": 969,
+    "meanRentIn": 13610,
+    "meanRentOut": 10530,
+    "meanCredit": 732
+   }
+  },
+  "events": {
+   "LOAN_TAKEN": 0,
+   "INTERMEDIATE_LOAN_TAKEN": 7.3,
+   "LOAN_DEFAULTED": 1.6,
+   "COLLATERAL_SEIZED": 0,
+   "LOAN_INSTALLMENT_OVERDUE": 7.73,
+   "INTERMEDIATE_LOAN_REPAID": 3.4,
+   "PLAYER_BANKRUPT": 0.47,
+   "CRISIS_STRUCK": 8.37,
+   "CRISIS_COVERED": 0.47,
+   "INSURANCE_PURCHASED": 2.27,
+   "INSURANCE_EXPIRED": 1.8,
+   "AUCTION_WON": 16,
+   "AUCTION_UNSOLD": 4.8,
+   "PROPERTY_MORTGAGED": 8.9,
+   "PROPERTY_UNMORTGAGED": 2.9,
+   "BUILDING_SOLD": 1.23
+  },
+  "crises": {
+   "PAID": 250,
+   "COVERED": 14,
+   "BANKRUPT": 1
+  },
+  "capitalLoans": {
+   "SETTLED": 16,
+   "REPAID": 102,
+   "DEFAULTED": 23,
+   "WRITTEN_OFF": 22,
+   "ACTIVE": 56
+  }
+ },
+ "intermediate|10y|2p|uniform": {
+  "games": 30,
+  "reasons": {
+   "DURATION_REACHED": 25,
+   "LAST_PLAYER_STANDING": 5
+  },
+  "meanYearReached": 9.7,
+  "meanTurnsPerPlayer": 52.6,
+  "ledgerViolations": 0,
+  "moneyCreatedPerGame": 118698,
+  "moneySunkPerGame": 111381,
+  "p2pPerGame": 30917,
+  "flowsPerGame": {
+   "STARTING_FUNDS": {
+    "created": 50000,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "PROPERTY_PURCHASE": {
+    "created": 0,
+    "sunk": 20447,
+    "p2p": 0
+   },
+   "HOUSE_PURCHASE": {
+    "created": 0,
+    "sunk": 27083,
+    "p2p": 0
+   },
+   "JAIL_FINE": {
+    "created": 0,
+    "sunk": 933,
+    "p2p": 0
+   },
+   "CRISIS_PAYMENT": {
+    "created": 0,
+    "sunk": 28700,
+    "p2p": 0
+   },
+   "AUCTION_PAYMENT": {
+    "created": 0,
+    "sunk": 6510,
+    "p2p": 0
+   },
+   "CLUB_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 303
+   },
+   "START_REWARD": {
+    "created": 28050,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "TAX_PAYMENT": {
+    "created": 0,
+    "sunk": 1412,
+    "p2p": 0
+   },
+   "RENT_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 30098
+   },
+   "LOAN_DISBURSEMENT": {
+    "created": 19117,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "CARD_PAYMENT": {
+    "created": 0,
+    "sunk": 7875,
+    "p2p": 0
+   },
+   "LOAN_REPAYMENT": {
+    "created": 0,
+    "sunk": 12887,
+    "p2p": 0
+   },
+   "LOAN_INTEREST": {
+    "created": 0,
+    "sunk": 1476,
+    "p2p": 0
+   },
+   "REST_HOUSE_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 293
+   },
+   "CARD_REWARD": {
+    "created": 9150,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "MORTGAGE": {
+    "created": 8315,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "UNMORTGAGE": {
+    "created": 0,
+    "sunk": 847,
+    "p2p": 0
+   },
+   "OBJECTIVE_REWARD": {
+    "created": 2400,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "HOTEL_PURCHASE": {
+    "created": 0,
+    "sunk": 3000,
+    "p2p": 0
+   },
+   "HOTEL_SALE": {
+    "created": 1333,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "HOUSE_SALE": {
+    "created": 333,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "CARD_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 36
+   },
+   "BANKRUPTCY_SETTLEMENT": {
+    "created": 0,
+    "sunk": 211,
+    "p2p": 187
+   }
+  },
+  "endCashPerActivePlayer": 3991,
+  "endNetWorthPerActivePlayer": 80923,
+  "endDebtPerActivePlayer": 3263,
+  "bankruptciesPerGame": 0.17,
+  "gamesWithBankruptcy": 0.17,
+  "winnerShareOfNetWorth": 0.707,
+  "topToMedianNetWorth": 19970.38,
+  "developedPropertiesAtEnd": 2.3,
+  "housesAtEnd": 4.4,
+  "hotelsAtEnd": 0.8,
+  "allOwnedYear": 9,
+  "allOwnedShare": 0.07,
+  "shortagesPerGame": 13.5,
+  "shortagesAssetRichPerGame": 13.27,
+  "shortagesFatalPerGame": 0.17,
+  "shortageReasons": {
+   "CRISIS": 140,
+   "CARD": 63,
+   "RENT": 185,
+   "CLUB": 6,
+   "TAX": 11
+  },
+  "cashPerActivePlayerByYear": {
+   "1": 25000,
+   "2": 4595,
+   "3": 2540,
+   "4": 2193,
+   "5": 2255,
+   "6": 1957,
+   "7": 2147,
+   "8": 1944,
+   "9": 2257,
+   "10": 2177
+  },
+  "ownedByYear": {
+   "1": 0,
+   "2": 6.6,
+   "3": 11.8,
+   "4": 15.1,
+   "5": 17.4,
+   "6": 18.7,
+   "7": 19.6,
+   "8": 20.8,
+   "9": 21.4,
+   "10": 22.6
+  },
+  "buildingsByYear": {
+   "1": 0,
+   "2": 3.6,
+   "3": 3.8,
+   "4": 4.1,
+   "5": 4.3,
+   "6": 4.3,
+   "7": 4.5,
+   "8": 4.7,
+   "9": 4.9,
+   "10": 4.9
+  },
+  "byProfile": {
+   "INVESTOR": {
+    "n": 60,
+    "meanNetWorth": 74180,
+    "winRate": 0.5,
+    "bankruptRate": 0.083,
+    "meanCash": 3659,
+    "meanProps": 11.3,
+    "meanDebt": 2991,
+    "meanRentIn": 15049,
+    "meanRentOut": 15049,
+    "meanCredit": 708
+   }
+  },
+  "events": {
+   "LOAN_TAKEN": 0,
+   "INTERMEDIATE_LOAN_TAKEN": 9.77,
+   "LOAN_DEFAULTED": 0.67,
+   "COLLATERAL_SEIZED": 0,
+   "LOAN_INSTALLMENT_OVERDUE": 8.3,
+   "INTERMEDIATE_LOAN_REPAID": 6.17,
+   "PLAYER_BANKRUPT": 0.17,
+   "CRISIS_STRUCK": 9.67,
+   "CRISIS_COVERED": 0,
+   "INSURANCE_PURCHASED": 0,
+   "INSURANCE_EXPIRED": 0,
+   "AUCTION_WON": 17.13,
+   "AUCTION_UNSOLD": 5.2,
+   "PROPERTY_MORTGAGED": 4.77,
+   "PROPERTY_UNMORTGAGED": 0.63,
+   "BUILDING_SOLD": 0.4
+  },
+  "crises": {
+   "PAID": 287,
+   "BANKRUPT": 3
+  },
+  "capitalLoans": {
+   "REPAID": 185,
+   "ACTIVE": 74,
+   "DEFAULTED": 13,
+   "SETTLED": 6,
+   "WRITTEN_OFF": 15
+  }
+ },
+ "intermediate|10y|4p|mixed": {
+  "games": 30,
+  "reasons": {
+   "LAST_PLAYER_STANDING": 15,
+   "DURATION_REACHED": 15
+  },
+  "meanYearReached": 8.73,
+  "meanTurnsPerPlayer": 44.9,
+  "ledgerViolations": 0,
+  "moneyCreatedPerGame": 290578,
+  "moneySunkPerGame": 279326,
+  "p2pPerGame": 138938,
+  "flowsPerGame": {
+   "STARTING_FUNDS": {
+    "created": 100000,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "PROPERTY_PURCHASE": {
+    "created": 0,
+    "sunk": 39877,
+    "p2p": 0
+   },
+   "INSURANCE_PREMIUM": {
+    "created": 0,
+    "sunk": 5727,
+    "p2p": 0
+   },
+   "LOAN_DISBURSEMENT": {
+    "created": 66050,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "HOUSE_PURCHASE": {
+    "created": 0,
+    "sunk": 102917,
+    "p2p": 0
+   },
+   "HOTEL_PURCHASE": {
+    "created": 0,
+    "sunk": 19950,
+    "p2p": 0
+   },
+   "JAIL_FINE": {
+    "created": 0,
+    "sunk": 2267,
+    "p2p": 0
+   },
+   "CARD_PAYMENT": {
+    "created": 0,
+    "sunk": 11632,
+    "p2p": 0
+   },
+   "RENT_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 128725
+   },
+   "CRISIS_PAYMENT": {
+    "created": 0,
+    "sunk": 23700,
+    "p2p": 0
+   },
+   "AUCTION_PAYMENT": {
+    "created": 0,
+    "sunk": 24657,
+    "p2p": 0
+   },
+   "REST_HOUSE_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 1128
+   },
+   "START_REWARD": {
+    "created": 49300,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "MORTGAGE": {
+    "created": 36962,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "HOTEL_SALE": {
+    "created": 13033,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "LOAN_REPAYMENT": {
+    "created": 0,
+    "sunk": 29109,
+    "p2p": 0
+   },
+   "LOAN_INTEREST": {
+    "created": 0,
+    "sunk": 4502,
+    "p2p": 0
+   },
+   "CLUB_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 1273
+   },
+   "CARD_REWARD": {
+    "created": 15700,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "UNMORTGAGE": {
+    "created": 0,
+    "sunk": 12190,
+    "p2p": 0
+   },
+   "TAX_PAYMENT": {
+    "created": 0,
+    "sunk": 2525,
+    "p2p": 0
+   },
+   "BANKRUPTCY_SETTLEMENT": {
+    "created": 0,
+    "sunk": 275,
+    "p2p": 7630
+   },
+   "HOUSE_SALE": {
+    "created": 6267,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "OBJECTIVE_REWARD": {
+    "created": 3267,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "CARD_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 182
+   }
+  },
+  "endCashPerActivePlayer": 5923,
+  "endNetWorthPerActivePlayer": 92416,
+  "endDebtPerActivePlayer": 10807,
+  "bankruptciesPerGame": 2.1,
+  "gamesWithBankruptcy": 0.97,
+  "winnerShareOfNetWorth": 0.781,
+  "topToMedianNetWorth": 98023.41,
+  "developedPropertiesAtEnd": 5.1,
+  "housesAtEnd": 6.3,
+  "hotelsAtEnd": 3.6,
+  "allOwnedYear": 7.33,
+  "allOwnedShare": 0.6,
+  "shortagesPerGame": 27.23,
+  "shortagesAssetRichPerGame": 23.77,
+  "shortagesFatalPerGame": 2.1,
+  "shortageReasons": {
+   "RENT": 599,
+   "CRISIS": 129,
+   "CARD": 64,
+   "CLUB": 12,
+   "TAX": 13
+  },
+  "cashPerActivePlayerByYear": {
+   "1": 25000,
+   "2": 7167,
+   "3": 5563,
+   "4": 4113,
+   "5": 3593,
+   "6": 3296,
+   "7": 2864,
+   "8": 2659,
+   "9": 2154,
+   "10": 2733
+  },
+  "ownedByYear": {
+   "1": 0,
+   "2": 11.6,
+   "3": 17.8,
+   "4": 21.5,
+   "5": 23,
+   "6": 23.4,
+   "7": 24.3,
+   "8": 24.3,
+   "9": 24.9,
+   "10": 24.2
+  },
+  "buildingsByYear": {
+   "1": 0,
+   "2": 6.5,
+   "3": 7.2,
+   "4": 8.1,
+   "5": 9,
+   "6": 8.8,
+   "7": 9.3,
+   "8": 9,
+   "9": 9.4,
+   "10": 9.6
+  },
+  "byProfile": {
+   "INSURER": {
+    "n": 20,
+    "meanNetWorth": 29281,
+    "winRate": 0.2,
+    "bankruptRate": 0.55,
+    "meanCash": 2133,
+    "meanProps": 3.3,
+    "meanDebt": 3359,
+    "meanRentIn": 27535,
+    "meanRentOut": 38428,
+    "meanCredit": 677
+   },
+   "BORROWER": {
+    "n": 20,
+    "meanNetWorth": 41563,
+    "winRate": 0.15,
+    "bankruptRate": 0.5,
+    "meanCash": 2818,
+    "meanProps": 4.1,
+    "meanDebt": 2783,
+    "meanRentIn": 38390,
+    "meanRentOut": 28753,
+    "meanCredit": 589
+   },
+   "LOW": {
+    "n": 20,
+    "meanNetWorth": 502,
+    "winRate": 0,
+    "bankruptRate": 0.95,
+    "meanCash": 73,
+    "meanProps": 0.1,
+    "meanDebt": 0,
+    "meanRentIn": 1333,
+    "meanRentOut": 27440,
+    "meanCredit": 701
+   },
+   "DEADBEAT": {
+    "n": 20,
+    "meanNetWorth": 86404,
+    "winRate": 0.5,
+    "bankruptRate": 0.2,
+    "meanCash": 5360,
+    "meanProps": 10.5,
+    "meanDebt": 18965,
+    "meanRentIn": 53385,
+    "meanRentOut": 30403,
+    "meanCredit": 485
+   },
+   "ALLIN": {
+    "n": 20,
+    "meanNetWorth": 43178,
+    "winRate": 0.3,
+    "bankruptRate": 0.6,
+    "meanCash": 1819,
+    "meanProps": 4.2,
+    "meanDebt": 2019,
+    "meanRentIn": 34373,
+    "meanRentOut": 34955,
+    "meanCredit": 676
+   },
+   "INVESTOR": {
+    "n": 20,
+    "meanNetWorth": 62460,
+    "winRate": 0.35,
+    "bankruptRate": 0.35,
+    "meanCash": 4677,
+    "meanProps": 7.3,
+    "meanDebt": 3675,
+    "meanRentIn": 38073,
+    "meanRentOut": 33110,
+    "meanCredit": 713
+   }
+  },
+  "events": {
+   "LOAN_TAKEN": 0,
+   "INTERMEDIATE_LOAN_TAKEN": 16.13,
+   "LOAN_DEFAULTED": 2.53,
+   "COLLATERAL_SEIZED": 0,
+   "LOAN_INSTALLMENT_OVERDUE": 14.53,
+   "INTERMEDIATE_LOAN_REPAID": 5.6,
+   "PLAYER_BANKRUPT": 2.1,
+   "CRISIS_STRUCK": 8,
+   "CRISIS_COVERED": 0.5,
+   "INSURANCE_PURCHASED": 7.9,
+   "INSURANCE_EXPIRED": 6.97,
+   "AUCTION_WON": 17.83,
+   "AUCTION_UNSOLD": 0.2,
+   "PROPERTY_MORTGAGED": 19.4,
+   "PROPERTY_UNMORTGAGED": 6.07,
+   "BUILDING_SOLD": 4.9
+  },
+  "crises": {
+   "PAID": 237,
+   "COVERED": 15,
+   "BANKRUPT": 3
+  },
+  "capitalLoans": {
+   "REPAID": 168,
+   "SETTLED": 18,
+   "WRITTEN_OFF": 161,
+   "ACTIVE": 105,
+   "DEFAULTED": 32
+  }
+ },
+ "intermediate|10y|4p|uniform": {
+  "games": 30,
+  "reasons": {
+   "LAST_PLAYER_STANDING": 9,
+   "DURATION_REACHED": 21
+  },
+  "meanYearReached": 9.93,
+  "meanTurnsPerPlayer": 51.9,
+  "ledgerViolations": 0,
+  "moneyCreatedPerGame": 267397,
+  "moneySunkPerGame": 253759,
+  "p2pPerGame": 145758,
+  "flowsPerGame": {
+   "STARTING_FUNDS": {
+    "created": 100000,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "PROPERTY_PURCHASE": {
+    "created": 0,
+    "sunk": 39750,
+    "p2p": 0
+   },
+   "HOUSE_PURCHASE": {
+    "created": 0,
+    "sunk": 85767,
+    "p2p": 0
+   },
+   "HOTEL_PURCHASE": {
+    "created": 0,
+    "sunk": 13900,
+    "p2p": 0
+   },
+   "JAIL_FINE": {
+    "created": 0,
+    "sunk": 2733,
+    "p2p": 0
+   },
+   "CARD_PAYMENT": {
+    "created": 0,
+    "sunk": 16727,
+    "p2p": 0
+   },
+   "AUCTION_PAYMENT": {
+    "created": 0,
+    "sunk": 27987,
+    "p2p": 0
+   },
+   "RENT_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 138388
+   },
+   "LOAN_DISBURSEMENT": {
+    "created": 54300,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "CRISIS_PAYMENT": {
+    "created": 0,
+    "sunk": 29100,
+    "p2p": 0
+   },
+   "REST_HOUSE_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 1416
+   },
+   "START_REWARD": {
+    "created": 57150,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "CLUB_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 1317
+   },
+   "LOAN_REPAYMENT": {
+    "created": 0,
+    "sunk": 29132,
+    "p2p": 0
+   },
+   "LOAN_INTEREST": {
+    "created": 0,
+    "sunk": 3580,
+    "p2p": 0
+   },
+   "MORTGAGE": {
+    "created": 21480,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "TAX_PAYMENT": {
+    "created": 0,
+    "sunk": 3265,
+    "p2p": 0
+   },
+   "BANKRUPTCY_SETTLEMENT": {
+    "created": 0,
+    "sunk": 153,
+    "p2p": 4404
+   },
+   "CARD_REWARD": {
+    "created": 19550,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "HOTEL_SALE": {
+    "created": 4633,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "HOUSE_SALE": {
+    "created": 6117,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "UNMORTGAGE": {
+    "created": 0,
+    "sunk": 1667,
+    "p2p": 0
+   },
+   "OBJECTIVE_REWARD": {
+    "created": 4167,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "CARD_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 233
+   }
+  },
+  "endCashPerActivePlayer": 5682,
+  "endNetWorthPerActivePlayer": 85976,
+  "endDebtPerActivePlayer": 4352,
+  "bankruptciesPerGame": 1.6,
+  "gamesWithBankruptcy": 0.77,
+  "winnerShareOfNetWorth": 0.711,
+  "topToMedianNetWorth": 95112.95,
+  "developedPropertiesAtEnd": 5.6,
+  "housesAtEnd": 7,
+  "hotelsAtEnd": 3.7,
+  "allOwnedYear": 7.5,
+  "allOwnedShare": 0.73,
+  "shortagesPerGame": 31.67,
+  "shortagesAssetRichPerGame": 29.27,
+  "shortagesFatalPerGame": 1.6,
+  "shortageReasons": {
+   "CRISIS": 128,
+   "RENT": 706,
+   "CLUB": 15,
+   "CARD": 82,
+   "TAX": 19
+  },
+  "cashPerActivePlayerByYear": {
+   "1": 25000,
+   "2": 4063,
+   "3": 3111,
+   "4": 3016,
+   "5": 2937,
+   "6": 3186,
+   "7": 3721,
+   "8": 3547,
+   "9": 3738,
+   "10": 3624
+  },
+  "ownedByYear": {
+   "1": 0,
+   "2": 11.5,
+   "3": 17.7,
+   "4": 21.5,
+   "5": 23.4,
+   "6": 24.1,
+   "7": 24.2,
+   "8": 24.4,
+   "9": 24.1,
+   "10": 24.3
+  },
+  "buildingsByYear": {
+   "1": 0,
+   "2": 6.8,
+   "3": 7.3,
+   "4": 7.7,
+   "5": 8.5,
+   "6": 8.7,
+   "7": 9.1,
+   "8": 9.9,
+   "9": 9.8,
+   "10": 10.3
+  },
+  "byProfile": {
+   "INVESTOR": {
+    "n": 120,
+    "meanNetWorth": 51585,
+    "winRate": 0.25,
+    "bankruptRate": 0.4,
+    "meanCash": 3409,
+    "meanProps": 5.5,
+    "meanDebt": 2611,
+    "meanRentIn": 34597,
+    "meanRentOut": 34597,
+    "meanCredit": 722
+   }
+  },
+  "events": {
+   "LOAN_TAKEN": 0,
+   "INTERMEDIATE_LOAN_TAKEN": 23.07,
+   "LOAN_DEFAULTED": 1.1,
+   "COLLATERAL_SEIZED": 0,
+   "LOAN_INSTALLMENT_OVERDUE": 13.67,
+   "INTERMEDIATE_LOAN_REPAID": 11.37,
+   "PLAYER_BANKRUPT": 1.6,
+   "CRISIS_STRUCK": 9.77,
+   "CRISIS_COVERED": 0,
+   "INSURANCE_PURCHASED": 0,
+   "INSURANCE_EXPIRED": 0,
+   "AUCTION_WON": 18.5,
+   "AUCTION_UNSOLD": 0.23,
+   "PROPERTY_MORTGAGED": 10.27,
+   "PROPERTY_UNMORTGAGED": 1.07,
+   "BUILDING_SOLD": 3.53
+  },
+  "crises": {
+   "PAID": 291,
+   "BANKRUPT": 2
+  },
+  "capitalLoans": {
+   "REPAID": 341,
+   "WRITTEN_OFF": 176,
+   "ACTIVE": 169,
+   "SETTLED": 6
+  }
+ },
+ "intermediate|10y|8p|mixed": {
+  "games": 30,
+  "reasons": {
+   "DURATION_REACHED": 6,
+   "LAST_PLAYER_STANDING": 24
+  },
+  "meanYearReached": 9.1,
+  "meanTurnsPerPlayer": 46.3,
+  "ledgerViolations": 0,
+  "moneyCreatedPerGame": 676143,
+  "moneySunkPerGame": 661731,
+  "p2pPerGame": 511327,
+  "flowsPerGame": {
+   "STARTING_FUNDS": {
+    "created": 200000,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "CARD_REWARD": {
+    "created": 32833,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "LOAN_DISBURSEMENT": {
+    "created": 172267,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "PROPERTY_PURCHASE": {
+    "created": 0,
+    "sunk": 79680,
+    "p2p": 0
+   },
+   "INSURANCE_PREMIUM": {
+    "created": 0,
+    "sunk": 12913,
+    "p2p": 0
+   },
+   "HOUSE_PURCHASE": {
+    "created": 0,
+    "sunk": 273200,
+    "p2p": 0
+   },
+   "HOTEL_PURCHASE": {
+    "created": 0,
+    "sunk": 64750,
+    "p2p": 0
+   },
+   "RENT_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 478363
+   },
+   "AUCTION_PAYMENT": {
+    "created": 0,
+    "sunk": 57740,
+    "p2p": 0
+   },
+   "JAIL_FINE": {
+    "created": 0,
+    "sunk": 5567,
+    "p2p": 0
+   },
+   "CLUB_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 5123
+   },
+   "CARD_PAYMENT": {
+    "created": 0,
+    "sunk": 26393,
+    "p2p": 0
+   },
+   "CRISIS_PAYMENT": {
+    "created": 0,
+    "sunk": 23800,
+    "p2p": 0
+   },
+   "START_REWARD": {
+    "created": 102000,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "REST_HOUSE_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 4264
+   },
+   "HOTEL_SALE": {
+    "created": 57300,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "TAX_PAYMENT": {
+    "created": 0,
+    "sunk": 5258,
+    "p2p": 0
+   },
+   "MORTGAGE": {
+    "created": 81977,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "LOAN_REPAYMENT": {
+    "created": 0,
+    "sunk": 68127,
+    "p2p": 0
+   },
+   "LOAN_INTEREST": {
+    "created": 0,
+    "sunk": 12407,
+    "p2p": 0
+   },
+   "UNMORTGAGE": {
+    "created": 0,
+    "sunk": 31627,
+    "p2p": 0
+   },
+   "CARD_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 1590
+   },
+   "BANKRUPTCY_SETTLEMENT": {
+    "created": 0,
+    "sunk": 269,
+    "p2p": 21986
+   },
+   "HOUSE_SALE": {
+    "created": 27900,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "OBJECTIVE_REWARD": {
+    "created": 1867,
+    "sunk": 0,
+    "p2p": 0
+   }
+  },
+  "endCashPerActivePlayer": 11086,
+  "endNetWorthPerActivePlayer": 195503,
+  "endDebtPerActivePlayer": 14687,
+  "bankruptciesPerGame": 6.7,
+  "gamesWithBankruptcy": 1,
+  "winnerShareOfNetWorth": 0.933,
+  "topToMedianNetWorth": 235875.83,
+  "developedPropertiesAtEnd": 9.5,
+  "housesAtEnd": 4.6,
+  "hotelsAtEnd": 8.4,
+  "allOwnedYear": 5.13,
+  "allOwnedShare": 0.77,
+  "shortagesPerGame": 71.67,
+  "shortagesAssetRichPerGame": 55.57,
+  "shortagesFatalPerGame": 6.7,
+  "shortageReasons": {
+   "CRISIS": 123,
+   "RENT": 1831,
+   "TAX": 32,
+   "CARD": 128,
+   "CLUB": 36
+  },
+  "cashPerActivePlayerByYear": {
+   "1": 25000,
+   "2": 8392,
+   "3": 5342,
+   "4": 4870,
+   "5": 4214,
+   "6": 4378,
+   "7": 4232,
+   "8": 4438,
+   "9": 3898,
+   "10": 4263
+  },
+  "ownedByYear": {
+   "1": 0,
+   "2": 18.6,
+   "3": 23.5,
+   "4": 24.8,
+   "5": 24.8,
+   "6": 23.1,
+   "7": 23.2,
+   "8": 23.5,
+   "9": 22.4,
+   "10": 23
+  },
+  "buildingsByYear": {
+   "1": 0,
+   "2": 12.9,
+   "3": 16.3,
+   "4": 16.6,
+   "5": 16.3,
+   "6": 15.6,
+   "7": 16.2,
+   "8": 16.1,
+   "9": 14.7,
+   "10": 15.3
+  },
+  "byProfile": {
+   "BORROWER": {
+    "n": 40,
+    "meanNetWorth": 47249,
+    "winRate": 0.175,
+    "bankruptRate": 0.725,
+    "meanCash": 3042,
+    "meanProps": 3.4,
+    "meanDebt": 2055,
+    "meanRentIn": 77658,
+    "meanRentOut": 61076,
+    "meanCredit": 689
+   },
+   "INSURER": {
+    "n": 40,
+    "meanNetWorth": 11159,
+    "winRate": 0.05,
+    "bankruptRate": 0.95,
+    "meanCash": 1062,
+    "meanProps": 0.7,
+    "meanDebt": 347,
+    "meanRentIn": 47891,
+    "meanRentOut": 66835,
+    "meanCredit": 709
+   },
+   "LOW": {
+    "n": 40,
+    "meanNetWorth": 0,
+    "winRate": 0,
+    "bankruptRate": 1,
+    "meanCash": 0,
+    "meanProps": 0,
+    "meanDebt": 0,
+    "meanRentIn": 1073,
+    "meanRentOut": 28563,
+    "meanCredit": 700
+   },
+   "ALLIN": {
+    "n": 40,
+    "meanNetWorth": 22464,
+    "winRate": 0.1,
+    "bankruptRate": 0.85,
+    "meanCash": 1506,
+    "meanProps": 1.6,
+    "meanDebt": 1656,
+    "meanRentIn": 73500,
+    "meanRentOut": 75111,
+    "meanCredit": 740
+   },
+   "DEADBEAT": {
+    "n": 40,
+    "meanNetWorth": 94331,
+    "winRate": 0.35,
+    "bankruptRate": 0.575,
+    "meanCash": 4376,
+    "meanProps": 6.2,
+    "meanDebt": 10068,
+    "meanRentIn": 112855,
+    "meanRentOut": 60593,
+    "meanCredit": 475
+   },
+   "INVESTOR": {
+    "n": 40,
+    "meanNetWorth": 15412,
+    "winRate": 0.075,
+    "bankruptRate": 0.925,
+    "meanCash": 823,
+    "meanProps": 0.9,
+    "meanDebt": 194,
+    "meanRentIn": 45796,
+    "meanRentOut": 66595,
+    "meanCredit": 723
+   }
+  },
+  "events": {
+   "LOAN_TAKEN": 0,
+   "INTERMEDIATE_LOAN_TAKEN": 45.93,
+   "LOAN_DEFAULTED": 3.67,
+   "COLLATERAL_SEIZED": 0,
+   "LOAN_INSTALLMENT_OVERDUE": 26.53,
+   "INTERMEDIATE_LOAN_REPAID": 13.9,
+   "PLAYER_BANKRUPT": 6.7,
+   "CRISIS_STRUCK": 8.03,
+   "CRISIS_COVERED": 0.87,
+   "INSURANCE_PURCHASED": 17.13,
+   "INSURANCE_EXPIRED": 15.33,
+   "AUCTION_WON": 20,
+   "AUCTION_UNSOLD": 0.03,
+   "PROPERTY_MORTGAGED": 39.6,
+   "PROPERTY_UNMORTGAGED": 14.03,
+   "BUILDING_SOLD": 20.43
+  },
+  "crises": {
+   "PAID": 238,
+   "COVERED": 26,
+   "BANKRUPT": 3
+  },
+  "capitalLoans": {
+   "REPAID": 417,
+   "WRITTEN_OFF": 838,
+   "ACTIVE": 83,
+   "DEFAULTED": 34,
+   "SETTLED": 6
+  }
+ },
+ "intermediate|10y|8p|uniform": {
+  "games": 30,
+  "reasons": {
+   "LAST_PLAYER_STANDING": 14,
+   "DURATION_REACHED": 16
+  },
+  "meanYearReached": 9.63,
+  "meanTurnsPerPlayer": 49.7,
+  "ledgerViolations": 0,
+  "moneyCreatedPerGame": 594760,
+  "moneySunkPerGame": 553883,
+  "p2pPerGame": 556439,
+  "flowsPerGame": {
+   "STARTING_FUNDS": {
+    "created": 200000,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "CARD_REWARD": {
+    "created": 36667,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "PROPERTY_PURCHASE": {
+    "created": 0,
+    "sunk": 83153,
+    "p2p": 0
+   },
+   "HOUSE_PURCHASE": {
+    "created": 0,
+    "sunk": 223550,
+    "p2p": 0
+   },
+   "HOTEL_PURCHASE": {
+    "created": 0,
+    "sunk": 57233,
+    "p2p": 0
+   },
+   "RENT_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 523770
+   },
+   "AUCTION_PAYMENT": {
+    "created": 0,
+    "sunk": 53083,
+    "p2p": 0
+   },
+   "JAIL_FINE": {
+    "created": 0,
+    "sunk": 6033,
+    "p2p": 0
+   },
+   "CLUB_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 6500
+   },
+   "CARD_PAYMENT": {
+    "created": 0,
+    "sunk": 25475,
+    "p2p": 0
+   },
+   "CRISIS_PAYMENT": {
+    "created": 0,
+    "sunk": 28300,
+    "p2p": 0
+   },
+   "START_REWARD": {
+    "created": 109500,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "REST_HOUSE_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 6310
+   },
+   "LOAN_DISBURSEMENT": {
+    "created": 152967,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "TAX_PAYMENT": {
+    "created": 0,
+    "sunk": 4937,
+    "p2p": 0
+   },
+   "CARD_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 1447
+   },
+   "LOAN_REPAYMENT": {
+    "created": 0,
+    "sunk": 58217,
+    "p2p": 0
+   },
+   "LOAN_INTEREST": {
+    "created": 0,
+    "sunk": 8135,
+    "p2p": 0
+   },
+   "MORTGAGE": {
+    "created": 46102,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "HOTEL_SALE": {
+    "created": 27300,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "UNMORTGAGE": {
+    "created": 0,
+    "sunk": 5476,
+    "p2p": 0
+   },
+   "BANKRUPTCY_SETTLEMENT": {
+    "created": 0,
+    "sunk": 290,
+    "p2p": 18412
+   },
+   "HOUSE_SALE": {
+    "created": 17025,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "OBJECTIVE_REWARD": {
+    "created": 5200,
+    "sunk": 0,
+    "p2p": 0
+   }
+  },
+  "endCashPerActivePlayer": 14955,
+  "endNetWorthPerActivePlayer": 119018,
+  "endDebtPerActivePlayer": 6530,
+  "bankruptciesPerGame": 5.27,
+  "gamesWithBankruptcy": 1,
+  "winnerShareOfNetWorth": 0.722,
+  "topToMedianNetWorth": 214363.75,
+  "developedPropertiesAtEnd": 11.8,
+  "housesAtEnd": 3.7,
+  "hotelsAtEnd": 10.5,
+  "allOwnedYear": 4.72,
+  "allOwnedShare": 0.97,
+  "shortagesPerGame": 69.9,
+  "shortagesAssetRichPerGame": 55.13,
+  "shortagesFatalPerGame": 5.27,
+  "shortageReasons": {
+   "RENT": 1815,
+   "TAX": 19,
+   "CARD": 108,
+   "CRISIS": 107,
+   "CLUB": 48
+  },
+  "cashPerActivePlayerByYear": {
+   "1": 25000,
+   "2": 5804,
+   "3": 4482,
+   "4": 4398,
+   "5": 4914,
+   "6": 5880,
+   "7": 7038,
+   "8": 7148,
+   "9": 8222,
+   "10": 10138
+  },
+  "ownedByYear": {
+   "1": 0,
+   "2": 18.6,
+   "3": 23.6,
+   "4": 25.3,
+   "5": 25.4,
+   "6": 25.1,
+   "7": 24.6,
+   "8": 24.3,
+   "9": 24.1,
+   "10": 22.7
+  },
+  "buildingsByYear": {
+   "1": 0,
+   "2": 12.5,
+   "3": 14.2,
+   "4": 16.1,
+   "5": 16.9,
+   "6": 17.6,
+   "7": 16.7,
+   "8": 16.8,
+   "9": 15.3,
+   "10": 15.9
+  },
+  "byProfile": {
+   "INVESTOR": {
+    "n": 240,
+    "meanNetWorth": 40665,
+    "winRate": 0.125,
+    "bankruptRate": 0.658,
+    "meanCash": 5110,
+    "meanProps": 2.5,
+    "meanDebt": 2231,
+    "meanRentIn": 65471,
+    "meanRentOut": 65471,
+    "meanCredit": 733
+   }
+  },
+  "events": {
+   "LOAN_TAKEN": 0,
+   "INTERMEDIATE_LOAN_TAKEN": 53.03,
+   "LOAN_DEFAULTED": 0.57,
+   "COLLATERAL_SEIZED": 0,
+   "LOAN_INSTALLMENT_OVERDUE": 23.7,
+   "INTERMEDIATE_LOAN_REPAID": 18.93,
+   "PLAYER_BANKRUPT": 5.27,
+   "CRISIS_STRUCK": 9.47,
+   "CRISIS_COVERED": 0,
+   "INSURANCE_PURCHASED": 0,
+   "INSURANCE_EXPIRED": 0,
+   "AUCTION_WON": 15.57,
+   "AUCTION_UNSOLD": 0,
+   "PROPERTY_MORTGAGED": 21.73,
+   "PROPERTY_UNMORTGAGED": 2.8,
+   "BUILDING_SOLD": 11.43
+  },
+  "crises": {
+   "PAID": 283,
+   "BANKRUPT": 1
+  },
+  "capitalLoans": {
+   "REPAID": 568,
+   "WRITTEN_OFF": 816,
+   "ACTIVE": 206,
+   "SETTLED": 1
+  }
+ },
+ "classic|5y-early3|4p|mixed": {
+  "games": 30,
+  "reasons": {
+   "VOTE": 30
+  },
+  "meanYearReached": 3,
+  "meanTurnsPerPlayer": 11,
+  "ledgerViolations": 0,
+  "moneyCreatedPerGame": 147898,
+  "moneySunkPerGame": 126765,
+  "p2pPerGame": 20220,
+  "flowsPerGame": {
+   "STARTING_FUNDS": {
+    "created": 100000,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "PROPERTY_PURCHASE": {
+    "created": 0,
+    "sunk": 30377,
+    "p2p": 0
+   },
+   "LOAN_DISBURSEMENT": {
+    "created": 31650,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "LOAN_REPAYMENT": {
+    "created": 0,
+    "sunk": 13333,
+    "p2p": 0
+   },
+   "HOUSE_PURCHASE": {
+    "created": 0,
+    "sunk": 49467,
+    "p2p": 0
+   },
+   "HOTEL_PURCHASE": {
+    "created": 0,
+    "sunk": 9400,
+    "p2p": 0
+   },
+   "RENT_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 19232
+   },
+   "JAIL_FINE": {
+    "created": 0,
+    "sunk": 750,
+    "p2p": 0
+   },
+   "AUCTION_PAYMENT": {
+    "created": 0,
+    "sunk": 19010,
+    "p2p": 0
+   },
+   "CLUB_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 400
+   },
+   "REST_HOUSE_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 353
+   },
+   "START_REWARD": {
+    "created": 9500,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "HOTEL_SALE": {
+    "created": 867,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "LOAN_INTEREST": {
+    "created": 0,
+    "sunk": 1562,
+    "p2p": 0
+   },
+   "CARD_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 235
+   },
+   "TAX_PAYMENT": {
+    "created": 0,
+    "sunk": 312,
+    "p2p": 0
+   },
+   "MORTGAGE": {
+    "created": 1107,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "HOUSE_SALE": {
+    "created": 125,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "CARD_PAYMENT": {
+    "created": 0,
+    "sunk": 2283,
+    "p2p": 0
+   },
+   "CARD_REWARD": {
+    "created": 4650,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "UNMORTGAGE": {
+    "created": 0,
+    "sunk": 271,
+    "p2p": 0
+   }
+  },
+  "endCashPerActivePlayer": 5283,
+  "endNetWorthPerActivePlayer": 34278,
+  "endDebtPerActivePlayer": 4579,
+  "bankruptciesPerGame": 0,
+  "gamesWithBankruptcy": 0,
+  "winnerShareOfNetWorth": 0.362,
+  "topToMedianNetWorth": 1.81,
+  "developedPropertiesAtEnd": 4.5,
+  "housesAtEnd": 4.5,
+  "hotelsAtEnd": 2.5,
+  "allOwnedYear": 0,
+  "allOwnedShare": 0,
+  "shortagesPerGame": 2.3,
+  "shortagesAssetRichPerGame": 2.27,
+  "shortagesFatalPerGame": 0,
+  "shortageReasons": {
+   "RENT": 60,
+   "LOAN_INTEREST": 1,
+   "CARD": 7,
+   "CLUB": 1
+  },
+  "cashPerActivePlayerByYear": {
+   "1": 25000,
+   "2": 6985,
+   "3": 5538
+  },
+  "ownedByYear": {
+   "1": 0,
+   "2": 11.2,
+   "3": 18.1
+  },
+  "buildingsByYear": {
+   "1": 0,
+   "2": 6.6,
+   "3": 6.9
+  },
+  "byProfile": {
+   "LOW": {
+    "n": 20,
+    "meanNetWorth": 24385,
+    "winRate": 0,
+    "bankruptRate": 0,
+    "meanCash": 18660,
+    "meanProps": 2.5,
+    "meanDebt": 0,
+    "meanRentIn": 300,
+    "meanRentOut": 3720,
+    "meanCredit": null
+   },
+   "BORROWER": {
+    "n": 20,
+    "meanNetWorth": 33630,
+    "winRate": 0.2,
+    "bankruptRate": 0,
+    "meanCash": 3250,
+    "meanProps": 4.6,
+    "meanDebt": 2175,
+    "meanRentIn": 4480,
+    "meanRentOut": 5715,
+    "meanCredit": null
+   },
+   "DEADBEAT": {
+    "n": 20,
+    "meanNetWorth": 36716,
+    "winRate": 0.4,
+    "bankruptRate": 0,
+    "meanCash": 2946,
+    "meanProps": 5.4,
+    "meanDebt": 20000,
+    "meanRentIn": 9958,
+    "meanRentOut": 4358,
+    "meanCredit": null
+   },
+   "INSURER": {
+    "n": 20,
+    "meanNetWorth": 35533,
+    "winRate": 0.3,
+    "bankruptRate": 0,
+    "meanCash": 2973,
+    "meanProps": 5.1,
+    "meanDebt": 1875,
+    "meanRentIn": 3865,
+    "meanRentOut": 5788,
+    "meanCredit": null
+   },
+   "ALLIN": {
+    "n": 20,
+    "meanNetWorth": 35688,
+    "winRate": 0.15,
+    "bankruptRate": 0,
+    "meanCash": 1508,
+    "meanProps": 4.4,
+    "meanDebt": 1625,
+    "meanRentIn": 5898,
+    "meanRentOut": 4298,
+    "meanCredit": null
+   },
+   "INVESTOR": {
+    "n": 20,
+    "meanNetWorth": 39720,
+    "winRate": 0.45,
+    "bankruptRate": 0,
+    "meanCash": 2365,
+    "meanProps": 5.5,
+    "meanDebt": 1800,
+    "meanRentIn": 4348,
+    "meanRentOut": 4970,
+    "meanCredit": null
+   }
+  },
+  "events": {
+   "LOAN_TAKEN": 3.13,
+   "INTERMEDIATE_LOAN_TAKEN": 0,
+   "LOAN_DEFAULTED": 0,
+   "COLLATERAL_SEIZED": 0,
+   "LOAN_INSTALLMENT_OVERDUE": 0,
+   "INTERMEDIATE_LOAN_REPAID": 0,
+   "PLAYER_BANKRUPT": 0,
+   "CRISIS_STRUCK": 0,
+   "CRISIS_COVERED": 0,
+   "INSURANCE_PURCHASED": 0,
+   "INSURANCE_EXPIRED": 0,
+   "AUCTION_WON": 9.57,
+   "AUCTION_UNSOLD": 0,
+   "PROPERTY_MORTGAGED": 0.6,
+   "PROPERTY_UNMORTGAGED": 0.17,
+   "BUILDING_SOLD": 0.2
+  },
+  "crises": {},
+  "capitalLoans": {}
+ },
+ "intermediate|5y-early3|4p|mixed": {
+  "games": 30,
+  "reasons": {
+   "VOTE": 30
+  },
+  "meanYearReached": 3,
+  "meanTurnsPerPlayer": 10.6,
+  "ledgerViolations": 0,
+  "moneyCreatedPerGame": 157688,
+  "moneySunkPerGame": 134910,
+  "p2pPerGame": 21858,
+  "flowsPerGame": {
+   "STARTING_FUNDS": {
+    "created": 100000,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "CARD_REWARD": {
+    "created": 5133,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "PROPERTY_PURCHASE": {
+    "created": 0,
+    "sunk": 30770,
+    "p2p": 0
+   },
+   "LOAN_DISBURSEMENT": {
+    "created": 32350,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "HOUSE_PURCHASE": {
+    "created": 0,
+    "sunk": 60133,
+    "p2p": 0
+   },
+   "HOTEL_PURCHASE": {
+    "created": 0,
+    "sunk": 12183,
+    "p2p": 0
+   },
+   "INSURANCE_PREMIUM": {
+    "created": 0,
+    "sunk": 2010,
+    "p2p": 0
+   },
+   "CLUB_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 360
+   },
+   "RENT_PAYMENT": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 21137
+   },
+   "AUCTION_PAYMENT": {
+    "created": 0,
+    "sunk": 17430,
+    "p2p": 0
+   },
+   "REST_HOUSE_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 325
+   },
+   "START_REWARD": {
+    "created": 9550,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "LOAN_REPAYMENT": {
+    "created": 0,
+    "sunk": 2125,
+    "p2p": 0
+   },
+   "LOAN_INTEREST": {
+    "created": 0,
+    "sunk": 971,
+    "p2p": 0
+   },
+   "JAIL_FINE": {
+    "created": 0,
+    "sunk": 717,
+    "p2p": 0
+   },
+   "CARD_PAYMENT": {
+    "created": 0,
+    "sunk": 2943,
+    "p2p": 0
+   },
+   "MORTGAGE": {
+    "created": 2613,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "CRISIS_PAYMENT": {
+    "created": 0,
+    "sunk": 4900,
+    "p2p": 0
+   },
+   "TAX_PAYMENT": {
+    "created": 0,
+    "sunk": 367,
+    "p2p": 0
+   },
+   "OBJECTIVE_REWARD": {
+    "created": 5067,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "HOTEL_SALE": {
+    "created": 2333,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "UNMORTGAGE": {
+    "created": 0,
+    "sunk": 361,
+    "p2p": 0
+   },
+   "HOUSE_SALE": {
+    "created": 642,
+    "sunk": 0,
+    "p2p": 0
+   },
+   "CARD_COLLECTION": {
+    "created": 0,
+    "sunk": 0,
+    "p2p": 37
+   }
+  },
+  "endCashPerActivePlayer": 5695,
+  "endNetWorthPerActivePlayer": 34600,
+  "endDebtPerActivePlayer": 7997,
+  "bankruptciesPerGame": 0,
+  "gamesWithBankruptcy": 0,
+  "winnerShareOfNetWorth": 0.38,
+  "topToMedianNetWorth": 1.9,
+  "developedPropertiesAtEnd": 4.9,
+  "housesAtEnd": 5,
+  "hotelsAtEnd": 3,
+  "allOwnedYear": 0,
+  "allOwnedShare": 0,
+  "shortagesPerGame": 3.77,
+  "shortagesAssetRichPerGame": 3.7,
+  "shortagesFatalPerGame": 0,
+  "shortageReasons": {
+   "CRISIS": 22,
+   "RENT": 75,
+   "CARD": 13,
+   "CLUB": 2,
+   "TAX": 1
+  },
+  "cashPerActivePlayerByYear": {
+   "1": 25000,
+   "2": 6618,
+   "3": 4542
+  },
+  "ownedByYear": {
+   "1": 0,
+   "2": 10.8,
+   "3": 18
+  },
+  "buildingsByYear": {
+   "1": 0,
+   "2": 7.4,
+   "3": 8
+  },
+  "byProfile": {
+   "LOW": {
+    "n": 20,
+    "meanNetWorth": 22603,
+    "winRate": 0,
+    "bankruptRate": 0,
+    "meanCash": 16013,
+    "meanProps": 2.5,
+    "meanDebt": 0,
+    "meanRentIn": 303,
+    "meanRentOut": 7038,
+    "meanCredit": 700
+   },
+   "DEADBEAT": {
+    "n": 20,
+    "meanNetWorth": 34934,
+    "winRate": 0.35,
+    "bankruptRate": 0,
+    "meanCash": 3493,
+    "meanProps": 5.3,
+    "meanDebt": 21975,
+    "meanRentIn": 8445,
+    "meanRentOut": 5980,
+    "meanCredit": 665
+   },
+   "BORROWER": {
+    "n": 20,
+    "meanNetWorth": 39503,
+    "winRate": 0.4,
+    "bankruptRate": 0,
+    "meanCash": 4640,
+    "meanProps": 6,
+    "meanDebt": 18235,
+    "meanRentIn": 9085,
+    "meanRentOut": 3425,
+    "meanCredit": 692
+   },
+   "INSURER": {
+    "n": 20,
+    "meanNetWorth": 32851,
+    "winRate": 0.25,
+    "bankruptRate": 0,
+    "meanCash": 3967,
+    "meanProps": 4.5,
+    "meanDebt": 2606,
+    "meanRentIn": 4773,
+    "meanRentOut": 6008,
+    "meanCredit": 704
+   },
+   "ALLIN": {
+    "n": 20,
+    "meanNetWorth": 37677,
+    "winRate": 0.25,
+    "bankruptRate": 0,
+    "meanCash": 2160,
+    "meanProps": 4.3,
+    "meanDebt": 3858,
+    "meanRentIn": 5043,
+    "meanRentOut": 4575,
+    "meanCredit": 705
+   },
+   "INVESTOR": {
+    "n": 20,
+    "meanNetWorth": 40030,
+    "winRate": 0.25,
+    "bankruptRate": 0,
+    "meanCash": 3895,
+    "meanProps": 4.8,
+    "meanDebt": 1305,
+    "meanRentIn": 4058,
+    "meanRentOut": 4680,
+    "meanCredit": 702
+   }
+  },
+  "events": {
+   "LOAN_TAKEN": 0,
+   "INTERMEDIATE_LOAN_TAKEN": 5.23,
+   "LOAN_DEFAULTED": 0,
+   "COLLATERAL_SEIZED": 0,
+   "LOAN_INSTALLMENT_OVERDUE": 2.07,
+   "INTERMEDIATE_LOAN_REPAID": 0,
+   "PLAYER_BANKRUPT": 0,
+   "CRISIS_STRUCK": 1.63,
+   "CRISIS_COVERED": 0.37,
+   "INSURANCE_PURCHASED": 3.67,
+   "INSURANCE_EXPIRED": 1.7,
+   "AUCTION_WON": 9.37,
+   "AUCTION_UNSOLD": 0,
+   "PROPERTY_MORTGAGED": 1.17,
+   "PROPERTY_UNMORTGAGED": 0.13,
+   "BUILDING_SOLD": 0.57
+  },
+  "crises": {
+   "COVERED": 11,
+   "PAID": 49
+  },
+  "capitalLoans": {
+   "ACTIVE": 157
+  }
+ }
+}

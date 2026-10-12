@@ -361,7 +361,7 @@ describe('hidden finances, Classic', () => {
     const g = played();
     g.act('Bilal', { type: 'PAY_RENT' });
     expect(financesHidden(g.state)).toBe(true);
-    g.act('Asha', { type: 'END_GAME' });
+    g.endByVote('Asha');
     expect(g.state.status).toBe('FINISHED');
     expect(financesHidden(g.state)).toBe(false);
     const snapshot = full(g);

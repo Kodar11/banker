@@ -15,7 +15,22 @@ import { DECK_LABELS, findCard, type CardDefinition, type Deck, type MoveDirecti
 import { Draft } from './draft.ts';
 import { fail, GameError } from './errors.ts';
 import { formatINR } from './format.ts';
-import { configOf, parseGameConfig, updateGameConfig } from './gameConfig.ts';
+import { configOf, durationLabel, parseGameConfig, updateGameConfig } from './gameConfig.ts';
+import {
+  atMaximumDuration,
+  durationLimit,
+  durationOver,
+  END_VOTE_SECONDS,
+  endBallots,
+  endVoteComplete,
+  endVoteDeadline,
+  endVoteRequestBlocker,
+  endVotesRequired,
+  financialYear,
+  hasGameDuration,
+  newGameEnd,
+  openEndVote,
+} from './gameEnd.ts';
 import {
   assertCrisisBankruptcy,
   buyInsurance,
@@ -27,9 +42,9 @@ import {
   forgetUndoFor,
   payCrisisBill,
 } from './insurance.ts';
-import { initEconomy, payDefaultedLoan, payInstallment, prepayLoan, recordDiceMovement, takeLoan, writeOffLoans } from './intermediateEngine.ts';
+import { advanceCalendar, initEconomy, payDefaultedLoan, payInstallment, prepayLoan, recordDiceMovement, takeLoan, writeOffLoans } from './intermediateEngine.ts';
 import { INTERMEDIATE_RULES as IR } from './intermediateConfig.ts';
-import { isIntermediate, normalizeGameMode, type GameMode } from './intermediateState.ts';
+import { economyOf, isIntermediate, normalizeGameMode, type GameMode } from './intermediateState.ts';
 import { assignObjectives, finalizeObjectives, forgetObjectiveTrade, recordObjectiveTrade } from './objectives.ts';
 import { BUSINESS_MVP_RULES as RULES } from './rules.ts';
 import {
@@ -59,9 +74,14 @@ import {
 } from './selectors.ts';
 import type {
   AuctionState,
+  EndVote,
+  EndVoteChoice,
+  EndVoteKind,
+  EndVoteOutcome,
   EngineContext,
   EngineResult,
   FollowUp,
+  GameEndState,
   GameState,
   PaymentReason,
   Pending,
@@ -142,6 +162,7 @@ export function createGame(
     undoStack: [],
     undoRequest: null,
     trades: [],
+    endGame: null,
     createdAt: ctx.now,
     expiresAt: addHours(ctx.now, RULES.session.ttlHours),
   };
@@ -207,6 +228,9 @@ const TURN_ACTIONS = new Set<GameAction['type']>([
   'DECLARE_BANKRUPTCY',
 ]);
 
+/** What may still be done while a vote on ending the game is open: vote, settle the vote, walk away, and resume a paused table. */
+const DURING_END_VOTE = new Set<GameAction['type']>(['CAST_END_VOTE', 'CLOSE_END_VOTE', 'LEAVE_GAME', 'RESUME_GAME']);
+
 /** Everything a player can do before the game starts. */
 const LOBBY_ACTIONS = new Set<GameAction['type']>(['SET_READY', 'START_GAME', 'LEAVE_GAME', 'UPDATE_CONFIG', 'SET_LOBBY_LOCK', 'REMOVE_PLAYER']);
 
@@ -233,16 +257,23 @@ export function applyAction(state: GameState, actorId: string, rawAction: unknow
       fail('GAME_NOT_STARTED', 'The game has not started yet.');
     }
   } else if (state.status === 'PAUSED') {
-    if (action.type !== 'RESUME_GAME' && action.type !== 'END_GAME' && action.type !== 'LEAVE_GAME') fail('GAME_PAUSED', 'Game is paused.');
+    if (action.type !== 'RESUME_GAME' && action.type !== 'LEAVE_GAME') fail('GAME_PAUSED', 'Game is paused.');
   } else if (action.type === 'SET_READY' || action.type === 'START_GAME' || action.type === 'SET_LOBBY_LOCK' || action.type === 'REMOVE_PLAYER') {
     fail('INVALID_PHASE', 'The game has already started.');
   }
 
   const d = new Draft(state, ctx);
+  // A hosted game that was already running when durations were introduced gets its end-of-game state now.
+  gameEnd(d);
   const actor = d.player(actorId);
   if (actor.status === 'LEFT') fail('FORBIDDEN', 'You have left this game.');
-  if (state.status !== 'WAITING' && actor.status !== 'ACTIVE' && action.type !== 'END_GAME' && action.type !== 'LEAVE_GAME') {
+  if (state.status !== 'WAITING' && actor.status !== 'ACTIVE' && action.type !== 'LEAVE_GAME') {
     fail('FORBIDDEN', 'You are out of the game.');
+  }
+  // A vote on ending the game is open: until it is settled nothing else is played, so its result never
+  // lands in the middle of a move. (At most END_VOTE_SECONDS, and the server closes it by itself.)
+  if (openEndVote(state) && !DURING_END_VOTE.has(action.type)) {
+    fail('INVALID_PHASE', 'A vote on ending the game is in progress.');
   }
   // Capital Mode: an unsettled crisis bill comes before everything else — whose turn it is included.
   if (state.status === 'ACTIVE') {
@@ -416,9 +447,14 @@ export function applyAction(state: GameState, actorId: string, rawAction: unknow
     case 'RESUME_GAME':
       resumeGame(d, actor);
       break;
-    case 'END_GAME':
-      if (!actor.isHost || !RULES.endGame.hostMayEnd) fail('FORBIDDEN', 'Only the host can end the game.');
-      finishGame(d, 'HOST_ENDED');
+    case 'REQUEST_END_VOTE':
+      requestEndVote(d, actor);
+      break;
+    case 'CAST_END_VOTE':
+      castEndVote(d, actor, action.voteId, action.choice);
+      break;
+    case 'CLOSE_END_VOTE':
+      closeEndVote(d, action.voteId);
       break;
     case 'LEAVE_GAME':
       leaveTable(d, actor);
@@ -461,6 +497,8 @@ function startGame(d: Draft, actor: PlayerState): void {
     // Dealt last, so the draws above are exactly what they were before objectives existed.
     if (config.secretObjectives) assignObjectives(d, ordered);
   }
+  // The game's duration starts counting here. (startHostlessGame takes it away again: a matchmade game has none.)
+  d.state.endGame = newGameEnd(d.state);
   const first = ordered[0];
   if (!first) fail('NOT_ENOUGH_PLAYERS', 'No players.');
   d.state.turn = { ...freshTurn(), playerId: first.id, number: 1 };
@@ -474,7 +512,7 @@ function startGame(d: Draft, actor: PlayerState): void {
  * Starts a game the server assembled (public matchmaking). It is the host's START_GAME — the same
  * turn-order draw, starting cash, economy and objectives, in the same order — run by the server once
  * every player has confirmed, and it leaves the table without a host: nobody at a table of strangers
- * may end the game for everyone else. Nothing else about the game differs from a hosted one.
+ * may end the game for everyone else, and it has no duration and no end-game votes. Nothing else about the game differs from a hosted one.
  */
 export function startHostlessGame(state: GameState, ctx: EngineContext): EngineResult {
   assertLoadable(state, ctx);
@@ -485,6 +523,8 @@ export function startHostlessGame(state: GameState, ctx: EngineContext): EngineR
   startGame(d, host);
   host.isHost = false;
   d.state.hostPlayerId = null;
+  // No host, so no duration and no votes either: the game runs until one player is left.
+  d.state.endGame = null;
   bumpVersion(d);
   return d.result();
 }
@@ -532,6 +572,8 @@ function rollDice(d: Draft, actor: PlayerState): void {
   });
   // Capital Mode only: the dice move feeds the shared financial calendar (years, market, loan due dates).
   if (isIntermediate(d.state)) recordDiceMovement(d, actor, total);
+  // Classic has no economy: a game with a duration keeps the same dice clock itself, only to count its years.
+  else recordClassicMovement(d, actor, total);
   d.setPhase('RESOLVING');
   if (!settleDueInterest(d, actor, { kind: 'RESOLVE_LANDING', rollTotal: total, depth: 0 })) return;
   resolveLanding(d, actor, total, 0);
@@ -979,8 +1021,22 @@ function endTurn(d: Draft, actor: PlayerState): void {
   advanceTurn(d, actor.id);
 }
 
-/** Moves the turn to the next active player, consuming skipped turns. */
+/**
+ * Moves the turn to the next active player, consuming skipped turns.
+ *
+ * This is also where a game's duration is settled: a turn has just finished, so nothing is half done.
+ * If the dice have carried the calendar past the game's last financial year, no new turn begins —
+ * the finish-or-extend vote opens instead (or, at the longest a game may be, the game ends), and
+ * play resumes from here only if the players decide to go on.
+ */
 function advanceTurn(d: Draft, fromPlayerId: string): void {
+  // A duration vote is open (a player left during it): the next turn waits for its result.
+  if (openEndVote(d.state)?.kind === 'DURATION') return;
+  if (d.state.status !== 'FINISHED' && durationOver(d.state)) {
+    if (atMaximumDuration(d.state)) finishGame(d, 'DURATION_REACHED');
+    else openVote(d, 'DURATION', null, fromPlayerId);
+    return;
+  }
   const seats = [...d.state.players].sort((a, b) => a.seat - b.seat);
   const startIndex = Math.max(
     0,
@@ -1567,6 +1623,13 @@ function dropPayee(d: Draft, playerId: string): void {
  *   - if fewer than two players are left, the game finishes (the last one wins, as with bankruptcy).
  */
 function leaveTable(d: Draft, actor: PlayerState): void {
+  walkAway(d, actor);
+  // Leaving is not a ballot. But a vote that was only waiting for this player has nobody left to wait for.
+  const vote = openEndVote(d.state);
+  if (vote && d.state.status !== 'FINISHED' && endVoteComplete(d.state, vote)) settleVote(d, vote);
+}
+
+function walkAway(d: Draft, actor: PlayerState): void {
   const started = d.state.status !== 'WAITING';
   actor.status = 'LEFT';
   actor.ready = false;
@@ -1638,10 +1701,19 @@ function leaveTable(d: Draft, actor: PlayerState): void {
   advanceTurn(d, actor.id);
 }
 
-function finishGame(d: Draft, reason: 'HOST_ENDED' | 'LAST_PLAYER_STANDING' | 'PLAYERS_LEFT'): void {
+/**
+ * THE completion flow. Every way a game ends comes through here, so the final accounts, the
+ * objectives and the winner are always worked out the same way:
+ *   LAST_PLAYER_STANDING  everyone else is bankrupt        PLAYERS_LEFT      fewer than two players remain
+ *   VOTE                  an early vote passed              DURATION_VOTE     the finish-or-extend vote ended it
+ *   DURATION_REACHED      the longest a game may be was played out
+ */
+function finishGame(d: Draft, reason: 'VOTE' | 'DURATION_VOTE' | 'DURATION_REACHED' | 'LAST_PLAYER_STANDING' | 'PLAYERS_LEFT'): void {
   d.setStatus('FINISHED');
   d.state.pausedFrom = null;
   d.state.pausedAt = null;
+  // A vote the game ended under (everyone else left, a bankruptcy) is over with it. Nothing more is asked.
+  if (d.state.endGame) d.state.endGame.vote = null;
   expireTrades(d, () => true);
   d.state.undoStack = [];
   d.state.undoRequest = null;
@@ -1663,6 +1735,129 @@ function finishGame(d: Draft, reason: 'HOST_ENDED' | 'LAST_PLAYER_STANDING' | 'P
   });
 }
 
+// ---------------------------------------------------------------------------
+// Ending the game by vote (hosted games; the rules are in gameEnd.ts)
+// ---------------------------------------------------------------------------
+
+/** The game's end-of-game state. A hosted game that was already running when votes were introduced gets it here, the first time it is needed. */
+function gameEnd(d: Draft): GameEndState | null {
+  if (!hasGameDuration(d.state)) return null;
+  d.state.endGame ??= newGameEnd(d.state);
+  return d.state.endGame;
+}
+
+/** Classic: the dice clock that counts the game's financial years. (Capital counts them in its economy.) */
+function recordClassicMovement(d: Draft, player: PlayerState, spaces: number): void {
+  const calendar = gameEnd(d)?.calendar;
+  if (!calendar || spaces <= 0 || !(player.id in calendar.movement)) return;
+  const before = financialYear(d.state);
+  calendar.movement[player.id] = (calendar.movement[player.id] ?? 0) + spaces;
+  const year = financialYear(d.state);
+  if (year > before) d.event('GAME_YEAR_STARTED', null, `Year ${year} begins`, { year });
+}
+
+/**
+ * THE way a vote opens. The electorate is everyone ACTIVE at this instant and the number of END
+ * ballots needed is worked out from it here, once: neither moves afterwards, whoever disconnects or leaves.
+ */
+function openVote(d: Draft, kind: EndVoteKind, requestedBy: PlayerState | null, resumeAfterPlayerId: string | null): EndVote {
+  const end = gameEnd(d);
+  if (!end) fail('VOTE_NOT_ALLOWED', 'This game has no end-game votes.');
+  const electorate = d.activePlayers().map((p) => p.id);
+  const vote: EndVote = {
+    id: d.ctx.newId(),
+    kind,
+    year: financialYear(d.state),
+    requestedBy: requestedBy?.id ?? null,
+    electorate,
+    required: endVotesRequired(kind, electorate.length),
+    ballots: {},
+    endsAt: addSeconds(d.ctx.now, END_VOTE_SECONDS),
+    createdAt: d.ctx.now,
+    resumeAfterPlayerId,
+  };
+  end.vote = vote;
+  const message =
+    kind === 'EARLY'
+      ? `${requestedBy?.name ?? 'A player'} asked for a vote to end the game early`
+      : `${durationLabel(durationLimit(d.state))} played — vote: end the game or play one more year`;
+  d.event('END_VOTE_STARTED', requestedBy?.id ?? null, message, { voteId: vote.id, kind, year: vote.year, required: vote.required, electors: electorate.length, endsAt: vote.endsAt });
+  return vote;
+}
+
+/**
+ * An active player asks for an early vote. Refused, never queued, when the moment is wrong
+ * (endVoteRequestBlocker says why). Asking uses up the player's one request for this financial year
+ * whatever the vote decides — and it is their END ballot: nobody asks for a vote they would vote against.
+ */
+function requestEndVote(d: Draft, actor: PlayerState): void {
+  const end = gameEnd(d);
+  const why = endVoteRequestBlocker(d.state, actor.id);
+  if (!end || why) fail('VOTE_NOT_ALLOWED', why ?? 'This game has no end-game votes.');
+  end.requestedIn[actor.id] = financialYear(d.state);
+  const vote = openVote(d, 'EARLY', actor, null);
+  vote.ballots[actor.id] = 'END';
+  if (endVoteComplete(d.state, vote)) settleVote(d, vote);
+}
+
+function voteInProgress(d: Draft, voteId: string): EndVote {
+  const vote = openEndVote(d.state);
+  if (!vote || vote.id !== voteId) fail('VOTE_CLOSED', 'That vote has closed.');
+  return vote;
+}
+
+/**
+ * One ballot per player per vote, locked once cast: a second one is refused, whichever device or
+ * retry it comes from. In time means the server received it before the deadline — never a client's
+ * clock. No event is written: who has voted, and how, is nobody else's business.
+ */
+function castEndVote(d: Draft, actor: PlayerState, voteId: string, choice: EndVoteChoice): void {
+  const vote = voteInProgress(d, voteId);
+  if (!vote.electorate.includes(actor.id)) fail('FORBIDDEN', 'You are not taking part in this vote.');
+  if (actor.id in vote.ballots) fail('VOTE_NOT_ALLOWED', 'You have already voted.');
+  if (Date.parse(d.ctx.receivedAt ?? d.ctx.now) >= endVoteDeadline(vote)) fail('VOTE_CLOSED', 'Voting has ended.');
+  vote.ballots[actor.id] = choice;
+  if (endVoteComplete(d.state, vote)) settleVote(d, vote);
+}
+
+/** The deadline has passed: count what was cast. Asked by any device or by the server's timer; only the first one finds a vote to close. */
+function closeEndVote(d: Draft, voteId: string): void {
+  const vote = voteInProgress(d, voteId);
+  if (Date.parse(d.ctx.now) < endVoteDeadline(vote)) fail('INVALID_PHASE', 'The vote is still open.');
+  settleVote(d, vote);
+}
+
+/**
+ * THE result of a vote, applied once: the vote is taken out of the state in the same step, so a
+ * second close — a timer racing a last ballot — finds nothing to settle.
+ *
+ * Only ballots that were cast count; a player who did not vote is on neither side. Enough END
+ * ballots finish the game through the one completion flow. Otherwise an early vote simply fails
+ * and play goes on, and a duration vote adds exactly one financial year to this same game — the
+ * year that had been held back now begins — and the turn passes on from where it stopped.
+ */
+function settleVote(d: Draft, vote: EndVote): void {
+  const end = d.state.endGame;
+  if (!end) return;
+  const ended = endBallots(vote) >= vote.required;
+  const outcome: EndVoteOutcome = ended ? 'ENDED' : vote.kind === 'EARLY' ? 'CONTINUED' : 'EXTENDED';
+  end.vote = null;
+  end.lastResult = { id: vote.id, kind: vote.kind, outcome, closedAt: d.ctx.now };
+  if (outcome === 'EXTENDED') end.extraYears += 1;
+  const limit = durationLimit(d.state);
+  const message = ended ? 'Game ending approved' : outcome === 'CONTINUED' ? 'Game will continue' : `The game will extend by one financial year — to year ${limit}`;
+  d.event('END_VOTE_CLOSED', null, message, { voteId: vote.id, kind: vote.kind, outcome, durationYears: limit });
+  if (ended) {
+    finishGame(d, vote.kind === 'EARLY' ? 'VOTE' : 'DURATION_VOTE');
+    return;
+  }
+  if (outcome !== 'EXTENDED') return;
+  const eco = economyOf(d.state);
+  if (eco) advanceCalendar(d, eco);
+  else d.event('GAME_YEAR_STARTED', null, `Year ${financialYear(d.state)} begins`, { year: financialYear(d.state) });
+  if (vote.resumeAfterPlayerId) advanceTurn(d, vote.resumeAfterPlayerId);
+}
+
 function resumeGame(d: Draft, actor: PlayerState): void {
   const pausedAt = d.state.pausedAt;
   d.setStatus('ACTIVE');
@@ -1673,6 +1868,12 @@ function resumeGame(d: Draft, actor: PlayerState): void {
     // Give back the time bidders lost while paused.
     const pausedMs = Math.max(0, Date.parse(d.ctx.now) - Date.parse(pausedAt));
     auction.endsAt = new Date(Date.parse(auction.endsAt) + pausedMs).toISOString();
+  }
+  // The same for a vote: the time it was frozen is given back. (One can open while paused, when a player leaves.)
+  const vote = openEndVote(d.state);
+  if (vote && pausedAt) {
+    const frozenMs = Math.max(0, Date.parse(d.ctx.now) - Math.max(Date.parse(pausedAt), Date.parse(vote.createdAt)));
+    vote.endsAt = new Date(Date.parse(vote.endsAt) + frozenMs).toISOString();
   }
   d.event('GAME_RESUMED', actor.id, `${actor.name} resumed the game`);
 }

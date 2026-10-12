@@ -1,0 +1,7 @@
+const repo = 'C:/Users/Tanmay Chavan/Documents/Computer Science/React Native/board-game-bank';
+export default {
+  root: repo,
+  resolve: { alias: { '@': `${repo}/src`, '#tests': `${repo}/tests` } },
+  server: { fs: { strict: false } },
+  test: { include: [`${process.env.AUDIT_DIR}/**/*.audit.ts`], environment: 'node', fileParallelism: false, testTimeout: 600000 },
+};

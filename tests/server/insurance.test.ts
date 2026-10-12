@@ -434,7 +434,9 @@ describe.skipIf(!DATABASE_URL)('Property insurance through the handler (Postgres
       await give(g, 'Bilal', 'AGRA');
       await rollTo(g, FIRST);
       const cash = await balance(g, 'Bilal');
-      const ended = ok(await g.act('Asha', { type: 'END_GAME' }));
+      // No vote can be asked for while a bill is open; the game ends here because the other player walks away.
+      expect(await g.act('Asha', { type: 'REQUEST_END_VOTE' })).toMatchObject({ ok: false, error: { code: 'INVALID_PHASE' } });
+      const ended = ok(await g.act('Asha', { type: 'LEAVE_GAME' }));
       expect(ended.snapshot.state.status).toBe('FINISHED');
       expect(await crisisRows(g)).toMatchObject([{ status: 'PAID', paid: BILL }]);
       expect(await balance(g, 'Bilal')).toBe(cash - BILL);

@@ -152,7 +152,7 @@ describe('Chat / React button', () => {
     const first = await render(<GameScreen view={viewFor(paused, 'Asha')} />);
     expect(screen.queryByTestId('open-chat')).toBeNull();
     await first.unmount();
-    const over = new Fixture().act('Asha', { type: 'END_GAME' }).loadAs('Asha');
+    const over = new Fixture().endByVote('Asha').loadAs('Asha');
     await render(<GameScreen view={viewFor(over, 'Asha')} />);
     expect(screen.queryByTestId('open-chat')).toBeNull();
   });

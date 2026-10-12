@@ -76,7 +76,7 @@ describe('main screen hierarchy', () => {
   it('header → players → turn + primary action → board → contextual card → actions; no View-board button, no permanent log', async () => {
     const f = table().loadAs('Tanmay');
     await render(<GameScreen view={viewFor(f, 'Tanmay')} />);
-    expect(screen.getByTestId('game-header')).toHaveTextContent(/BUSINESS.*Classic · India/);
+    expect(screen.getByTestId('game-header')).toHaveTextContent(/BUSINESS.*Classic · Year 1 of 5/);
     expect(screen.getByTestId('players-strip')).toBeTruthy();
     expect(screen.getByTestId('turn-bar')).toBeTruthy();
     expect(screen.getByTestId('classic-board')).toBeTruthy();

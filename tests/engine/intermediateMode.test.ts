@@ -927,7 +927,7 @@ describe('financial position', () => {
     const g = newGame();
     g.give('Bilal', 'MUMBAI');
     eco(g).market.MUMBAI.value = 100;
-    const r = g.act('Asha', { type: 'END_GAME' });
+    const r = g.endByVote('Asha');
     const finished = r.events.find((e) => e.type === 'GAME_FINISHED') as unknown as { payload: { standings: { playerId: string; netWorth: number }[] } };
     expect(finished.payload.standings).toEqual([
       { playerId: g.id('Bilal'), netWorth: START_CASH + 100 },

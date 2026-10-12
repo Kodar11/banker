@@ -1,4 +1,4 @@
-# 10. Finish game: host ends the game; winner by net worth is shown.
+# 10. Finish game: the host asks for an end-game vote, the other player agrees; winner by net worth is shown.
 appId: com.clashofcapitals.app
 ---
 - runFlow: subflows/host_game_with_bot.yaml
@@ -12,8 +12,19 @@ appId: com.clashofcapitals.app
 - tapOn:
     id: open-more
 - tapOn:
-    id: end-game-button
-- tapOn: End game
+    id: request-end-vote
+- tapOn: Start Vote
+# Nobody ends the game alone: the vote card is up until the other player has voted.
+- extendedWaitUntil:
+    visible:
+      id: end-vote
+    timeout: 15000
+- runScript:
+    file: scripts/bot.js
+    env:
+      OP: vote
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_KEY: ${SUPABASE_KEY}
 - extendedWaitUntil:
     visible: '(?i).* wins!'
     timeout: 15000

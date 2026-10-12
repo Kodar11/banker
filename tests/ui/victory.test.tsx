@@ -34,7 +34,7 @@ const viewFor = (f: Fixture, name: string) => viewOf(f.snapshot(), f.ids[name]!)
 function endedGame(extra: Record<string, number> = {}, names = ['Asha', 'Bilal']): Fixture {
   const f = new Fixture(names);
   for (const [name, amount] of Object.entries(extra)) f.state.players.find((p) => p.id === f.ids[name])!.balance += amount;
-  return f.act('Asha', { type: 'END_GAME' });
+  return f.endByVote('Asha');
 }
 
 async function renderTable(f: Fixture, name = 'Asha', size = { width: 412, height: 840 }) {
@@ -141,7 +141,7 @@ describe('The result card', () => {
     const f = new Fixture(['Asha', 'Bilal'], { mode: 'intermediate' });
     const objectives: Record<string, ObjectiveId> = { Asha: 'CASH_GUARDIAN', Bilal: 'DEAL_MAKER' };
     for (const [name, id] of Object.entries(objectives)) f.state.objectives!.assignments[f.ids[name]!] = id;
-    f.act('Asha', { type: 'END_GAME' });
+    f.endByVote('Asha');
     await renderTable(f, 'Bilal');
     const card = screen.getByTestId('context-card');
     expect(within(card).getByTestId('context-title')).toHaveTextContent('Asha wins!');
@@ -192,7 +192,7 @@ describe('Final Standings', () => {
   });
 
   it('Capital explains market value, mortgages and loans', async () => {
-    const f = new Fixture(['Asha', 'Bilal'], { mode: 'intermediate', config: { secretObjectives: false } }).act('Asha', { type: 'END_GAME' });
+    const f = new Fixture(['Asha', 'Bilal'], { mode: 'intermediate', config: { secretObjectives: false } }).endByVote('Asha');
     await renderTable(f, 'Asha');
     await fireEvent.press(screen.getByTestId('context-cta'));
     await fireEvent.press(screen.getByTestId('net-worth-info'));

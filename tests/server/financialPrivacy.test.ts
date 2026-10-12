@@ -11,6 +11,7 @@
  */
 import { randomBytes, randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { endByVote } from './endByVote.ts';
 import { createSql, type Sql } from '../../supabase/functions/game-action/db.ts';
 import { handleRequest, type HandlerDeps } from '../../supabase/functions/game-action/handler.ts';
 import {
@@ -334,7 +335,7 @@ describe.skipIf(!DATABASE_URL)('open and hidden finances (Postgres)', () => {
       const g = await setupGame({ config: HIDDEN });
       ok(await g.act('Asha', { type: 'REQUEST_LOAN', amount: 5000 }));
       expect(balanceOf(await g.view('Chitra'), g, 'Asha')).toBe(0);
-      ok(await g.act('Asha', { type: 'END_GAME' }));
+      ok(await endByVote(g.act, Object.keys(g.seats), 'Asha'));
       const final = await g.view('Chitra');
       expect(final.state.status).toBe('FINISHED');
       expect(balanceOf(final, g, 'Asha')).toBe(30000);

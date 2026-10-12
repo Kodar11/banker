@@ -628,8 +628,10 @@ describe.skipIf(!DATABASE_URL)('random matchmaking (Postgres)', () => {
       const rolled = ok(await call({ op: 'action', gameId: match.game_id, playerId: current.id, token: tokens.get(current.user_id), actionId: randomUUID(), expectedVersion: game!.state_version, action: { type: 'ROLL_DICE' } satisfies GameAction }));
       expect(rolled.snapshot.state.turn.hasRolled).toBe(true);
       // Nobody can end it for the others: there is no host.
-      const ended = await call({ op: 'action', gameId: match.game_id, playerId: current.id, token: tokens.get(current.user_id), actionId: randomUUID(), expectedVersion: rolled.snapshot.state.version, action: { type: 'END_GAME' } satisfies GameAction });
-      expect(ended).toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } });
+      const ended = await call({ op: 'action', gameId: match.game_id, playerId: current.id, token: tokens.get(current.user_id), actionId: randomUUID(), expectedVersion: rolled.snapshot.state.version, action: { type: 'REQUEST_END_VOTE' } satisfies GameAction });
+      // ...not even by asking for a vote: a matchmade game has no duration and no end-game votes.
+      expect(ended).toMatchObject({ ok: false, error: { code: 'VOTE_NOT_ALLOWED', message: 'This game has no end-game votes.' } });
+      expect((await sql`select end_game from public.games where id = ${match.game_id}`)[0]!.end_game).toBeNull();
       // And nobody can join it.
       expect(await call({ op: 'join', actionId: randomUUID(), token: token(), code: game!.code, name: 'Late' })).toMatchObject({ ok: false });
     });

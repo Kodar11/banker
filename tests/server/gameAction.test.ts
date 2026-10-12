@@ -10,6 +10,7 @@
  */
 import { randomBytes, randomUUID } from 'node:crypto';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { endByVote } from './endByVote.ts';
 import { createSql, type Sql } from '../../supabase/functions/game-action/db.ts';
 import { closeAuctionIfDue, handleRequest, type HandlerDeps } from '../../supabase/functions/game-action/handler.ts';
 import type { ApiResponse, GameAction, GameSnapshot, StateBroadcast } from '../../supabase/functions/_shared/engine/index.ts';
@@ -263,16 +264,24 @@ describe.skipIf(!DATABASE_URL)('game-action handler (Postgres)', () => {
       expect(snap.events.filter((e) => e.type === 'PLAYER_LEFT')).toHaveLength(1);
     });
 
-    it('the host leaves: exactly one host row afterwards, and only the new host can end the game', async () => {
+    it('the host leaves: exactly one host row afterwards, the game goes on, and the new host cannot end it alone either', async () => {
       const g = await setupGame(NAMES);
       ok(await g.act('Tanmay', { type: 'START_GAME' }));
       ok(await g.act('Tanmay', { type: 'LEAVE_GAME' }));
       expect(await playerRows(g.gameId)).toEqual(['0:Tanmay:LEFT', '1:Shamin:ACTIVE:host', '2:Ram:ACTIVE', '3:Priya:ACTIVE']);
       const [game] = await sql`select host_player_id, status, current_player_id from public.games where id = ${g.gameId}`;
       expect(game).toMatchObject({ host_player_id: g.seats.Shamin!.playerId, status: 'ACTIVE', current_player_id: g.seats.Shamin!.playerId });
-      expect(await g.act('Ram', { type: 'END_GAME' })).toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } });
-      expect(await g.act('Tanmay', { type: 'END_GAME' })).toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } });
-      ok(await g.act('Shamin', { type: 'END_GAME' }));
+      // The removed host action is not an action any more, for anyone.
+      for (const name of ['Shamin', 'Ram']) expect(await g.act(name, { type: 'END_GAME' } as unknown as GameAction)).toMatchObject({ ok: false, error: { code: 'VALIDATION' } });
+      expect(await g.act('Tanmay', { type: 'REQUEST_END_VOTE' })).toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } });
+      // The new host asks: that opens a vote among the three who are left, and decides nothing by itself.
+      const asked = ok(await g.act('Shamin', { type: 'REQUEST_END_VOTE' }));
+      expect(asked.snapshot.state).toMatchObject({ status: 'ACTIVE', endGame: { vote: { kind: 'EARLY', required: 2 } } });
+      expect(asked.snapshot.state.endGame!.vote!.electorate).not.toContain(g.seats.Tanmay!.playerId);
+      const cast = { type: 'CAST_END_VOTE', voteId: asked.snapshot.state.endGame!.vote!.id, choice: 'CONTINUE' } as const;
+      ok(await g.act('Ram', cast));
+      const closed = ok(await g.act('Priya', cast));
+      expect(closed.snapshot.state).toMatchObject({ status: 'ACTIVE', endGame: { vote: null, lastResult: { outcome: 'CONTINUED' } } });
     });
 
     it('nobody can leave for someone else: the token decides who the request is from', async () => {
@@ -510,7 +519,7 @@ describe.skipIf(!DATABASE_URL)('game-action handler (Postgres)', () => {
     expect(await g.act('Bilal', { type: 'END_TURN' })).toMatchObject({ ok: false, error: { code: 'GAME_PAUSED' } });
     ok(await g.act('Bilal', { type: 'RESUME_GAME' }));
     ok(await g.act('Bilal', { type: 'END_TURN' }));
-    ok(await g.act('Asha', { type: 'END_GAME' }));
+    ok(await endByVote(g.act, Object.keys(g.seats), 'Asha'));
     snap = await state(g.gameId, g.seats.Asha!);
     expect(snap.state.status).toBe('FINISHED');
     expect(snap.state.winnerId).toBeTruthy();
@@ -1148,11 +1157,13 @@ describe.skipIf(!DATABASE_URL)('game-action handler (Postgres)', () => {
 
   });
 
-  it('host can end a paused game (persists without violating constraints)', async () => {
+  it('a paused game takes no vote, even from the host; resumed and voted over, it persists without violating constraints', async () => {
     const g = await setupGame(['Asha', 'Bilal']);
     ok(await g.act('Asha', { type: 'START_GAME' }));
     ok(await g.act('Bilal', { type: 'PAUSE_GAME' }));
-    ok(await g.act('Asha', { type: 'END_GAME' }));
+    expect(await g.act('Asha', { type: 'REQUEST_END_VOTE' })).toMatchObject({ ok: false, error: { code: 'GAME_PAUSED' } });
+    ok(await g.act('Bilal', { type: 'RESUME_GAME' }));
+    ok(await endByVote(g.act, Object.keys(g.seats)));
     const [row] = await sql`select status, paused_at from public.games where id = ${g.gameId}`;
     expect(row).toMatchObject({ status: 'FINISHED', paused_at: null });
   });

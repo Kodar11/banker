@@ -5,6 +5,8 @@ export interface MoreItem {
   icon: string;
   label: string;
   hint?: string;
+  /** Lines the hint may take (default 1). More for a hint that explains why the action is unavailable. */
+  hintLines?: number;
   testID: string;
   onPress: () => void;
   disabled?: boolean;
@@ -31,7 +33,7 @@ export function MoreActions({ items }: { items: MoreItem[] }) {
           <View className="flex-1">
             <Text className={`text-base font-bold ${item.destructive ? 'text-brick' : 'text-ink'}`}>{item.label}</Text>
             {item.hint ? (
-              <Text className="text-xs text-stone-500" numberOfLines={1}>
+              <Text className="text-xs text-stone-500" numberOfLines={item.hintLines ?? 1}>
                 {item.hint}
               </Text>
             ) : null}

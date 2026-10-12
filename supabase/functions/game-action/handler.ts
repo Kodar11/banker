@@ -18,6 +18,8 @@ import {
   publicEvents,
   applyAction,
   auctionAcceptUntil,
+  endVoteDeadline,
+  openEndVote,
   RULES_VERSION,
   STALE_SENSITIVE_ACTIONS,
   type ApiRequest,
@@ -36,7 +38,8 @@ export interface HandlerDeps {
   broadcast?: (gameId: string, payload: StateBroadcast) => Promise<void>;
   /**
    * Runs `task` after `delayMs`, outside the request (Edge: EdgeRuntime.waitUntil). Used to close
-   * an auction when its deadline passes without depending on any phone staying connected.
+   * an auction - or a vote on ending the game - when its deadline passes without depending on any
+   * phone staying connected.
    */
   defer?: (delayMs: number, task: () => Promise<void>) => void;
   now?: () => Date;
@@ -265,6 +268,21 @@ async function stateOp(req: Extract<ApiRequest, { op: 'state' }>, deps: HandlerD
   // through the one settlement path (closeAuctionIfDue: same lock, same engine rule, exactly once).
   // The read itself stays a read: it answers with what it found, and the close reaches every phone
   // the way any committed action does. Reading a game whose auction is still running arms nothing.
+  // The same recovery for a vote on ending the game whose deadline has passed (closeEndVoteIfDue).
+  const vote = openEndVote(snapshot.state);
+  if (deps.defer && vote && snapshot.state.status === 'ACTIVE') {
+    const nowMs = (deps.now ? deps.now() : new Date()).getTime();
+    if (nowMs >= endVoteDeadline(vote)) {
+      deps.defer(0, async () => {
+        try {
+          await closeEndVoteIfDue(req.gameId, vote.id, deps);
+        } catch (error) {
+          // The next read, or any phone showing the vote, tries again.
+          console.error('end-vote recovery on read failed', error);
+        }
+      });
+    }
+  }
   const auction = snapshot.state.auction;
   if (deps.defer && auction && auction.status === 'OPEN' && snapshot.state.status === 'ACTIVE') {
     const nowMs = (deps.now ? deps.now() : new Date()).getTime();
@@ -326,11 +344,15 @@ async function actionOp(
         ${tx.json({ transactions: result.transactions.map((t) => t.id), events: result.events.map((e) => e.type) })})`;
     const [fresh] = await tx`select * from public.games where id = ${req.gameId}`;
     const deadlineSet = result.state.auction?.id !== state.auction?.id || result.state.auction?.endsAt !== state.auction?.endsAt;
-    return { duplicate: false as const, snapshot: await loadSnapshot(tx, fresh!, req.playerId), result, deadlineSet };
+    const before = openEndVote(state);
+    const after = openEndVote(result.state);
+    const voteDeadlineSet = !!after && (after.id !== before?.id || after.endsAt !== before.endsAt);
+    return { duplicate: false as const, snapshot: await loadSnapshot(tx, fresh!, req.playerId), result, deadlineSet, voteDeadlineSet };
   });
 
   if (!outcome.duplicate) {
     if (outcome.deadlineSet) scheduleAuctionClose(deps, outcome.result.state);
+    if (outcome.voteDeadlineSet) scheduleEndVoteClose(deps, outcome.result.state);
     await notify(deps, outcome.result.state, outcome.result.events);
   }
   return {
@@ -391,6 +413,61 @@ export async function closeAuctionIfDue(gameId: string, auctionId: string, deps:
     return closed;
   });
   if (!result) return false;
+  await notify(deps, result.state, result.events);
+  return true;
+}
+
+/** Arms the server-side close for the deadline an action just set (a vote opened, or a paused game with one resumed). */
+function scheduleEndVoteClose(deps: HandlerDeps, state: GameState): void {
+  const vote = openEndVote(state);
+  if (!deps.defer || !vote || state.status !== 'ACTIVE') return;
+  const nowMs = (deps.now ? deps.now() : new Date()).getTime();
+  const delay = Math.max(0, endVoteDeadline(vote) - nowMs) + CLOSE_TIMER_SLACK_MS;
+  deps.defer(delay, async () => {
+    try {
+      await closeEndVoteIfDue(state.id, vote.id, deps);
+    } catch (error) {
+      // Phones showing the vote also ask for the close, and so does the next read of the game.
+      console.error('end-vote close timer failed', error);
+    }
+  });
+}
+
+/**
+ * Server-owned closure of a vote on ending the game: settles `voteId` if it is still the game's open
+ * vote and its deadline has passed. Same lock, same engine rule and same exactly-once guarantee as a
+ * player's CLOSE_END_VOTE - the vote leaves the state in the transaction that settles it - so it is
+ * safe to call any number of times, alongside ballots and players' own close requests: whoever comes
+ * second finds no vote and does nothing. Returns true when this call closed the vote.
+ */
+export async function closeEndVoteIfDue(gameId: string, voteId: string, deps: HandlerDeps): Promise<boolean> {
+  const random = deps.random ?? secureRandom;
+  const newId = deps.newId ?? (() => crypto.randomUUID());
+  const result = await deps.sql.begin(async (tx) => {
+    const game = await lockGame(tx, gameId);
+    if (!game || game.status !== 'ACTIVE' || game.rules_version !== RULES_VERSION) return null;
+    const state = await loadState(tx, game);
+    if (openEndVote(state)?.id !== voteId) return null;
+    // The engine needs an acting player; closing has no actor of its own (the event names nobody).
+    const actor = state.players.find((p) => p.status === 'ACTIVE');
+    if (!actor) return null;
+    const actionId = newId();
+    const action = { type: 'CLOSE_END_VOTE', voteId };
+    let closed;
+    try {
+      closed = applyAction(state, actor.id, action, { actionId, now: (deps.now ? deps.now() : new Date()).toISOString(), random, newId });
+    } catch (error) {
+      if (isGameError(error)) return null; // already closed, or the deadline moved (the game was paused)
+      throw error;
+    }
+    await persistResult(tx, state.version, closed);
+    await tx`insert into public.game_actions (action_id, game_id, player_id, type, payload, state_version_after, result)
+      values (${actionId}, ${gameId}, null, 'CLOSE_END_VOTE', ${tx.json({ ...action, by: 'SERVER_TIMER' })}, ${closed.state.version},
+        ${tx.json({ transactions: closed.transactions.map((t) => t.id), events: closed.events.map((e) => e.type) })})`;
+    return closed;
+  });
+  if (!result) return false;
+  // A vote that extended the game may have started a turn; one that ended it finished the game. Either way every phone is told.
   await notify(deps, result.state, result.events);
   return true;
 }

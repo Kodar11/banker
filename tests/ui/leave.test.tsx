@@ -1,6 +1,6 @@
 /// <reference types="jest" />
 import { router } from 'expo-router';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { netWorth, outstandingDebt } from '@/engine/index.ts';
 import { GameGate } from '@/features/game/GameGate';
 import { PlayersStrip } from '@/features/game/GamePanels';
@@ -63,19 +63,24 @@ beforeEach(() => {
 });
 
 describe('More → Leave game', () => {
-  it('every player has Leave game; only the host also has End game', async () => {
+  it('every player has Leave game, with the vote request below it; nobody — the host included — has End game', async () => {
     const f = new Fixture(NAMES).loadAs('Bilal');
     const guest = await render(<GameScreen view={viewFor(f, 'Bilal')} />);
     await fireEvent.press(screen.getByTestId('open-more'));
     expect(screen.getByTestId('leave-game-button')).toHaveTextContent(/Leave game/);
+    expect(screen.getByTestId('request-end-vote')).toHaveTextContent(/Request End-Game Vote/);
     expect(screen.queryByTestId('end-game-button')).toBeNull();
     await guest.unmount();
 
     f.loadAs('Asha');
     await render(<GameScreen view={viewFor(f, 'Asha')} />);
     await fireEvent.press(screen.getByTestId('open-more'));
-    expect(screen.getByTestId('leave-game-button')).toBeTruthy();
-    expect(screen.getByTestId('end-game-button')).toBeTruthy();
+    const ids = within(screen.getByTestId('more-actions'))
+      .getAllByRole('button')
+      .map((b) => b.props.testID as string);
+    expect(ids.slice(-2)).toEqual(['leave-game-button', 'request-end-vote']);
+    expect(screen.queryByTestId('end-game-button')).toBeNull();
+    expect(screen.queryByText(/End game \(host\)/)).toBeNull();
   });
 
   it('asks first, in words that match what will happen; Cancel changes nothing', async () => {

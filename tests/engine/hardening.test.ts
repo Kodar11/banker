@@ -55,7 +55,9 @@ const SELF_DESCRIBING: Record<string, string> = {
   REJECT_UNDO: 'names the request',
   PAUSE_GAME: 'no payload; pausing an already paused game is refused',
   RESUME_GAME: 'no payload',
-  END_GAME: 'no payload; host only; a finished game refuses everything',
+  REQUEST_END_VOTE: 'no payload; judged against the state as it is: the table at rest, no vote open, once per player per financial year',
+  CAST_END_VOTE: 'names the vote and the choice; one locked ballot per player',
+  CLOSE_END_VOTE: 'names the vote; the server decides by its own clock, exactly once',
   LEAVE_GAME: 'no payload; a player who left cannot act again',
 };
 
@@ -116,6 +118,8 @@ function exampleOf(type: GameActionType, g: TestGame): GameAction {
     REQUEST_UNDO: { type: 'REQUEST_UNDO', targetActionId: id },
     APPROVE_UNDO: { type: 'APPROVE_UNDO', requestId: id },
     REJECT_UNDO: { type: 'REJECT_UNDO', requestId: id },
+    CAST_END_VOTE: { type: 'CAST_END_VOTE', voteId: id, choice: 'END' },
+    CLOSE_END_VOTE: { type: 'CLOSE_END_VOTE', voteId: id },
   };
   return examples[type] ?? ({ type } as GameAction);
 }
@@ -136,7 +140,7 @@ function refusal(g: TestGame, name: string, action: unknown): string {
 describe('a finished game accepts nothing', () => {
   it('every action, from every player, is refused and changes nothing', () => {
     const g = new TestGame();
-    g.act('Asha', { type: 'END_GAME' });
+    g.endByVote('Asha');
     expect(g.state.status).toBe('FINISHED');
     for (const type of ALL_ACTIONS) {
       for (const name of ['Asha', 'Bilal', 'Chitra']) expect(`${type}: ${refusal(g, name, exampleOf(type, g))}`).toBe(`${type}: GAME_FINISHED`);
@@ -144,7 +148,7 @@ describe('a finished game accepts nothing', () => {
     expect(stateViolations(g.state, g.ledger)).toEqual([]);
   });
 
-  it('ending the game while an auction, a trade offer and a payment are outstanding: nobody is charged for any of them', () => {
+  it('a vote is never opened over unfinished business; once the table is at rest, ending charges nobody for an open offer', () => {
     const g = new TestGame();
     // Asha owns Railway and has offered it to Chitra; Bilal has landed on it and owes rent.
     g.roll('Asha', 1, 2);
@@ -153,38 +157,38 @@ describe('a finished game accepts nothing', () => {
     g.act('Asha', { type: 'END_TURN' });
     g.roll('Bilal', 1, 2);
     expect(g.state.turn).toMatchObject({ phase: 'AWAITING_PAYMENT', pending: { kind: 'PAYMENT', reason: 'RENT' } });
+    // Not while rent is owed: refused, nothing changed, and the request is not used up.
+    expect(refusal(g, 'Asha', { type: 'REQUEST_END_VOTE' })).toBe('VOTE_NOT_ALLOWED');
+    g.act('Bilal', { type: 'PAY_RENT' });
     const balances = Object.fromEntries(g.state.players.map((p) => [p.name, p.balance]));
-    const ended = g.act('Asha', { type: 'END_GAME' });
+    const ended = g.endByVote('Asha');
     expect(g.state.status).toBe('FINISHED');
     expect(ended.transactions).toEqual([]);
     expect(Object.fromEntries(g.state.players.map((p) => [p.name, p.balance]))).toEqual(balances);
     expect(g.state.trades.map((t) => t.status)).toEqual(['EXPIRED']);
     expect(g.state.properties.RAILWAY.ownerId).toBe(g.id('Asha'));
-    expect(refusal(g, 'Bilal', { type: 'PAY_RENT' })).toBe('GAME_FINISHED');
     expect(refusal(g, 'Chitra', { type: 'ACCEPT_TRADE', tradeId: g.state.trades[0]!.id })).toBe('GAME_FINISHED');
 
-    // The same with the bank's auction running: no winner, no payment, the property stays with the bank.
+    // Nor while the bank's auction is running — for the bidders or for the player who declined. The auction runs to its end first.
     const h = new TestGame();
     h.roll('Asha', 1, 2);
     h.act('Asha', { type: 'DECLINE_PROPERTY' });
     const auctionId = h.state.auction!.id;
     h.act('Bilal', { type: 'PLACE_BID', auctionId, amount: 3000 });
-    const over = h.act('Asha', { type: 'END_GAME' });
-    expect(over.transactions).toEqual([]);
-    expect(h.state.properties.RAILWAY.ownerId).toBeNull();
-    expect(h.balance('Bilal')).toBe(25000);
+    for (const name of ['Asha', 'Bilal', 'Chitra']) expect(refusal(h, name, { type: 'REQUEST_END_VOTE' })).toBe('VOTE_NOT_ALLOWED');
     h.advance(3600);
-    for (const action of [{ type: 'CLOSE_AUCTION', auctionId }, { type: 'PLACE_BID', auctionId, amount: 9000 }, { type: 'PASS_AUCTION', auctionId }]) {
-      expect(refusal(h, 'Chitra', action)).toBe('GAME_FINISHED');
-    }
-    expect(h.state.properties.RAILWAY.ownerId).toBeNull();
+    h.act('Chitra', { type: 'CLOSE_AUCTION', auctionId });
+    expect(h.state.properties.RAILWAY.ownerId).toBe(h.id('Bilal'));
+    const over = h.endByVote('Asha');
+    expect(over.transactions).toEqual([]);
+    expect(h.balance('Bilal')).toBe(22000);
   });
 });
 
 describe('who wins', () => {
   it('a tie in net worth goes to the earlier seat; one rupee more decides it otherwise', () => {
     const tie = new TestGame();
-    tie.act('Asha', { type: 'END_GAME' });
+    tie.endByVote('Asha');
     expect(tie.state.players.map((p) => netWorth(tie.state, p.id))).toEqual([25000, 25000, 25000]);
     expect(tie.state.winnerId).toBe(tie.id('Asha'));
     const finished = tie.results.at(-1)!.events.find((e) => e.type === 'GAME_FINISHED')!;
@@ -192,7 +196,7 @@ describe('who wins', () => {
 
     const edge = new TestGame();
     edge.act('Asha', { type: 'TRANSFER_MONEY', toPlayerId: edge.id('Chitra'), amount: 1 });
-    edge.act('Asha', { type: 'END_GAME' });
+    edge.endByVote('Asha');
     expect(edge.state.winnerId).toBe(edge.id('Chitra'));
   });
 
@@ -203,7 +207,7 @@ describe('who wins', () => {
     g.act('Dev', { type: 'LEAVE_GAME' });
     expect(g.balance('Dev')).toBe(55000);
     g.act('Asha', { type: 'TRANSFER_MONEY', toPlayerId: g.id('Bilal'), amount: 1 });
-    g.act('Asha', { type: 'END_GAME' });
+    g.endByVote('Asha');
     expect(g.state.winnerId).toBe(g.id('Bilal'));
     const finished = g.results.at(-1)!.events.find((e) => e.type === 'GAME_FINISHED')!;
     expect((finished.payload.standings as { playerId: string }[]).map((s) => s.playerId)).not.toContain(g.id('Dev'));
@@ -293,7 +297,10 @@ describe('actions out of turn, out of order, or malformed', () => {
       { type: 'PLACE_BID', auctionId: testId(), amount: -1 },
       { type: 'REQUEST_LOAN', amount: Number.POSITIVE_INFINITY },
       { type: 'CREATE_TRADE', toPlayerId: g.id('Bilal'), offeredPropertyKeys: ['RAILWAY'], requestedPropertyKeys: [], offeredMoney: -1, requestedMoney: 0 },
-      { type: 'END_GAME', winnerId: g.id('Asha') },
+      { type: 'END_GAME' },
+      { type: 'REQUEST_END_VOTE', winnerId: g.id('Asha') },
+      { type: 'CAST_END_VOTE', voteId: testId(), choice: 'MAYBE' },
+      { type: 'CAST_END_VOTE', voteId: testId(), choice: 'END', playerId: g.id('Bilal') },
     ];
     for (const action of bad) expect(`${JSON.stringify(action)}: ${refusal(g, 'Asha', action)}`).toBe(`${JSON.stringify(action)}: VALIDATION`);
     // Somebody who is not at this table at all.
@@ -307,6 +314,6 @@ describe('actions out of turn, out of order, or malformed', () => {
     const old: GameState = { ...g.state, rulesVersion: `${RULES_VERSION}-OLD` };
     expect(() => applyAction(old, g.id('Asha'), { type: 'ROLL_DICE' }, g.ctx())).toThrow(/older version of the board/);
     g.advance(60 * 60 * 24 * 30);
-    for (const type of ['ROLL_DICE', 'LEAVE_GAME', 'END_GAME'] as const) expect(refusal(g, 'Asha', { type })).toBe('GAME_EXPIRED');
+    for (const type of ['ROLL_DICE', 'LEAVE_GAME', 'REQUEST_END_VOTE'] as const) expect(refusal(g, 'Asha', { type })).toBe('GAME_EXPIRED');
   });
 });

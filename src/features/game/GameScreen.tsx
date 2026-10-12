@@ -2,7 +2,24 @@ import { useCallback, useContext, useEffect, useRef, useState, type ReactNode } 
 import { ScrollView, Text, useWindowDimensions, View, type LayoutChangeEvent } from 'react-native';
 import { SafeAreaInsetsContext, SafeAreaView } from 'react-native-safe-area-context';
 import { router, useIsFocused } from 'expo-router';
-import { configOf, economyOf, isIntermediate, isPropertyKey, pendingCrisisOf, positionOfProperty, spaceAt, spaceName, topUndoable, yearProgressPercent, type UndoableRecord } from '@/engine/index.ts';
+import {
+  configOf,
+  durationLimit,
+  economyOf,
+  endVoteRequestBlocker,
+  financialYear,
+  hasGameDuration,
+  isIntermediate,
+  isPropertyKey,
+  openEndVote,
+  pendingCrisisOf,
+  positionOfProperty,
+  spaceAt,
+  spaceName,
+  topUndoable,
+  yearProgressPercent,
+  type UndoableRecord,
+} from '@/engine/index.ts';
 import { Button, ConfirmDialog, ConnectionBanner, Sheet } from '@/components/ui';
 import { NEW_AUCTION } from '@/features/auction/AuctionView';
 import { ClassicBoard } from '@/features/board/ClassicBoard';
@@ -27,13 +44,14 @@ import { PayPlayerSheet } from '@/features/transactions/PayPlayerSheet';
 import { PushToTalkButton } from '@/features/voice/PushToTalkButton';
 import { useVoice } from '@/features/voice/voice';
 import { VoiceSection } from '@/features/voice/VoiceSection';
-import { useGameStore } from '@/store/gameStore';
 import { haptics } from '@/utils/haptics';
 import { ActionPanel } from './ActionPanel';
 import { AdaptiveActionBar, type BarAction } from './AdaptiveActionBar';
 import { ContextualCard } from './ContextualCard';
+import { RequestEndVoteDialog } from './EndVote';
 import { GameLog } from './GameLog';
 import { FinishedView, PlayersStrip, UndoBanner } from './GamePanels';
+import { GamePlanIntro, useGamePlanSeen } from './GamePlanIntro';
 import { needsDecision, pickContext, type ContextTarget } from './gameFocus';
 import { leaveGame } from './leaveGame';
 import { LeaveGameDialog } from './LeaveGameDialog';
@@ -80,11 +98,10 @@ export function GameScreen({ view }: { view: GameView }) {
   const chat = useQuickChat({ onSent: () => setTool(null) });
   /** Who the pay / trade sheet was last opened for; changing it remounts (resets) that sheet. */
   const [preselect, setPreselect] = useState<{ pay: string | null; trade: string | null }>({ pay: null, trade: null });
-  const [confirmEnd, setConfirmEnd] = useState(false);
+  const [confirmVote, setConfirmVote] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
   /** The action the player is being asked to confirm an undo request for (asked from the More sheet). */
   const [undoAsk, setUndoAsk] = useState<{ record: UndoableRecord; busy: boolean; error: string | null } | null>(null);
-  const ending = useGameStore((s) => s.pendingAction === 'END_GAME');
   // The host turned voice on for this private room (the server's flag; a matchmade game never has it).
   const voiceRoom = useVoice((s) => s.room?.enabled === true);
   /** False while another screen (auction, wallet, settings) covers the table: a held mic button is released. */
@@ -94,6 +111,11 @@ export function GameScreen({ view }: { view: GameView }) {
   // Capital with secret objectives only, and only my own: this phone holds nobody else's.
   const hasObjective = !!me && !!state.objectives?.assignments[me.id];
   const objectiveSeen = useObjectiveSeen(state.id, hasObjective && me ? me.id : null);
+  // A hosted game runs for a chosen number of financial years and ends by vote; a matchmade game has neither.
+  const timed = hasGameDuration(state);
+  const planSeen = useGamePlanSeen(state.id, timed && me ? me.id : null);
+  /** A vote on ending the game is open: its card (EndVoteHost, above every screen) has the table until it is settled. */
+  const voting = !!openEndVote(state);
   /** "Later" on the reveal: not offered again until the game is next opened. */
   const [revealLater, setRevealLater] = useState(false);
   /** The Capital introduction has finished (or was not needed): the reveal waits its turn behind it. */
@@ -113,6 +135,7 @@ export function GameScreen({ view }: { view: GameView }) {
       setPanelState(next ? { panel: next, auctionId } : null);
       setUndoAsk(null); // a confirmation belongs to the sheet it was opened from
       setConfirmLeave(false);
+      setConfirmVote(false);
     },
     [auctionId],
   );
@@ -317,21 +340,23 @@ export function GameScreen({ view }: { view: GameView }) {
       },
     },
   );
-  // Any player may walk away; only the host may end the game for everyone (below).
+  // Any player may walk away. Nobody — the host included — ends the game for everyone: that takes a vote (below).
   if (me && state.status !== 'FINISHED') {
     moreItems.push({ key: 'leave', icon: '🚪', label: 'Leave game', hint: 'Return to the home screen', testID: 'leave-game-button', onPress: () => setConfirmLeave(true) });
   }
-  if (view.isHost && state.status !== 'FINISHED') {
+  // Hosted games only: a matchmade game has no duration and no votes, so it never lists this.
+  if (me?.status === 'ACTIVE' && timed && state.status !== 'FINISHED') {
+    // The server's own rule, so the button is offered exactly when the request would be accepted.
+    const blocked = endVoteRequestBlocker(state, me.id);
     moreItems.push({
-      key: 'end',
-      icon: '🏆',
-      label: 'End game (host)',
-      testID: 'end-game-button',
-      destructive: true,
-      onPress: () => {
-        setPanel(null);
-        setConfirmEnd(true);
-      },
+      key: 'end-vote',
+      icon: '🗳️',
+      label: 'Request End-Game Vote',
+      hint: blocked ?? 'Ask all active players to vote on ending the match.',
+      hintLines: 2,
+      testID: 'request-end-vote',
+      disabled: !!blocked,
+      onPress: () => setConfirmVote(true),
     });
   }
 
@@ -423,6 +448,13 @@ export function GameScreen({ view }: { view: GameView }) {
               onConfirm={requestUndo}
             />
             <LeaveGameDialog visible={confirmLeave} onClose={() => setConfirmLeave(false)} />
+            <RequestEndVoteDialog
+              visible={confirmVote}
+              players={state.players.filter((p) => p.status === 'ACTIVE').length}
+              onClose={() => setConfirmVote(false)}
+              // Asked: back to the table, where the vote now opens for everyone.
+              onRequested={() => setPanel(null)}
+            />
           </>
         );
         break;
@@ -447,7 +479,7 @@ export function GameScreen({ view }: { view: GameView }) {
         break;
       case 'config':
         panelTitle = 'Game settings';
-        panelBody = <GameConfigSummary mode={state.mode} config={configOf(state)} title="This game" note="Locked when the game started. The same for every player." />;
+        panelBody = <GameConfigSummary mode={state.mode} config={configOf(state)} timed={timed} title="This game" note="Locked when the game started. The same for every player." />;
         break;
       case 'objective':
         panelTitle = 'My secret objective';
@@ -456,14 +488,14 @@ export function GameScreen({ view }: { view: GameView }) {
     }
   }
 
-  // The reveal: once per player per game, never over another sheet or dialog, and after the introduction.
+  // The opening sequence, each step once and never over another sheet or dialog: the Capital introduction
+  // (once per device), then this game's plan — how long it runs and how it ends — then my secret objective.
   const introPending = !!eco && playing && !introSettled;
-  const revealVisible =
-    hasObjective &&
-    state.status !== 'FINISHED' &&
-    objectiveSeen.seen === false &&
-    !revealLater &&
-    !(panelOpen || !!tool || !!auctionId || confirmEnd || confirmLeave || introPending);
+  const covered = panelOpen || !!tool || !!auctionId || confirmLeave || introPending || voting;
+  // Until storage has answered, the plan might still be due: the reveal waits for it rather than jump ahead.
+  const planPending = timed && playing && planSeen.seen !== true;
+  const planVisible = planPending && planSeen.seen === false && !covered;
+  const revealVisible = hasObjective && state.status !== 'FINISHED' && objectiveSeen.seen === false && !revealLater && !(covered || planPending);
 
   const context = pickContext(view);
   const gutter = screenGutter(width);
@@ -489,9 +521,19 @@ export function GameScreen({ view }: { view: GameView }) {
               <Text
                 className="text-xs font-bold uppercase tracking-[2px] text-cream/80"
                 testID="year-indicator"
-                accessibilityLabel={`Capital Mode, financial year ${eco.year}, ${yearProgressPercent(eco)} percent through`}
+                accessibilityLabel={`Capital Mode, financial year ${eco.year}${timed ? ` of ${durationLimit(state)}` : ''}, ${yearProgressPercent(eco)} percent through`}
               >
                 Capital · Year {eco.year}
+                {timed ? ` of ${durationLimit(state)}` : ''}
+              </Text>
+            ) : timed && state.status !== 'FINISHED' ? (
+              // Classic counts financial years only to know when the game is over: the same clock, no economy behind it.
+              <Text
+                className="text-xs font-bold uppercase tracking-[2px] text-cream/80"
+                testID="duration-indicator"
+                accessibilityLabel={`Classic Mode, financial year ${financialYear(state)} of ${durationLimit(state)}`}
+              >
+                Classic · Year {financialYear(state)} of {durationLimit(state)}
               </Text>
             ) : (
               <Text className="text-xs font-bold uppercase tracking-[2px] text-cream/60">{isIntermediate(state) ? 'Capital · India' : 'Classic · India'}</Text>
@@ -570,12 +612,13 @@ export function GameScreen({ view }: { view: GameView }) {
         <FinanceNotices
           view={view}
           eco={eco}
-          suspended={panelOpen || !!tool || !!auctionId || confirmEnd || confirmLeave || revealVisible || !!myCrisis}
+          suspended={panelOpen || !!tool || !!auctionId || confirmLeave || voting || planVisible || revealVisible || !!myCrisis}
           onOpenLoans={() => openTool({ kind: 'loan', tab: 'loans' })}
         />
       ) : null}
-      {eco?.insurance ? <CrisisNotice view={view} suspended={panelOpen || !!tool || !!auctionId || confirmEnd || confirmLeave || revealVisible || introPending} /> : null}
+      {eco?.insurance ? <CrisisNotice view={view} suspended={panelOpen || !!tool || !!auctionId || confirmLeave || voting || planVisible || revealVisible || introPending} /> : null}
       {eco && playing ? <IntermediateIntro onSettled={settleIntro} /> : null}
+      {planVisible ? <GamePlanIntro state={state} onDone={planSeen.markSeen} /> : null}
       {revealVisible ? <ObjectiveReveal view={view} onLater={() => setRevealLater(true)} onSeen={objectiveSeen.markSeen} /> : null}
       <TradeSheet
         key={`trade-${preselect.trade}`}
@@ -584,22 +627,6 @@ export function GameScreen({ view }: { view: GameView }) {
         onClose={() => setTool(null)}
         view={view}
         send={send}
-      />
-      <ConfirmDialog
-        visible={confirmEnd && view.isHost && state.status !== 'FINISHED'}
-        icon="🏆"
-        title="End Game?"
-        message="Are you sure you want to finish this game?"
-        detail="Highest net worth wins."
-        confirmTitle="End Game"
-        destructive
-        loading={ending}
-        testID="end-game-dialog"
-        onCancel={() => setConfirmEnd(false)}
-        onConfirm={async () => {
-          await send({ type: 'END_GAME' });
-          setConfirmEnd(false);
-        }}
       />
     </SafeAreaView>
   );

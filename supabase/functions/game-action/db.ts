@@ -6,6 +6,7 @@ import {
   normalizeGameConfig,
   normalizeGameMode,
   PROPERTY_KEYS,
+  redactEndVote,
   redactFinances,
   redactObjectives,
   type AuctionState,
@@ -214,6 +215,8 @@ export async function loadState(tx: Tx, game: Row): Promise<GameState> {
     undoStack: (game.undo_stack as GameState['undoStack']) ?? [],
     undoRequest: (game.undo_request as GameState['undoRequest']) ?? null,
     trades,
+    // Null for a lobby, a matchmade game, and a row written before games had a duration.
+    endGame: (game.end_game as GameState['endGame']) ?? null,
     createdAt: iso(game.created_at),
     expiresAt: iso(game.expires_at),
   };
@@ -245,9 +248,10 @@ function mapObjectives(rows: readonly Row[], trades: unknown): ObjectivesState |
 
 /**
  * What one player's device receives. `viewerId` is required on purpose: every snapshot that leaves the
- * server is cut down to what that player may see (redactObjectives, redactFinances), so no code path
- * can send another player's secret objective - or, in a game with hidden finances, their money - by
- * forgetting to ask who is looking. Create, join, state and action all answer through here.
+ * server is cut down to what that player may see (redactObjectives, redactEndVote, redactFinances), so
+ * no code path can send another player's secret objective, their ballot in an end-game vote - or, in a
+ * game with hidden finances, their money - by forgetting to ask who is looking. Create, join, state and
+ * action all answer through here.
  */
 export async function loadSnapshot(tx: Tx, game: Row, viewerId: string): Promise<GameSnapshot> {
   const id = game.id as string;
@@ -258,7 +262,7 @@ export async function loadSnapshot(tx: Tx, game: Row, viewerId: string): Promise
   ]);
   return redactFinances(
     {
-      state: redactObjectives(state, viewerId),
+      state: redactEndVote(redactObjectives(state, viewerId), viewerId),
       events: events.map(mapEvent),
       transactions: transactions.map(mapTransaction),
       serverTime: new Date().toISOString(),
@@ -367,6 +371,7 @@ export async function persistResult(tx: Tx, prevVersion: number, result: EngineR
       undo_stack = ${tx.json(s.undoStack as unknown as postgres.JSONValue)},
       undo_request = ${json(s.undoRequest)},
       intermediate = ${json(s.intermediate)},
+      end_game = ${json(s.endGame)},
       objective_trades = ${tx.json((s.objectives?.trades ?? []) as unknown as postgres.JSONValue)},
       current_auction_id = ${s.auction?.id ?? null},
       expires_at = ${s.expiresAt},

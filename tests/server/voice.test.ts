@@ -9,6 +9,7 @@
  */
 import { randomBytes, randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { endByVote } from './endByVote.ts';
 import { createSql, type Sql } from '../../supabase/functions/game-action/db.ts';
 import { handleRequest } from '../../supabase/functions/game-action/handler.ts';
 import { createTokenBuilder } from '../../supabase/functions/voice-token/agora.ts';
@@ -326,7 +327,7 @@ describe.skipIf(!DATABASE_URL)('voice chat authorization (Postgres)', () => {
     await played.act('Asha', { type: 'PAUSE_GAME' });
     expect(await denial('renew', played.gameId, played.seats.Bilal!)).toBe('OK');
     await played.act('Asha', { type: 'RESUME_GAME' });
-    await played.act('Asha', { type: 'END_GAME' });
+    await endByVote(played.act, Object.keys(played.seats), 'Asha');
     expect(await denial('renew', played.gameId, played.seats.Bilal!)).toBe('GAME_NOT_ACTIVE');
     expect(await denial('heartbeat', played.gameId, played.seats.Bilal!)).toBe('GAME_NOT_ACTIVE');
     expect(await denial('enable', played.gameId, played.host, { enabled: true })).toBe('GAME_NOT_ACTIVE');

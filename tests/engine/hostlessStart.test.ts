@@ -43,7 +43,7 @@ describe('startHostlessGame', () => {
     const g = new TestGame(['Asha', 'Bilal'], { start: false });
     const started = startHostlessGame(g.state, ctx(orderRandoms(['Asha', 'Bilal'], ['Asha', 'Bilal'])));
     for (const p of started.state.players) {
-      expect(() => applyAction(started.state, p.id, { type: 'END_GAME' }, ctx())).toThrow(/Only the host/);
+      expect(() => applyAction(started.state, p.id, { type: 'REQUEST_END_VOTE' }, ctx())).toThrow(/no end-game votes/);
     }
     const first = started.state.turn.playerId!;
     const rolled = applyAction(started.state, first, { type: 'ROLL_DICE' }, ctx([0.01, 0.2]));

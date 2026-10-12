@@ -184,11 +184,12 @@ describe('Create game: settings', () => {
       marketVolatility: 'balanced',
       secretObjectives: false,
       financialPrivacy: 'open',
+      durationYears: 5,
     });
   });
 
   it('a customised Capital game sends its mode and settings', async () => {
-    const config = { startingCash: 25000, loanLimit: 20000, marketVolatility: 'stable', secretObjectives: false, financialPrivacy: 'open' } as const;
+    const config = { startingCash: 25000, loanLimit: 20000, marketVolatility: 'stable', secretObjectives: false, financialPrivacy: 'open', durationYears: 5 } as const;
     const f = new Fixture(['Tanmay'], { start: false, mode: 'intermediate', config });
     api.create.mockResolvedValue(ok(f.snapshot()));
     await render(<CreateGame />);
@@ -212,7 +213,7 @@ describe('Create game: settings', () => {
 });
 
 describe('Lobby: the rules every player will play by', () => {
-  const config = { startingCash: 30000, loanLimit: 25000, marketVolatility: 'balanced', secretObjectives: true, financialPrivacy: 'open' } as const;
+  const config = { startingCash: 30000, loanLimit: 25000, marketVolatility: 'balanced', secretObjectives: true, financialPrivacy: 'open', durationYears: 5 } as const;
 
   it.each(['Asha', 'Bilal'])('%s sees the same mode and settings', async (name) => {
     const f = new Fixture(['Asha', 'Bilal'], { start: false, mode: 'intermediate', config }).loadAs(name);
@@ -258,7 +259,7 @@ describe('Lobby: the rules every player will play by', () => {
     await waitFor(() => expect(api.action).toHaveBeenCalledTimes(1));
     expect(api.action.mock.calls[0]![3]).toEqual({
       type: 'UPDATE_CONFIG',
-      config: { startingCash: 30000, loanLimit: 20000, marketVolatility: 'volatile', secretObjectives: true, financialPrivacy: 'open' },
+      config: { startingCash: 30000, loanLimit: 20000, marketVolatility: 'volatile', secretObjectives: true, financialPrivacy: 'open', durationYears: 5 },
     });
   });
 
@@ -506,7 +507,7 @@ describe('Secret objective: the reveal when the game starts', () => {
 
   it('a finished game reveals through the standings, not through the private pop-up', async () => {
     const f = twoPlayers();
-    f.act('Asha', { type: 'END_GAME' });
+    f.endByVote('Asha');
     await renderGame(f, 'Bilal', { revealed: false });
     await settled();
     expect(screen.queryByTestId('objective-reveal')).toBeNull();
@@ -517,7 +518,7 @@ describe('End of the game: the reveal', () => {
   it('shows every player’s objective, the outcome, the bonus and why', async () => {
     const f = new Fixture(['Asha', 'Bilal'], { mode: 'intermediate' });
     assign(f, { Asha: 'CASH_GUARDIAN', Bilal: 'DEAL_MAKER' });
-    f.act('Asha', { type: 'END_GAME' });
+    f.endByVote('Asha');
     loadAs(f, 'Bilal');
     await render(<FinishedView view={viewFor(f, 'Bilal')} />);
     const asha = screen.getByTestId(`objective-result-${f.ids.Asha}`);
@@ -539,7 +540,7 @@ describe('End of the game: the reveal', () => {
   it('the bonus appears in the winner’s history as its own entry', async () => {
     const f = new Fixture(['Asha', 'Bilal'], { mode: 'intermediate' });
     assign(f, { Asha: 'CASH_GUARDIAN', Bilal: 'DEAL_MAKER' });
-    f.act('Asha', { type: 'END_GAME' });
+    f.endByVote('Asha');
     const bonus = f.transactions.filter((t) => t.type === 'OBJECTIVE_REWARD');
     expect(bonus).toMatchObject([{ toPlayerId: f.ids.Asha, fromPlayerId: null, amount: 4000, memo: 'Secret objective bonus: Cash Guardian' }]);
   });
@@ -549,7 +550,7 @@ describe('End of the game: the reveal', () => {
     ['a Capital game with objectives off', { mode: 'intermediate' as const, config: { secretObjectives: false } }],
   ])('%s shows no objectives panel at all', async (_label, options) => {
     const f = new Fixture(['Asha', 'Bilal'], options);
-    f.act('Asha', { type: 'END_GAME' });
+    f.endByVote('Asha');
     loadAs(f, 'Asha');
     await render(<FinishedView view={viewFor(f, 'Asha')} />);
     expect(screen.getByTestId('finished-card')).toBeTruthy();

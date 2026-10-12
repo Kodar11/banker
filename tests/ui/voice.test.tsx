@@ -267,7 +267,7 @@ describe('push-to-talk', () => {
     await table(f, 'Asha');
     await joinVoice();
     const e = engine();
-    f.act('Asha', { type: 'END_GAME' });
+    f.endByVote('Asha');
     await act(async () => void useGameStore.getState().applySnapshot(f.snapshot()));
     expect(e.left).toBe(true);
     expect(voice.store.getState().phase).toBe('unavailable');

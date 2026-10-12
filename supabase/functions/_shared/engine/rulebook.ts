@@ -6,6 +6,7 @@
 import { getDeed, groupMembers, PROPERTY_KEYS, type PropertyDeed } from './businessBoard.ts';
 import { formatINR } from './format.ts';
 import { defaultGameConfig, type GameConfig } from './gameConfig.ts';
+import { INTERMEDIATE_RULES as IR } from './intermediateConfig.ts';
 import { BUSINESS_MVP_RULES as R } from './rules.ts';
 import { unmortgageCost } from './selectors.ts';
 
@@ -92,7 +93,7 @@ export function topRules(config: RulebookConfig = STANDARD): readonly RuleEntry[
       lines: [
         'Offer properties and money to another player. Nothing changes until they accept.',
         'Keep track of your mortgages and loans.',
-        'The last player not bankrupt wins. If the host ends the game early, the highest net worth wins.',
+        'The last player not bankrupt wins. If the game ends by a vote or runs its full duration, the highest net worth wins.',
       ],
     },
   ];
@@ -299,7 +300,13 @@ export function ruleSections(config: RulebookConfig = STANDARD): readonly RuleSe
           title: 'Winning',
           lines: [
             'The game ends when only one player is not bankrupt. That player wins.',
-            'The host can end the game at any time. The player with the highest net worth then wins.',
+            `A game with a host runs for the number of financial years the host chose (${R.endGame.duration.minYears} to ${R.endGame.duration.maxYears}).`,
+            `A financial year passes each time the players have moved ${IR.year.spacesPerYear} spaces by dice on average: about one lap of the board each.`,
+            'Nobody ends the game alone. Before the last year, any active player can ask for a vote to end early, once per financial year.',
+            'An early vote ends the game only if more than half of the active players vote to end.',
+            'When the last year is over everyone votes: end the game, or play one more financial year. Half of the active players (at least one) voting to end is enough.',
+            `Otherwise the game goes on for one more year and then asks again, up to year ${R.endGame.duration.maxYears}, where it ends.`,
+            `A vote lasts ${R.endGame.voteSeconds} seconds and is secret. Not voting counts for neither side. When the game ends this way, the highest net worth wins.`,
           ],
         },
         {

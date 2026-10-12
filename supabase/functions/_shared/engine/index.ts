@@ -5,6 +5,7 @@ export * from './errors.ts';
 export * from './financialPrivacy.ts';
 export * from './format.ts';
 export * from './gameConfig.ts';
+export * from './gameEnd.ts';
 export * from './insurance.ts';
 export * from './insuranceState.ts';
 export * from './intermediateConfig.ts';

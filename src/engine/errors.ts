@@ -25,6 +25,8 @@ export type GameErrorCode =
   | 'INSURANCE_NOT_ALLOWED'
   | 'UNDO_NOT_ALLOWED'
   | 'TRADE_NOT_ALLOWED'
+  | 'VOTE_NOT_ALLOWED'
+  | 'VOTE_CLOSED'
   | 'STALE_STATE';
 
 export class GameError extends Error {

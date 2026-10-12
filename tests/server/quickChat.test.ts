@@ -9,6 +9,7 @@
  */
 import { randomBytes, randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { endByVote } from './endByVote.ts';
 import { createSql, type Sql } from '../../supabase/functions/game-action/db.ts';
 import { handleRequest } from '../../supabase/functions/game-action/handler.ts';
 import { handleQuickChat, type QuickChatDeps } from '../../supabase/functions/game-action/quickChat.ts';
@@ -308,7 +309,7 @@ describe.skipIf(!DATABASE_URL)('quick chat (Postgres)', () => {
     await g.act('Bilal', { type: 'PAUSE_GAME' });
     expect(await send(g.gameId, g.seats.Bilal!, reaction())).toMatchObject({ ok: true });
     await g.act('Bilal', { type: 'RESUME_GAME' });
-    await g.act('Asha', { type: 'END_GAME' });
+    await endByVote(g.act, Object.keys(g.seats), 'Asha');
     expect(await send(g.gameId, g.seats.Asha!, message())).toMatchObject({ ok: false, error: { code: 'GAME_NOT_ACTIVE' } });
     expect(sent).toHaveLength(1);
   });

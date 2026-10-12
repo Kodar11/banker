@@ -1,0 +1,552 @@
+// TEMPORARY AUDIT EXPERIMENT - not part of the repository's test suite. Shared simulator core (no tests in this file).
+// Strategy-driven whole-game simulation through the real engine (applyAction). Nothing is mocked.
+import {
+  applyAction,
+  createGame,
+  joinGame,
+  isGameError,
+  netWorth,
+  ownedBy,
+  getDeed,
+  purchasePrice,
+  unmortgageCost,
+  loanOffers,
+  economyOf,
+  pendingCrises,
+  premiumForYear,
+  uninsuredProperties,
+  openEndVote,
+  financialYear,
+  minimumNextBid,
+  outstandingPrincipal,
+  payableInstallment,
+  rentMultiplier,
+  isPledged,
+  configOf,
+  totalDebt,
+  ledgerViolations,
+  propertyViolations,
+  PROPERTY_KEYS,
+  BUSINESS_MVP_RULES as RULES,
+  INTERMEDIATE_RULES as IR,
+  type EngineContext,
+  type GameAction,
+  type GameMode,
+  type GameState,
+  type GameEventRecord,
+  type PropertyKey,
+  type TransactionRecord,
+} from '@/engine/index.ts';
+
+export const SEEDS = Number(process.env.SIM_SEEDS ?? 30);
+
+function prng(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+interface Profile {
+  name: string;
+  buyMax: number;
+  reserve: number;
+  build: boolean;
+  buildReserve: number;
+  loans: 'none' | 'emergency' | 'max';
+  repay: boolean;
+  insure: boolean;
+  bidFrac: number;
+}
+
+export const P = {
+  LOW: { name: 'LOW', buyMax: 3000, reserve: 12000, build: false, buildReserve: 0, loans: 'none', repay: true, insure: false, bidFrac: 0.5 },
+  INVESTOR: { name: 'INVESTOR', buyMax: 1e9, reserve: 2000, build: true, buildReserve: 5000, loans: 'emergency', repay: true, insure: false, bidFrac: 0.8 },
+  BORROWER: { name: 'BORROWER', buyMax: 1e9, reserve: 2000, build: true, buildReserve: 4000, loans: 'max', repay: true, insure: false, bidFrac: 0.9 },
+  /** BORROWER in every respect except that it never repays: isolates the effect of not repaying. */
+  NOREPAY: { name: 'NOREPAY', buyMax: 1e9, reserve: 2000, build: true, buildReserve: 4000, loans: 'max', repay: false, insure: false, bidFrac: 0.9 },
+  DEADBEAT: { name: 'DEADBEAT', buyMax: 1e9, reserve: 500, build: true, buildReserve: 1000, loans: 'max', repay: false, insure: false, bidFrac: 0.9 },
+  INSURER: { name: 'INSURER', buyMax: 1e9, reserve: 2000, build: true, buildReserve: 5000, loans: 'emergency', repay: true, insure: true, bidFrac: 0.8 },
+  ALLIN: { name: 'ALLIN', buyMax: 1e9, reserve: 0, build: true, buildReserve: 0, loans: 'emergency', repay: true, insure: false, bidFrac: 1.0 },
+} satisfies Record<string, Profile>;
+const MIXED: Profile[] = [P.INVESTOR, P.LOW, P.BORROWER, P.DEADBEAT, P.INSURER, P.ALLIN];
+
+export interface Cfg {
+  mode: GameMode;
+  players: number;
+  years: number;
+  seed: number;
+  set: 'mixed' | 'uniform' | 'deviant';
+  /** set = 'deviant': player 0 plays this profile, everyone else is INVESTOR. */
+  deviant?: keyof typeof P;
+  earlyEndYear?: number;
+}
+
+interface Shortage {
+  profile: string;
+  reason: string;
+  amount: number;
+  cash: number;
+  netWorth: number;
+  year: number;
+  survived: boolean;
+}
+
+export function runGame(cfg: Cfg) {
+  const rng = prng(cfg.seed * 7919 + cfg.players * 131 + cfg.years * 17 + (cfg.mode === 'classic' ? 1 : 2));
+  let counter = 0;
+  const newId = () => {
+    counter += 1;
+    return `00000000-0000-4000-8000-${counter.toString(16).padStart(12, '0')}`;
+  };
+  const now = '2026-01-01T10:00:00.000Z';
+  const ctx = (): EngineContext => ({ actionId: newId(), now, random: rng, newId });
+  const ids: string[] = [];
+  const names = ['Asha', 'Bilal', 'Chitra', 'Dev', 'Esha', 'Farid', 'Gita', 'Hari'];
+  ids.push(newId());
+  let state: GameState = createGame({ gameId: newId(), code: '123456', hostPlayerId: ids[0]!, hostName: names[0]!, mode: cfg.mode, config: { durationYears: cfg.years } }, ctx()).state;
+  for (let i = 1; i < cfg.players; i += 1) {
+    ids.push(newId());
+    state = joinGame(state, { playerId: ids[i]!, name: names[i]! }, ctx()).state;
+  }
+  const profileOf: Record<string, Profile> = {};
+  ids.forEach((id, i) => {
+    profileOf[id] = cfg.set === 'uniform' ? P.INVESTOR : cfg.set === 'deviant' ? (i === 0 ? P[cfg.deviant ?? 'INVESTOR'] : P.INVESTOR) : MIXED[(i + cfg.seed) % MIXED.length]!;
+  });
+  const ledger: TransactionRecord[] = [];
+  const events: GameEventRecord[] = [];
+  const eventCounts: Record<string, number> = {};
+  const shortages: Shortage[] = [];
+  const tookMax = new Set<string>();
+  const snapshots: { year: number; cash: number; owned: number; houses: number; hotels: number; mortgaged: number; active: number }[] = [];
+  let actions = 0;
+  let allOwnedYear: number | null = null;
+
+  const act = (pid: string, action: GameAction): boolean => {
+    try {
+      const r = applyAction(state, pid, action, ctx());
+      state = r.state;
+      ledger.push(...r.transactions);
+      for (const e of r.events) {
+        eventCounts[e.type] = (eventCounts[e.type] ?? 0) + 1;
+        if (e.type === 'GAME_FINISHED') events.push(e);
+      }
+      actions += 1;
+      return true;
+    } catch (error) {
+      if (isGameError(error)) return false;
+      throw error;
+    }
+  };
+  const player = (pid: string) => state.players.find((p) => p.id === pid)!;
+  const bal = (pid: string) => player(pid).balance;
+  const capital = cfg.mode === 'intermediate';
+
+  const snapshot = (year: number) => {
+    let houses = 0;
+    let hotels = 0;
+    let owned = 0;
+    let mortgaged = 0;
+    for (const k of PROPERTY_KEYS) {
+      const p = state.properties[k];
+      if (p.ownerId) owned += 1;
+      if (p.hotel) hotels += 1;
+      houses += p.houses;
+      if (p.mortgaged) mortgaged += 1;
+    }
+    const active = state.players.filter((p) => p.status === 'ACTIVE');
+    snapshots.push({ year, cash: active.reduce((s, p) => s + p.balance, 0), owned, houses, hotels, mortgaged, active: active.length });
+    if (allOwnedYear === null && owned === PROPERTY_KEYS.length) allOwnedYear = year;
+  };
+
+  const borrow = (pid: string, amount: number, force = false): void => {
+    if (amount <= 0) return;
+    if (!capital) {
+      const capacity = configOf(state).loanLimit - outstandingPrincipal(state.loans, pid);
+      let amt = Math.max(RULES.loans.minAmount, Math.ceil(amount / RULES.loans.step) * RULES.loans.step);
+      amt = Math.min(amt, Math.floor(capacity / RULES.loans.step) * RULES.loans.step);
+      if (amt >= RULES.loans.minAmount) act(pid, { type: 'REQUEST_LOAN', amount: amt });
+      return;
+    }
+    let need = amount;
+    for (let guard = 0; guard < 6 && need > 0; guard += 1) {
+      const offers = loanOffers(state, pid)
+        .filter((o) => !o.blocked && o.maxAmount >= IR.loans.minAmount && (force || !o.secured))
+        .sort((a, b) => a.ratePercent - b.ratePercent);
+      const offer = offers.find((o) => o.maxAmount >= need) ?? offers.sort((a, b) => b.maxAmount - a.maxAmount)[0];
+      if (!offer) return;
+      const pledge = offer.secured ? [...offer.collateral].sort((a, b) => b.limit - a.limit)[0] : undefined;
+      const cap = Math.min(offer.maxAmount, pledge ? pledge.limit : offer.maxAmount);
+      const amt = Math.min(cap, Math.max(IR.loans.minAmount, Math.ceil(need / IR.loans.step) * IR.loans.step));
+      const before = bal(pid);
+      const ok = act(pid, {
+        type: 'TAKE_INTERMEDIATE_LOAN',
+        product: offer.product,
+        amount: amt,
+        ...(pledge ? { collateralKey: pledge.key } : {}),
+        expectedRatePercent: offer.ratePercent,
+      });
+      if (!ok) return;
+      need -= bal(pid) - before;
+    }
+  };
+
+  const baseRent = (k: PropertyKey) => {
+    const d = getDeed(k);
+    return d.kind === 'CITY' ? d.rent[0] : d.rent.type === 'FIXED' ? d.rent.base : d.rent.multiplier * 7;
+  };
+
+  /** Raises cash towards `need` using everything the profile (or, when forced, the rules) allow. */
+  const raise = (pid: string, need: number, force = false): void => {
+    const profile = profileOf[pid]!;
+    if (bal(pid) >= need) return;
+    if (profile.loans !== 'none' || force) borrow(pid, need - bal(pid), force);
+    const mine = () => ownedBy(state, pid).sort((a, b) => baseRent(a) - baseRent(b));
+    for (const k of mine()) {
+      if (bal(pid) >= need) return;
+      const p = state.properties[k];
+      if (!p.mortgaged && !p.hotel && p.houses === 0) act(pid, { type: 'MORTGAGE_PROPERTY', propertyKey: k });
+    }
+    for (let guard = 0; guard < 200 && bal(pid) < need; guard += 1) {
+      const k = mine().find((x) => !state.properties[x].mortgaged && (state.properties[x].hotel || state.properties[x].houses > 0));
+      if (!k || !act(pid, { type: 'SELL_BUILDING', propertyKey: k })) break;
+    }
+    for (const k of mine()) {
+      if (bal(pid) >= need) return;
+      if (!state.properties[k].mortgaged) act(pid, { type: 'MORTGAGE_PROPERTY', propertyKey: k });
+    }
+    if (force && bal(pid) < need) {
+      for (const k of mine()) {
+        if (bal(pid) >= need) return;
+        act(pid, { type: 'SELL_PROPERTY', propertyKey: k });
+      }
+      borrow(pid, need - bal(pid), true);
+    }
+  };
+
+  const manage = (pid: string): void => {
+    const profile = profileOf[pid]!;
+    const eco = economyOf(state);
+    // 1. the "borrow to the limit" profiles do it once, at their first turn
+    if (profile.loans === 'max' && !tookMax.has(pid)) {
+      tookMax.add(pid);
+      if (!capital) borrow(pid, configOf(state).loanLimit);
+      else {
+        const rate = (product: 'LONG_TERM' | 'PERSONAL') => loanOffers(state, pid).find((o) => o.product === product)!;
+        const lt = rate('LONG_TERM');
+        if (!lt.blocked && lt.maxAmount >= 1000) act(pid, { type: 'TAKE_INTERMEDIATE_LOAN', product: 'LONG_TERM', amount: lt.maxAmount, expectedRatePercent: lt.ratePercent });
+        const pl = rate('PERSONAL');
+        if (!pl.blocked && pl.maxAmount >= 1000) act(pid, { type: 'TAKE_INTERMEDIATE_LOAN', product: 'PERSONAL', amount: pl.maxAmount, expectedRatePercent: pl.ratePercent });
+      }
+    }
+    // 2. repayments
+    if (profile.repay) {
+      if (!capital) {
+        for (const loan of state.loans.filter((l) => l.playerId === pid && l.status === 'ACTIVE')) {
+          if (bal(pid) >= loan.outstanding + 10000) act(pid, { type: 'REPAY_LOAN', loanId: loan.id, amount: loan.outstanding });
+        }
+      } else if (eco) {
+        for (const loan of eco.loans.filter((l) => l.playerId === pid)) {
+          if (loan.status === 'ACTIVE') {
+            for (let guard = 0; guard < 6; guard += 1) {
+              const current = economyOf(state)!.loans.find((l) => l.id === loan.id)!;
+              const inst = payableInstallment(current);
+              if (!inst || bal(pid) < inst.principal + inst.interest) break;
+              if (!act(pid, { type: 'PAY_LOAN_INSTALLMENT', loanId: loan.id })) break;
+            }
+          } else if (loan.status === 'DEFAULTED' && loan.defaultBalance > 0) {
+            const pay = Math.min(loan.defaultBalance, bal(pid) - profile.reserve);
+            if (pay > 0) act(pid, { type: 'PAY_DEFAULTED_LOAN', loanId: loan.id, amount: pay });
+          }
+        }
+      }
+    }
+    // 3. redeem mortgages
+    for (const k of ownedBy(state, pid).sort((a, b) => baseRent(b) - baseRent(a))) {
+      if (state.properties[k].mortgaged && bal(pid) >= unmortgageCost(k) + profile.reserve + 2000) act(pid, { type: 'UNMORTGAGE_PROPERTY', propertyKey: k });
+    }
+    // 4. insurance (Capital)
+    if (capital && profile.insure && eco) {
+      const keys = uninsuredProperties(state, pid);
+      const premium = premiumForYear(eco.year);
+      if (keys.length && bal(pid) >= keys.length * premium + profile.reserve) act(pid, { type: 'INSURE_PROPERTIES', propertyKeys: keys, expectedPremium: premium });
+    }
+    // 5. build: best marginal rent per rupee first
+    if (profile.build) {
+      for (let guard = 0; guard < 12; guard += 1) {
+        let best: { k: PropertyKey; score: number; cost: number; hotel: boolean } | null = null;
+        for (const k of ownedBy(state, pid)) {
+          const d = getDeed(k);
+          const p = state.properties[k];
+          if (d.kind !== 'CITY' || p.mortgaged || p.hotel || isPledged(state, k)) continue;
+          const hotel = p.houses === 3;
+          const cost = hotel ? d.hotelCost : d.houseCost;
+          const gain = (hotel ? d.hotelRent - d.rent[3] : d.rent[p.houses + 1]! - d.rent[p.houses]!) * rentMultiplier(state, k);
+          const score = gain / cost;
+          if (bal(pid) - cost >= profile.buildReserve && (!best || score > best.score)) best = { k, score, cost, hotel };
+        }
+        if (!best) break;
+        if (!act(pid, { type: best.hotel ? 'BUILD_HOTEL' : 'BUILD_HOUSE', propertyKey: best.k })) break;
+      }
+    }
+  };
+
+  const valuation = (pid: string, key: PropertyKey): number => {
+    const profile = profileOf[pid]!;
+    const price = purchasePrice(state, key);
+    if (price > profile.buyMax) return 0;
+    return Math.floor(Math.min(price * profile.bidFrac, bal(pid) - profile.reserve) / 100) * 100;
+  };
+
+  const noteShortage = (pid: string, reason: string, amount: number): Shortage => {
+    const s: Shortage = { profile: profileOf[pid]!.name, reason, amount, cash: bal(pid), netWorth: netWorth(state, pid), year: financialYear(state), survived: true };
+    shortages.push(s);
+    return s;
+  };
+
+  if (!act(ids[0]!, { type: 'START_GAME' })) throw new Error('START_GAME refused');
+  snapshot(1);
+  let lastYear = 1;
+
+  for (let guard = 0; guard < 200000 && state.status !== 'FINISHED'; guard += 1) {
+    const before = actions;
+    const vote = openEndVote(state);
+    if (vote) {
+      const voter = vote.electorate.find((id) => !(id in vote.ballots) && player(id).status === 'ACTIVE');
+      if (!voter) throw new Error('vote open with nobody left to vote');
+      act(voter, { type: 'CAST_END_VOTE', voteId: vote.id, choice: 'END' });
+    } else if (pendingCrises(state)[0]) {
+      const crisis = pendingCrises(state)[0]!;
+      const pid = crisis.ownerId!;
+      const due = crisis.amount - crisis.paid;
+      let s: Shortage | null = null;
+      if (bal(pid) < due) {
+        s = noteShortage(pid, 'CRISIS', due);
+        raise(pid, due, true);
+      }
+      if (bal(pid) >= due) act(pid, { type: 'PAY_CRISIS_BILL', crisisId: crisis.id });
+      else {
+        if (s) s.survived = false;
+        if (!act(pid, { type: 'DECLARE_CRISIS_BANKRUPTCY', crisisId: crisis.id })) throw new Error(`crisis stuck: ${JSON.stringify(crisis)}`);
+      }
+    } else {
+      const turn = state.turn;
+      const pid = turn.playerId!;
+      const me = player(pid);
+      const profile = profileOf[pid]!;
+      switch (turn.phase) {
+        case 'AWAITING_ROLL': {
+          if (cfg.earlyEndYear && financialYear(state) >= cfg.earlyEndYear && act(pid, { type: 'REQUEST_END_VOTE' })) break;
+          if (me.inJail) {
+            if (!(me.balance >= RULES.jail.fine + profile.reserve && act(pid, { type: 'PAY_JAIL_FINE' }))) act(pid, { type: 'STAY_IN_JAIL' });
+            break;
+          }
+          act(pid, { type: 'ROLL_DICE' });
+          const y = financialYear(state);
+          if (y > lastYear) {
+            lastYear = y;
+            snapshot(y);
+          }
+          break;
+        }
+        case 'AWAITING_DECISION': {
+          const pending = turn.pending;
+          if (pending?.kind !== 'BUY') throw new Error('decision without BUY');
+          const price = pending.price;
+          const eco = economyOf(state);
+          const want = price <= profile.buyMax && me.balance - price >= profile.reserve;
+          if (want) {
+            const premium = eco ? premiumForYear(eco.year) : 0;
+            const insure = capital && profile.insure && eco?.insurance && me.balance - price - premium >= 0;
+            if (!act(pid, insure ? { type: 'BUY_PROPERTY', insurePremium: premium } : { type: 'BUY_PROPERTY' })) act(pid, { type: 'DECLINE_PROPERTY' });
+          } else act(pid, { type: 'DECLINE_PROPERTY' });
+          break;
+        }
+        case 'AUCTION': {
+          const a = state.auction;
+          if (!a || a.status !== 'OPEN') throw new Error('AUCTION phase without an open auction');
+          const min = minimumNextBid(a);
+          const next = a.participantIds.find((id) => !a.passedIds.includes(id) && a.highBidderId !== id);
+          if (!next) throw new Error('auction with nobody to act');
+          if (valuation(next, a.propertyKey) >= min) {
+            if (!act(next, { type: 'PLACE_BID', auctionId: a.id, amount: min })) act(next, { type: 'PASS_AUCTION', auctionId: a.id });
+          } else act(next, { type: 'PASS_AUCTION', auctionId: a.id });
+          break;
+        }
+        case 'AWAITING_PAYMENT': {
+          const pending = turn.pending;
+          if (pending?.kind !== 'PAYMENT') throw new Error('payment phase without payment');
+          let s: Shortage | null = null;
+          if (me.balance < pending.amount) {
+            s = noteShortage(pid, pending.reason, pending.amount);
+            raise(pid, pending.amount);
+          }
+          const pay = { RENT: 'PAY_RENT', TAX: 'PAY_TAX', CARD: 'PAY_CARD', LOAN_INTEREST: 'PAY_INTEREST', CLUB: 'PAY_CLUB' } as const;
+          if (bal(pid) >= pending.amount) act(pid, { type: pay[pending.reason] });
+          else {
+            if (s) s.survived = false;
+            act(pid, { type: 'DECLARE_BANKRUPTCY' });
+          }
+          break;
+        }
+        case 'AWAITING_CARD':
+          act(pid, { type: 'RESOLVE_CARD', resolution: 'NONE' });
+          break;
+        case 'TURN_COMPLETE':
+          manage(pid);
+          if (!pendingCrises(state)[0]) act(pid, { type: 'END_TURN' });
+          break;
+        default:
+          throw new Error(`unexpected resting phase ${turn.phase}`);
+      }
+    }
+    if (actions === before) throw new Error(`stuck: phase ${state.turn.phase} pending ${JSON.stringify(state.turn.pending)} cfg ${JSON.stringify(cfg)}`);
+  }
+  if (state.status !== 'FINISHED') throw new Error(`game did not finish: ${JSON.stringify(cfg)}`);
+
+  // Ledger integrity over the whole game, every transaction of every action.
+  const violations = [...ledgerViolations(state, ledger), ...propertyViolations(state)];
+
+  const flows: Record<string, { created: number; sunk: number; p2p: number }> = {};
+  for (const t of ledger) {
+    const f = (flows[t.type] ??= { created: 0, sunk: 0, p2p: 0 });
+    if (t.fromPlayerId === null && t.toPlayerId !== null) f.created += t.amount;
+    else if (t.fromPlayerId !== null && t.toPlayerId === null) f.sunk += t.amount;
+    else if (t.fromPlayerId !== null && t.toPlayerId !== null) f.p2p += t.amount;
+  }
+  const eco = economyOf(state);
+  const finish = events[events.length - 1];
+  const players = state.players.map((p) => {
+    const keys = ownedBy(state, p.id);
+    return {
+      profile: profileOf[p.id]!.name,
+      status: p.status,
+      winner: state.winnerId === p.id,
+      cash: p.balance,
+      netWorth: p.status === 'ACTIVE' ? netWorth(state, p.id) : 0,
+      properties: keys.length,
+      houses: keys.reduce((s, k) => s + state.properties[k].houses, 0),
+      hotels: keys.filter((k) => state.properties[k].hotel).length,
+      mortgaged: keys.filter((k) => state.properties[k].mortgaged).length,
+      debt: p.status === 'ACTIVE' ? totalDebt(state, p.id) : 0,
+      credit: eco ? (eco.credit[p.id] ?? null) : null,
+      rentIn: ledger.filter((t) => t.type === 'RENT_PAYMENT' && t.toPlayerId === p.id).reduce((s, t) => s + t.amount, 0),
+      rentOut: ledger.filter((t) => t.type === 'RENT_PAYMENT' && t.fromPlayerId === p.id).reduce((s, t) => s + t.amount, 0),
+    };
+  });
+  return {
+    cfg,
+    reason: (finish?.payload as { reason?: string })?.reason ?? 'UNKNOWN',
+    yearReached: lastYear,
+    turns: state.turn.number,
+    actions,
+    violations,
+    flows,
+    players,
+    shortages,
+    snapshots,
+    allOwnedYear,
+    eventCounts,
+    crises: eco?.insurance ? eco.insurance.crises.reduce<Record<string, number>>((m, c) => ({ ...m, [c.status]: (m[c.status] ?? 0) + 1 }), {}) : {},
+    capitalLoans: eco ? eco.loans.reduce<Record<string, number>>((m, l) => ({ ...m, [l.status]: (m[l.status] ?? 0) + 1 }), {}) : {},
+  };
+}
+
+export type Result = ReturnType<typeof runGame>;
+const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
+const r0 = (x: number) => Math.round(x);
+
+export function summarise(results: Result[]) {
+  const n = results.length;
+  const playersPerGame = results[0]!.cfg.players;
+  const flowTotals: Record<string, { created: number; sunk: number; p2p: number }> = {};
+  for (const r of results) {
+    for (const [type, f] of Object.entries(r.flows)) {
+      const t = (flowTotals[type] ??= { created: 0, sunk: 0, p2p: 0 });
+      t.created += f.created;
+      t.sunk += f.sunk;
+      t.p2p += f.p2p;
+    }
+  }
+  const perGame = Object.fromEntries(Object.entries(flowTotals).map(([k, f]) => [k, { created: r0(f.created / n), sunk: r0(f.sunk / n), p2p: r0(f.p2p / n) }]));
+  const created = Object.values(flowTotals).reduce((s, f) => s + f.created, 0) / n;
+  const sunk = Object.values(flowTotals).reduce((s, f) => s + f.sunk, 0) / n;
+  const p2p = Object.values(flowTotals).reduce((s, f) => s + f.p2p, 0) / n;
+  const all = results.flatMap((r) => r.players);
+  const active = all.filter((p) => p.status === 'ACTIVE');
+  const shortages = results.flatMap((r) => r.shortages);
+  const byProfile: Record<string, { n: number; meanNetWorth: number; winRate: number; bankruptRate: number; meanCash: number; meanProps: number; meanDebt: number; meanRentIn: number; meanRentOut: number; meanCredit: number | null }> = {};
+  for (const name of [...new Set(all.map((p) => p.profile))]) {
+    const ps = all.filter((p) => p.profile === name);
+    byProfile[name] = {
+      n: ps.length,
+      meanNetWorth: r0(mean(ps.map((p) => p.netWorth))),
+      winRate: +(ps.filter((p) => p.winner).length / ps.length).toFixed(3),
+      bankruptRate: +(ps.filter((p) => p.status === 'BANKRUPT').length / ps.length).toFixed(3),
+      meanCash: r0(mean(ps.map((p) => p.cash))),
+      meanProps: +mean(ps.map((p) => p.properties)).toFixed(1),
+      meanDebt: r0(mean(ps.map((p) => p.debt))),
+      meanRentIn: r0(mean(ps.map((p) => p.rentIn))),
+      meanRentOut: r0(mean(ps.map((p) => p.rentOut))),
+      meanCredit: ps[0]!.credit === null ? null : r0(mean(ps.map((p) => p.credit ?? 0))),
+    };
+  }
+  const yearCash: Record<number, number[]> = {};
+  const yearOwned: Record<number, number[]> = {};
+  const yearBuildings: Record<number, number[]> = {};
+  for (const r of results) {
+    for (const s of r.snapshots) {
+      (yearCash[s.year] ??= []).push(s.cash / Math.max(1, s.active));
+      (yearOwned[s.year] ??= []).push(s.owned);
+      (yearBuildings[s.year] ??= []).push(s.houses + s.hotels);
+    }
+  }
+  const sortedNW = results.map((r) => r.players.map((p) => p.netWorth).sort((a, b) => b - a));
+  const ev: Record<string, number> = {};
+  for (const r of results) for (const [k, v] of Object.entries(r.eventCounts)) ev[k] = (ev[k] ?? 0) + v;
+  const crises: Record<string, number> = {};
+  for (const r of results) for (const [k, v] of Object.entries(r.crises)) crises[k] = (crises[k] ?? 0) + v;
+  const capitalLoans: Record<string, number> = {};
+  for (const r of results) for (const [k, v] of Object.entries(r.capitalLoans)) capitalLoans[k] = (capitalLoans[k] ?? 0) + v;
+  return {
+    games: n,
+    reasons: results.reduce<Record<string, number>>((m, r) => ({ ...m, [r.reason]: (m[r.reason] ?? 0) + 1 }), {}),
+    meanYearReached: +mean(results.map((r) => r.yearReached)).toFixed(2),
+    meanTurnsPerPlayer: +mean(results.map((r) => r.turns / playersPerGame)).toFixed(1),
+    ledgerViolations: results.reduce((s, r) => s + r.violations.length, 0),
+    moneyCreatedPerGame: r0(created),
+    moneySunkPerGame: r0(sunk),
+    p2pPerGame: r0(p2p),
+    flowsPerGame: perGame,
+    endCashPerActivePlayer: r0(mean(active.map((p) => p.cash))),
+    endNetWorthPerActivePlayer: r0(mean(active.map((p) => p.netWorth))),
+    endDebtPerActivePlayer: r0(mean(active.map((p) => p.debt))),
+    bankruptciesPerGame: +(all.filter((p) => p.status === 'BANKRUPT').length / n).toFixed(2),
+    gamesWithBankruptcy: +(results.filter((r) => r.players.some((p) => p.status === 'BANKRUPT')).length / n).toFixed(2),
+    winnerShareOfNetWorth: +mean(sortedNW.map((xs) => xs[0]! / Math.max(1, xs.reduce((a, b) => a + b, 0)))).toFixed(3),
+    topToMedianNetWorth: +mean(sortedNW.map((xs) => xs[0]! / Math.max(1, xs[Math.floor(xs.length / 2)]!))).toFixed(2),
+    developedPropertiesAtEnd: +mean(results.map((r) => r.players.reduce((s, p) => s + p.hotels, 0) + r.players.filter((p) => p.houses > 0).length)).toFixed(1),
+    housesAtEnd: +mean(results.map((r) => r.players.reduce((s, p) => s + p.houses, 0))).toFixed(1),
+    hotelsAtEnd: +mean(results.map((r) => r.players.reduce((s, p) => s + p.hotels, 0))).toFixed(1),
+    allOwnedYear: +mean(results.filter((r) => r.allOwnedYear !== null).map((r) => r.allOwnedYear!)).toFixed(2),
+    allOwnedShare: +(results.filter((r) => r.allOwnedYear !== null).length / n).toFixed(2),
+    shortagesPerGame: +(shortages.length / n).toFixed(2),
+    shortagesAssetRichPerGame: +(shortages.filter((s) => s.netWorth >= 2 * s.amount).length / n).toFixed(2),
+    shortagesFatalPerGame: +(shortages.filter((s) => !s.survived).length / n).toFixed(2),
+    shortageReasons: shortages.reduce<Record<string, number>>((m, s) => ({ ...m, [s.reason]: (m[s.reason] ?? 0) + 1 }), {}),
+    cashPerActivePlayerByYear: Object.fromEntries(Object.entries(yearCash).map(([y, xs]) => [y, r0(mean(xs))])),
+    ownedByYear: Object.fromEntries(Object.entries(yearOwned).map(([y, xs]) => [y, +mean(xs).toFixed(1)])),
+    buildingsByYear: Object.fromEntries(Object.entries(yearBuildings).map(([y, xs]) => [y, +mean(xs).toFixed(1)])),
+    byProfile,
+    events: Object.fromEntries(
+      ['LOAN_TAKEN', 'INTERMEDIATE_LOAN_TAKEN', 'LOAN_DEFAULTED', 'COLLATERAL_SEIZED', 'LOAN_INSTALLMENT_OVERDUE', 'INTERMEDIATE_LOAN_REPAID', 'PLAYER_BANKRUPT', 'CRISIS_STRUCK', 'CRISIS_COVERED', 'INSURANCE_PURCHASED', 'INSURANCE_EXPIRED', 'AUCTION_WON', 'AUCTION_UNSOLD', 'PROPERTY_MORTGAGED', 'PROPERTY_UNMORTGAGED', 'BUILDING_SOLD'].map((k) => [k, +((ev[k] ?? 0) / n).toFixed(2)]),
+    ),
+    crises,
+    capitalLoans,
+  };
+}
+

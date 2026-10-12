@@ -55,7 +55,7 @@ describe('LEAVE_GAME: a player leaves, the game goes on', () => {
     const after = structuredClone(g.state);
     expect(() => g.act('Shamin', { type: 'TRANSFER_MONEY', toPlayerId: g.id('Ram'), amount: 100 })).toThrow('You have left this game.');
     expect(() => g.act('Shamin', { type: 'ROLL_DICE' })).toThrow('You have left this game.');
-    expect(() => g.act('Shamin', { type: 'END_GAME' })).toThrow('You have left this game.');
+    expect(() => g.act('Shamin', { type: 'REQUEST_END_VOTE' })).toThrow('You have left this game.');
     expect(() => g.act('Shamin', { type: 'LEAVE_GAME' })).toThrow('You have left this game.');
     expect(g.state).toEqual(after);
     // Nobody can leave on someone else's behalf: the action carries no player id at all.
@@ -214,14 +214,17 @@ describe('LEAVE_GAME during an auction, a trade or an undo request', () => {
 });
 
 describe('LEAVE_GAME and the host', () => {
-  it('leaving is never ending: only the host can end the game, before and after someone leaves', () => {
+  it('leaving is never ending, and nobody — the host included — ends the game alone', () => {
     const g = new TestGame(NAMES);
-    expect(() => g.act('Ram', { type: 'END_GAME' })).toThrow('Only the host can end the game.');
     g.act('Ram', { type: 'LEAVE_GAME' });
     expect(g.state.status).toBe('ACTIVE');
-    expect(() => g.act('Shamin', { type: 'END_GAME' })).toThrow('Only the host can end the game.');
-    g.act('Tanmay', { type: 'END_GAME' });
-    expect(g.state.status).toBe('FINISHED');
+    // The host asks to end: that only opens a vote. The game goes on unless enough of the others agree.
+    g.act('Tanmay', { type: 'REQUEST_END_VOTE' });
+    expect(g.state.status).toBe('ACTIVE');
+    const vote = g.state.endGame!.vote!;
+    expect(vote.electorate).not.toContain(g.id('Ram'));
+    for (const name of NAMES.filter((n) => n !== 'Tanmay' && n !== 'Ram')) g.act(name, { type: 'CAST_END_VOTE', voteId: vote.id, choice: 'CONTINUE' });
+    expect(g.state).toMatchObject({ status: 'ACTIVE', endGame: { vote: null, lastResult: { outcome: 'CONTINUED' } } });
   });
 
   it('the host leaves: the next player in the drawn order becomes the only host', () => {
@@ -231,8 +234,11 @@ describe('LEAVE_GAME and the host', () => {
     expect(g.state.players.filter((p) => p.isHost).map((p) => p.name)).toEqual(['Shamin']);
     expect(r.events.find((e) => e.type === 'HOST_CHANGED')).toMatchObject({ message: 'Shamin is now the host', payload: { hostPlayerId: g.id('Shamin') } });
     expect(g.state.status).toBe('ACTIVE');
-    expect(() => g.act('Ram', { type: 'END_GAME' })).toThrow('Only the host can end the game.');
-    g.act('Shamin', { type: 'END_GAME' });
+    // The game carries on without its first host, and the new one has no more say over its end than anyone else.
+    g.act('Shamin', { type: 'REQUEST_END_VOTE' });
+    expect(g.state.status).toBe('ACTIVE');
+    expect(g.state.endGame!.vote!.electorate).not.toContain(g.id('Tanmay'));
+    g.vote(Object.fromEntries(NAMES.filter((n) => n !== 'Tanmay' && n !== 'Shamin').map((n) => [n, 'END' as const])));
     expect(g.state.status).toBe('FINISHED');
   });
 

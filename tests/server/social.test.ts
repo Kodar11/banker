@@ -885,7 +885,8 @@ describe.skipIf(!DATABASE_URL)('friends, invitations and notifications (Postgres
       expect(await joinTable(table, friend!)).toMatchObject({ ok: false, error: { code: 'GAME_NOT_ACTIVE' } });
 
       // Closed (the game finished).
-      ok(await act(table, host!, { type: 'END_GAME' }));
+      const asked = ok(await act(table, host!, { type: 'REQUEST_END_VOTE' }));
+      ok(await act(table, second!, { type: 'CAST_END_VOTE', voteId: asked.snapshot.state.endGame!.vote!.id, choice: 'END' }));
       expect((await socialState(friend!)).invites[0]).toMatchObject({ state: 'closed' });
       expect(await rpc(friend!, 'open_game_invite', sent.invite_id)).toEqual({ ok: false, code: 'GAME_CLOSED' });
       expect(await rpc(host!, 'send_game_invite', table.gameId, friend!.playerId)).toEqual({ ok: false, code: 'GAME_CLOSED' });

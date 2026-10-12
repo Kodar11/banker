@@ -525,7 +525,7 @@ describe('Entry points and isolation from the game', () => {
   });
 
   it('a finished game suggests a lesson under the standings; it opens the module and does not hold the result back', async () => {
-    const f = new Fixture().act('Asha', { type: 'END_GAME' }).loadAs('Asha');
+    const f = new Fixture().endByVote('Asha').loadAs('Asha');
     await render(<GameScreen view={viewFor(f, 'Asha')} />);
     // The game-over actions are there without touching the suggestion.
     expect(screen.getByTestId('return-home-button')).toBeTruthy();

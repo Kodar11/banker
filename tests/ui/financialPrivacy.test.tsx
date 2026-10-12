@@ -138,7 +138,7 @@ describe('Lobby: the setting is the game’s, read from the server', () => {
     await waitFor(() => expect(api.action).toHaveBeenCalledTimes(1));
     expect(api.action.mock.calls[0]![3]).toEqual({
       type: 'UPDATE_CONFIG',
-      config: { startingCash: 25000, loanLimit: 15000, marketVolatility: 'balanced', secretObjectives: false, financialPrivacy: 'hidden' },
+      config: { startingCash: 25000, loanLimit: 15000, marketVolatility: 'balanced', secretObjectives: false, financialPrivacy: 'hidden', durationYears: 5 },
     });
   });
 

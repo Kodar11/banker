@@ -132,6 +132,33 @@ export class TestGame {
     return this.absorb(applyAction(this.state, this.id(name), action, this.ctx(actionId)));
   }
 
+  /**
+   * Ends the game the only way players can end one early: `requester` asks for a vote (their own
+   * END ballot) and every other active player votes END. The table must be at rest — before a roll,
+   * or after a turn's business is done. Returns the action that finished the game.
+   */
+  endByVote(requester: string = Object.keys(this.ids)[0]!): EngineResult {
+    let result = this.act(requester, { type: 'REQUEST_END_VOTE' });
+    for (const p of [...this.state.players]) {
+      const vote = this.state.endGame?.vote;
+      if (!vote) break;
+      if (p.status === 'ACTIVE' && !(p.id in vote.ballots)) result = this.act(p.name, { type: 'CAST_END_VOTE', voteId: vote.id, choice: 'END' });
+    }
+    if (this.state.status !== 'FINISHED') throw new Error('The vote did not end the game.');
+    return result;
+  }
+
+  /** Every active player's ballot in the open vote, in seat order, until it is settled. `choices` by name; anyone not named does not vote. */
+  vote(choices: Record<string, 'END' | 'CONTINUE'>): EngineResult | null {
+    let result: EngineResult | null = null;
+    for (const [name, choice] of Object.entries(choices)) {
+      const vote = this.state.endGame?.vote;
+      if (!vote) break;
+      result = this.act(name, { type: 'CAST_END_VOTE', voteId: vote.id, choice });
+    }
+    return result;
+  }
+
   /** A new player joins the lobby. */
   join(name: string): EngineResult {
     const id = testId();

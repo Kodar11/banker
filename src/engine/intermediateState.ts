@@ -124,7 +124,10 @@ export interface YearReport {
 
 export interface IntermediateState {
   configVersion: string;
-  /** Current financial year, starting at 1. Always 1 + floor(clock / yearLength). */
+  /**
+   * Current financial year, starting at 1: 1 + floor(clock / yearLength) — except that in a game with
+   * a duration it waits at the game's last year until the players have voted to play another (gameEnd.ts).
+   */
   year: number;
   /** Players who started the game. Fixed: bankruptcies and departures never change it. */
   playerCount: number;

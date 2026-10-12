@@ -198,8 +198,18 @@ export const BUSINESS_MVP_RULES = {
   endGame: {
     /** Game ends when only one player is not bankrupt. */
     lastPlayerStandingWins: true,
-    /** Host may end the game at any time; highest net worth wins. */
-    hostMayEnd: true,
+    /**
+     * A hosted (private) game runs for a number of financial years the host picks when creating it.
+     * Nobody ends it alone: the players vote (gameEnd.ts). A matchmade game has no host, no duration
+     * and no votes.
+     */
+    duration: {
+      minYears: 5,
+      maxYears: 10,
+      defaultYears: 5,
+    },
+    /** How long a vote on ending the game stays open, on the server's clock. */
+    voteSeconds: 30,
   },
 
   session: {
