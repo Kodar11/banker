@@ -2,7 +2,7 @@ import { goBack } from '@/utils/navigation';
 import { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { auctionAcceptUntil, auctionOpensAt, getDeed, insuranceOf, isIntermediate, minimumNextBid, type AuctionState, type PlayerState } from '@/engine/index.ts';
+import { auctionAcceptUntil, auctionOpensAt, getDeed, insuranceOf, isIntermediate, minimumNextBid, type AuctionState, type GameState, type PlayerState } from '@/engine/index.ts';
 import { Button, Card, ConnectionBanner, Label, Screen } from '@/components/ui';
 import { PROPERTY_GROUP_THEME } from '@/constants/theme';
 import { useGameAction } from '@/features/game/useGameAction';
@@ -92,6 +92,26 @@ export function auctionResultHeading(auction: Pick<AuctionState, 'winnerId'> & P
   if (auction.winnerId !== null) return 'SOLD';
   if (!auction.resale) return 'CLOSED';
   return auction.resale.outcome === 'CANCELLED' ? 'CANCELLED' : 'NOT SOLD';
+}
+
+/**
+ * What to tell a bidder whose bid the server refused because the game had moved on, from the state
+ * as it stands now (read again after the refusal). Their bid was not placed; this says what was —
+ * usually somebody else's bid, a moment earlier — and what it takes to bid again. Only what the
+ * server's state shows is claimed: no winner unless the auction has closed with one.
+ */
+export function staleBidMessage(state: Pick<GameState, 'auction' | 'players' | 'status'>, auctionId: string, meId: string | null): string {
+  const auction = state.auction?.id === auctionId ? state.auction : null;
+  if (!auction) return 'The auction ended before your bid was accepted.';
+  if (auction.status !== 'OPEN') return `The auction ended before your bid was accepted. ${auctionResult(auction, state.players).text}.`;
+  const unplaced = 'The auction changed before your bid was accepted, so it was not placed.';
+  if (auction.highBid === null || auction.highBidderId === null || auction.highBidderId === meId) return `${unplaced} Check the screen and bid again.`;
+  const name = state.players.find((p) => p.id === auction.highBidderId)?.name.trim();
+  const first = `${name || 'Another player'} bid ${formatINR(auction.highBid)} first, so your bid was not placed.`;
+  const me = state.players.find((p) => p.id === meId);
+  const min = minimumNextBid(auction);
+  const canBid = !!me && state.status === 'ACTIVE' && auction.participantIds.includes(me.id) && !auction.passedIds.includes(me.id) && min <= me.balance;
+  return canBid ? `${first} Bid ${formatINR(min)} or more to lead.` : first;
 }
 
 /**
@@ -318,7 +338,18 @@ export function AuctionView({ view, auctionId }: { view: GameView; auctionId: st
               testID={i === 0 ? 'bid-button' : `bid-button-${i}`}
               disabled={!!pending || starting}
               loading={pending === 'PLACE_BID' && i === 0}
-              onPress={() => send({ type: 'PLACE_BID', auctionId: auction.id, amount })}
+              onPress={() =>
+                send(
+                  { type: 'PLACE_BID', auctionId: auction.id, amount },
+                  {
+                    // Refused because someone got in first: say who and for how much, from the state just read again.
+                    staleMessage: () => {
+                      const now = useGameStore.getState().snapshot?.state;
+                      return now ? staleBidMessage(now, auction.id, me?.id ?? null) : null;
+                    },
+                  },
+                )
+              }
             />
           ))}
           <Button

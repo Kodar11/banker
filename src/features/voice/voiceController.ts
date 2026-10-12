@@ -142,6 +142,15 @@ export class VoiceController {
   private statusSeq = 0;
   /** Foreground rejoins in a row that have not connected yet (see MAX_AUTO_RESUMES). */
   private autoResumes = 0;
+  /** Between appBackground and appForeground. */
+  private background = false;
+  /**
+   * The join is waiting for the permission prompt it opened itself. Android reports that prompt as
+   * the app going to the background; it is not the player leaving, and nothing is connected yet.
+   */
+  private prompting = false;
+  /** The prompt was answered while the app was not in front: the rest of that join, run once when it is. */
+  private afterPrompt: (() => void) | null = null;
 
   constructor(private readonly deps: VoiceDeps) {}
 
@@ -260,10 +269,22 @@ export class VoiceController {
     this.wantJoined = true;
     this.set({ phase: 'connecting', problem: null });
 
+    this.prompting = true;
     const mic = await this.deps.requestMic();
     if (epoch !== this.epoch) return;
+    this.prompting = false;
     this.set({ mic });
+    if (this.background) {
+      // Answered, but the app is not in front (yet): no channel is joined from the background.
+      this.afterPrompt = () => void this.connect(creds, epoch, mic);
+      return;
+    }
+    await this.connect(creds, epoch, mic);
+  }
 
+  /** The rest of a join, once the permission prompt has been answered: a token, then the channel (muted). */
+  private async connect(creds: Credentials, epoch: number, mic: Exclude<MicPermission, 'unknown'>): Promise<void> {
+    if (epoch !== this.epoch) return;
     const res = await this.deps.api.join(creds);
     if (epoch !== this.epoch) {
       // Left (or backgrounded) while the token was on its way: the server opened a session nobody is using.
@@ -308,6 +329,8 @@ export class VoiceController {
   private drop(tellServer: boolean): void {
     this.epoch += 1;
     this.holding = false;
+    this.prompting = false;
+    this.afterPrompt = null;
     if (this.holdTimer) clearTimeout(this.holdTimer);
     if (this.joinTimer) clearTimeout(this.joinTimer);
     if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
@@ -518,6 +541,10 @@ export class VoiceController {
   /** The app went to the background: the microphone and the channel are both let go. */
   appBackground(): void {
     this.stopTransmitting();
+    this.background = true;
+    // The join's own permission prompt, not the player leaving: the join carries on when it is answered
+    // (and the app is back in front). There is no channel and no microphone to let go of yet.
+    if (this.prompting || this.afterPrompt) return;
     if (!this.joined && this.state.phase !== 'connecting') return;
     this.resumeOnForeground = this.wantJoined;
     this.drop(true);
@@ -526,6 +553,13 @@ export class VoiceController {
 
   /** Back in front: rejoin (muted) if the player was in voice. */
   appForeground(): void {
+    this.background = false;
+    const carryOn = this.afterPrompt;
+    if (carryOn) {
+      this.afterPrompt = null;
+      carryOn();
+      return;
+    }
     if (!this.resumeOnForeground) return;
     this.resumeOnForeground = false;
     if (!this.wantJoined || this.state.phase !== 'idle_muted') return;

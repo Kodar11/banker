@@ -8,7 +8,17 @@ import type { MicPermission } from './voiceController';
  * expo-camera owns the permission in this app (its config plugin writes the iOS usage text and
  * the Android RECORD_AUDIO permission), so no extra native module is needed for it.
  */
-export async function requestMicPermission(): Promise<Exclude<MicPermission, 'unknown'>> {
+export function requestMicPermission(): Promise<Exclude<MicPermission, 'unknown'>> {
+  // One request at a time: whoever asks while the prompts are open gets the same answer, never a second prompt.
+  asking ??= ask().finally(() => {
+    asking = null;
+  });
+  return asking;
+}
+
+let asking: Promise<Exclude<MicPermission, 'unknown'>> | null = null;
+
+async function ask(): Promise<Exclude<MicPermission, 'unknown'>> {
   try {
     let res = await Camera.getMicrophonePermissionsAsync();
     if (!res.granted && res.canAskAgain) res = await Camera.requestMicrophonePermissionsAsync();

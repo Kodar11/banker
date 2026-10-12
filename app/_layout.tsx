@@ -1,5 +1,5 @@
 import '../global.css';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -14,6 +14,7 @@ import { VoiceHost } from '@/features/voice/voice';
 import { useLearningStore } from '@/store/learningStore';
 import { useOnboardingStore } from '@/store/onboardingStore';
 import { useSessionStore } from '@/store/sessionStore';
+import { startupRouting } from '@/utils/startupRouting';
 
 /**
  * Home is the root of the stack. Without this, Expo Router orders explicitly
@@ -39,6 +40,9 @@ export const unstable_settings = {
 };
 
 export default function RootLayout() {
+  // Every mount of the root is a launch of the screens, also when Android rebuilt the activity under a
+  // running app: Home then takes the player back to their game again. Before the first child renders.
+  useState(() => startupRouting.reset());
   const hydrate = useSessionStore((s) => s.hydrate);
   const hydrateLearning = useLearningStore((s) => s.hydrate);
   const hydrateOnboarding = useOnboardingStore((s) => s.hydrate);

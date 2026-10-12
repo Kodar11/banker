@@ -16,10 +16,20 @@ function loadAgora(): Agora | null {
 }
 
 /**
+ * The SDK has ONE engine per app (createAgoraRtcEngine always returns the same object). It is
+ * initialized the first time voice is joined and then kept for the rest of this run of the app:
+ * destroying it and creating it again for every join is what the SDK warns against (release is
+ * synchronous-only, and a new engine must wait for it), and a join right behind a release is not
+ * safe. Leaving therefore leaves the channel and stops the microphone, and does not destroy.
+ */
+let initialized = false;
+
+/**
  * Live player voice over Agora RTC, audio only: no video, no recording, no screen sharing, no
- * proxy. One engine per voice session, created on join and released on leave, so nothing of the
- * SDK (and no microphone capture) outlives "Leave voice", the game, or the app going to the
- * background.
+ * proxy. One of these per voice session: it joins on `join` and, on `leave`, leaves the channel,
+ * stops capturing the microphone and removes its event handler, so no call and no microphone
+ * capture outlives "Leave voice", the game, or the app going to the background. After `leave` it
+ * does nothing more: neither its methods nor late SDK events reach anything.
  *
  * Push-to-talk uses muteLocalAudioStream: the channel is joined as a publisher with the local
  * stream muted, and holding the button unmutes it. That is the switch Agora documents for
@@ -37,10 +47,10 @@ export function createAgoraVoiceEngine(appId: string | undefined): VoiceEngine |
     return null;
   }
   let handler: Parameters<typeof rtc.registerEventHandler>[0] | null = null;
-  let released = false;
-  /** Every SDK call after release is a no-op; a failing call never reaches the game. */
+  let left = false;
+  /** Every SDK call after leaving is a no-op; a failing call never reaches the game. */
   const safe = (run: () => unknown) => {
-    if (released) return;
+    if (left) return;
     try {
       run();
     } catch {
@@ -50,26 +60,44 @@ export function createAgoraVoiceEngine(appId: string | undefined): VoiceEngine |
 
   return {
     join: ({ token, channel, uid, micAllowed }, events: VoiceEngineEvents) => {
-      rtc.initialize({ appId, channelProfile: ChannelProfileType.ChannelProfileCommunication });
+      if (left) throw new Error('voice session already left');
+      if (!initialized) {
+        const code = rtc.initialize({ appId, channelProfile: ChannelProfileType.ChannelProfileCommunication });
+        if (typeof code === 'number' && code < 0) throw new Error(`initialize ${code}`);
+        initialized = true;
+      }
       handler = {
         onJoinChannelSuccess: () => {
+          if (left) return;
           // Said again once connected: joined means muted, whatever the SDK did with the earlier call.
           safe(() => rtc.muteLocalAudioStream(true));
           events.onJoined();
         },
-        onRejoinChannelSuccess: () => events.onConnection('connected'),
+        onRejoinChannelSuccess: () => {
+          if (!left) events.onConnection('connected');
+        },
         onConnectionStateChanged: (_connection, state) => {
+          if (left) return;
           if (state === ConnectionStateType.ConnectionStateReconnecting) events.onConnection('reconnecting');
           else if (state === ConnectionStateType.ConnectionStateConnected) events.onConnection('connected');
           else if (state === ConnectionStateType.ConnectionStateFailed) events.onConnection('failed');
         },
-        onConnectionLost: () => events.onConnection('reconnecting'),
-        onUserJoined: (_connection, remoteUid) => events.onUserJoined(remoteUid),
-        onUserOffline: (_connection, remoteUid) => events.onUserLeft(remoteUid),
+        onConnectionLost: () => {
+          if (!left) events.onConnection('reconnecting');
+        },
+        onUserJoined: (_connection, remoteUid) => {
+          if (!left) events.onUserJoined(remoteUid);
+        },
+        onUserOffline: (_connection, remoteUid) => {
+          if (!left) events.onUserLeft(remoteUid);
+        },
         // A player's push-to-talk, as the SDK reports it: unmuted while they hold the button.
-        onUserMuteAudio: (_connection, remoteUid, muted) => events.onUserSpeaking(remoteUid, !muted),
+        onUserMuteAudio: (_connection, remoteUid, muted) => {
+          if (!left) events.onUserSpeaking(remoteUid, !muted);
+        },
         // The same fact from the audio itself; it also covers someone already talking when we join.
         onRemoteAudioStateChanged: (_connection, remoteUid, state, reason) => {
+          if (left) return;
           if (state === RemoteAudioState.RemoteAudioStateDecoding) events.onUserSpeaking(remoteUid, true);
           else if (
             state === RemoteAudioState.RemoteAudioStateStopped &&
@@ -78,8 +106,12 @@ export function createAgoraVoiceEngine(appId: string | undefined): VoiceEngine |
             events.onUserSpeaking(remoteUid, false);
           }
         },
-        onTokenPrivilegeWillExpire: () => events.onTokenWillExpire(),
-        onRequestToken: () => events.onTokenExpired(),
+        onTokenPrivilegeWillExpire: () => {
+          if (!left) events.onTokenWillExpire();
+        },
+        onRequestToken: () => {
+          if (!left) events.onTokenExpired();
+        },
       };
       rtc.registerEventHandler(handler);
       rtc.disableVideo();
@@ -104,20 +136,20 @@ export function createAgoraVoiceEngine(appId: string | undefined): VoiceEngine |
     renewToken: (token) => safe(() => rtc.renewToken(token)),
     setTransmitting: (on) => {
       // Not through `safe`: a failure to MUTE must not pass silently (the controller then leaves the channel).
-      if (!released) rtc.muteLocalAudioStream(!on);
+      if (!left) rtc.muteLocalAudioStream(!on);
     },
     allowMic: () => safe(() => rtc.enableLocalAudio(true)),
     muteRemote: (uid, muted) => safe(() => rtc.muteRemoteAudioStream(uid, muted)),
     setRemoteVolume: (uid, volume) => safe(() => rtc.adjustUserPlaybackSignalVolume(uid, volume)),
     setMasterVolume: (volume) => safe(() => rtc.adjustPlaybackSignalVolume(volume)),
     leave: () => {
-      if (released) return;
+      if (left) return;
       safe(() => rtc.muteLocalAudioStream(true));
       safe(() => rtc.enableLocalAudio(false));
       safe(() => rtc.leaveChannel());
       if (handler) safe(() => rtc.unregisterEventHandler(handler!));
-      safe(() => rtc.release());
-      released = true;
+      handler = null;
+      left = true;
     },
   };
 }

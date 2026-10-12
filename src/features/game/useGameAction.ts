@@ -17,6 +17,12 @@ export interface SendOptions {
   silent?: boolean;
   /** Toast shown after the server accepts the action. */
   successMessage?: string;
+  /**
+   * What to tell the player when the action was refused because the game had moved on (STALE_STATE).
+   * Called after the server's state has been read again, so it can say what the game looks like now;
+   * null keeps the server's own message.
+   */
+  staleMessage?: () => string | null;
 }
 
 /** `unknown`: every attempt was lost on the way, so the server may or may not have carried the action out. */
@@ -126,12 +132,15 @@ export function useGameAction() {
         return { ok: true };
       }
 
-      if (res.error.code === 'STALE_STATE') {
+      const stale = res.error.code === 'STALE_STATE';
+      if (stale) {
         await refreshGame(session);
+        // Left this game while it was being read again: nothing of it is reported any more.
+        if (useGameStore.getState().gameId !== session.gameId) return LEFT;
       }
       if (!options.silent) {
         haptics.error();
-        useGameStore.getState().notify(res.error.code === 'STALE_STATE' ? 'info' : 'error', res.error.message);
+        useGameStore.getState().notify(stale ? 'info' : 'error', (stale && options.staleMessage?.()) || res.error.message);
       }
       return { ok: false, error: res.error };
     },

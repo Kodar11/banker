@@ -21,10 +21,15 @@ function setup() {
     setMasterVolume: () => undefined,
     leave: () => undefined,
   };
+  /** What happens to the app while the token is being fetched (nothing, unless a test says so). */
+  let duringToken: () => void = () => undefined;
   const api = {
     status: vi.fn(async () => ({ ok: true as const, room: OPEN })),
     enable: vi.fn(),
-    join: vi.fn(async () => ({ ok: true as const, grant: GRANT })),
+    join: vi.fn(async () => {
+      duringToken();
+      return { ok: true as const, grant: GRANT };
+    }),
     renew: vi.fn(async () => ({ ok: true as const, grant: GRANT })),
     heartbeat: vi.fn(async () => ({ ok: true as const })),
     leave: vi.fn(async () => ({ ok: true as const })),
@@ -41,7 +46,7 @@ function setup() {
     voice.setGameLive(true);
     await vi.advanceTimersByTimeAsync(0);
   };
-  return { voice, api, requestMic, open, sdk: () => events!, onPrompt: (run: () => void) => (duringPrompt = run) };
+  return { voice, api, requestMic, open, sdk: () => events!, onPrompt: (run: () => void) => (duringPrompt = run), onToken: (run: () => void) => (duringToken = run) };
 }
 
 beforeEach(() => {
@@ -53,35 +58,47 @@ afterEach(() => {
 
 describe('the foreground rejoin is capped', () => {
   /**
-   * What an Android permission request does when it is not granted: the activity is paused and
-   * resumed (with or without a visible dialog), which React Native reports as the app going to
-   * the background and coming back.
+   * The activity is paused and resumed, which React Native reports as the app going to the
+   * background and coming back. An Android permission request does this (with or without a visible
+   * dialog); so does anything else that briefly covers the app.
    */
   const bounce = (voice: VoiceController) => {
     voice.appBackground();
     voice.appForeground();
   };
 
-  it('a prompt that bounces the app on EVERY join cannot restart the join for ever', async () => {
+  it('something that bounces the app during EVERY join cannot restart the join for ever', async () => {
+    const t = setup();
+    await t.open();
+    t.onToken(() => bounce(t.voice));
+    t.voice.tap();
+    await vi.advanceTimersByTimeAsync(1000);
+    // The tap, then MAX_AUTO_RESUMES rejoins, each overtaken while its token was on the way; then it stops.
+    expect(t.api.join).toHaveBeenCalledTimes(1 + MAX_AUTO_RESUMES);
+    expect(t.requestMic).toHaveBeenCalledTimes(1 + MAX_AUTO_RESUMES);
+    expect(t.voice.store.getState().phase).toBe('idle_muted');
+    // Coming to the foreground again starts nothing by itself…
+    t.voice.appForeground();
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(t.api.join).toHaveBeenCalledTimes(1 + MAX_AUTO_RESUMES);
+    // …and a tap starts again from zero.
+    t.onToken(() => undefined);
+    t.voice.tap();
+    await vi.advanceTimersByTimeAsync(0);
+    t.sdk().onJoined();
+    expect(t.voice.store.getState().phase).toBe('ready_muted');
+  });
+
+  it('a prompt that bounces the app on every join does not restart it at all: the join waits for the answer', async () => {
     const t = setup();
     await t.open();
     t.onPrompt(() => bounce(t.voice));
     t.voice.tap();
     await vi.advanceTimersByTimeAsync(1000);
-    // The tap, then MAX_AUTO_RESUMES rejoins, each overtaken at the permission prompt; then it stops.
-    expect(t.requestMic).toHaveBeenCalledTimes(1 + MAX_AUTO_RESUMES);
-    expect(t.api.join).not.toHaveBeenCalled();
-    expect(t.voice.store.getState().phase).toBe('idle_muted');
-    // Coming to the foreground again starts nothing by itself…
-    t.voice.appForeground();
-    await vi.advanceTimersByTimeAsync(1000);
-    expect(t.requestMic).toHaveBeenCalledTimes(1 + MAX_AUTO_RESUMES);
-    // …and a tap starts again from zero.
-    t.onPrompt(() => undefined);
-    t.voice.tap();
-    await vi.advanceTimersByTimeAsync(0);
     t.sdk().onJoined();
     expect(t.voice.store.getState().phase).toBe('ready_muted');
+    expect(t.requestMic).toHaveBeenCalledTimes(1);
+    expect(t.api.join).toHaveBeenCalledTimes(1);
   });
 
   it('the ordinary first use (one prompt, one bounce) still connects', async () => {

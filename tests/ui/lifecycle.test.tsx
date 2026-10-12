@@ -2,6 +2,7 @@
 import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react-native';
 import { useState } from 'react';
 import { router, usePathname } from 'expo-router';
+import RootLayout from '../../app/_layout';
 import Home from '../../app/index';
 import CreateGame from '../../app/create-game';
 import JoinGame from '../../app/join-game';
@@ -118,6 +119,73 @@ describe('Game Over is not a dead end', () => {
     expect(useSessionStore.getState().session?.gameId).toBe(f.state.id);
     expect(useGameStore.getState().snapshot?.state.id).toBe(f.state.id);
     (usePathname as jest.Mock).mockReturnValue('/');
+  });
+});
+
+describe('the screens rebuilt under a running app (Android recreated the activity)', () => {
+  // The JavaScript, the stores and the session all lived on; only the navigator started again, at Home.
+  const stillRunning = () => startupRouting.markDone();
+  /** The root layout mounts again (it reads the stored session, here: none yet — each test then puts its game in the stores). */
+  const rebuild = async () => {
+    stillRunning();
+    await render(<RootLayout />);
+    await waitFor(() => expect(useSessionStore.getState().hydrated).toBe(true));
+    await act(async () => undefined);
+  };
+
+  it('the root layout mounting is a new launch of the screens', async () => {
+    stillRunning();
+    await render(<RootLayout />);
+    expect(startupRouting.isDone()).toBe(false);
+  });
+
+  it('Home takes the player back to the same game, once, as the same player — no join, no new game', async () => {
+    await rebuild();
+    const f = new Fixture().loadAs('Bilal');
+    const session = useSessionStore.getState().session;
+    const home = await render(<Home />);
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith(`/game/${f.state.id}`));
+    await home.rerender(<Home />);
+    expect(router.replace).toHaveBeenCalledTimes(1);
+    expect(api.join).not.toHaveBeenCalled();
+    expect(api.create).not.toHaveBeenCalled();
+    expect(useSessionStore.getState().session).toBe(session);
+    expect(useGameStore.getState().snapshot?.state.id).toBe(f.state.id);
+  });
+
+  it('a lobby is restored as a lobby', async () => {
+    await rebuild();
+    const f = new Fixture(['Asha', 'Bilal'], { start: false }).loadAs('Bilal');
+    await render(<Home />);
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith(`/lobby/${f.state.id}`));
+  });
+
+  it('a finished game is not restored: it is let go of', async () => {
+    await rebuild();
+    finishedGame('Bilal');
+    await render(<Home />);
+    await waitFor(() => expect(useSessionStore.getState().session).toBeNull());
+    expect(router.replace).not.toHaveBeenCalled();
+  });
+
+  it('a game the server no longer lets this phone into is not restored', async () => {
+    await rebuild();
+    const f = new Fixture();
+    useSessionStore.setState({ session: { gameId: f.state.id, playerId: f.ids.Bilal!, token: 'a'.repeat(64) }, hydrated: true });
+    useGameStore.getState().reset(f.state.id);
+    useGameStore.getState().setLoadError({ code: 'FORBIDDEN', message: 'You are not a player in this game.' });
+    await render(<Home />);
+    await waitFor(() => expect(useSessionStore.getState().session).toBeNull());
+    expect(router.replace).not.toHaveBeenCalled();
+  });
+
+  it('without a rebuild, a player who went Home during their game stays on Home (Resume is there)', async () => {
+    new Fixture().loadAs('Bilal');
+    stillRunning();
+    await render(<Home />);
+    expect(screen.getByTestId('resume-game')).toBeTruthy();
+    expect(router.replace).not.toHaveBeenCalled();
+    expect(useSessionStore.getState().session).not.toBeNull();
   });
 });
 
