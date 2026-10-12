@@ -91,6 +91,8 @@ function describe(space: BoardSpaceViewModel): string {
   return parts.join(', ');
 }
 
+const CELL_BORDER = 0.5;
+
 /** The cell: an absolutely positioned, clipped box whose place and size come only from the board layout. */
 function cellStyle(slot: SquareSlot, backgroundColor: string): ViewStyle {
   return {
@@ -99,7 +101,7 @@ function cellStyle(slot: SquareSlot, backgroundColor: string): ViewStyle {
     top: slot.y,
     width: slot.width,
     height: slot.height,
-    borderWidth: 0.5,
+    borderWidth: CELL_BORDER,
     borderColor: COLORS.boardLine,
     overflow: 'hidden',
     backgroundColor,
@@ -326,7 +328,9 @@ function BuildingStrip({ space, slot }: { space: BoardSpaceViewModel; slot: Squa
 /** Who owns it: a thin line in the owner's player colour on the card's outer edge, opposite the strip — never a letter or a badge. */
 function OwnerStrip({ space, slot }: { space: BoardSpaceViewModel; slot: SquareSlot }) {
   if (!space.owner) return null;
-  return <View testID={`board-owner-strip-${space.propertyKey}`} style={{ position: 'absolute', ...slot.parts.owner!, backgroundColor: playerColor(space.owner).color }} />;
+  // Children are placed inside the cell's border, so a line on the far (right / bottom) edge would lose both border widths to clipping: pull it back in to show at full thickness, like the top and left ones.
+  const inset = slot.side === 'right' ? { marginLeft: -2 * CELL_BORDER } : slot.side === 'bottom' ? { marginTop: -2 * CELL_BORDER } : null;
+  return <View testID={`board-owner-strip-${space.propertyKey}`} style={{ position: 'absolute', ...slot.parts.owner!, ...inset, backgroundColor: playerColor(space.owner).color }} />;
 }
 
 interface SquareProps {

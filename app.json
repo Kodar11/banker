@@ -9,9 +9,13 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.clashofcapitals.app"
+      "bundleIdentifier": "com.clashofcapitals.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
+      "versionCode": 2,
       "package": "com.clashofcapitals.app",
       "adaptiveIcon": {
         "backgroundColor": "#064E3B",
