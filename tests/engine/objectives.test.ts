@@ -684,8 +684,8 @@ describe('the end of the game', () => {
     const finished = r.events.find((e) => e.type === 'GAME_FINISHED')!;
     expect(finished.message).toBe('Bilal wins! 🏆');
     expect(finished.payload.standings).toEqual([
-      { playerId: g.id('Bilal'), netWorth: 29000 },
-      { playerId: g.id('Asha'), netWorth: 26500 },
+      { playerId: g.id('Bilal'), netWorth: 29000, liabilities: 0, rank: 1 },
+      { playerId: g.id('Asha'), netWorth: 26500, liabilities: 0, rank: 2 },
     ]);
     // The declared standings are the real final numbers.
     for (const s of finished.payload.standings as { playerId: string; netWorth: number }[]) expect(netWorth(g.state, s.playerId)).toBe(s.netWorth);
@@ -758,7 +758,9 @@ describe('the end of the game', () => {
     g.act('Bilal', { type: 'LEAVE_GAME' });
     end(g);
     expect(resultOf(g, 'Bilal')).toEqual({ playerId: g.id('Bilal'), objectiveId: 'CASH_GUARDIAN', completed: false, reward: 0, detail: 'Left the game before it ended — no bonus.' });
-    expect(g.balance('Bilal')).toBe(25000);
+    // Their cash left play when they did, and no bonus followed it.
+    expect(g.balance('Bilal')).toBe(0);
+    expect(rewards(g).map((t) => t.toPlayerId)).not.toContain(g.id('Bilal'));
     expect(resultOf(g, 'Asha')).toMatchObject({ completed: true, reward: 4000 });
   });
 
@@ -771,8 +773,8 @@ describe('the end of the game', () => {
     expect(r.events.map((e) => e.type)).toEqual(['END_VOTE_CLOSED', 'GAME_FINISHED']);
     expect(g.state.winnerId).toBe(g.id('Asha'));
     expect(r.events[1]!.payload.standings).toEqual([
-      { playerId: g.id('Asha'), netWorth: 26500 },
-      { playerId: g.id('Bilal'), netWorth: 25000 },
+      { playerId: g.id('Asha'), netWorth: 26500, liabilities: 0, rank: 1 },
+      { playerId: g.id('Bilal'), netWorth: 25000, liabilities: 0, rank: 2 },
     ]);
   });
 

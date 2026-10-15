@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { Text, View } from 'react-native';
-import { BUSINESS_MVP_RULES, configOf, loanTerms, nextInterestCircuit, outstandingPrincipal, type GameAction } from '@/engine/index.ts';
+import { BUSINESS_MVP_RULES, classicBorrowingBlock, configOf, isEnforceableLoan, loanTerms, nextInterestCircuit, outstandingPrincipal, type GameAction } from '@/engine/index.ts';
 import { Button, Card, Label, Pill, Sheet, TextField } from '@/components/ui';
 import type { GameView } from '@/features/game/useGameView';
 import { useGameStore } from '@/store/gameStore';
 import { formatINR } from '@/utils/currency';
+import { classicLoanDue } from './classicLoanDue';
 
 const RULES = BUSINESS_MVP_RULES.loans;
 const QUICK = [1000, 2000, 5000, 10000];
@@ -22,13 +23,16 @@ export function LoanSheet({ visible, onClose, view, send }: LoanSheetProps) {
   const me = view.me;
   if (!me) return null;
   const loans = view.snapshot.state.loans.filter((l) => l.playerId === me.id);
-  const active = loans.filter((l) => l.status === 'ACTIVE');
+  // Every loan the bank can still collect: being repaid, or in default.
+  const active = loans.filter(isEnforceableLoan);
+  const blocked = classicBorrowingBlock(view.snapshot.state, me.id);
   // The game's own loan limit (the host's setting).
   const room = Math.max(0, configOf(view.snapshot.state).loanLimit - outstandingPrincipal(view.snapshot.state.loans, me.id));
   const value = Number.parseInt(amount, 10) || 0;
   const terms = loanTerms(value);
-  const error =
-    value < RULES.minAmount
+  const error = blocked
+    ? blocked
+    : value < RULES.minAmount
       ? `Minimum ${formatINR(RULES.minAmount)}`
       : value % RULES.step !== 0
         ? `Steps of ${formatINR(RULES.step)}`
@@ -40,7 +44,8 @@ export function LoanSheet({ visible, onClose, view, send }: LoanSheetProps) {
     <Sheet visible={visible} onClose={onClose} title="Bank loan" testID="loan-sheet">
       <Text className="text-sm text-stone-600">
         You get the full amount now. {RULES.interestRatePercent}% interest is charged {RULES.interestEveryCircuit ? 'every time' : 'once, the next time'} you
-        pass or land on Start. Repay the loan before then to pay no interest.
+        pass or land on Start. Repay the loan before then to pay no interest. The principal is due at your {ordinal(RULES.maturityCircuits)} Start after
+        borrowing; unpaid at the next two, the loan goes into default and you can’t borrow until it is repaid.
       </Text>
       <View className="flex-row flex-wrap gap-2">
         {QUICK.filter((q) => q <= room).map((q) => (
@@ -71,13 +76,16 @@ export function LoanSheet({ visible, onClose, view, send }: LoanSheetProps) {
         <Card key={loan.id} className="gap-2 bg-white" testID="loan-row">
           <View className="flex-row items-center justify-between">
             <Text className="text-lg font-bold text-ink">Owed {formatINR(loan.outstanding)}</Text>
-            <Pill tone="warn">Active</Pill>
+            <Pill tone={loan.status === 'DEFAULTED' ? 'bad' : 'warn'}>{loan.status === 'DEFAULTED' ? 'In default' : 'Active'}</Pill>
           </View>
           <Text className="text-sm text-stone-500" testID="loan-interest-status">
             Borrowed {formatINR(loan.principal)} ·{' '}
             {nextInterestCircuit(loan) !== null
               ? `${formatINR(loan.interestAmount)} interest due at your next Start`
               : `interest paid ${formatINR(loan.interestPaid)}`}
+          </Text>
+          <Text className="text-sm font-semibold text-stone-700" testID="loan-due-status">
+            {classicLoanDue(loan, me.circuits)}
           </Text>
           <View className="flex-row gap-2">
             {loan.outstanding > 1000 ? (
@@ -104,6 +112,11 @@ export function LoanSheet({ visible, onClose, view, send }: LoanSheetProps) {
       ))}
     </Sheet>
   );
+}
+
+function ordinal(n: number): string {
+  const suffix = n % 100 >= 11 && n % 100 <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[n % 10] ?? 'th';
+  return `${n}${suffix}`;
 }
 
 function Row({ label, value, bold = false }: { label: string; value: string; bold?: boolean }) {

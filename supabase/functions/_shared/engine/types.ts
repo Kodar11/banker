@@ -23,8 +23,9 @@ export type TurnPhase =
   | 'TURN_COMPLETE';
 
 /**
- * ACTIVE plays. BANKRUPT lost everything to a debt. LEFT walked away (LEAVE_GAME): takes no more
- * turns and can no longer act, but keeps what was in their name — nothing is sold or forgiven.
+ * ACTIVE plays. BANKRUPT could not pay a debt and was settled out (estate.ts). LEFT walked away
+ * (LEAVE_GAME): their estate was settled the same way — debts first, properties back to the bank,
+ * remaining cash out of play — and they take no more part in the game.
  */
 export type PlayerStatus = 'ACTIVE' | 'BANKRUPT' | 'LEFT';
 
@@ -63,12 +64,21 @@ export interface PropertyState {
   mortgaged: boolean;
 }
 
+/**
+ * ACTIVE     being repaid; `outstanding` is the principal still owed.
+ * REPAID     cleared (closedAt set).
+ * DEFAULTED  closedAt null: the principal was not repaid by the default checkpoint; `outstanding`
+ *            is still owed and enforceable (it counts in net worth and blocks new borrowing).
+ *            closedAt set: the borrower's estate was settled (bankruptcy or leaving) and `outstanding`
+ *            is the part the estate could not pay — recorded, no longer collectable.
+ */
 export type LoanStatus = 'ACTIVE' | 'REPAID' | 'DEFAULTED';
 
 /**
  * A bank loan. The principal is repaid with REPAY_LOAN; interest is NOT added
  * when borrowing — it becomes payable (in cash, to the bank) when the borrower
- * next reaches/passes Start (see BUSINESS_MVP_RULES.loans).
+ * next reaches/passes Start (see BUSINESS_MVP_RULES.loans). The principal itself falls due at
+ * `maturityCircuit` (classicLoanStanding).
  */
 export interface LoanState {
   id: string;
@@ -88,6 +98,11 @@ export interface LoanState {
   interestCharges: number;
   /** Total interest paid so far. */
   interestPaid: number;
+  /**
+   * The borrower's `circuits` at which the principal falls due (createdAtCircuit + BUSINESS_MVP_RULES.loans.maturityCircuits,
+   * fixed at signing). Null for a loan signed before loans had a maturity: it keeps the contract it was signed under.
+   */
+  maturityCircuit: number | null;
   createdAt: string;
   closedAt: string | null;
 }
@@ -386,6 +401,8 @@ export type TransactionType =
   | 'INSURANCE_PREMIUM'
   | 'CRISIS_PAYMENT'
   | 'OBJECTIVE_REWARD'
+  /** A departed or bankrupt player's cash left after every claim on their estate was settled: it leaves play. */
+  | 'ESTATE_SETTLEMENT'
   | 'UNDO_REVERSAL';
 
 export interface TransactionRecord {

@@ -186,13 +186,16 @@ describe('a finished game accepts nothing', () => {
 });
 
 describe('who wins', () => {
-  it('a tie in net worth goes to the earlier seat; one rupee more decides it otherwise', () => {
+  it('level on net worth and liabilities: a shared victory, never the earlier seat; one rupee more decides it otherwise', () => {
     const tie = new TestGame();
     tie.endByVote('Asha');
     expect(tie.state.players.map((p) => netWorth(tie.state, p.id))).toEqual([25000, 25000, 25000]);
-    expect(tie.state.winnerId).toBe(tie.id('Asha'));
+    expect(tie.state.winnerId).toBeNull();
     const finished = tie.results.at(-1)!.events.find((e) => e.type === 'GAME_FINISHED')!;
-    expect((finished.payload.standings as { playerId: string }[]).map((s) => s.playerId)).toEqual(['Asha', 'Bilal', 'Chitra'].map((n) => tie.id(n)));
+    expect(finished.payload).toMatchObject({ sharedVictory: true, winnerIds: ['Asha', 'Bilal', 'Chitra'].map((n) => tie.id(n)) });
+    expect(finished.message).toBe('Asha, Bilal and Chitra share the victory! 🏆');
+    // Listed in seat order for display only: they share first place.
+    expect((finished.payload.standings as { playerId: string; rank: number }[]).map((s) => [s.playerId, s.rank])).toEqual(['Asha', 'Bilal', 'Chitra'].map((n) => [tie.id(n), 1]));
 
     const edge = new TestGame();
     edge.act('Asha', { type: 'TRANSFER_MONEY', toPlayerId: edge.id('Chitra'), amount: 1 });
@@ -204,8 +207,10 @@ describe('who wins', () => {
     const g = new TestGame(['Asha', 'Bilal', 'Chitra', 'Dev']);
     // Everyone pays Dev, who then walks away with the most money at the table.
     for (const name of ['Asha', 'Bilal', 'Chitra']) g.act(name, { type: 'TRANSFER_MONEY', toPlayerId: g.id('Dev'), amount: 10000 });
-    g.act('Dev', { type: 'LEAVE_GAME' });
-    expect(g.balance('Dev')).toBe(55000);
+    const left = g.act('Dev', { type: 'LEAVE_GAME' });
+    // Leaving takes the cash out of play — nobody inherits it, and it can't be ranked.
+    expect(left.transactions.filter((t) => t.type === 'ESTATE_SETTLEMENT').map((t) => [t.fromPlayerId, t.toPlayerId, t.amount])).toEqual([[g.id('Dev'), null, 55000]]);
+    expect(g.balance('Dev')).toBe(0);
     g.act('Asha', { type: 'TRANSFER_MONEY', toPlayerId: g.id('Bilal'), amount: 1 });
     g.endByVote('Asha');
     expect(g.state.winnerId).toBe(g.id('Bilal'));

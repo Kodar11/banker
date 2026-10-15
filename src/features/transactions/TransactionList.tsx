@@ -34,6 +34,7 @@ export const TRANSACTION_LABELS: Record<TransactionType, string> = {
   INSURANCE_PREMIUM: 'Insurance premium',
   CRISIS_PAYMENT: 'Crisis bill',
   OBJECTIVE_REWARD: 'Secret objective bonus',
+  ESTATE_SETTLEMENT: 'Estate settled',
   UNDO_REVERSAL: 'Undo',
 };
 

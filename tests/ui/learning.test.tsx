@@ -195,7 +195,8 @@ describe('Lesson player', () => {
     expect([...learning().completed].sort()).toEqual(LESSONS.map((l) => l.id).sort());
     expect(api.action).not.toHaveBeenCalled();
     expect(api.state).not.toHaveBeenCalled();
-  });
+    // Renders every lesson once per choice: about 4.6 s on its own, so the 5 s default fails whenever the machine is busy.
+  }, 30_000);
 
   it('the concept scenes show their figures: present value, compounding, loans, mortgage, credit', async () => {
     let view = await render(<LessonPlayer lessonId="L04" />);
@@ -243,8 +244,9 @@ describe('Lesson player', () => {
     view = await render(<LessonPlayer lessonId="L12" />);
     await playTo('consequence', 'b');
     expect(screen.getByTestId('scene-credit')).toHaveTextContent(/Installment overdue−20 → 680/);
-    expect(screen.getByTestId('scene-credit')).toHaveTextContent(/Caught up\+5 → 685/);
-    expect(screen.getByTestId('scene-credit-score')).toHaveTextContent('685');
+    // Catching up earns nothing back: the score stays where the late payment put it.
+    expect(screen.getByTestId('scene-credit')).toHaveTextContent(/Caught up\+0 → 680/);
+    expect(screen.getByTestId('scene-credit-score')).toHaveTextContent('680');
     await view.unmount();
 
     useLearningStore.setState({ inProgress: {} });

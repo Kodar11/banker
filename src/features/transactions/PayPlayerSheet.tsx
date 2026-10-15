@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { View } from 'react-native';
-import type { GameAction } from '@/engine/index.ts';
+import { mandatoryPaymentsOwed, type GameAction } from '@/engine/index.ts';
 import { Button, MoneyField, PlayerPicker, Sheet, TextField } from '@/components/ui';
 import type { GameView } from '@/features/game/useGameView';
 import { useGameStore } from '@/store/gameStore';
@@ -15,7 +15,11 @@ interface PayPlayerSheetProps {
   initialPlayerId?: string | null;
 }
 
-/** Player-to-player payment (deals, side bets, settling up): who → how much → why (optional) → pay. */
+/**
+ * Player-to-player payment (deals, side bets, settling up): who → how much → why (optional) → pay.
+ * A gift between players: the game moves the money and never collects it back. Closed while this
+ * player owes a payment the game asked for — the server refuses it then too.
+ */
 export function PayPlayerSheet({ visible, onClose, view, send, initialPlayerId = null }: PayPlayerSheetProps) {
   const [to, setTo] = useState<string | null>(initialPlayerId);
   const [amount, setAmount] = useState('');
@@ -26,9 +30,12 @@ export function PayPlayerSheet({ visible, onClose, view, send, initialPlayerId =
   const others = view.snapshot.state.players.filter((p) => p.id !== me.id && p.status === 'ACTIVE');
   const value = Number.parseInt(amount, 10) || 0;
   const short = value > me.balance;
-  const valid = !!to && value > 0 && !short;
+  const owing = mandatoryPaymentsOwed(view.snapshot.state, me.id) > 0;
+  const valid = !owing && !!to && value > 0 && !short;
   // The button always says what is still missing, or exactly what it will do.
-  const next = !to
+  const next = owing
+    ? 'Settle what you owe first'
+    : !to
     ? 'Choose a player'
     : amount === ''
       ? 'Enter amount'

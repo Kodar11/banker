@@ -88,7 +88,7 @@ describe('More → Leave game', () => {
     const dialog = screen.getByTestId('leave-dialog');
     expect(dialog).toHaveTextContent(/Leave this game\?/);
     expect(dialog).toHaveTextContent(/You’ll leave this game and return to the home screen\. The other players keep playing\./);
-    expect(dialog).toHaveTextContent(/You can’t rejoin\. Your cash and properties stay in your name\./);
+    expect(dialog).toHaveTextContent(/You can’t rejoin\. Any bank loans are repaid first\. Your properties go back to the bank and any cash left leaves the game\./);
     expect(screen.getByTestId('leave-dialog-confirm')).toHaveTextContent('Leave Game');
     await fireEvent.press(screen.getByTestId('leave-dialog-cancel'));
     expect(screen.queryByTestId('leave-dialog')).toBeNull();
@@ -150,13 +150,13 @@ describe('More → Leave game', () => {
 describe('what the confirmation promises', () => {
   it('follows the server’s rules for host hand-over, the last two players, bankrupt players and the lobby', () => {
     const three = new Fixture(NAMES);
-    expect(leaveConsequence(viewFor(three, 'Asha')).detail).toBe('You can’t rejoin. Your cash and properties stay in your name. Bilal becomes the host.');
-    expect(leaveConsequence(viewFor(three, 'Chitra')).detail).toBe('You can’t rejoin. Your cash and properties stay in your name.');
+    expect(leaveConsequence(viewFor(three, 'Asha')).detail).toBe('You can’t rejoin. Any bank loans are repaid first. Your properties go back to the bank and any cash left leaves the game. Bilal becomes the host.');
+    expect(leaveConsequence(viewFor(three, 'Chitra')).detail).toBe('You can’t rejoin. Any bank loans are repaid first. Your properties go back to the bank and any cash left leaves the game.');
 
     const two = new Fixture(['Asha', 'Bilal']);
     expect(leaveConsequence(viewFor(two, 'Bilal'))).toEqual({
       message: 'You’ll leave this game and return to the home screen.',
-      detail: 'Only two players are left, so the game ends and Asha wins.',
+      detail: 'Any bank loans are repaid first. Your properties go back to the bank and any cash left leaves the game. Only two players are left, so the game ends and Asha wins.',
     });
     // …and that is what the engine then does.
     two.act('Bilal', { type: 'LEAVE_GAME' });

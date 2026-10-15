@@ -69,8 +69,11 @@ export function intermediateRuleEntries(config: GameConfig = defaultGameConfig('
       title: 'Credit score',
       lines: [
         `Everyone starts at ${IR.credit.start} (range ${IR.credit.min}–${IR.credit.max}). It sets the rate of new loans: ${IR.credit.bands.map((b) => `${b.min}+ ${b.adjustPercent === 0 ? 'base rate' : `${signed(b.adjustPercent)} points`}`).join(', ')}.`,
-        `On-time payment ${signed(C.ON_TIME_PAYMENT)}, overdue ${signed(C.INSTALLMENT_OVERDUE)}, caught up ${signed(C.CAUGHT_UP)}, default ${signed(C.LOAN_DEFAULT)}, loan repaid ${signed(C.LOAN_REPAID)}, a year with a loan and nothing overdue ${signed(C.CLEAN_YEAR)}.`,
-        'A loan you already signed keeps its rate whatever happens to your score.',
+        `On-time payment ${signed(C.ON_TIME_PAYMENT)}, overdue ${signed(C.INSTALLMENT_OVERDUE)}, default ${signed(C.LOAN_DEFAULT)}. Paying an overdue installment late earns ${C.CAUGHT_UP === 0 ? 'nothing back' : signed(C.CAUGHT_UP)}.`,
+        `A loan repaid in full ${signed(C.LOAN_REPAID)}, once — only if you paid at least one installment on time and none late. Repaying a loan before anything fell due earns nothing.`,
+        `A financial year in which you paid an installment on time and ended with nothing due, overdue or in default ${signed(C.CLEAN_YEAR)}.`,
+        `Your score can rise by at most ${IR.credit.maxGainPerYear} points in one financial year. Drops are never limited.`,
+        'A loan you already signed keeps its rate whatever happens to your score. The score is not money: it is not part of your net worth.',
       ],
     },
     {
@@ -79,7 +82,8 @@ export function intermediateRuleEntries(config: GameConfig = defaultGameConfig('
         `A payment is on time for a quarter of a financial year after it falls due. Then it is overdue, and you cannot borrow until it is paid.`,
         `Unpaid for ${L.graceYears} more full year${L.graceYears === 1 ? '' : 's'}, the loan defaults: everything still owed is payable at once, with no further interest.`,
         'A secured loan in default costs you the pledged property: the bank takes it at market value, pays you any surplus, and you still owe any shortfall.',
-        'Default is not bankruptcy. Bankruptcy follows the usual rule.',
+        'Default is not bankruptcy, and it forgives nothing: the balance stays owed, counts against your net worth, and blocks new loans until it is cleared.',
+        'Bankruptcy follows the usual rule: only when even selling everything to the bank would not cover what you owe. Borrowing is never required.',
       ],
     },
     {
@@ -97,7 +101,7 @@ export function intermediateRuleEntries(config: GameConfig = defaultGameConfig('
         `Insurance is bought per property: ${formatINR(premiumForYear(1))} in Year 1, ${formatINR(I.premiumStepPerYear)} more each financial year, never above ${formatINR(I.premiumMax)}. You are shown the price and must confirm it.`,
         `A policy lasts ${I.coverageSpaces} spaces of average movement from the moment you buy it and waives one crisis bill on that property. Used or run out, it is over: no refund, no automatic renewal.`,
         'Insurance pays nothing else — not rent, taxes, loans or mortgages. A crisis leaves the property, its buildings and its mortgage exactly as they were. A policy protects the player who bought it, not a later owner.',
-        'An unpaid crisis bill stops the game for everyone until it is settled. Raise the money the usual ways: sell a building, sell or mortgage a property, take a loan. Bankruptcy is possible only once none of those is left.',
+        'An unpaid crisis bill stops the game for everyone until it is settled. Raise the money the usual ways: sell a building, sell or mortgage a property, or take a loan if you choose. Bankruptcy is possible only when even selling everything to the bank would not cover it.',
       ],
       example: `Insuring three properties costs ${formatINR(3 * premiumForYear(1))} in Year 1 and ${formatINR(3 * premiumForYear(4))} in Year 4.`,
     },
@@ -114,7 +118,11 @@ export function intermediateRuleEntries(config: GameConfig = defaultGameConfig('
     },
     {
       title: 'Net worth',
-      lines: ['Cash + properties at market value + buildings at cost − what it costs to redeem your mortgages − loans owed.', 'Net worth is not cash: only cash pays an installment.'],
+      lines: [
+        'Cash + properties at market value + buildings at what they cost to build − what it costs to redeem your mortgages − loans owed − crisis bills owed.',
+        'A loan counts at what would close it today: the principal, installments due, interest built up this loan year, or the balance of a loan in default.',
+        'Net worth is not cash: only cash pays an installment.',
+      ],
     },
     ...(config.secretObjectives ? [secretObjectivesEntry(config)] : []),
   ];

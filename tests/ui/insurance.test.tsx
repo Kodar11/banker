@@ -366,9 +366,9 @@ describe('Crisis: the player who owes', () => {
     expect(screen.getByTestId('crisis-cash')).toHaveTextContent('Your cash: ₹1,700');
     expect(screen.getByTestId('crisis-short')).toHaveTextContent('You’re ₹1,300 short.');
     expect(screen.getByTestId('crisis-pay').props.accessibilityState.disabled).toBe(true);
-    expect(screen.getByTestId('crisis-options')).toHaveTextContent('You can still: mortgage a property, sell a property to the bank, take a loan.');
+    expect(screen.getByTestId('crisis-options')).toHaveTextContent('You can still: mortgage a property, sell a property to the bank, take a loan (optional).');
     expect(screen.getByTestId('crisis-bankrupt').props.accessibilityState.disabled).toBe(true);
-    expect(screen.getByTestId('crisis-bankrupt-note')).toHaveTextContent(/Bankruptcy is only possible once nothing is left to try/);
+    expect(screen.getByTestId('crisis-bankrupt-note')).toHaveTextContent(/Bankruptcy is only possible when even that would not be enough/);
     await fireEvent.press(screen.getByTestId('crisis-bankrupt'));
     expect(screen.queryByTestId('crisis-bankrupt-dialog')).toBeNull();
 

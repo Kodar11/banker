@@ -230,8 +230,9 @@ describe('loans — interest is charged at the NEXT Start, not when borrowing', 
       const { g } = brokeAtStart();
       g.act('Asha', { type: 'DECLARE_BANKRUPTCY' });
       expect(g.player('Asha').status).toBe('BANKRUPT');
-      expect(g.state.loans[0]!.status).toBe('DEFAULTED');
-      expect(g.ledger.at(-1)).toMatchObject({ type: 'BANKRUPTCY_SETTLEMENT', toPlayerId: null, amount: 100 + REWARD });
+      // Everything she had went to the interest owed; the rest of it and the principal stay on record as unpaid.
+      expect(g.ledger.at(-1)).toMatchObject({ type: 'LOAN_INTEREST', toPlayerId: null, amount: 100 + REWARD });
+      expect(g.state.loans[0]).toMatchObject({ status: 'DEFAULTED', interestPaid: 100 + REWARD, outstanding: 20000, closedAt: expect.any(String) });
     });
   });
 });

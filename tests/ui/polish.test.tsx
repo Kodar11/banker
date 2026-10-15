@@ -147,7 +147,7 @@ describe('Game log', () => {
     expect(screen.getByText('Showing the latest 2 events')).toBeTruthy();
     await view.rerender(<GameLog events={[]} players={state.players} />);
     expect(screen.queryByTestId('event-feed')).toBeNull();
-    expect(screen.getByTestId('event-feed-empty')).toHaveTextContent(/Nothing has happened yet\./);
+    expect(screen.getByTestId('event-feed-empty')).toHaveTextContent(/No activity yet/);
   });
 });
 

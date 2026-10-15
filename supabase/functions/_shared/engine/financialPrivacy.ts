@@ -192,6 +192,15 @@ export const EVENT_PRIVACY: Readonly<Record<string, typeof PUBLIC | EventRule>> 
   LOAN_PREPAID: PRIVATE,
   LOAN_DEFAULT_PAYMENT: PRIVATE,
   CREDIT_SCORE_CHANGED: PRIVATE,
+  // Classic loan principal: due, overdue (LOAN_DEFAULTED above covers the default).
+  LOAN_PRINCIPAL_DUE: PRIVATE,
+  LOAN_OVERDUE: PRIVATE,
+  // A departed or bankrupt player's estate: what each creditor was paid. The table sees that it was
+  // settled and what returned to the bank (the board shows it anyway); the debts behind it stay private.
+  ESTATE_SETTLED: {
+    parties: (e) => (Array.isArray(e.payload.creditorIds) ? e.payload.creditorIds : []),
+    publicView: (e, name) => ({ message: `${name(e.actorId)}'s estate was settled`, payload: { propertiesReturned: e.payload.propertiesReturned } }),
+  },
 };
 
 /**

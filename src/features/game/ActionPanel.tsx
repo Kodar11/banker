@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { DECK_LABELS, economyOf, getDeed, BUSINESS_MVP_RULES, INTERMEDIATE_RULES, premiumForYear, type GameAction } from '@/engine/index.ts';
+import { bankruptcyBlockerNow, DECK_LABELS, economyOf, getDeed, BUSINESS_MVP_RULES, INTERMEDIATE_RULES, premiumForYear, type GameAction } from '@/engine/index.ts';
 import { Button, Card, ConfirmDialog, Label, Pill, TextField } from '@/components/ui';
 import { useGameStore } from '@/store/gameStore';
 import { formatINR } from '@/utils/currency';
@@ -131,6 +131,7 @@ export function ActionPanel({ view, send, onOpenLoan }: ActionPanelProps) {
       const p = turn.pending;
       const type = PAY_ACTION[p.reason];
       const short = p.amount - me.balance;
+      const bankruptcyBlock = short > 0 ? bankruptcyBlockerNow(state, me.id) : null;
       const heading =
         p.reason === 'RENT' ? `Owned by ${playerName(p.toPlayerId)}` : p.reason === 'TAX' ? p.label : p.reason === 'LOAN_INTEREST' ? 'Loan interest' : p.reason === 'CLUB' ? 'Club' : 'Card';
       return (
@@ -149,8 +150,12 @@ export function ActionPanel({ view, send, onOpenLoan }: ActionPanelProps) {
             {short > 0 ? (
               <View className="gap-3 rounded-2xl bg-red-50 p-3">
                 <Text className="text-center text-base font-bold text-brick">You’re {formatINR(short)} short.</Text>
+                {/* The same answer the server gives: bankruptcy only once the bank would not pay enough for what you own. */}
+                <Text className="text-center text-sm text-stone-700" testID="raise-funds-help">
+                  {bankruptcyBlock ?? 'Even selling everything to the bank would not cover this. You may borrow if the bank offers a loan — or declare bankruptcy.'}
+                </Text>
                 <View className="flex-row gap-3">
-                  <Button className="flex-1" size="sm" variant="secondary" title="Take a loan" testID="raise-loan" onPress={onOpenLoan} />
+                  <Button className="flex-1" size="sm" variant="secondary" title="Take a loan (optional)" testID="raise-loan" onPress={onOpenLoan} />
                   <Button
                     className="flex-1"
                     size="sm"
@@ -164,13 +169,14 @@ export function ActionPanel({ view, send, onOpenLoan }: ActionPanelProps) {
                   variant="danger"
                   title="Declare bankruptcy"
                   testID="bankrupt-button"
+                  disabled={!!bankruptcyBlock}
                   onPress={() => setBankruptcy({ busy: false, error: null })}
                 />
                 {/* Rendered inside the decision sheet, so it opens above it. */}
                 <ConfirmDialog
                   visible={!!bankruptcy}
                   title="Declare bankruptcy?"
-                  message="Your cash goes to the creditor and your properties return to the bank."
+                  message="Your estate pays this debt first — your cash, and your buildings and properties sold back to the bank — then any bank loans. Your properties return to the bank."
                   detail="You leave the game. This can’t be taken back."
                   confirmTitle="Declare"
                   destructive

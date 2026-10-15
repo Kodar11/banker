@@ -10,6 +10,7 @@ import {
   PROPERTY_KEYS,
   propertyViolations,
   RESTING_PHASES,
+  balanceSheet,
   type EngineResult,
   type GameState,
   type TransactionRecord,
@@ -25,7 +26,8 @@ import {
  * Deliberately NOT asserted, because the established rules allow it:
  *   - "even building" across a colour group (rules.building has no such rule);
  *   - buildings only where the whole group is owned (a trade or a resale moves a built property);
- *   - a LEFT player owning property and being paid rent (leaving freezes holdings, see leaveTable).
+ * Asserted since estates are settled (estate.ts): a player who is out of the game — bankrupt or
+ * left — holds no cash, owns no property, is owed no payment, and has no loan the bank can still collect.
  */
 
 type Flow = 'BANK_TO_PLAYER' | 'PLAYER_TO_BANK' | 'PLAYER_TO_PLAYER';
@@ -56,6 +58,8 @@ export const ALLOWED_FLOWS: Record<TransactionType, readonly Flow[]> = {
   JAIL_FINE: ['PLAYER_TO_BANK'],
   UNMORTGAGE: ['PLAYER_TO_BANK'],
   INSURANCE_PREMIUM: ['PLAYER_TO_BANK'],
+  // A departed or bankrupt player's leftover cash leaves play.
+  ESTATE_SETTLEMENT: ['PLAYER_TO_BANK'],
   CRISIS_PAYMENT: ['PLAYER_TO_BANK'],
   RENT_PAYMENT: ['PLAYER_TO_PLAYER'],
   PLAYER_TRANSFER: ['PLAYER_TO_PLAYER'],
@@ -131,7 +135,7 @@ export function ownershipViolations(state: GameState): string[] {
     if (!prop) continue;
     if (prop.key !== key) problems.push(`${key}: stored under the wrong key (${prop.key})`);
     const owner = prop.ownerId === null ? null : byId.get(prop.ownerId);
-    if (owner && owner.status === 'BANKRUPT') problems.push(`${key}: owned by ${owner.name}, who is bankrupt`);
+    if (owner && owner.status !== 'ACTIVE') problems.push(`${key}: owned by ${owner.name}, who is ${owner.status === 'LEFT' ? 'gone' : 'bankrupt'}`);
     const deed = getDeed(key);
     if (deed.kind !== 'CITY' && (prop.houses > 0 || prop.hotel)) problems.push(`${key}: buildings on a site that cannot be built on`);
     if (prop.houses > RULES.building.maxHouses) problems.push(`${key}: ${prop.houses} houses`);
@@ -154,7 +158,7 @@ export function turnViolations(state: GameState): string[] {
   // A bankrupt host keeps the role (they may still end the game, or leave and hand it on); a host who LEFT never does.
   if (state.hostPlayerId !== null && state.status !== 'FINISHED' && active.length > 0 && hosts[0] && hosts[0].status === 'LEFT') problems.push('the host has left the table');
   for (const p of state.players) {
-    if (p.status === 'BANKRUPT' && p.balance !== 0) problems.push(`${p.name}: bankrupt with ${p.balance} in cash`);
+    if (p.status !== 'ACTIVE' && p.balance !== 0) problems.push(`${p.name}: out of the game (${p.status}) with ${p.balance} in cash`);
     if (p.position < 0 || !Number.isInteger(p.position)) problems.push(`${p.name}: invalid position ${p.position}`);
     if (p.circuits < 0) problems.push(`${p.name}: negative circuits`);
   }
@@ -182,9 +186,10 @@ export function turnViolations(state: GameState): string[] {
       if (!Number.isInteger(pending.amount) || pending.amount <= 0) problems.push(`a pending payment of ${pending.amount}`);
       if (pending.toPlayerId !== null && !state.players.some((p) => p.id === pending.toPlayerId)) problems.push('a payment owed to nobody');
       if (pending.toPlayerId !== null && pending.toPlayerId === turn.playerId) problems.push('a payment owed to the payer');
+      if (pending.toPlayerId !== null && state.players.find((p) => p.id === pending.toPlayerId)?.status !== 'ACTIVE') problems.push('a payment owed to a player who is out of the game');
       for (const id of pending.payeeIds ?? []) {
         if (id === turn.playerId) problems.push('the payer is among the payees');
-        if (state.players.find((p) => p.id === id)?.status === 'BANKRUPT') problems.push('a share of the payment is owed to a bankrupt player');
+        if (state.players.find((p) => p.id === id)?.status !== 'ACTIVE') problems.push('a share of the payment is owed to a player who is out of the game');
       }
       if (pending.payeeIds?.length && pending.amount % pending.payeeIds.length !== 0) problems.push('a shared payment that does not divide among its payees');
     }
@@ -237,7 +242,9 @@ export function obligationViolations(state: GameState): string[] {
     if (loan.outstanding < 0 || loan.outstanding > loan.totalOwed) problems.push(`loan ${loan.id}: outstanding ${loan.outstanding} of ${loan.totalOwed}`);
     if (loan.status === 'REPAID' && loan.outstanding !== 0) problems.push(`loan ${loan.id}: repaid with ${loan.outstanding} outstanding`);
     if (loan.status === 'ACTIVE' && loan.outstanding === 0) problems.push(`loan ${loan.id}: active with nothing outstanding`);
-    if (loan.status === 'ACTIVE' && byId.get(loan.playerId)?.status === 'BANKRUPT') problems.push(`loan ${loan.id}: active, but its borrower is bankrupt`);
+    const collectable = loan.status === 'ACTIVE' || (loan.status === 'DEFAULTED' && loan.closedAt === null);
+    if (collectable && state.status !== 'WAITING' && byId.get(loan.playerId)?.status !== 'ACTIVE') problems.push(`loan ${loan.id}: still collectable, but its borrower is out of the game`);
+    if (loan.status === 'DEFAULTED' && loan.closedAt === null && loan.outstanding === 0) problems.push(`loan ${loan.id}: in default with nothing owed`);
     if (loan.interestPaid < 0 || loan.interestPaid > loan.interestCharges * loan.interestAmount) problems.push(`loan ${loan.id}: paid more interest than was charged`);
   }
   if (new Set(state.trades.map((t) => t.id)).size !== state.trades.length) problems.push('a trade offer appears twice');
@@ -262,7 +269,8 @@ export function obligationViolations(state: GameState): string[] {
   if (eco) {
     for (const loan of eco.loans) {
       if (!byId.has(loan.playerId)) problems.push(`Capital loan ${loan.id}: unknown borrower`);
-      if (loan.status === 'ACTIVE' && byId.get(loan.playerId)?.status === 'BANKRUPT') problems.push(`Capital loan ${loan.id}: active, but its borrower is bankrupt`);
+      if ((loan.status === 'ACTIVE' || loan.status === 'DEFAULTED') && byId.get(loan.playerId)?.status !== 'ACTIVE') problems.push(`Capital loan ${loan.id}: open, but its borrower is out of the game`);
+      if (loan.status === 'WRITTEN_OFF' && (loan.writtenOff ?? 0) < 0) problems.push(`Capital loan ${loan.id}: negative write-off`);
       if (loan.status === 'ACTIVE' && loan.collateralKey && state.properties[loan.collateralKey]?.ownerId !== loan.playerId) {
         problems.push(`Capital loan ${loan.id}: its collateral ${loan.collateralKey} is no longer the borrower's`);
       }
@@ -290,20 +298,20 @@ export function obligationViolations(state: GameState): string[] {
   return problems;
 }
 
-/** A finished game: a winner among the players still in it, with nobody above them, ties going to the first in the standings. */
+/**
+ * A finished game: the leaders are the players still in it with the best net worth and, among those,
+ * the lowest liabilities. One leader is the winner; several share the victory and winnerId is empty.
+ */
 export function completionViolations(state: GameState): string[] {
   if (state.status !== 'FINISHED') return state.winnerId === null ? [] : ['a winner before the game finished'];
-  const problems: string[] = [];
   const active = state.players.filter((p) => p.status === 'ACTIVE');
-  if (active.length === 0) {
-    if (state.winnerId !== null) problems.push('a winner although nobody is left');
-    return problems;
-  }
-  const winner = active.find((p) => p.id === state.winnerId);
-  if (!winner) return ['the winner is not a player still in the game'];
+  if (active.length === 0) return state.winnerId !== null ? ['a winner although nobody is left'] : [];
   const best = Math.max(...active.map((p) => netWorth(state, p.id)));
-  if (netWorth(state, winner.id) !== best) problems.push(`${winner.name} won with ${netWorth(state, winner.id)}, but the best net worth is ${best}`);
-  return problems;
+  const richest = active.filter((p) => netWorth(state, p.id) === best);
+  const least = Math.min(...richest.map((p) => balanceSheet(state, p.id).liabilities));
+  const leaders = richest.filter((p) => balanceSheet(state, p.id).liabilities === least);
+  if (leaders.length === 1) return state.winnerId === leaders[0]!.id ? [] : [`the winner should be ${leaders[0]!.name}`];
+  return state.winnerId === null ? [] : ['a single winner declared over a shared victory'];
 }
 
 /** Every invariant of a state, given the full ledger that led to it. */

@@ -174,6 +174,20 @@ export const BUSINESS_MVP_RULES = {
     step: 500,
     /** Max total outstanding principal per player. */
     maxOutstandingPrincipal: 20000,
+    /**
+     * PROPOSED POLICY — not part of the original Classic contract, which had no term at all. The
+     * principal falls due when the borrower reaches Start for the Nth time after borrowing (a lap is
+     * about one financial year, so 3 matches Capital's standard three-year Personal Loan). Fixed per
+     * loan at signing (LoanState.maturityCircuit). Review before release; see docs/economy-rules.md.
+     */
+    maturityCircuits: 3,
+    /**
+     * After it falls due the principal may still be repaid at any time. Unpaid at the borrower's next
+     * Start it is overdue (one missed checkpoint); unpaid at the Start after that (the second missed in
+     * a row) the loan defaults. Default adds no interest; it blocks new borrowing until cleared.
+     */
+    overdueAfterCircuits: 1,
+    defaultAfterCircuits: 2,
   },
 
   trades: {
@@ -191,7 +205,12 @@ export const BUSINESS_MVP_RULES = {
   },
 
   bankruptcy: {
-    /** On bankruptcy remaining cash goes to the creditor; properties return to the bank. */
+    /**
+     * Bankruptcy is allowed only when the payment owed is more than the player could raise from the
+     * bank by selling buildings and mortgaging or selling property (estate.ts liquidationValue).
+     * Borrowing is never required. The estate pays the payment that caused it first, then the bank;
+     * properties return to the bank; nothing is left in the bankrupt player's name.
+     */
     propertiesReturnTo: 'BANK' as const,
   },
 

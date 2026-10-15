@@ -77,6 +77,8 @@ function mapLoan(r: Row): LoanState {
     createdAtCircuit: Number(r.created_at_circuit),
     interestCharges: Number(r.interest_charges),
     interestPaid: Number(r.interest_paid),
+    // Null for a loan signed before loans had a maturity: it keeps the contract it was signed under.
+    maturityCircuit: r.maturity_circuit === null || r.maturity_circuit === undefined ? null : Number(r.maturity_circuit),
     createdAt: iso(r.created_at),
     closedAt: isoOrNull(r.closed_at),
   };
@@ -460,15 +462,18 @@ export async function persistResult(tx: Tx, prevVersion: number, result: EngineR
            or p.hotel <> x.hotel or p.mortgaged <> x.mortgaged)`;
 
   for (const l of s.loans) {
+    // The maturity is part of the contract: written once with the loan, never updated.
     await tx`
       insert into public.loans (id, game_id, player_id, principal, interest_rate_percent, interest_amount, total_owed,
-        outstanding, status, created_at_circuit, interest_charges, interest_paid, created_at, closed_at)
+        outstanding, status, created_at_circuit, interest_charges, interest_paid, maturity_circuit, created_at, closed_at)
       values (${l.id}, ${s.id}, ${l.playerId}, ${l.principal}, ${l.interestRatePercent}, ${l.interestAmount}, ${l.totalOwed},
-        ${l.outstanding}, ${l.status}, ${l.createdAtCircuit}, ${l.interestCharges}, ${l.interestPaid}, ${l.createdAt}, ${l.closedAt})
+        ${l.outstanding}, ${l.status}, ${l.createdAtCircuit}, ${l.interestCharges}, ${l.interestPaid}, ${l.maturityCircuit ?? null},
+        ${l.createdAt}, ${l.closedAt})
       on conflict (id) do update set outstanding = excluded.outstanding, status = excluded.status,
         closed_at = excluded.closed_at, interest_charges = excluded.interest_charges, interest_paid = excluded.interest_paid
       where public.loans.outstanding is distinct from excluded.outstanding
          or public.loans.status is distinct from excluded.status
+         or public.loans.closed_at is distinct from excluded.closed_at
          or public.loans.interest_charges is distinct from excluded.interest_charges
          or public.loans.interest_paid is distinct from excluded.interest_paid`;
   }

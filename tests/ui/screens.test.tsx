@@ -378,12 +378,22 @@ describe('Main game', () => {
   });
 
   it('finished game shows the winner', async () => {
-    const f = new Fixture().endByVote('Asha').loadAs('Bilal');
-    await render(<GameScreen view={viewFor(f, 'Bilal')} />);
-    expect(screen.getByTestId('context-card')).toHaveTextContent(/wins!/);
+    const g = new Fixture();
+    g.act('Asha', { type: 'TRANSFER_MONEY', toPlayerId: g.ids.Bilal!, amount: 100 });
+    g.endByVote('Asha').loadAs('Bilal');
+    await render(<GameScreen view={viewFor(g, 'Bilal')} />);
+    expect(screen.getByTestId('context-card')).toHaveTextContent(/Bilal wins!/);
     await fireEvent.press(screen.getByTestId('context-cta')); // Standings
     expect(screen.getByTestId('finished-card')).toBeTruthy();
-    expect(within(screen.getByTestId('finished-card')).getByText(/wins!/)).toBeTruthy();
+    expect(within(screen.getByTestId('finished-card')).getByText(/Bilal wins!/)).toBeTruthy();
+  });
+
+  it('a finished game level on net worth and liabilities shows a shared victory', async () => {
+    const f = new Fixture().endByVote('Asha').loadAs('Bilal');
+    await render(<GameScreen view={viewFor(f, 'Bilal')} />);
+    expect(screen.getByTestId('context-card')).toHaveTextContent(/share the victory!/);
+    await fireEvent.press(screen.getByTestId('context-cta')); // Standings
+    expect(within(screen.getByTestId('finished-card')).getByText(/share the victory!/)).toBeTruthy();
   });
 
   it('undo request asks the counterparty to approve', async () => {

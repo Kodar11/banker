@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { mandatoryPaymentsOwed } from '@/engine/index.ts';
 import { ConfirmDialog } from '@/components/ui';
 import { leaveGame } from './leaveGame';
 import { useGameAction } from './useGameAction';
@@ -23,10 +24,13 @@ export function leaveConsequence(view: Pick<GameView, 'snapshot' | 'me'> | null)
     return { message: 'You’ll leave this lobby and return to the home screen.', detail: others.length ? newHost.trim() || undefined : 'Nobody else is here, so the lobby closes.' };
   }
   if (me.status !== 'ACTIVE') return { message: home, detail: `The other players keep playing.${newHost}` };
+  // What the server's estate settlement will do (engine: estate.settleEstate).
+  const first = mandatoryPaymentsOwed(state, me.id) > 0 ? 'What you owe now is paid first, then any bank loans.' : 'Any bank loans are repaid first.';
+  const estate = `${first} Your properties go back to the bank and any cash left leaves the game.`;
   if (others.length < 2) {
-    return { message: home, detail: others[0] ? `Only two players are left, so the game ends and ${others[0].name} wins.` : 'Nobody else is playing, so the game ends.' };
+    return { message: home, detail: `${estate} ${others[0] ? `Only two players are left, so the game ends and ${others[0].name} wins.` : 'Nobody else is playing, so the game ends.'}` };
   }
-  return { message: `${home} The other players keep playing.`, detail: `You can’t rejoin. Your cash and properties stay in your name.${newHost}` };
+  return { message: `${home} The other players keep playing.`, detail: `You can’t rejoin. ${estate}${newHost}` };
 }
 
 /**

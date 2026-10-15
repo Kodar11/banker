@@ -2,6 +2,7 @@ export * from './actions.ts';
 export * from './businessBoard.ts';
 export * from './cards.ts';
 export * from './errors.ts';
+export * from './estate.ts';
 export * from './financialPrivacy.ts';
 export * from './format.ts';
 export * from './gameConfig.ts';

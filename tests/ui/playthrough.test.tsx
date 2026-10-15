@@ -6,7 +6,7 @@
  * game state (any square, any pending decision, either seat) fails the test.
  */
 import { act, render, screen } from '@testing-library/react-native';
-import { isGameError, minimumNextBid, type GameAction } from '@/engine/index.ts';
+import { bankruptcyBlockerNow, isGameError, minimumNextBid, ownedBy, propertyActionBlocker, type GameAction, type GameState } from '@/engine/index.ts';
 import { GameScreen } from '@/features/game/GameScreen';
 import { PAY_ACTION } from '@/features/game/gameFocus';
 import { useGameView } from '@/features/game/useGameView';
@@ -32,6 +32,20 @@ function Phone() {
 }
 
 const nameOf = (f: Fixture, id: string | null) => f.state.players.find((p) => p.id === id)!.name;
+
+/**
+ * Short of cash: what a player does next, as the payment card offers it. Bankruptcy only once the
+ * engine allows it (nothing left that the bank would pay enough for); until then, sell a building,
+ * or else mortgage a property.
+ */
+function raiseOrGoBankrupt(state: GameState, playerId: string): GameAction {
+  if (!bankruptcyBlockerNow(state, playerId)) return { type: 'DECLARE_BANKRUPTCY' };
+  for (const kind of ['SELL_BUILDING', 'MORTGAGE_PROPERTY', 'SELL_PROPERTY'] as const) {
+    const key = ownedBy(state, playerId).find((k) => propertyActionBlocker(state, playerId, k, kind) === null);
+    if (key) return { type: kind, propertyKey: key };
+  }
+  return { type: 'DECLARE_BANKRUPTCY' };
+}
 
 /** The next thing some player would plausibly do. null = game over. */
 function nextMove(f: Fixture, rnd: () => number): { who: string; action: GameAction } | 'roll' | null {
@@ -65,7 +79,7 @@ function nextMove(f: Fixture, rnd: () => number): { who: string; action: GameAct
       return { who, action: { type: turn.pending?.kind === 'BUY' && current.balance >= turn.pending.price && rnd() < 0.75 ? 'BUY_PROPERTY' : 'DECLINE_PROPERTY' } };
     case 'AWAITING_PAYMENT':
       if (turn.pending?.kind !== 'PAYMENT') return null;
-      return { who, action: { type: current.balance >= turn.pending.amount ? PAY_ACTION[turn.pending.reason] : 'DECLARE_BANKRUPTCY' } };
+      return { who, action: current.balance >= turn.pending.amount ? { type: PAY_ACTION[turn.pending.reason] } : raiseOrGoBankrupt(state, current.id) };
     case 'AWAITING_CARD':
       return { who, action: { type: 'RESOLVE_CARD', resolution: 'NONE' } };
     case 'TURN_COMPLETE':
@@ -95,7 +109,7 @@ async function playOn(phone: string, names: string[], seed: number, maxActions: 
       if (!isGameError(e)) throw e;
       if (f.state.version === before) {
         const who = nameOf(f, f.state.turn.playerId);
-        f.act(who, { type: f.state.turn.phase === 'TURN_COMPLETE' ? 'END_TURN' : 'DECLARE_BANKRUPTCY' });
+        f.act(who, f.state.turn.phase === 'TURN_COMPLETE' ? { type: 'END_TURN' } : raiseOrGoBankrupt(f.state, f.state.turn.playerId!));
       }
     }
     seen.add(`${f.state.turn.phase}:${f.state.turn.pending?.kind ?? '-'}`);

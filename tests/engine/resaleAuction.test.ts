@@ -628,10 +628,11 @@ describe('finalization is all or nothing', () => {
     const g = aboutToSell();
     const before = balances(g);
     const left = g.act('Bilal', { type: 'LEAVE_GAME' });
-    expect(left.transactions).toEqual([]);
+    // Nothing is paid for the property; Bilal's own cash leaves play with him.
+    expect(left.transactions.map((t) => [t.type, t.fromPlayerId, t.toPlayerId])).toEqual([['ESTATE_SETTLEMENT', g.id('Bilal'), null]]);
     expect(g.state.auction).toMatchObject({ status: 'CLOSED', winnerId: null, resale: { outcome: 'UNSOLD' } });
     expect(g.state.properties.MUMBAI).toMatchObject({ ownerId: g.id('Asha'), hotel: true });
-    expect(balances(g)).toEqual(before);
+    expect(balances(g)).toEqual({ ...before, Bilal: 0 });
   });
 
   const stale: [string, (g: TestGame) => void, RegExp][] = [
@@ -698,11 +699,13 @@ describe('finalization is all or nothing', () => {
     const g = aboutToSell();
     const before = balances(g);
     const left = g.act('Asha', { type: 'LEAVE_GAME' });
-    expect(left.transactions).toEqual([]);
+    // Withdrawn before her estate is settled: nobody buys it, and it returns to the bank with the rest of her property.
+    expect(left.transactions.map((t) => [t.type, t.fromPlayerId])).toEqual([['ESTATE_SETTLEMENT', g.id('Asha')]]);
     expect(g.state.auction).toBeNull();
     expect(types(left)).toContain('AUCTION_UNSOLD');
-    expect(g.state.properties.MUMBAI).toMatchObject({ ownerId: g.id('Asha'), hotel: true });
-    expect(balances(g)).toEqual(before);
+    expect(types(left).indexOf('AUCTION_UNSOLD')).toBeLessThan(types(left).indexOf('ESTATE_SETTLED'));
+    expect(g.state.properties.MUMBAI).toMatchObject({ ownerId: null, hotel: false });
+    expect(balances(g)).toEqual({ ...before, Asha: 0 });
     expect(g.current).toBe('Bilal');
     expect(g.state.turn.phase).toBe('AWAITING_ROLL');
   });

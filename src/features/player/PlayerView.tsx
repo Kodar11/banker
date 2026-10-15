@@ -6,6 +6,7 @@ import { Button, Card, Label, Pill, PlayerBadge, Screen } from '@/components/ui'
 import type { GameView } from '@/features/game/useGameView';
 import { useGameAction } from '@/features/game/useGameAction';
 import { FinanceHub } from '@/features/finance/FinanceHub';
+import { classicLoanDue } from '@/features/loan/classicLoanDue';
 import { LoanSheet } from '@/features/loan/LoanSheet';
 import { TransactionList } from '@/features/transactions/TransactionList';
 import { formatINR } from '@/utils/currency';
@@ -110,6 +111,7 @@ export function PlayerView({ view, playerId }: { view: GameView; playerId: strin
                         {l.interestRatePercent}% · left {formatINR(l.outstanding)} ·{' '}
                         {nextInterestCircuit(l) !== null ? `${formatINR(l.interestAmount)} interest at next Start` : `interest paid ${formatINR(l.interestPaid)}`}
                       </Text>
+                      {classicLoanDue(l, player.circuits) ? <Text className="text-xs font-semibold text-stone-600">{classicLoanDue(l, player.circuits)}</Text> : null}
                     </View>
                     <Pill tone={l.status === 'ACTIVE' ? 'warn' : l.status === 'REPAID' ? 'good' : 'bad'}>{l.status.toLowerCase()}</Pill>
                   </View>

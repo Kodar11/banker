@@ -23,7 +23,7 @@ function withAuction(): { g: TestGame; auctionId: string } {
 }
 
 describe('LEAVE_GAME: a player leaves, the game goes on', () => {
-  it('out of turn: only their status changes — no money moves, nothing they own is touched, the turn stays', () => {
+  it('out of turn: their estate is settled — the loan repaid, property back to the bank, the rest of the cash out of play — and the turn stays', () => {
     const g = new TestGame(NAMES);
     g.give('Ram', 'DELHI', { houses: 2 });
     passTurn(g, 'Tanmay');
@@ -34,14 +34,19 @@ describe('LEAVE_GAME: a player leaves, the game goes on', () => {
     const before = structuredClone(g.state);
     const ledger = g.ledger.length;
 
+    const cash = before.players.find((p) => p.name === 'Ram')!.balance;
     const r = g.act('Ram', { type: 'LEAVE_GAME' });
-    expect(eventsOf(r)).toEqual(['PLAYER_LEFT']);
+    expect(eventsOf(r)).toEqual(['PLAYER_LEFT', 'ESTATE_SETTLED']);
     expect(r.events[0]).toMatchObject({ actorId: g.id('Ram'), message: 'Ram left the game' });
-    expect(r.transactions).toHaveLength(0);
-    expect(g.ledger).toHaveLength(ledger);
-    expect(g.player('Ram')).toMatchObject({ status: 'LEFT', balance: before.players.find((p) => p.name === 'Ram')!.balance, isHost: false });
-    expect(g.state.properties.DELHI).toEqual(before.properties.DELHI); // still Ram's, houses and all
-    expect(g.state.loans).toEqual(before.loans); // not forgiven, not defaulted
+    // The bank's loan is collected first (its interest was paid at Start); what is left leaves play — nobody inherits it.
+    expect(r.transactions.map((t) => [t.type, t.fromPlayerId, t.toPlayerId, t.amount])).toEqual([
+      ['LOAN_REPAYMENT', g.id('Ram'), null, RULES.loans.minAmount],
+      ['ESTATE_SETTLEMENT', g.id('Ram'), null, cash - RULES.loans.minAmount],
+    ]);
+    expect(g.ledger).toHaveLength(ledger + 2);
+    expect(g.player('Ram')).toMatchObject({ status: 'LEFT', balance: 0, isHost: false });
+    expect(g.state.properties.DELHI).toEqual({ key: 'DELHI', ownerId: null, houses: 0, hotel: false, mortgaged: false });
+    expect(g.state.loans).toMatchObject([{ playerId: g.id('Ram'), status: 'REPAID', outstanding: 0 }]);
     expect(g.state.status).toBe('ACTIVE');
     expect(g.state.turn).toEqual(before.turn);
     expect(g.state.hostPlayerId).toBe(g.id('Tanmay'));
@@ -74,29 +79,32 @@ describe('LEAVE_GAME: a player leaves, the game goes on', () => {
     expect(seen).toEqual(['Tanmay', 'Shamin', 'Priya', 'Tanmay', 'Shamin', 'Priya', 'Tanmay']);
   });
 
-  it('what they own stays theirs: rent on their property is still owed to them', () => {
+  it('their property goes back to the bank: it earns them no rent and can be bought again', () => {
     const g = new TestGame(NAMES);
     g.give('Ram', 'DELHI');
     g.act('Ram', { type: 'LEAVE_GAME' });
-    const ram = g.balance('Ram');
     g.placeBefore('Tanmay', 'DELHI', 3);
     g.roll('Tanmay', 1, 2);
-    expect(g.state.turn.pending).toMatchObject({ kind: 'PAYMENT', reason: 'RENT', toPlayerId: g.id('Ram') });
-    g.act('Tanmay', { type: 'PAY_RENT' });
-    expect(g.balance('Ram')).toBeGreaterThan(ram);
-    expect(g.state.properties.DELHI.ownerId).toBe(g.id('Ram'));
+    expect(g.state.turn.pending).toMatchObject({ kind: 'BUY', propertyKey: 'DELHI' });
+    g.act('Tanmay', { type: 'BUY_PROPERTY' });
+    expect(g.state.properties.DELHI.ownerId).toBe(g.id('Tanmay'));
+    expect(g.balance('Ram')).toBe(0);
   });
 
-  it('it is not a bankruptcy: no settlement, no assets to the bank, no defaulted loans', () => {
+  it('it is not a bankruptcy: a solvent player pays what they owe in full, and nobody is declared bankrupt', () => {
     const g = new TestGame(NAMES);
     g.give('Tanmay', 'MUMBAI');
     g.act('Tanmay', { type: 'REQUEST_LOAN', amount: RULES.loans.minAmount });
     const r = g.act('Tanmay', { type: 'LEAVE_GAME' });
     expect(eventsOf(r)).not.toContain('PLAYER_BANKRUPT');
     expect(r.transactions.filter((t) => t.type === 'BANKRUPTCY_SETTLEMENT')).toHaveLength(0);
-    expect(g.state.properties.MUMBAI.ownerId).toBe(g.id('Tanmay'));
-    expect(g.state.loans.every((l) => l.status === 'ACTIVE')).toBe(true);
-    expect(g.balance('Tanmay')).toBe(RULES.startingCash + RULES.loans.minAmount);
+    expect(r.transactions.filter((t) => t.type === 'LOAN_REPAYMENT').map((t) => t.amount)).toEqual([RULES.loans.minAmount]);
+    // Nothing had to be sold: the cash covered the loan, and the property simply returns to the bank.
+    expect(r.transactions.some((t) => t.type === 'PROPERTY_SALE')).toBe(false);
+    expect(g.state.properties.MUMBAI.ownerId).toBeNull();
+    expect(g.state.loans.map((l) => l.status)).toEqual(['REPAID']);
+    expect(g.player('Tanmay')).toMatchObject({ status: 'LEFT', balance: 0 });
+    expect(r.events.find((e) => e.type === 'ESTATE_SETTLED')!.payload).toMatchObject({ kind: 'DEPARTURE', unpaid: 0, residual: RULES.startingCash, propertiesReturned: ['MUMBAI'] });
   });
 });
 
@@ -106,7 +114,7 @@ describe('LEAVE_GAME on your own turn', () => {
     const r = g.act('Tanmay', { type: 'LEAVE_GAME' });
     expect(g.current).toBe('Shamin');
     expect(g.state.turn).toMatchObject({ phase: 'AWAITING_ROLL', number: 2, pending: null, roll: null });
-    expect(eventsOf(r)).toEqual(['PLAYER_LEFT', 'HOST_CHANGED', 'TURN_STARTED']);
+    expect(eventsOf(r)).toEqual(['PLAYER_LEFT', 'ESTATE_SETTLED', 'HOST_CHANGED', 'TURN_STARTED']);
   });
 
   it('with a property to decide on: nothing is bought, no auction opens, next player', () => {
@@ -119,20 +127,25 @@ describe('LEAVE_GAME on your own turn', () => {
     expect(g.state.turn).toMatchObject({ phase: 'AWAITING_ROLL', pending: null });
     expect(g.state.properties.RAILWAY.ownerId).toBeNull();
     expect(g.state.auction).toBeNull();
-    expect(r.transactions).toHaveLength(0);
+    expect(r.transactions.map((t) => t.type)).toEqual(['ESTATE_SETTLEMENT']);
   });
 
-  it('while owing rent: the debt is neither paid nor turned into a bankruptcy — the turn simply moves on', () => {
+  it('while owing rent: leaving never drops it — the rent is paid first, to its owner, then the turn moves on', () => {
     const g = new TestGame(NAMES);
     g.give('Priya', 'DELHI');
     g.placeBefore('Tanmay', 'DELHI', 3);
     g.roll('Tanmay', 1, 2);
     expect(g.state.turn.phase).toBe('AWAITING_PAYMENT');
+    const rent = (g.state.turn.pending as { amount: number }).amount;
     const priya = g.balance('Priya');
     const r = g.act('Tanmay', { type: 'LEAVE_GAME' });
-    expect(r.transactions).toHaveLength(0);
-    expect(g.balance('Priya')).toBe(priya);
-    expect(g.balance('Tanmay')).toBe(RULES.startingCash);
+    expect(r.transactions.map((t) => [t.type, t.toPlayerId, t.amount])).toEqual([
+      ['RENT_PAYMENT', g.id('Priya'), rent],
+      ['ESTATE_SETTLEMENT', null, RULES.startingCash - rent],
+    ]);
+    expect(g.balance('Priya')).toBe(priya + rent);
+    expect(g.balance('Tanmay')).toBe(0);
+    expect(eventsOf(r)).not.toContain('PLAYER_BANKRUPT');
     expect(g.current).toBe('Shamin');
     expect(g.state.turn).toMatchObject({ pending: null, followUp: null });
   });
@@ -166,8 +179,9 @@ describe('LEAVE_GAME during an auction, a trade or an undo request', () => {
     const r = g.act('Ram', { type: 'LEAVE_GAME' });
     expect(g.state.auction).toMatchObject({ status: 'CLOSED', winnerId: null });
     expect(g.state.properties.RAILWAY.ownerId).toBeNull();
-    expect(r.transactions).toHaveLength(0);
-    expect(g.balance('Ram')).toBe(RULES.startingCash);
+    // Nobody is charged for the bid; Ram's own cash leaves play with him.
+    expect(r.transactions.map((t) => [t.type, t.fromPlayerId, t.amount])).toEqual([['ESTATE_SETTLEMENT', g.id('Ram'), RULES.startingCash]]);
+    expect(g.balance('Tanmay')).toBe(RULES.startingCash);
     expect(r.events.find((e) => e.type === 'AUCTION_UNSOLD')!.message).toBe('Railway stays with the bank (Ram left the game)');
     // Still Tanmay's turn, ready to end.
     expect(g.state.turn).toMatchObject({ playerId: g.id('Tanmay'), phase: 'TURN_COMPLETE' });
@@ -198,8 +212,10 @@ describe('LEAVE_GAME during an auction, a trade or an undo request', () => {
     g.act('Ram', { type: 'LEAVE_GAME' });
     expect(g.state.trades.map((t) => t.status)).toEqual(['EXPIRED', 'EXPIRED']);
     expect(g.state.undoRequest).toBeNull();
-    expect(g.balance('Ram')).toBe(RULES.startingCash + 100); // the payment stands
-    expect(g.state.properties.DELHI.ownerId).toBe(g.id('Ram'));
+    // The payment stands (it is not reversed); it left play with the rest of Ram's cash, and Delhi went back to the bank.
+    expect(g.results.at(-1)!.transactions.find((t) => t.type === 'ESTATE_SETTLEMENT')!.amount).toBe(RULES.startingCash + 100);
+    expect(g.balance('Ram')).toBe(0);
+    expect(g.state.properties.DELHI.ownerId).toBeNull();
   });
 
   it('a paused game can be left; it stays paused for the others', () => {

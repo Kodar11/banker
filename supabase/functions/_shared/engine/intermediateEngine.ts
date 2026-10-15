@@ -8,7 +8,6 @@ import { processCrisisCheckpoints } from './insurance.ts';
 import { freshInsurance } from './insuranceState.ts';
 import { INTERMEDIATE_RULES as IR, type CreditEventType, type LoanProductKey } from './intermediateConfig.ts';
 import {
-  accruedInterest,
   applyMarketChange,
   buildSchedule,
   clampScore,
@@ -30,6 +29,7 @@ import {
   prepaymentQuote,
 } from './intermediateSelectors.ts';
 import {
+  accruedLoanInterest,
   economyOf,
   gameClock,
   isOpenLoan,
@@ -76,16 +76,27 @@ const CREDIT_REASONS: Record<CreditEventType, string> = {
 
 /**
  * Applies one credit event. `id` names the thing that happened; an id already in the history
- * is ignored, so no event can ever move a score twice.
+ * is ignored, so no event can ever move a score twice — retries, repeated checkpoints and several
+ * loans each count once per thing that happened.
+ *
+ * Gains are capped: in one financial year (`year`, the year the event belongs to) a player's score
+ * rises by at most IR.credit.maxGainPerYear, whatever earned it. Penalties are never capped. A capped
+ * event is still recorded — its id is used up — with the change it actually made (`delta`).
  */
-function applyCreditEvent(d: Draft, eco: IntermediateState, input: { id: string; playerId: string; type: CreditEventType; loanId: string | null }): void {
+function applyCreditEvent(d: Draft, eco: IntermediateState, input: { id: string; playerId: string; type: CreditEventType; loanId: string | null; year?: number }): void {
   if (eco.creditEvents.some((e) => e.id === input.id)) return;
+  const year = input.year ?? eco.year;
   const before = creditScoreOf(eco, input.playerId);
-  const delta = IR.credit.events[input.type];
-  const after = clampScore(before + delta);
+  const earned = IR.credit.events[input.type];
+  const gained = eco.creditEvents.filter((e) => e.playerId === input.playerId && e.year === year && e.delta > 0).reduce((sum, e) => sum + e.delta, 0);
+  const allowed = earned > 0 ? Math.min(earned, Math.max(0, IR.credit.maxGainPerYear - gained)) : earned;
+  const after = clampScore(before + allowed);
+  const delta = after - before;
   eco.credit[input.playerId] = after;
-  const reason = CREDIT_REASONS[input.type];
-  eco.creditEvents.push({ ...input, delta, before, after, year: eco.year, reason, createdAt: d.ctx.now });
+  const capped = earned > 0 && allowed < earned;
+  const reason = `${CREDIT_REASONS[input.type]}${capped ? ` (yearly limit of +${IR.credit.maxGainPerYear} reached)` : ''}`;
+  eco.creditEvents.push({ id: input.id, playerId: input.playerId, type: input.type, loanId: input.loanId, delta, before, after, year, reason, createdAt: d.ctx.now });
+  if (delta === 0) return;
   d.event('CREDIT_SCORE_CHANGED', input.playerId, `${d.name(input.playerId)}'s credit score ${before} → ${after} (${reason.toLowerCase()})`, {
     creditEventId: input.id,
     kind: input.type,
@@ -189,15 +200,24 @@ function hasCreditProblem(eco: IntermediateState, playerId: string): boolean {
   return overdueInstallments(eco, playerId).length > 0 || defaultedLoans(eco, playerId).length > 0;
 }
 
-/** After the year's loan checkpoints: clean-year rewards, fresh flags for the new year, and the announcement. */
+/** An installment has fallen due and is still unpaid (on time or not). */
+function hasUnpaidInstallment(eco: IntermediateState, playerId: string): boolean {
+  return loansOf(eco, playerId).some((l) => l.status === 'ACTIVE' && unpaidInstallments(l).length > 0);
+}
+
+/**
+ * After the year's loan checkpoints: clean-year rewards, fresh flags for the new year, and the announcement.
+ * A clean year is one with a real obligation met: an installment paid on time during it, and at its end
+ * nothing due, overdue or in default — and nothing went late during it. Merely having a loan open is not enough.
+ */
 function closeYear(d: Draft, eco: IntermediateState, report: YearReport): void {
   const ended = report.year - 1;
   for (const player of d.activePlayers()) {
     const flags = eco.yearFlags[player.id];
     if (!flags) continue;
-    const clean = flags.borrowed && !flags.late && !hasCreditProblem(eco, player.id);
-    if (clean) applyCreditEvent(d, eco, { id: `CLEAN_YEAR:${player.id}:${ended}`, playerId: player.id, type: 'CLEAN_YEAR', loanId: null });
-    eco.yearFlags[player.id] = { borrowed: loansOf(eco, player.id).some(isOpenLoan), late: hasCreditProblem(eco, player.id) };
+    const clean = flags.paidOnTime === true && !flags.late && !hasCreditProblem(eco, player.id) && !hasUnpaidInstallment(eco, player.id);
+    if (clean) applyCreditEvent(d, eco, { id: `CLEAN_YEAR:${player.id}:${ended}`, playerId: player.id, type: 'CLEAN_YEAR', loanId: null, year: ended });
+    eco.yearFlags[player.id] = { borrowed: loansOf(eco, player.id).some(isOpenLoan), late: hasCreditProblem(eco, player.id), paidOnTime: false };
   }
   const moves = PROPERTY_KEYS.map((key) => ({ key, ...report.changes[key]! }));
   const up = moves.filter((m) => m.to > m.from).length;
@@ -301,12 +321,10 @@ function reschedule(loan: IntermediateLoan, principal: number): void {
  * An unsecured loan seizes nothing. Either way the borrower is not bankrupt.
  */
 function defaultLoan(d: Draft, eco: IntermediateState, loan: IntermediateLoan): void {
-  const clock = gameClock(eco);
-  const length = yearLength(eco);
   const due = unpaidInstallments(loan).reduce((sum, i) => sum + i.principal + i.interest, 0);
   const notYetDue = scheduledPrincipal(loan);
-  const next = loan.installments.find((i) => i.status === 'SCHEDULED');
-  const accrued = next ? accruedInterest(notYetDue, loan.ratePercent, clock - (next.dueAt - length), length) : 0;
+  // The same accrual an early repayment would charge today (accruedLoanInterest): the balance is loanPayoff at this instant.
+  const accrued = accruedLoanInterest(eco, loan);
   for (const installment of loan.installments) {
     if (installment.status === 'SCHEDULED' || installment.status === 'DUE' || installment.status === 'OVERDUE') installment.status = 'DEFAULTED';
   }
@@ -451,7 +469,16 @@ function payBank(d: Draft, actor: PlayerState, principal: number, interest: numb
   if (interest > 0) d.transfer({ type: 'LOAN_INTEREST', from: actor.id, to: null, amount: interest, memo: `${memo} — interest` });
 }
 
-/** The loan has nothing left on its schedule: it is repaid as agreed. */
+/**
+ * A good repayment history on one loan: at least one installment paid on time, and none ever late.
+ * Prepaying a loan before anything falls due builds no history, so borrowing and repaying at once
+ * can never be used to raise a score.
+ */
+export function hasGoodRepaymentHistory(loan: IntermediateLoan): boolean {
+  return loan.installments.some((i) => i.status === 'PAID') && !loan.installments.some((i) => i.status === 'OVERDUE' || i.status === 'CAUGHT_UP' || i.status === 'DEFAULTED');
+}
+
+/** The loan has nothing left on its schedule: it is repaid as agreed. The repayment bonus needs a good history (above). */
 function finishIfRepaid(d: Draft, eco: IntermediateState, loan: IntermediateLoan): void {
   if (loan.status !== 'ACTIVE' || loan.installments.some((i) => i.status === 'SCHEDULED' || i.status === 'DUE' || i.status === 'OVERDUE')) return;
   const released = loan.collateralKey;
@@ -460,7 +487,7 @@ function finishIfRepaid(d: Draft, eco: IntermediateState, loan: IntermediateLoan
     loanId: loan.id,
     releasedCollateral: released,
   });
-  applyCreditEvent(d, eco, { id: `LOAN_REPAID:${loan.id}`, playerId: loan.playerId, type: 'LOAN_REPAID', loanId: loan.id });
+  if (hasGoodRepaymentHistory(loan)) applyCreditEvent(d, eco, { id: `LOAN_REPAID:${loan.id}`, playerId: loan.playerId, type: 'LOAN_REPAID', loanId: loan.id });
 }
 
 /** "Pay now": settles the oldest installment that has fallen due on a loan, in full. */
@@ -481,12 +508,14 @@ export function payInstallment(d: Draft, actor: PlayerState, loanId: string): vo
     `${actor.name} paid ${name} installment ${installment.index} (${formatINR(amount)})${wasOverdue ? ' — late, within grace' : ''}`,
     { loanId: loan.id, installment: installment.index, amount, principal: installment.principal, interest: installment.interest },
   );
-  applyCreditEvent(d, eco, {
-    id: `${wasOverdue ? 'CAUGHT_UP' : 'ON_TIME_PAYMENT'}:${loan.id}:${installment.index}`,
-    playerId: actor.id,
-    type: wasOverdue ? 'CAUGHT_UP' : 'ON_TIME_PAYMENT',
-    loanId: loan.id,
-  });
+  // Catching up on an overdue installment stops the damage (no default) but earns nothing back.
+  if (!wasOverdue) {
+    applyCreditEvent(d, eco, { id: `ON_TIME_PAYMENT:${loan.id}:${installment.index}`, playerId: actor.id, type: 'ON_TIME_PAYMENT', loanId: loan.id });
+    const flags = eco.yearFlags[actor.id];
+    if (flags) flags.paidOnTime = true;
+  } else if (IR.credit.events.CAUGHT_UP !== 0) {
+    applyCreditEvent(d, eco, { id: `CAUGHT_UP:${loan.id}:${installment.index}`, playerId: actor.id, type: 'CAUGHT_UP', loanId: loan.id });
+  }
   finishIfRepaid(d, eco, loan);
 }
 
@@ -534,16 +563,4 @@ export function payDefaultedLoan(d: Draft, actor: PlayerState, loanId: string, a
     amount,
     remaining: loan.defaultBalance,
   });
-}
-
-/**
- * Bankruptcy (decided by the game's own rules, never by a default): the bankrupt player's loans
- * are written off and their collateral claims dropped, as their properties return to the bank.
- */
-export function writeOffLoans(d: Draft, playerId: string): void {
-  const eco = economyOf(d.state);
-  if (!eco) return;
-  for (const loan of loansOf(eco, playerId)) {
-    if (isOpenLoan(loan)) closeLoan(d, loan, 'WRITTEN_OFF');
-  }
 }

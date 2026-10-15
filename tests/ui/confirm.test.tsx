@@ -192,7 +192,7 @@ describe('Other confirmations use the same dialog', () => {
     await fireEvent.press(screen.getByTestId('turn-choose'));
     await fireEvent.press(screen.getByTestId('bankrupt-button'));
     const dialog = screen.getByTestId('bankrupt-dialog');
-    expect(dialog).toHaveTextContent(/Declare bankruptcy\?.*Your cash goes to the creditor and your properties return to the bank\..*You leave the game\./);
+    expect(dialog).toHaveTextContent(/Declare bankruptcy\?.*Your estate pays this debt first.*then any bank loans\. Your properties return to the bank\..*You leave the game\./);
     await fireEvent.press(screen.getByTestId('bankrupt-dialog-cancel'));
     expect(screen.queryByTestId('bankrupt-dialog')).toBeNull();
     expect(screen.getByTestId('bankrupt-button')).toBeTruthy(); // still on the same decision sheet

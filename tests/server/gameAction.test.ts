@@ -230,7 +230,7 @@ describe.skipIf(!DATABASE_URL)('game-action handler (Postgres)', () => {
         (r) => `${r.seat}:${r.name}:${r.status}${r.is_host ? ':host' : ''}`,
       );
 
-    it('a non-host leaves: stored as LEFT, broadcast to the others, history intact, and they can no longer act', async () => {
+    it('a non-host leaves: stored as LEFT with their estate settled, broadcast to the others, history intact, and they can no longer act', async () => {
       const g = await setupGame(NAMES);
       ok(await g.act('Tanmay', { type: 'START_GAME' }));
       ok(await g.act('Ram', { type: 'TRANSFER_MONEY', toPlayerId: g.seats.Priya!.playerId, amount: 300 }));
@@ -239,12 +239,13 @@ describe.skipIf(!DATABASE_URL)('game-action handler (Postgres)', () => {
       const left = ok(await g.act('Ram', { type: 'LEAVE_GAME' }));
       expect(left.snapshot.state.status).toBe('ACTIVE');
       expect(await playerRows(g.gameId)).toEqual(['0:Tanmay:ACTIVE:host', '1:Shamin:ACTIVE', '2:Ram:LEFT', '3:Priya:ACTIVE']);
-      expect(broadcasts.at(-1)!.payload.events.map((e) => e.type)).toEqual(['PLAYER_LEFT']);
-      // What another phone is served.
+      expect(broadcasts.at(-1)!.payload.events.map((e) => e.type)).toEqual(['PLAYER_LEFT', 'ESTATE_SETTLED']);
+      // What another phone is served: Ram's remaining cash left play (to the bank), in one ledger row.
       const seen = await state(g.gameId, g.seats.Priya!);
-      expect(seen.state.players.find((p) => p.name === 'Ram')).toMatchObject({ status: 'LEFT', balance: 25000 - 300 });
+      expect(seen.state.players.find((p) => p.name === 'Ram')).toMatchObject({ status: 'LEFT', balance: 0 });
       expect(seen.state.turn.playerId).toBe(g.seats.Tanmay!.playerId);
-      expect(seen.transactions).toHaveLength(ledgerBefore);
+      expect(seen.transactions).toHaveLength(ledgerBefore + 1);
+      expect(seen.transactions[0]).toMatchObject({ type: 'ESTATE_SETTLEMENT', fromPlayerId: g.seats.Ram!.playerId, toPlayerId: null, amount: 25000 - 300 });
       const ledger = await sql`select * from public.verify_game_ledger(${g.gameId})`;
       expect(ledger.every((r) => r.ok)).toBe(true);
       expect(await g.act('Ram', { type: 'TRANSFER_MONEY', toPlayerId: g.seats.Priya!.playerId, amount: 1 })).toMatchObject({ ok: false, error: { code: 'FORBIDDEN', message: 'You have left this game.' } });

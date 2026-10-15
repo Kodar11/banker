@@ -559,10 +559,11 @@ describe('repayments', () => {
     ]);
     expect(g.balance('Asha')).toBe(cash - lines[0]!.principal - lines[0]!.interest);
     expect(loanOf(g, id).installments[0]).toMatchObject({ status: 'PAID' });
-    expect(scoreOf(g, 'Asha')).toBe(710); // 705 after the clean Year 1, +5 for paying on time
+    // +5 for paying on time. (Year 1 earned nothing: having a loan open is not a clean year — nothing was paid in it.)
+    expect(scoreOf(g, 'Asha')).toBe(705);
     // Nothing more is due until the next anniversary.
     expect(refusal(() => g.act('Asha', { type: 'PAY_LOAN_INSTALLMENT', loanId: id })).code).toBe('LOAN_NOT_ALLOWED');
-    expect(scoreOf(g, 'Asha')).toBe(710);
+    expect(scoreOf(g, 'Asha')).toBe(705);
   });
 
   it('refuses a payment the player cannot afford, and nobody else can pay it', () => {
@@ -616,7 +617,7 @@ describe('repayments', () => {
     expect(refusal(() => g.act('Asha', { type: 'PREPAY_INTERMEDIATE_LOAN', loanId: id, amount: 6500 })).message).toMatch(/Only ₹6,000/);
   });
 
-  it('full early repayment closes the loan as agreed', () => {
+  it('full early repayment closes the loan as agreed — but prepaying before anything fell due earns no score', () => {
     const { g, id } = withLoan('EMERGENCY', 5000);
     jumpTo(g, 18);
     const r = g.act('Asha', { type: 'PREPAY_INTERMEDIATE_LOAN', loanId: id, amount: 5000 });
@@ -625,7 +626,9 @@ describe('repayments', () => {
       ['LOAN_INTEREST', accruedInterest(5000, 19, 18, YEAR)],
     ]);
     expect(loanOf(g, id)).toMatchObject({ status: 'REPAID', installments: [] });
-    expect(scoreOf(g, 'Asha')).toBe(715);
+    // No installment was ever paid on time: there is no repayment history to reward.
+    expect(scoreOf(g, 'Asha')).toBe(700);
+    expect(eco(g).creditEvents).toEqual([]);
     expect(totalDebt(g.state, g.id('Asha'))).toBe(0);
   });
 
@@ -710,11 +713,11 @@ describe('missed payments, grace and default', () => {
     expect(installmentDeadlines(eco(g), loanOf(g, id).installments[0]!)).toEqual({ overdueAt: YEAR + WINDOW, defaultAt: YEAR + WINDOW + YEAR });
     jumpTo(g, YEAR + WINDOW - 1);
     expect(loanOf(g, id).installments[0]!.status).toBe('DUE');
-    expect(scoreOf(g, 'Asha')).toBe(705); // the clean Year 1
+    expect(scoreOf(g, 'Asha')).toBe(700); // Year 1 had nothing to pay: no clean-year reward
     const r = tick(g, 2);
     expect(loanOf(g, id).installments[0]!.status).toBe('OVERDUE');
     expect(eventsOf(r, 'LOAN_INSTALLMENT_OVERDUE')).toHaveLength(1);
-    expect(scoreOf(g, 'Asha')).toBe(685);
+    expect(scoreOf(g, 'Asha')).toBe(680);
     expect(loanOf(g, id).status).toBe('ACTIVE');
     expect(g.player('Asha').status).toBe('ACTIVE');
     expect(borrowingBlock(eco(g), g.id('Asha'))).toMatch(/overdue payment/);
@@ -722,14 +725,14 @@ describe('missed payments, grace and default', () => {
     // Later rolls inside the grace period change nothing more.
     tick(g, 12);
     tick(g, 12);
-    expect(scoreOf(g, 'Asha')).toBe(685);
+    expect(scoreOf(g, 'Asha')).toBe(680);
     expect(eco(g).creditEvents.filter((e) => e.type === 'INSTALLMENT_OVERDUE')).toHaveLength(1);
     // The amount owed is exactly the installment: nothing forgiven, nothing added.
     const inst = loanOf(g, id).installments[0]!;
     expect(paymentsOwedNow(eco(g), g.id('Asha'))[0]).toMatchObject({ status: 'OVERDUE', amount: inst.principal + inst.interest, deadline: YEAR + WINDOW + YEAR });
   });
 
-  it('catching up within grace: +5 once, the late payment stays on record, borrowing reopens', () => {
+  it('catching up within grace earns nothing back: the late payment stays on record, borrowing reopens, no default', () => {
     const { g, id } = dueLoan();
     jumpTo(g, YEAR + WINDOW + 30);
     const inst = loanOf(g, id).installments[0]!;
@@ -738,12 +741,8 @@ describe('missed payments, grace and default', () => {
     expect(g.balance('Asha')).toBe(cash - inst.principal - inst.interest);
     expect(eventsOf(r, 'LOAN_INSTALLMENT_CAUGHT_UP')).toHaveLength(1);
     expect(loanOf(g, id).installments[0]!.status).toBe('CAUGHT_UP');
-    expect(scoreOf(g, 'Asha')).toBe(690);
-    expect(eco(g).creditEvents.map((e) => [e.type, e.before, e.after])).toEqual([
-      ['CLEAN_YEAR', 700, 705],
-      ['INSTALLMENT_OVERDUE', 705, 685],
-      ['CAUGHT_UP', 685, 690],
-    ]);
+    expect(scoreOf(g, 'Asha')).toBe(680);
+    expect(eco(g).creditEvents.map((e) => [e.type, e.before, e.after])).toEqual([['INSTALLMENT_OVERDUE', 700, 680]]);
     expect(borrowingBlock(eco(g), g.id('Asha'))).toBeNull();
     expect(borrow(g, 'Asha', 'EMERGENCY', 1000).status).toBe('ACTIVE');
     // Passing the old default deadline now does nothing.
@@ -751,7 +750,7 @@ describe('missed payments, grace and default', () => {
     expect(loanOf(g, id).status).toBe('ACTIVE');
   });
 
-  it('unsecured default after a full year of grace: −75 once, whole balance payable, nothing seized, not bankrupt', () => {
+  it('unsecured default after a full year of grace: −100 once, whole balance payable, nothing seized, not bankrupt', () => {
     const { g, id } = dueLoan('PERSONAL', 9000);
     g.give('Asha', 'DELHI');
     const lines = buildSchedule(9000, 11, 3);
@@ -767,9 +766,9 @@ describe('missed payments, grace and default', () => {
     expect(loan.installments.map((i) => i.status)).toEqual(['DEFAULTED', 'DEFAULTED', 'DEFAULTED']);
     expect(eventsOf(r, 'LOAN_DEFAULTED')).toHaveLength(1);
     expect(eventsOf(r, 'COLLATERAL_SEIZED')).toHaveLength(0);
-    // −20 for each of the two installments that went overdue, then −75 for the default.
-    expect(eco(g).creditEvents.map((e) => e.type)).toEqual(['CLEAN_YEAR', 'INSTALLMENT_OVERDUE', 'INSTALLMENT_OVERDUE', 'LOAN_DEFAULT']);
-    expect(scoreOf(g, 'Asha')).toBe(705 - 20 - 20 - 75);
+    // −20 for each of the two installments that went overdue (two missed in a row), then −100 for the default.
+    expect(eco(g).creditEvents.map((e) => e.type)).toEqual(['INSTALLMENT_OVERDUE', 'INSTALLMENT_OVERDUE', 'LOAN_DEFAULT']);
+    expect(scoreOf(g, 'Asha')).toBe(700 - 20 - 20 - 100);
     expect(g.state.properties.DELHI.ownerId).toBe(g.id('Asha'));
     expect(g.player('Asha').status).toBe('ACTIVE');
     // A default takes no cash: the only money that moved is the roll's own Start reward.
@@ -816,7 +815,7 @@ describe('missed payments, grace and default', () => {
     expect(r.transactions.filter((t) => t.type === 'COLLATERAL_SURPLUS').map((t) => [t.toPlayerId, t.amount, t.propertyKey])).toEqual([[g.id('Asha'), value - owed, 'MUMBAI']]);
     expect(g.balance('Asha')).toBe(cash + (value - owed) + startRewards(r, g.id('Asha')));
     expect(eventsOf(r, 'COLLATERAL_SEIZED')).toHaveLength(1);
-    expect(scoreOf(g, 'Asha')).toBe(705 - 20 - 20 - 75);
+    expect(scoreOf(g, 'Asha')).toBe(700 - 20 - 20 - 100);
     expect(borrowingBlock(eco(g), g.id('Asha'))).toBeNull(); // settled in full by the collateral
 
     // The property is the bank's again and is seized exactly once.
@@ -857,25 +856,51 @@ describe('missed payments, grace and default', () => {
 });
 
 describe('clean-year reward', () => {
-  it('+5 at year end for a borrower with nothing overdue — once per year, never for a non-borrower', () => {
+  it('+5 for a year in which an installment was paid on time and nothing is owed at its end — once per year, never for just having a loan', () => {
     const g = newGame();
     jumpTo(g, 30);
-    borrow(g, 'Asha', 'LONG_TERM', 5000);
+    const loan = borrow(g, 'Asha', 'LONG_TERM', 5000);
     const r = jumpTo(g, YEAR);
     expect(eco(g).year).toBe(2);
-    expect(eco(g).creditEvents.map((e) => [e.playerId, e.type, e.year])).toEqual([[g.id('Asha'), 'CLEAN_YEAR', 2]]);
-    expect(scoreOf(g, 'Asha')).toBe(705);
+    // Year 1: a loan was open, but nothing fell due, so no obligation was met.
+    expect(eco(g).creditEvents).toEqual([]);
+    expect(eventsOf(r, 'CREDIT_SCORE_CHANGED')).toHaveLength(0);
+    jumpTo(g, YEAR + 30);
+    g.act('Asha', { type: 'PAY_LOAN_INSTALLMENT', loanId: loan.id });
+    const close = jumpTo(g, YEAR * 2);
+    expect(eco(g).year).toBe(3);
+    // The reward belongs to the year it was earned in (Year 2), so it counts towards that year's limit.
+    expect(eco(g).creditEvents.map((e) => [e.playerId, e.type, e.year, e.delta])).toEqual([
+      [g.id('Asha'), 'ON_TIME_PAYMENT', 2, 5],
+      [g.id('Asha'), 'CLEAN_YEAR', 2, 5],
+    ]);
+    expect(scoreOf(g, 'Asha')).toBe(710);
     expect(scoreOf(g, 'Bilal')).toBe(700);
-    expect(eventsOf(r, 'CREDIT_SCORE_CHANGED')).toHaveLength(1);
+    expect(eventsOf(close, 'CREDIT_SCORE_CHANGED')).toHaveLength(1);
     tick(g, 12);
     tick(g, 12);
-    expect(eco(g).creditEvents).toHaveLength(1);
+    expect(eco(g).creditEvents).toHaveLength(2);
+  });
+
+  it('is withheld when an installment is due and unpaid at the year end, even inside its payment window', () => {
+    const g = newGame();
+    jumpTo(g, 30);
+    const loan = borrow(g, 'Asha', 'LONG_TERM', 5000);
+    jumpTo(g, YEAR + 30);
+    g.act('Asha', { type: 'PAY_LOAN_INSTALLMENT', loanId: loan.id });
+    // Installment 2 falls due just before Year 3 begins and is still inside its window when it does.
+    jumpTo(g, YEAR * 2 + 29);
+    jumpTo(g, YEAR * 2 + 31);
+    expect(loanOf(g, loan.id).installments[1]!.status).toBe('DUE');
+    const before = eco(g).creditEvents.length;
+    jumpTo(g, YEAR * 3);
+    expect(eco(g).creditEvents.slice(before).some((e) => e.type === 'CLEAN_YEAR')).toBe(false);
   });
 
   it('is withheld for a year in which an installment went overdue, even if it was caught up', () => {
     const g = newGame();
     const loan = borrow(g, 'Asha', 'LONG_TERM', 5000);
-    jumpTo(g, YEAR); // Year 2 begins: clean Year 1
+    jumpTo(g, YEAR); // Year 2 begins (Year 1: nothing paid, no reward)
     jumpTo(g, YEAR + WINDOW); // overdue in Year 2
     g.act('Asha', { type: 'PAY_LOAN_INSTALLMENT', loanId: loan.id });
     jumpTo(g, YEAR * 2 - 1); // still Year 2, one space before installment 2 falls due
@@ -883,7 +908,7 @@ describe('clean-year reward', () => {
     tick(g, 2); // Year 3 begins
     expect(eco(g).year).toBe(3);
     expect(eco(g).creditEvents.slice(before).some((e) => e.type === 'CLEAN_YEAR')).toBe(false);
-    expect(eco(g).creditEvents.filter((e) => e.type === 'CLEAN_YEAR')).toHaveLength(1);
+    expect(eco(g).creditEvents.filter((e) => e.type === 'CLEAN_YEAR')).toHaveLength(0);
   });
 });
 
@@ -915,11 +940,15 @@ describe('financial position', () => {
     expect(o.cashAfterNextPayment).toBe(o.cash - first.principal - first.interest);
   });
 
-  it('interest that has fallen due is a liability; interest not yet due is not', () => {
+  it('a loan is a liability for what would close it today: interest due, and interest accrued this loan year — never interest for years still to come', () => {
     const g = newGame();
     const loan = borrow(g, 'Asha', 'PERSONAL', 9000);
-    expect(totalDebt(g.state, g.id('Asha'))).toBe(9000);
+    expect(totalDebt(g.state, g.id('Asha'))).toBe(9000); // borrowing adds exactly the cash it pays out
+    jumpTo(g, 36); // half a loan year
+    expect(totalDebt(g.state, g.id('Asha'))).toBe(9000 + accruedInterest(9000, 11, 36, YEAR));
+    expect(totalDebt(g.state, g.id('Asha'))).toBe(9000 + prepaymentQuote(eco(g), loanOf(g, loan.id), 9000).accruedInterest);
     jumpTo(g, YEAR);
+    // Installment 1's interest is now due (and counted once, in the installment); a new loan year starts accruing from zero.
     expect(totalDebt(g.state, g.id('Asha'))).toBe(9000 + loanOf(g, loan.id).installments[0]!.interest);
   });
 
@@ -930,14 +959,14 @@ describe('financial position', () => {
     const r = g.endByVote('Asha');
     const finished = r.events.find((e) => e.type === 'GAME_FINISHED') as unknown as { payload: { standings: { playerId: string; netWorth: number }[] } };
     expect(finished.payload.standings).toEqual([
-      { playerId: g.id('Bilal'), netWorth: START_CASH + 100 },
-      { playerId: g.id('Asha'), netWorth: START_CASH },
+      { playerId: g.id('Bilal'), netWorth: START_CASH + 100, liabilities: 0, rank: 1 },
+      { playerId: g.id('Asha'), netWorth: START_CASH, liabilities: 0, rank: 2 },
     ]);
   });
 });
 
 describe('bankruptcy and leaving', () => {
-  it('bankruptcy (the game’s own rule) writes off the player’s loans and drops the collateral claim', () => {
+  it('bankruptcy takes a secured loan’s collateral for that loan, and its surplus goes to the creditor', () => {
     const g = newGame(['Asha', 'Bilal', 'Chitra']);
     g.give('Asha', 'DELHI');
     g.give('Bilal', 'MUMBAI', { hotel: true });
@@ -945,15 +974,25 @@ describe('bankruptcy and leaving', () => {
     g.act('Asha', { type: 'TRANSFER_MONEY', toPlayerId: g.id('Chitra'), amount: g.balance('Asha') - 100 });
     g.placeBefore('Asha', 'MUMBAI', 5);
     g.rollTotal('Asha', 5);
-    g.act('Asha', { type: 'DECLARE_BANKRUPTCY' });
-    expect(loanOf(g, loan.id)).toMatchObject({ status: 'WRITTEN_OFF', collateralKey: null });
+    const bilal = g.balance('Bilal');
+    const cash = g.balance('Asha'); // 100 left, plus the Start reward this roll paid
+    const r = g.act('Asha', { type: 'DECLARE_BANKRUPTCY' });
+    // Delhi (pledged, so it could raise nothing) is taken at its market value for the loan it secures; the loan is settled.
+    const value = eco(g).market.DELHI.value;
+    const owed = loanOf(g, loan.id).settlement!.applied;
+    expect(loanOf(g, loan.id)).toMatchObject({ status: 'SETTLED', collateralKey: null, settlement: { propertyKey: 'DELHI', value, applied: owed, surplus: value - owed } });
+    // The surplus is the bankrupt player's cash, so it goes to the rent first.
+    const rent = r.transactions.filter((t) => t.toPlayerId === g.id('Bilal'));
+    expect(rent.reduce((s, t) => s + t.amount, 0)).toBe(cash + value - owed);
+    expect(g.balance('Bilal')).toBe(bilal + cash + value - owed);
+    expect(g.balance('Asha')).toBe(0);
     expect(g.state.properties.DELHI.ownerId).toBeNull();
     // The property is free of any claim for its next owner.
     g.give('Bilal', 'DELHI');
     expect(eligibleCollateral(g.state, g.id('Bilal')).map((c) => c.key)).toContain('DELHI');
     // Nothing further is processed for the bankrupt player's loan.
     jumpTo(g, 108 * 3);
-    expect(loanOf(g, loan.id).status).toBe('WRITTEN_OFF');
+    expect(loanOf(g, loan.id).status).toBe('SETTLED');
     expect(eco(g).creditEvents.filter((e) => e.playerId === g.id('Asha'))).toEqual([]);
   });
 
@@ -965,10 +1004,12 @@ describe('bankruptcy and leaving', () => {
     expect(refusal(() => g.act(g.current, { type: 'DECLARE_BANKRUPTCY' })).code).toBe('INVALID_PHASE');
   });
 
-  it('a player who left keeps their loan frozen: no checkpoints, no score changes', () => {
+  it('a player who leaves repays their loan from their estate: closed, no more checkpoints, no score changes', () => {
     const g = newGame(['Asha', 'Bilal', 'Chitra']);
     const loan = borrow(g, 'Chitra', 'PERSONAL', 3000);
-    g.act('Chitra', { type: 'LEAVE_GAME' });
+    const r = g.act('Chitra', { type: 'LEAVE_GAME' });
+    expect(r.transactions.filter((t) => t.type === 'LOAN_REPAYMENT').map((t) => t.amount)).toEqual([3000]);
+    expect(loanOf(g, loan.id)).toMatchObject({ status: 'SETTLED', closedAt: expect.any(String) });
     jumpTo(g, 108 * 4);
     expect(loanOf(g, loan.id).installments.map((i) => i.status)).toEqual(['SCHEDULED', 'SCHEDULED', 'SCHEDULED']);
     expect(eco(g).creditEvents).toEqual([]);
@@ -982,9 +1023,9 @@ describe('credit history', () => {
     jumpTo(g, YEAR);
     g.act('Asha', { type: 'PAY_LOAN_INSTALLMENT', loanId: loan.id });
     expect(eco(g).creditEvents.map((e) => ({ id: e.id, type: e.type, delta: e.delta, before: e.before, after: e.after, loanId: e.loanId, year: e.year, reason: e.reason }))).toEqual([
-      { id: `CLEAN_YEAR:${g.id('Asha')}:1`, type: 'CLEAN_YEAR', delta: 5, before: 700, after: 705, loanId: null, year: 2, reason: 'Finished a financial year with nothing overdue' },
-      { id: `ON_TIME_PAYMENT:${loan.id}:1`, type: 'ON_TIME_PAYMENT', delta: 5, before: 705, after: 710, loanId: loan.id, year: 2, reason: 'Paid an installment on time' },
-      { id: `LOAN_REPAID:${loan.id}`, type: 'LOAN_REPAID', delta: 15, before: 710, after: 725, loanId: loan.id, year: 2, reason: 'Repaid a loan in full, as agreed' },
+      { id: `ON_TIME_PAYMENT:${loan.id}:1`, type: 'ON_TIME_PAYMENT', delta: 5, before: 700, after: 705, loanId: loan.id, year: 2, reason: 'Paid an installment on time' },
+      // +10 earned, +5 given: Year 2's gains are capped at +10 in all.
+      { id: `LOAN_REPAID:${loan.id}`, type: 'LOAN_REPAID', delta: 5, before: 705, after: 710, loanId: loan.id, year: 2, reason: 'Repaid a loan in full, as agreed (yearly limit of +10 reached)' },
     ]);
     expect(new Set(eco(g).creditEvents.map((e) => e.id)).size).toBe(eco(g).creditEvents.length);
   });

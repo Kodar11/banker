@@ -168,8 +168,9 @@ describe('story figures', () => {
 
   it('12: the score is a sample, and never called a real credit score', () => {
     expect(outcome('L12', 'a').headline).toContain('680');
-    expect(outcome('L12', 'a').headline).toContain('605');
-    expect(outcome('L12', 'b').headline).toContain('685');
+    expect(outcome('L12', 'a').headline).toContain('580');
+    expect(outcome('L12', 'b').headline).toBe('Paid within the grace period: no default, but the sample score stays at 680.');
+    expect(outcome('L12', 'c').headline).toContain('685');
     for (const c of lesson('L12').choices) expect(JSON.stringify(c.outcome.scene)).toContain('not a real credit bureau score');
   });
 

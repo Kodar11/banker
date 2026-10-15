@@ -68,12 +68,22 @@ describe('The final result is the server’s, read once', () => {
     expect(result.tiedWithIds).toEqual([]);
   });
 
-  it('a tie has a zero lead and names who is level', () => {
+  it('level on net worth and liabilities: a shared victory — no single winner, no lead, every co-winner named', () => {
     const f = endedGame({}, ['Asha', 'Bilal', 'Chitra']);
     const result = finalResult(f.snapshot());
-    expect(result.lead).toBe(0);
-    expect(result.tiedWithIds).toHaveLength(2);
-    expect(result.tiedWithIds).not.toContain(result.winnerId);
+    expect(result).toMatchObject({ winnerId: null, sharedVictory: true, lead: null, wonOnLiabilities: false, winnerNetWorth: 25000 });
+    expect(result.winnerIds).toEqual([f.ids.Asha, f.ids.Bilal, f.ids.Chitra]);
+    expect(result.standings.map((s) => s.rank)).toEqual([1, 1, 1]);
+  });
+
+  it('level on net worth, fewer liabilities wins: a zero lead, won on the tie-break', () => {
+    const f = new Fixture(['Asha', 'Bilal']).act('Asha', { type: 'REQUEST_LOAN', amount: 5000 }).endByVote('Asha');
+    const result = finalResult(f.snapshot());
+    expect(result).toMatchObject({ winnerId: f.ids.Bilal, winnerIds: [f.ids.Bilal], sharedVictory: false, lead: 0, wonOnLiabilities: true, tiedWithIds: [f.ids.Asha] });
+    expect(result.standings.map((s) => [s.playerId, s.liabilities, s.rank])).toEqual([
+      [f.ids.Bilal, 0, 1],
+      [f.ids.Asha, 5000, 2],
+    ]);
   });
 
   it('one ranked player has no lead; a game without its result has no figures at all', () => {
@@ -105,15 +115,25 @@ describe('The result card', () => {
     expect(screen.queryByText(/Play again|Rematch|Share/i)).toBeNull();
   });
 
-  it('a tie says so and shows no lead', async () => {
+  it('a shared victory says so, names everyone who shares it, and shows no lead', async () => {
     const f = endedGame();
     await renderTable(f, 'Bilal');
     const card = screen.getByTestId('context-card');
-    expect(within(card).getByTestId('context-label')).toHaveTextContent('Game over · Tied finish');
-    expect(within(card).getByTestId('victory-second-label', { includeHiddenElements: true })).toHaveTextContent('Tied on net worth');
-    const other = f.state.winnerId === f.ids.Asha ? 'Bilal' : 'Asha';
-    expect(within(card).getByTestId('victory-lead', { includeHiddenElements: true })).toHaveTextContent(`Level with ${other}`);
+    expect(within(card).getByTestId('context-label')).toHaveTextContent('Game over · Shared victory');
+    expect(within(card).getByTestId('context-title')).toHaveTextContent('Asha and Bilal share the victory!');
+    expect(within(card).getByTestId('victory-second-label', { includeHiddenElements: true })).toHaveTextContent('Level on net worth and liabilities');
+    expect(within(card).getByTestId('victory-lead', { includeHiddenElements: true })).toHaveTextContent('2 winners');
     expect(card).not.toHaveTextContent(/Lead over second place/);
+  });
+
+  it('a win on the tie-break says how it was decided', async () => {
+    const f = new Fixture(['Asha', 'Bilal']).act('Asha', { type: 'REQUEST_LOAN', amount: 5000 }).endByVote('Asha');
+    await renderTable(f, 'Asha');
+    const card = screen.getByTestId('context-card');
+    expect(within(card).getByTestId('context-label')).toHaveTextContent('Game over · Won on the tie-break');
+    expect(within(card).getByTestId('context-title')).toHaveTextContent('Bilal wins!');
+    expect(within(card).getByTestId('victory-second-label', { includeHiddenElements: true })).toHaveTextContent('Level on net worth');
+    expect(within(card).getByTestId('victory-lead', { includeHiddenElements: true })).toHaveTextContent('Fewer liabilities than Asha');
   });
 
   it('the last player standing has no lead to show', async () => {
@@ -185,7 +205,9 @@ describe('Final Standings', () => {
     // The formula is one tap away, not a paragraph under the list.
     expect(screen.queryByText(/Net worth = cash/)).toBeNull();
     await fireEvent.press(screen.getByTestId('net-worth-info'));
-    expect(screen.getByTestId('net-worth-info-text')).toHaveTextContent('Net worth = cash + property at cost + buildings − loans owed. The highest net worth wins.');
+    expect(screen.getByTestId('net-worth-info-text')).toHaveTextContent(
+      'Net worth = cash + property at its price + buildings at what they cost − mortgages − loans owed (with interest charged and unpaid). The highest net worth wins. Level on net worth, fewer liabilities wins; level on both, the victory is shared.',
+    );
     await fireEvent.press(screen.getByTestId('net-worth-info-close'));
     expect(screen.queryByText(/Net worth = cash/)).toBeNull();
     expect(screen.getByTestId('finished-card')).toBeTruthy();
@@ -196,7 +218,7 @@ describe('Final Standings', () => {
     await renderTable(f, 'Asha');
     await fireEvent.press(screen.getByTestId('context-cta'));
     await fireEvent.press(screen.getByTestId('net-worth-info'));
-    expect(screen.getByTestId('net-worth-info-text')).toHaveTextContent(/cash \+ property at market value \+ buildings at cost − mortgages to redeem − loans owed/);
+    expect(screen.getByTestId('net-worth-info-text')).toHaveTextContent(/cash \+ property at market value \+ buildings at what they cost − mortgages to redeem − loans owed \(with interest due or accrued\) − crisis bills/);
   });
 });
 

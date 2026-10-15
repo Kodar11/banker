@@ -36,7 +36,9 @@ describe('Capital config', () => {
       { percent: 20, weight: 20 },
     ]);
     expect(IR.credit).toMatchObject({ start: 700, min: 300, max: 850 });
-    expect(IR.credit.events).toEqual({ ON_TIME_PAYMENT: 5, INSTALLMENT_OVERDUE: -20, CAUGHT_UP: 5, LOAN_DEFAULT: -75, LOAN_REPAID: 15, CLEAN_YEAR: 5 });
+    // The agreed credit policy: no bonus for catching up, −100 for a default, +10 once for a loan repaid with a good history, gains capped at +10 a year.
+    expect(IR.credit.events).toEqual({ ON_TIME_PAYMENT: 5, INSTALLMENT_OVERDUE: -20, CAUGHT_UP: 0, LOAN_DEFAULT: -100, LOAN_REPAID: 10, CLEAN_YEAR: 5 });
+    expect(IR.credit.maxGainPerYear).toBe(10);
     expect(IR.rates).toEqual({ minPercent: 4, maxPercent: 30 });
     expect(IR.loans).toMatchObject({ minAmount: 1000, step: 500, maxOutstandingPrincipal: 20000, collateralAdvancePercent: 50, graceYears: 1, originationFee: 0, prepaymentPenalty: 0 });
     const p = IR.loans.products;

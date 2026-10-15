@@ -51,7 +51,8 @@ describe('Game Over is not a dead end', () => {
     finishedGame(name);
     await render(<Table />);
     expect(screen.getByTestId('turn-title')).toHaveTextContent('GAME OVER');
-    expect(screen.getByTestId('context-card')).toHaveTextContent(/wins!/);
+    // Nobody moved before the vote: everyone is level, so the result is a shared victory.
+    expect(screen.getByTestId('context-card')).toHaveTextContent(/share the victory!/);
     expect(screen.getByTestId('return-home-button')).toHaveTextContent('Return to Home');
     expect(screen.queryByTestId('new-game-button')).toBeNull();
     expect(screen.queryByTestId('join-another-button')).toBeNull();
@@ -59,7 +60,7 @@ describe('Game Over is not a dead end', () => {
     expect(screen.getByTestId('open-more')).toBeTruthy(); // log and rules stay reachable
     // The standings are still one tap away.
     await fireEvent.press(screen.getByTestId('context-cta'));
-    expect(screen.getByTestId('finished-card')).toHaveTextContent(/wins!/);
+    expect(screen.getByTestId('finished-card')).toHaveTextContent(/share the victory!/);
   });
 
   it('the exit is offered only once the game is over', async () => {

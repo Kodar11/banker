@@ -12,6 +12,7 @@ import {
   type PropertyKey,
 } from './businessBoard.ts';
 import { DECK_LABELS, findCard, type CardDefinition, type Deck, type MoveDirection } from './cards.ts';
+import { bankruptcyBlockerNow, PAYMENT_TX, settleEstate, type EstateTrigger } from './estate.ts';
 import { Draft } from './draft.ts';
 import { fail, GameError } from './errors.ts';
 import { formatINR } from './format.ts';
@@ -35,14 +36,14 @@ import {
   assertCrisisBankruptcy,
   buyInsurance,
   buyInsuranceForAll,
-  closeCrisesInBankruptcy,
+
   closePendingCrises,
   crisisGate,
   endInsuranceOnSale,
   forgetUndoFor,
   payCrisisBill,
 } from './insurance.ts';
-import { advanceCalendar, initEconomy, payDefaultedLoan, payInstallment, prepayLoan, recordDiceMovement, takeLoan, writeOffLoans } from './intermediateEngine.ts';
+import { advanceCalendar, initEconomy, payDefaultedLoan, payInstallment, prepayLoan, recordDiceMovement, takeLoan } from './intermediateEngine.ts';
 import { INTERMEDIATE_RULES as IR } from './intermediateConfig.ts';
 import { economyOf, isIntermediate, normalizeGameMode, type GameMode } from './intermediateState.ts';
 import { assignObjectives, finalizeObjectives, forgetObjectiveTrade, recordObjectiveTrade } from './objectives.ts';
@@ -51,15 +52,18 @@ import {
   auctionOpensAt,
   buildingCount,
   buildingLabel,
+  classicBorrowingBlock,
   computeRent,
   incomeTaxDue,
+  isEnforceableLoan,
   loansWithInterestDue,
   loanTerms,
   mortgagePayout,
-  netWorth,
+  mandatoryPaymentsOwed,
   outstandingPrincipal,
   propertyActionBlocker,
   purchasePrice,
+  rankStandings,
   resaleBlocker,
   resaleSaleBlocker,
   reservePriceBlocker,
@@ -70,6 +74,7 @@ import {
   undoBlocker,
   unmortgageCost,
   wealthTaxDue,
+  winnersOf,
   type PropertyActionKind,
 } from './selectors.ts';
 import type {
@@ -630,6 +635,32 @@ function completeCircuit(d: Draft, player: PlayerState): void {
       loanId: loan.id,
       amount: loan.interestAmount,
     });
+  }
+  processLoanMaturities(d, player);
+}
+
+/**
+ * Classic loan principal, checked at the borrower's own Start — the same checkpoint as the interest,
+ * reached by every forward move that passes it, so it is never skipped and never run twice (circuits
+ * only ever grow by one). At the maturity Start the principal falls due; one Start later, still
+ * unpaid, it is overdue; one more and the loan defaults. Default is recorded once, adds no interest,
+ * and leaves the whole principal owed: it counts in net worth, it is collected first if the borrower's
+ * estate is ever settled, and it blocks new borrowing until repaid.
+ */
+function processLoanMaturities(d: Draft, player: PlayerState): void {
+  const rules = RULES.loans;
+  for (const loan of d.state.loans) {
+    if (loan.playerId !== player.id || loan.status !== 'ACTIVE' || loan.maturityCircuit === null) continue;
+    const since = player.circuits - loan.maturityCircuit;
+    const payload = { loanId: loan.id, amount: loan.outstanding, maturityCircuit: loan.maturityCircuit };
+    if (since >= rules.defaultAfterCircuits) {
+      loan.status = 'DEFAULTED';
+      d.event('LOAN_DEFAULTED', player.id, `${player.name} defaulted on a bank loan — ${formatINR(loan.outstanding)} still owed`, { ...payload, owed: loan.outstanding });
+    } else if (since === rules.overdueAfterCircuits) {
+      d.event('LOAN_OVERDUE', player.id, `${player.name}'s bank loan is overdue — repay ${formatINR(loan.outstanding)} before the next Start or it defaults`, payload);
+    } else if (since === 0) {
+      d.event('LOAN_PRINCIPAL_DUE', player.id, `${player.name}'s bank loan of ${formatINR(loan.outstanding)} is due — repay it before the next Start`, payload);
+    }
   }
 }
 
@@ -1197,7 +1228,9 @@ function closeResale(d: Draft, auction: AuctionState, resale: ResaleTerms, outco
   auction.status = 'CLOSED';
   auction.closedAt = d.ctx.now;
   resale.outcome = outcome;
-  d.setPhase(resale.resumePhase);
+  // Listed while a payment was owed, and that payment has since been cancelled (its payee left the game): nothing is left to pay.
+  const nothingOwed = resale.resumePhase === 'AWAITING_PAYMENT' && d.state.turn.pending?.kind !== 'PAYMENT';
+  d.setPhase(nothingOwed ? 'TURN_COMPLETE' : resale.resumePhase);
 }
 
 /** The seller withdraws their auction. Only while nobody has bid; a repeat of a cancel that already happened changes nothing. */
@@ -1392,14 +1425,6 @@ function finalizeAuction(d: Draft): void {
 // Payments, cards, bankruptcy
 // ---------------------------------------------------------------------------
 
-const PAYMENT_TX = {
-  RENT: 'RENT_PAYMENT',
-  TAX: 'TAX_PAYMENT',
-  CARD: 'CARD_PAYMENT',
-  LOAN_INTEREST: 'LOAN_INTEREST',
-  CLUB: 'CLUB_PAYMENT',
-} as const;
-
 function payPending(d: Draft, actor: PlayerState, reason: PaymentReason): void {
   const turn = d.state.turn;
   const pending = turn.pending;
@@ -1502,14 +1527,20 @@ function resolveManualCard(d: Draft, actor: PlayerState, resolution: 'PAY' | 'RE
   d.setPhase('AWAITING_PAYMENT');
 }
 
+/**
+ * Bankruptcy over the payment the turn is waiting on. Refused while the player could still raise the
+ * money from the bank (estate.bankruptcyBlocker) — lacking the cash is not enough, and borrowing is
+ * never required. The payment stays owed while they raise it; once they can pay, they pay it as usual.
+ */
 function declareBankruptcy(d: Draft, actor: PlayerState): void {
   const turn = d.state.turn;
   const pending = turn.pending;
   if (turn.phase !== 'AWAITING_PAYMENT' || pending?.kind !== 'PAYMENT') {
     fail('INVALID_PHASE', 'You can only declare bankruptcy when you owe money.');
   }
-  if (actor.balance >= pending.amount) fail('INVALID_PHASE', 'You can afford this payment.');
-  liquidate(d, actor, pending.payeeIds?.length ? null : pending.toPlayerId, pending.label);
+  const why = bankruptcyBlockerNow(d.state, actor.id);
+  if (why) fail('INVALID_PHASE', why);
+  goBankrupt(d, actor, { kind: 'TURN' });
   turn.pending = null;
   turn.followUp = null;
   d.setPhase('TURN_COMPLETE');
@@ -1522,57 +1553,36 @@ function declareBankruptcy(d: Draft, actor: PlayerState): void {
 }
 
 /**
- * THE bankruptcy: the player's cash goes to the creditor (null = the bank), every property returns
- * to the bank cleared, their loans are closed and their offers expire, and they are out of the game.
- * What happens to the turn afterwards is the caller's business.
+ * THE bankruptcy: the estate is settled (estate.settleEstate — the payment that caused it first, then
+ * the bank; nothing left in the player's name) and the player is out of the game. What happens to the
+ * turn afterwards is the caller's business.
  */
-function liquidate(d: Draft, actor: PlayerState, creditorId: string | null, label: string): void {
-  if (actor.balance > 0) {
-    d.transfer({
-      type: 'BANKRUPTCY_SETTLEMENT',
-      from: actor.id,
-      to: creditorId,
-      amount: actor.balance,
-      memo: `Bankruptcy settlement (${label})`,
-    });
-  }
-  for (const key of PROPERTY_KEYS) {
-    const prop = d.state.properties[key];
-    if (prop.ownerId === actor.id) {
-      prop.ownerId = null;
-      prop.houses = 0;
-      prop.hotel = false;
-      prop.mortgaged = false;
-    }
-  }
-  for (const loan of d.state.loans) {
-    if (loan.playerId === actor.id && loan.status === 'ACTIVE') {
-      loan.status = 'DEFAULTED';
-      loan.closedAt = d.ctx.now;
-    }
-  }
-  writeOffLoans(d, actor.id);
+function goBankrupt(d: Draft, actor: PlayerState, trigger: EstateTrigger): void {
+  settleEstate(d, actor, 'BANKRUPTCY', trigger);
+  takeOutOfPlay(d, actor, 'BANKRUPT');
+  d.event('PLAYER_BANKRUPT', actor.id, `${actor.name} is bankrupt`);
+}
+
+/** A player whose estate has been settled stops taking part: their offers expire, the undo history goes, and they never play again. */
+function takeOutOfPlay(d: Draft, actor: PlayerState, status: 'BANKRUPT' | 'LEFT'): void {
   expireTrades(d, (t) => t.fromPlayerId === actor.id || t.toPlayerId === actor.id);
   // Ownership was reset wholesale: no earlier action can be compensated safely.
   d.state.undoStack = [];
   d.state.undoRequest = null;
-  actor.status = 'BANKRUPT';
+  actor.status = status;
+  actor.ready = false;
   actor.skipTurns = 0;
   actor.inJail = false;
   actor.jailTurnsLeft = 0;
-  d.event('PLAYER_BANKRUPT', actor.id, `${actor.name} is bankrupt`);
 }
 
 /**
  * Bankruptcy over a crisis bill (Capital Mode). Unlike a debt met on a turn, the bill can fall
- * on any player, so this is not a turn action — but it is the same bankruptcy, and it is refused
- * while the player can still afford the bill or has any way left to raise money.
+ * on any player, so this is not a turn action — but it is the same bankruptcy, under the same rule.
  */
 function declareCrisisBankruptcy(d: Draft, actor: PlayerState, crisisId: string): void {
   assertCrisisBankruptcy(d, actor, crisisId);
-  const cash = actor.balance;
-  liquidate(d, actor, null, 'Crisis bill');
-  closeCrisesInBankruptcy(d, actor.id, cash);
+  goBankrupt(d, actor, { kind: 'CRISIS', crisisId });
   const turn = d.state.turn;
   const wasTheirTurn = turn.playerId === actor.id;
   if (wasTheirTurn) {
@@ -1591,11 +1601,15 @@ function declareCrisisBankruptcy(d: Draft, actor: PlayerState, crisisId: string)
   advanceTurn(d, actor.id);
 }
 
-/** A player who is owed the current turn's payment went bankrupt: their part of it is no longer owed. */
+/**
+ * A player who is owed the current turn's payment is out of the game (bankrupt, or left): their
+ * property has gone back to the bank, so their part of it is no longer owed.
+ */
 function dropPayee(d: Draft, playerId: string): void {
   const turn = d.state.turn;
   const pending = turn.pending;
-  if (turn.phase !== 'AWAITING_PAYMENT' || pending?.kind !== 'PAYMENT') return;
+  // (Also while the payer runs a resale auction to raise the money: the turn comes back to it afterwards.)
+  if (pending?.kind !== 'PAYMENT' || turn.playerId === playerId) return;
   if (pending.payeeIds?.includes(playerId)) {
     const share = Math.floor(pending.amount / pending.payeeIds.length);
     pending.payeeIds = pending.payeeIds.filter((id) => id !== playerId);
@@ -1607,20 +1621,28 @@ function dropPayee(d: Draft, playerId: string): void {
   // Rent on a property that has just returned to the bank, or nobody left to pay: nothing is owed.
   turn.pending = null;
   turn.followUp = null;
-  d.event('PAYMENT_CANCELLED', turn.playerId, `${pending.label}: no longer owed — ${d.name(playerId)} is bankrupt`);
-  d.setPhase('TURN_COMPLETE');
+  const gone = d.state.players.find((p) => p.id === playerId)?.status === 'LEFT' ? 'has left the game' : 'is bankrupt';
+  d.event('PAYMENT_CANCELLED', turn.playerId, `${pending.label}: no longer owed — ${d.name(playerId)} ${gone}`);
+  if (turn.phase === 'AWAITING_PAYMENT') d.setPhase('TURN_COMPLETE');
 }
 
 /**
- * A player walks away from the table. NOT a bankruptcy and not an end of the game: nothing they
- * hold is sold, handed over or forgiven — cash, properties and loans stay in their name, frozen
- * (rent on their properties is still owed to them). They take no more turns and can no longer act.
+ * A player walks away from the table (LEAVE_GAME — the app asks them to confirm first). Not an end of
+ * the game, and not a way out of anything owed. Their estate is settled at once, in this one action
+ * (estate.settleEstate): a payment their turn was waiting on is paid first, to whoever it was owed,
+ * then their crisis bills and the bank's loans (secured loans take their collateral); buildings and
+ * property are sold back to the bank only as far as that needs; whatever cash is left leaves play —
+ * nobody inherits it — and every property returns to the bank. What the estate could not pay is
+ * recorded, not forgiven. They take no more turns, collect no rent, cannot vote, and cannot win.
  * Whatever was waiting on them is closed so the others are never stuck:
  *   - their open trade offers expire, and an undo request that needs them is dropped;
- *   - in a running auction they count as passed; if they held the high bid the property goes unsold;
+ *   - their own resale listing is withdrawn; in another running auction they count as passed, and if
+ *     they held the high bid the property goes unsold;
+ *   - a payment owed to them on someone else's turn is no longer owed (their property is the bank's);
  *   - if it was their turn, it passes to the next player in the drawn order (after the auction, if one is running);
  *   - the host role moves to the next player in the drawn order;
  *   - if fewer than two players are left, the game finishes (the last one wins, as with bankruptcy).
+ * A player who already went bankrupt has nothing left to settle: leaving only changes their status.
  */
 function leaveTable(d: Draft, actor: PlayerState): void {
   walkAway(d, actor);
@@ -1631,14 +1653,30 @@ function leaveTable(d: Draft, actor: PlayerState): void {
 
 function walkAway(d: Draft, actor: PlayerState): void {
   const started = d.state.status !== 'WAITING';
+  const playing = started && actor.status === 'ACTIVE';
+  d.event('PLAYER_LEFT', actor.id, `${actor.name} left the game`);
+  if (playing) {
+    // Their own listing first: the property must not be sold out from under the settlement.
+    const listing = d.state.auction;
+    if (listing && listing.status === 'OPEN' && listing.resale?.sellerId === actor.id) {
+      closeResale(d, listing, listing.resale, 'UNSOLD');
+      d.event('AUCTION_UNSOLD', null, `${getDeed(listing.propertyKey).name}: auction withdrawn (${actor.name} left the game)`, {
+        auctionId: listing.id,
+        propertyKey: listing.propertyKey,
+        resale: true,
+        sellerId: actor.id,
+      });
+    }
+    // Leaving never cancels what the turn was waiting on: if it is theirs, the estate pays it first.
+    const owesOnTurn = d.state.turn.playerId === actor.id && d.state.turn.pending?.kind === 'PAYMENT';
+    settleEstate(d, actor, 'DEPARTURE', owesOnTurn ? { kind: 'TURN' } : null);
+  }
   actor.status = 'LEFT';
   actor.ready = false;
   actor.skipTurns = 0;
   actor.inJail = false;
   actor.jailTurnsLeft = 0;
-  d.event('PLAYER_LEFT', actor.id, `${actor.name} left the game`);
-  // Capital Mode: leaving does not dodge a crisis bill, and does not leave the table waiting on it.
-  closePendingCrises(d, actor.id);
+  if (playing) dropPayee(d, actor.id);
 
   const remaining = d.activePlayers().sort((a, b) => a.seat - b.seat);
   const heir = remaining[0];
@@ -1670,18 +1708,9 @@ function walkAway(d: Draft, actor: PlayerState): void {
     return;
   }
 
+  // (Their own resale listing was withdrawn before the settlement, above.)
   const auction = d.state.auction;
-  if (auction && auction.status === 'OPEN' && d.state.turn.phase === 'AUCTION' && auction.resale?.sellerId === actor.id) {
-    // The seller walked away from their own auction: it is withdrawn, whatever was bid. Nothing is sold.
-    const deed = getDeed(auction.propertyKey);
-    closeResale(d, auction, auction.resale, 'UNSOLD');
-    d.event('AUCTION_UNSOLD', null, `${deed.name} stays with ${actor.name} (${actor.name} left the game)`, {
-      auctionId: auction.id,
-      propertyKey: deed.key,
-      resale: true,
-      sellerId: actor.id,
-    });
-  } else if (auction && auction.status === 'OPEN' && d.state.turn.phase === 'AUCTION' && auction.participantIds.includes(actor.id)) {
+  if (auction && auction.status === 'OPEN' && d.state.turn.phase === 'AUCTION' && auction.participantIds.includes(actor.id)) {
     if (auction.highBidderId === actor.id) {
       finalizeAuction(d);
     } else {
@@ -1707,6 +1736,14 @@ function walkAway(d: Draft, actor: PlayerState): void {
  *   LAST_PLAYER_STANDING  everyone else is bankrupt        PLAYERS_LEFT      fewer than two players remain
  *   VOTE                  an early vote passed              DURATION_VOTE     the finish-or-extend vote ended it
  *   DURATION_REACHED      the longest a game may be was played out
+ *
+ * In this order, once (the game is FINISHED from the first line, and nothing is accepted after):
+ *   1. obligations the ending settles: open trades expire; a crisis bill still open is collected;
+ *   2. secret objectives are checked and paid (Capital);
+ *   3. every remaining loan stays as it is and is counted at what would close it today — nothing is
+ *      collected or forgiven at the end, so a loan signed just before still counts in full;
+ *   4. net worth from the one balance sheet; 5. the ranking and its tie-break (rankStandings);
+ *   6. the standings and the winner(s) are stored and announced together.
  */
 function finishGame(d: Draft, reason: 'VOTE' | 'DURATION_VOTE' | 'DURATION_REACHED' | 'LAST_PLAYER_STANDING' | 'PLAYERS_LEFT'): void {
   d.setStatus('FINISHED');
@@ -1718,20 +1755,24 @@ function finishGame(d: Draft, reason: 'VOTE' | 'DURATION_VOTE' | 'DURATION_REACH
   d.state.undoStack = [];
   d.state.undoRequest = null;
   // Capital Mode: a crisis bill still open is collected first, so it is in the final balances.
-  closePendingCrises(d, null);
+  closePendingCrises(d);
   // Secret-objective bonuses are checked and paid here, before the ranking: the winner below is decided
   // on the final balances, so the declared result and the money always agree. (Nothing to do in Classic.)
   finalizeObjectives(d);
-  const ranked = d
-    .activePlayers()
-    .map((p) => ({ p, worth: netWorth(d.state, p.id) }))
-    .sort((a, b) => b.worth - a.worth);
-  const winner = ranked[0]?.p ?? null;
-  d.state.winnerId = winner?.id ?? null;
-  d.event('GAME_FINISHED', null, winner ? `${winner.name} wins! 🏆` : 'Game over', {
+  // Only players still in the game are ranked: nobody who went bankrupt or left can win.
+  const standings = rankStandings(d.state);
+  const winners = winnersOf(standings);
+  // A shared victory has no single winner: winnerId stays empty and the event names everyone who shares it.
+  d.state.winnerId = winners.length === 1 ? winners[0]! : null;
+  const names = winners.map((id) => d.name(id));
+  const message =
+    winners.length === 0 ? 'Game over' : winners.length === 1 ? `${names[0]} wins! 🏆` : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]} share the victory! 🏆`;
+  d.event('GAME_FINISHED', null, message, {
     reason,
-    winnerId: winner?.id ?? null,
-    standings: ranked.map((r) => ({ playerId: r.p.id, netWorth: r.worth })),
+    winnerId: d.state.winnerId,
+    winnerIds: winners,
+    sharedVictory: winners.length > 1,
+    standings,
   });
 }
 
@@ -1981,10 +2022,16 @@ function propertyAction(d: Draft, actor: PlayerState, key: PropertyKey, kind: Pr
   }
 }
 
+/**
+ * A gift: one player hands another cash, for whatever they agreed between them. The game moves the
+ * money and nothing else — a gift is never a loan the game will collect. Refused while the giver owes
+ * a payment the game asked for (mandatoryPaymentsOwed): money due to a creditor can't be given away first.
+ */
 function transferMoney(d: Draft, actor: PlayerState, toPlayerId: string, amount: number, memo?: string): void {
   if (toPlayerId === actor.id) fail('VALIDATION', 'Choose another player.');
   const to = d.state.players.find((p) => p.id === toPlayerId);
   if (!to || to.status !== 'ACTIVE') fail('NOT_FOUND', 'That player is not in the game.');
+  if (mandatoryPaymentsOwed(d.state, actor.id) > 0) fail('TRANSFER_NOT_ALLOWED', 'Settle the payment you owe before giving money away.');
   if (amount > RULES.transfers.maxAmount) fail('VALIDATION', 'That amount is too large.');
   if (actor.balance < amount) fail('INSUFFICIENT_FUNDS', 'Not enough money for this payment.');
   const note = memo?.trim() || 'Payment';
@@ -1995,6 +2042,8 @@ function transferMoney(d: Draft, actor: PlayerState, toPlayerId: string, amount:
 
 function requestLoan(d: Draft, actor: PlayerState, amount: number): void {
   const rules = RULES.loans;
+  const blocked = classicBorrowingBlock(d.state, actor.id);
+  if (blocked) fail('LOAN_NOT_ALLOWED', blocked);
   if (amount < rules.minAmount) fail('LOAN_NOT_ALLOWED', `Minimum loan is ${formatINR(rules.minAmount)}.`);
   if (amount % rules.step !== 0) fail('LOAN_NOT_ALLOWED', `Loans come in steps of ${formatINR(rules.step)}.`);
   const current = outstandingPrincipal(d.state.loans, actor.id);
@@ -2016,6 +2065,8 @@ function requestLoan(d: Draft, actor: PlayerState, amount: number): void {
     createdAtCircuit: actor.circuits,
     interestCharges: 0,
     interestPaid: 0,
+    // The term is fixed now, with the loan: a later change to the rule never moves a signed due date.
+    maturityCircuit: actor.circuits + rules.maturityCircuits,
     createdAt: d.ctx.now,
     closedAt: null,
   };
@@ -2025,16 +2076,18 @@ function requestLoan(d: Draft, actor: PlayerState, amount: number): void {
     loanId: loan.id,
     principal: amount,
     interestDueAtNextStart: terms.interest,
+    maturityCircuit: loan.maturityCircuit,
   });
 }
 
+/** Repays principal, in any amount: on a loan being repaid, or on one in default (clearing it lifts the borrowing block). */
 function repayLoan(d: Draft, actor: PlayerState, loanId: string, amount: number): void {
   const loan = d.state.loans.find((l) => l.id === loanId);
   if (!loan || loan.playerId !== actor.id) fail('NOT_FOUND', 'Loan not found.');
-  if (loan.status !== 'ACTIVE') fail('LOAN_NOT_ALLOWED', 'This loan is already closed.');
+  if (!isEnforceableLoan(loan)) fail('LOAN_NOT_ALLOWED', 'This loan is already closed.');
   if (amount > loan.outstanding) fail('VALIDATION', `You only owe ${formatINR(loan.outstanding)} on this loan.`);
   if (actor.balance < amount) fail('INSUFFICIENT_FUNDS', 'Not enough money to repay that much.');
-  d.transfer({ type: 'LOAN_REPAYMENT', from: actor.id, to: null, amount, memo: 'Loan repayment' });
+  d.transfer({ type: 'LOAN_REPAYMENT', from: actor.id, to: null, amount, memo: loan.status === 'DEFAULTED' ? 'Loan repayment (in default)' : 'Loan repayment' });
   loan.outstanding -= amount;
   if (loan.outstanding === 0) {
     loan.status = 'REPAID';

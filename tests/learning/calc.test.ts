@@ -87,8 +87,9 @@ describe('figures taken from the game rule set', () => {
   it('sample credit score: overdue, caught up, on time, default', () => {
     const start = INTERMEDIATE_RULES.credit.start;
     expect(start).toBe(700);
-    expect(creditScoresAfter(start, ['INSTALLMENT_OVERDUE', 'CAUGHT_UP', 'ON_TIME_PAYMENT'])).toEqual([680, 685, 690]);
-    expect(creditScoresAfter(start, ['INSTALLMENT_OVERDUE', 'LOAN_DEFAULT'])).toEqual([680, 605]);
+    // Catching up earns nothing back; a default costs 100.
+    expect(creditScoresAfter(start, ['INSTALLMENT_OVERDUE', 'CAUGHT_UP', 'ON_TIME_PAYMENT'])).toEqual([680, 680, 685]);
+    expect(creditScoresAfter(start, ['INSTALLMENT_OVERDUE', 'LOAN_DEFAULT'])).toEqual([680, 580]);
     // Never outside the scale the game uses.
     expect(creditScoresAfter(310, ['LOAN_DEFAULT'])).toEqual([INTERMEDIATE_RULES.credit.min]);
   });

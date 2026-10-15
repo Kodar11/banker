@@ -20,6 +20,7 @@ import { formatINR } from '@/utils/currency';
 import { specialSquareInfo } from '@/features/board/squareInfo';
 import { describeTradeSide } from '@/features/trade/TradeSheet';
 import { describeWaiting, destinationLabel } from './describe';
+import { finalResult, resultTitle } from './finalResult';
 import type { GameView } from './useGameView';
 
 /**
@@ -96,7 +97,8 @@ export function turnStatus(view: Pick<GameView, 'snapshot' | 'me' | 'current' | 
     return { title: 'GAME PAUSED', detail: `${turnNo} · No dice or payments until resumed`, primary: me ? { kind: 'resume' } : null };
   }
   if (state.status === 'FINISHED') {
-    return { title: 'GAME OVER', detail: state.winnerId ? `${view.playerName(state.winnerId)} wins` : 'Final positions', primary: null };
+    const result = finalResult(view.snapshot);
+    return { title: 'GAME OVER', detail: result.winnerIds.length ? resultTitle(result, view.playerName).replace(/!$/, '') : 'Final positions', primary: null };
   }
   if (state.status !== 'ACTIVE' || !view.current) return { title: 'WAITING TO START', detail: 'Players gather in the lobby', primary: null };
 
@@ -286,7 +288,7 @@ export function pickContext(view: Pick<GameView, 'snapshot' | 'me' | 'current' |
       kind: 'finished',
       icon: '🏆',
       label: 'Game over',
-      title: state.winnerId ? `${view.playerName(state.winnerId)} wins!` : 'Game over',
+      title: resultTitle(finalResult(view.snapshot), view.playerName),
       detail: 'Highest net worth wins',
       cta: { label: 'Standings', target: { kind: 'standings' } },
     };

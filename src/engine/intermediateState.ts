@@ -1,6 +1,7 @@
 import type { PropertyKey } from './businessBoard.ts';
 import type { CrisisRecord, InsuranceState } from './insuranceState.ts';
 import { INTERMEDIATE_RULES as IR, type CreditEventType, type LoanProductKey } from './intermediateConfig.ts';
+import { accruedInterest } from './intermediateFinance.ts';
 
 /**
  * Capital Mode state. Lives in GameState.intermediate (one JSON document per game, written
@@ -40,8 +41,10 @@ export interface Installment {
  * ACTIVE     being repaid on its schedule.
  * REPAID     fully repaid as agreed.
  * DEFAULTED  an installment stayed unpaid through the grace period; `defaultBalance` is still owed.
- * SETTLED    defaulted, and the balance has since been cleared (collateral and/or payments).
- * WRITTEN_OFF the borrower went bankrupt.
+ * SETTLED    cleared outside its schedule: a default balance paid off (collateral and/or payments),
+ *            or the whole payoff collected when the borrower's estate was settled.
+ * WRITTEN_OFF the borrower's estate (bankruptcy or leaving) could not pay all of it; `writtenOff`
+ *            records the part left unpaid. Closed: no longer collectable, no longer a liability.
  */
 export type IntermediateLoanStatus = 'ACTIVE' | 'REPAID' | 'DEFAULTED' | 'SETTLED' | 'WRITTEN_OFF';
 
@@ -89,6 +92,8 @@ export interface IntermediateLoan {
   /** Early principal repayments, with the interest that had accrued on each. */
   prepayments: { clock: number; year: number; principal: number; interest: number }[];
   settlement: CollateralSettlement | null;
+  /** WRITTEN_OFF only: what the borrower's estate could not pay. Absent on loans closed before estates were settled. */
+  writtenOff?: number;
   createdAt: string;
   closedAt: string | null;
 }
@@ -138,8 +143,11 @@ export interface IntermediateState {
   credit: Record<string, number>;
   creditEvents: CreditEvent[];
   loans: IntermediateLoan[];
-  /** Per player, for the year in progress: had a loan open / had anything overdue or in default. */
-  yearFlags: Record<string, { borrowed: boolean; late: boolean }>;
+  /**
+   * Per player, for the year in progress: had a loan open / had anything overdue or in default /
+   * paid an installment on time (absent in a game stored before it was tracked: read as false).
+   */
+  yearFlags: Record<string, { borrowed: boolean; late: boolean; paidOnTime?: boolean }>;
   /** What the last financial-year transition did (drives the announcement on every device). */
   lastReport: YearReport | null;
   /**
@@ -217,11 +225,43 @@ export function loanOutstandingPrincipal(loan: IntermediateLoan): number {
   return scheduledPrincipal(loan) + unpaidInstallments(loan).reduce((sum, i) => sum + i.principal, 0);
 }
 
-/** Everything a loan is a liability for today: outstanding principal plus interest already due. */
-export function loanLiability(loan: IntermediateLoan): number {
-  if (loan.status === 'DEFAULTED') return loan.defaultBalance;
+type Clock = Pick<IntermediateState, 'movement' | 'playerCount'>;
+
+/**
+ * Interest built up so far this loan year on `principal` of the not-yet-due principal: the annual
+ * interest pro rata for the share of the year since the last installment fell due (or since signing).
+ * The one accrual rule — an early repayment charges it, a default fixes it, and the liability counts it.
+ */
+export function accruedLoanInterest(eco: Clock, loan: IntermediateLoan, principal: number = scheduledPrincipal(loan)): number {
   if (loan.status !== 'ACTIVE') return 0;
-  return scheduledPrincipal(loan) + unpaidInstallments(loan).reduce((sum, i) => sum + i.principal + i.interest, 0);
+  const next = loan.installments.find((i) => i.status === 'SCHEDULED');
+  if (!next) return 0;
+  const length = yearLength(eco);
+  return accruedInterest(principal, loan.ratePercent, gameClock(eco) - (next.dueAt - length), length);
+}
+
+/**
+ * What would close a loan today, split into principal and interest. Each part of a debt appears in
+ * exactly one place:
+ *   ACTIVE     installments due or overdue (their principal and interest)
+ *              + principal not yet due + the interest accrued on it this loan year
+ *   DEFAULTED  the default balance — fixed at default, it already contains all of the above
+ *   otherwise  nothing (repaid, settled, or closed when the borrower's estate was settled)
+ */
+export function loanPayoff(eco: Clock, loan: IntermediateLoan): { principal: number; interest: number } {
+  if (loan.status === 'DEFAULTED') return { principal: loan.defaultBalance, interest: 0 };
+  if (loan.status !== 'ACTIVE') return { principal: 0, interest: 0 };
+  const due = unpaidInstallments(loan);
+  return {
+    principal: scheduledPrincipal(loan) + due.reduce((sum, i) => sum + i.principal, 0),
+    interest: due.reduce((sum, i) => sum + i.interest, 0) + accruedLoanInterest(eco, loan),
+  };
+}
+
+/** Everything a loan is a liability for today: its payoff (loanPayoff). Borrowing adds exactly the cash it pays out. */
+export function loanLiability(eco: Clock, loan: IntermediateLoan): number {
+  const payoff = loanPayoff(eco, loan);
+  return payoff.principal + payoff.interest;
 }
 
 export function loansOf(eco: IntermediateState, playerId: string): IntermediateLoan[] {

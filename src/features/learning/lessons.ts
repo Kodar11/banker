@@ -1059,8 +1059,11 @@ const L12 = (() => {
         label: 'Check the amount and pay now',
         description: 'Catch up while you still can.',
         outcome: {
-          headline: `Paid within the grace period: the sample score recovers from ${overdue} to ${caughtUp}.`,
-          text: `Catching up helps but does not erase the late mark: you are still ${start - caughtUp!} points below where you began.`,
+          headline:
+            caughtUp! > overdue!
+              ? `Paid within the grace period: the sample score recovers from ${overdue} to ${caughtUp}.`
+              : `Paid within the grace period: no default, but the sample score stays at ${caughtUp}.`,
+          text: `Catching up stops the damage but does not erase the late mark: you are still ${start - caughtUp!} points below where you began.`,
           scene: [
             { kind: 'cash', start: cash, movements: [{ label: 'Overdue installment paid', amount: -installment }] },
             { kind: 'credit', start, steps: [{ label: 'Installment overdue', event: 'INSTALLMENT_OVERDUE' }, { label: 'Caught up', event: 'CAUGHT_UP' }] },

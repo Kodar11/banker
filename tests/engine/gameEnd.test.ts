@@ -22,6 +22,7 @@ import {
   hasGameDuration,
   INTERMEDIATE_RULES as IR,
   legacyGameConfig,
+  balanceSheet,
   netWorth,
   normalizeGameConfig,
   parseGameConfig,
@@ -39,7 +40,12 @@ const MODES: GameMode[] = ['classic', 'intermediate'];
 const table = (players: number, options: { mode?: GameMode; config?: unknown } = {}) => new TestGame(NAMES.slice(0, players), options);
 const types = (r: EngineResult) => r.events.map((e) => e.type);
 const vote = (g: TestGame) => g.state.endGame!.vote!;
-const finished = (r: EngineResult) => r.events.find((e) => e.type === 'GAME_FINISHED')!.payload as { reason: string; standings: { playerId: string; netWorth: number }[] };
+const finished = (r: EngineResult) =>
+  r.events.find((e) => e.type === 'GAME_FINISHED')!.payload as {
+    reason: string;
+    winnerIds: string[];
+    standings: { playerId: string; netWorth: number; liabilities: number; rank: number }[];
+  };
 
 function refusal(fn: () => unknown): { code: string; message: string } {
   try {
@@ -190,9 +196,12 @@ describe.each(MODES)('early-ending vote (%s)', (mode) => {
     expect(enough.state.status).toBe('FINISHED');
     const last = enough.results.at(-1)!;
     expect(types(last)).toEqual(['END_VOTE_CLOSED', 'GAME_FINISHED']);
-    // The existing completion flow, untouched: the standings are plain net worth, highest first.
-    expect(finished(last)).toMatchObject({ reason: 'VOTE' });
-    expect(finished(last).standings).toEqual(enough.state.players.map((p) => ({ playerId: p.id, netWorth: worth[p.id] ?? netWorth(enough.state, p.id) })));
+    // The completion flow: nobody has moved, so every player is level on net worth and on liabilities —
+    // a shared victory, never decided by seat order.
+    expect(finished(last)).toMatchObject({ reason: 'VOTE', sharedVictory: true, winnerId: null });
+    expect(finished(last).standings).toEqual(enough.state.players.map((p) => ({ playerId: p.id, netWorth: worth[p.id] ?? netWorth(enough.state, p.id), liabilities: 0, rank: 1 })));
+    expect(finished(last).winnerIds).toEqual(enough.state.players.map((p) => p.id));
+    expect(enough.state.winnerId).toBeNull();
     expect(last.transactions).toEqual([]);
   });
 
@@ -444,11 +453,19 @@ describe.each(MODES)('finish-or-extend vote when the duration is over (%s)', (mo
     const again = playOut(g, 6);
     expect(types(again)).toContain('END_VOTE_STARTED');
     expect(vote(g)).toMatchObject({ kind: 'DURATION', year: 6, required: need });
-    const worth = g.state.players.map((p) => ({ playerId: p.id, netWorth: netWorth(g.state, p.id) })).sort((a, b) => b.netWorth - a.netWorth);
+    const worth = g.state.players
+      .map((p) => ({ playerId: p.id, netWorth: netWorth(g.state, p.id), liabilities: balanceSheet(g.state, p.id).liabilities }))
+      .sort((a, b) => b.netWorth - a.netWorth || a.liabilities - b.liabilities);
     castAll(g, need);
     expect(g.state.status).toBe('FINISHED');
     const last = g.results.at(-1)!;
-    expect(finished(last)).toEqual({ reason: 'DURATION_VOTE', winnerId: g.state.winnerId, standings: worth });
+    const result = finished(last);
+    expect(result).toMatchObject({ reason: 'DURATION_VOTE', winnerId: g.state.winnerId });
+    expect(result.standings.map(({ rank: _rank, ...s }) => s)).toEqual(worth);
+    // Rank 1 is shared only by players level on both net worth and liabilities; winnerId is set only when one player has it.
+    const top = result.standings.filter((s) => s.netWorth === worth[0]!.netWorth && s.liabilities === worth[0]!.liabilities).map((s) => s.playerId);
+    expect(result.winnerIds).toEqual(top);
+    expect(g.state.winnerId).toBe(top.length === 1 ? top[0] : null);
     expect(types(last)).not.toContain('TURN_STARTED');
   });
 

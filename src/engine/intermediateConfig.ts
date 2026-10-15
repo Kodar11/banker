@@ -67,6 +67,8 @@ const IntermediateRulesSchema = z
         min: z.number().int(),
         max: z.number().int(),
         events: z.object(Object.fromEntries(CREDIT_EVENT_TYPES.map((t) => [t, z.number().int()])) as Record<CreditEventType, z.ZodNumber>).strict(),
+        /** The most a player's score can rise in one financial year, whatever earned it. Penalties are never capped. */
+        maxGainPerYear: z.number().int().min(0),
         /** Highest band first. `adjustPercent` is added to a product's base rate for new offers. */
         bands: z.array(z.object({ min: z.number().int(), max: z.number().int(), label: z.string(), adjustPercent: percent }).strict()).min(1),
       })
@@ -154,7 +156,7 @@ export function validateIntermediateRules(raw: unknown): IntermediateRules {
 
 export const INTERMEDIATE_RULES: IntermediateRules = validateIntermediateRules({
   /** Stored with every Capital game's economy. Bump when any value below changes. */
-  version: 'INTERMEDIATE-V2',
+  version: 'INTERMEDIATE-V3',
 
   year: {
     spacesPerYear: 36,
@@ -200,14 +202,21 @@ export const INTERMEDIATE_RULES: IntermediateRules = validateIntermediateRules({
     start: 700,
     min: 300,
     max: 850,
+    /**
+     * The agreed credit policy. A late installment paid within grace earns nothing back (CAUGHT_UP 0);
+     * LOAN_REPAID needs a real repayment history (an installment paid on time, nothing ever late), so
+     * borrowing and prepaying at once earns nothing; CLEAN_YEAR needs an installment paid on time
+     * that year and nothing due, overdue or in default at its end.
+     */
     events: {
       ON_TIME_PAYMENT: 5,
       INSTALLMENT_OVERDUE: -20,
-      CAUGHT_UP: 5,
-      LOAN_DEFAULT: -75,
-      LOAN_REPAID: 15,
+      CAUGHT_UP: 0,
+      LOAN_DEFAULT: -100,
+      LOAN_REPAID: 10,
       CLEAN_YEAR: 5,
     },
+    maxGainPerYear: 10,
     bands: [
       { min: 750, max: 850, label: 'Excellent', adjustPercent: -2 },
       { min: 700, max: 749, label: 'Good', adjustPercent: -1 },

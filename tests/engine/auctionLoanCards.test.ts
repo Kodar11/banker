@@ -83,16 +83,22 @@ describe('auctions', () => {
 });
 
 describe('bankruptcy and game end', () => {
-  it('bankrupt player pays remaining cash to creditor, loses properties, turn advances', () => {
+  it('bankrupt player’s estate pays the creditor — cash, then the house and the site sold back to the bank — and the turn advances', () => {
     const g = new TestGame();
     g.give('Bilal', 'MUMBAI', { hotel: true });
     g.give('Asha', 'INDORE', { houses: 1 });
     g.act('Asha', { type: 'TRANSFER_MONEY', toPlayerId: g.id('Chitra'), amount: START - 1500 });
     g.placeBefore('Asha', 'MUMBAI', 4); // passes Start: 1,500 + 1,500 = 3,000
     g.roll('Asha', 2, 2);
-    g.act('Asha', { type: 'DECLARE_BANKRUPTCY' });
+    // Rent ₹9,000; Asha could raise only ₹3,000 + ₹1,000 (half the house) + ₹750 (Indore's mortgage value): bankruptcy is allowed.
+    const r = g.act('Asha', { type: 'DECLARE_BANKRUPTCY' });
+    expect(r.transactions.map((t) => [t.type, t.fromPlayerId === null ? 'bank' : 'Asha', t.amount])).toEqual([
+      ['HOUSE_SALE', 'bank', 1000],
+      ['PROPERTY_SALE', 'bank', 750],
+      ['BANKRUPTCY_SETTLEMENT', 'Asha', 4750],
+    ]);
     expect(g.player('Asha')).toMatchObject({ status: 'BANKRUPT', balance: 0 });
-    expect(g.balance('Bilal')).toBe(START + 3000);
+    expect(g.balance('Bilal')).toBe(START + 4750);
     expect(g.state.properties.INDORE).toMatchObject({ ownerId: null, houses: 0 });
     expect(g.current).toBe('Bilal');
     expect(() => g.act('Asha', { type: 'TRANSFER_MONEY', toPlayerId: g.id('Bilal'), amount: 1 })).toThrow('You are out of the game.');

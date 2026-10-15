@@ -3,7 +3,6 @@ import { formatINR } from './format.ts';
 import { configOf, type ConfigAware } from './gameConfig.ts';
 import { INTERMEDIATE_RULES as IR, LOAN_PRODUCT_KEYS, type LoanProductKey } from './intermediateConfig.ts';
 import {
-  accruedInterest,
   buildSchedule,
   collateralLimit,
   creditBand,
@@ -16,6 +15,7 @@ import {
   type ScheduleLine,
 } from './intermediateFinance.ts';
 import {
+  accruedLoanInterest,
   crisisOwed,
   economyOf,
   gameClock,
@@ -30,7 +30,7 @@ import {
   type IntermediateLoan,
   type IntermediateState,
 } from './intermediateState.ts';
-import { buildingCost, intermediateDebt, intermediateNetAssets, openResaleFor, ownedBy, unmortgageCost } from './selectors.ts';
+import { balanceSheet, buildingCost, intermediateDebt, intermediateNetAssets, openResaleFor, ownedBy, unmortgageCost } from './selectors.ts';
 import type { GameState } from './types.ts';
 
 /**
@@ -299,10 +299,7 @@ export function prepaymentBlocker(loan: IntermediateLoan, principal: number): st
 
 /** What repaying `principal` early costs right now: that principal plus the interest accrued on it. No penalty. */
 export function prepaymentQuote(eco: IntermediateState, loan: IntermediateLoan, principal: number): PrepaymentQuote {
-  const next = nextScheduledInstallment(loan);
-  const length = yearLength(eco);
-  const elapsed = next ? gameClock(eco) - (next.dueAt - length) : 0;
-  const interest = accruedInterest(principal, loan.ratePercent, elapsed, length);
+  const interest = accruedLoanInterest(eco, loan, principal);
   return { principal, accruedInterest: interest, total: principal + interest + LOANS.prepaymentPenalty, remainingPrincipal: scheduledPrincipal(loan) - principal };
 }
 
@@ -355,8 +352,10 @@ export interface FinancialOverview {
   /** cash + property + buildings − mortgage redemption. */
   netAssets: number;
   loanPrincipal: number;
-  /** Principal plus interest already due. */
+  /** What would close every loan today: principal, interest due, interest accrued this loan year, defaulted balances. */
   loanLiability: number;
+  /** The part of loanLiability that is interest accrued but not yet due. */
+  accruedInterest: number;
   /** A crisis bill this player still owes (0 when none). */
   crisisOwed: number;
   /** netAssets − loanLiability − crisisOwed. */
@@ -407,8 +406,10 @@ export function financialOverview(state: Pick<GameState, 'properties' | 'players
     netAssets,
     loanPrincipal,
     loanLiability: liability,
+    accruedInterest: loansOf(eco, playerId).reduce((sum, l) => sum + accruedLoanInterest(eco, l), 0),
     crisisOwed: crisisOwed(eco, playerId),
-    netWorth: netAssets - liability - crisisOwed(eco, playerId),
+    // The one net worth: the dashboard, the player sheets and the final standings all read balanceSheet.
+    netWorth: balanceSheet(state, playerId).netWorth,
     creditScore: score,
     creditBand: creditBand(score).label,
     debtRatio: debtRatio(loanPrincipal, netAssets),

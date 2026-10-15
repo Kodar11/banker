@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BUSINESS_MVP_RULES, positionOfSpecial, type GameAction, type PropertyKey } from '@/engine/index.ts';
+import { BUSINESS_MVP_RULES, type GameAction, type PropertyKey } from '@/engine/index.ts';
 import { TestGame } from './harness.ts';
 
 const START = BUSINESS_MVP_RULES.startingCash;
@@ -185,8 +185,10 @@ describe('trade validation', () => {
     const g = new TestGame();
     g.give('Asha', 'INDORE');
     const t = offer(g, 'Asha', 'Bilal', { keys: ['INDORE'] }, { money: 100 });
+    g.give('Chitra', 'MUMBAI', { hotel: true });
     g.act('Asha', { type: 'TRANSFER_MONEY', toPlayerId: g.id('Chitra'), amount: START - 100 });
-    g.landOn('Asha', positionOfSpecial('CLUB'), 5); // Club ₹100 × 2 players > ₹100
+    g.placeBefore('Asha', 'MUMBAI', 5); // a hotel's rent: more than ₹100 plus all Indore could raise
+    g.rollTotal('Asha', 5);
     g.act('Asha', { type: 'DECLARE_BANKRUPTCY' });
     expect(g.state.trades.find((x) => x.id === t.id)?.status).toBe('EXPIRED');
     expect(() => g.act('Bilal', { type: 'ACCEPT_TRADE', tradeId: t.id })).toThrow('This offer was already expired.');

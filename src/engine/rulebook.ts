@@ -33,6 +33,7 @@ const groupSize = groupMembers('BLUE').length;
 const sellBack = percent(R.building.sellBackRate);
 const mortgageInterest = percent(R.mortgage.unmortgageInterestRate);
 const loanRate = `${R.loans.interestRatePercent}%`;
+const ordinal = (n: number) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : (['th', 'st', 'nd', 'rd'][n % 10] ?? 'th')}`;
 const colourSet = R.rent.sameColorThreshold;
 
 /** The host's settings the rulebook quotes. Outside a game: the standard values. */
@@ -85,7 +86,7 @@ export function topRules(config: RulebookConfig = STANDARD): readonly RuleEntry[
       lines: [
         `Everyone starts with ${formatINR(config.startingCash)}.`,
         'Pay rent, taxes and special-square charges when they fall due.',
-        'Short of cash? Take a loan, mortgage, sell buildings or trade. If you still cannot pay, you go bankrupt.',
+        'Short of cash? Sell buildings, mortgage or sell property — or take a loan if you want to. Bankruptcy comes only when even selling everything would not pay.',
       ],
     },
     {
@@ -93,7 +94,7 @@ export function topRules(config: RulebookConfig = STANDARD): readonly RuleEntry[
       lines: [
         'Offer properties and money to another player. Nothing changes until they accept.',
         'Keep track of your mortgages and loans.',
-        'The last player not bankrupt wins. If the game ends by a vote or runs its full duration, the highest net worth wins.',
+        'The last player not bankrupt wins. If the game ends by a vote or runs its full duration, the highest net worth wins; level on net worth, fewer liabilities wins.',
       ],
     },
   ];
@@ -173,6 +174,8 @@ export function ruleSections(config: RulebookConfig = STANDARD): readonly RuleSe
             `Interest is ${loanRate} of the amount you borrowed. It is charged ${R.loans.interestEveryCircuit ? 'each time' : 'once, the next time'} a forward move takes you past or onto Start.`,
             'Repay the whole loan before then and you pay no interest.',
             'Repay the amount you borrowed whenever you like, in part or in full.',
+            `The amount you borrowed is due at your ${ordinal(R.loans.maturityCircuits)} Start after borrowing. Still unpaid at the next Start, the loan is overdue; at the one after that, it is in default.`,
+            'An overdue loan or one in default stops you borrowing again until it is repaid. A loan in default is still owed in full: it adds no interest, and it counts against your net worth.',
           ],
           example: `Borrow ${formatINR(exampleLoan)} and receive ${formatINR(exampleLoan)}. At your next Start you pay ${formatINR(Math.round((exampleLoan * R.loans.interestRatePercent) / 100))} interest${R.loans.interestEveryCircuit ? '' : ', once'}. You still owe ${formatINR(exampleLoan)} until you repay it.`,
         },
@@ -203,10 +206,11 @@ export function ruleSections(config: RulebookConfig = STANDARD): readonly RuleSe
         {
           title: 'Not enough money and bankruptcy',
           lines: [
-            'If you owe more than you have, your turn waits while you raise money: sell buildings, mortgage, sell a property to the bank, take a loan or trade.',
-            'If you still cannot pay, you declare bankruptcy and leave the game.',
-            'Your remaining cash goes to the player you owe. If you owe the bank or several players at once, it goes to the bank.',
-            'Your properties return to the bank with no buildings and no mortgage, and your loans are written off.',
+            'If you owe more than you have, your turn waits while you raise money: sell buildings, mortgage, sell a property to the bank, trade, or take a loan. Borrowing is your choice, never a requirement.',
+            'While a payment is waiting you can’t give money away, and a trade can’t leave you with less than the bank would pay for what you hand over. Fair trades are fine.',
+            'You can declare bankruptcy only when even selling every building and mortgaging or selling every property to the bank would not cover what you owe.',
+            'Your estate then pays the player you owe first — your cash, and your buildings and properties sold back to the bank — and then any bank loans. A payment owed to several players is shared equally.',
+            'Your properties return to the bank with no buildings and no mortgage, ready to be bought again. Anything the estate could not pay is recorded as unpaid.',
             'Rest House and Birthday collections are the exception: a player who cannot pay their full share pays what they have, and owes nothing more.',
           ],
         },
@@ -300,6 +304,7 @@ export function ruleSections(config: RulebookConfig = STANDARD): readonly RuleSe
           title: 'Winning',
           lines: [
             'The game ends when only one player is not bankrupt. That player wins.',
+            'Players who went bankrupt or left can’t win, whatever they held.',
             `A game with a host runs for the number of financial years the host chose (${R.endGame.duration.minYears} to ${R.endGame.duration.maxYears}).`,
             `A financial year passes each time the players have moved ${IR.year.spacesPerYear} spaces by dice on average: about one lap of the board each.`,
             'Nobody ends the game alone. Before the last year, any active player can ask for a vote to end early, once per financial year.',
@@ -307,6 +312,7 @@ export function ruleSections(config: RulebookConfig = STANDARD): readonly RuleSe
             'When the last year is over everyone votes: end the game, or play one more financial year. Half of the active players (at least one) voting to end is enough.',
             `Otherwise the game goes on for one more year and then asks again, up to year ${R.endGame.duration.maxYears}, where it ends.`,
             `A vote lasts ${R.endGame.voteSeconds} seconds and is secret. Not voting counts for neither side. When the game ends this way, the highest net worth wins.`,
+            'Level on net worth, the player with fewer liabilities (loans, interest owed and mortgages) wins. Level on both, they share the victory.',
           ],
         },
         {
@@ -315,7 +321,7 @@ export function ruleSections(config: RulebookConfig = STANDARD): readonly RuleSe
             'Your cash,',
             'plus the deed price of every property you own (less its mortgage value if it is mortgaged),',
             `plus what your houses and hotels cost to build (a hotel counts its own price and the ${R.building.maxHouses} houses it replaced),`,
-            'minus the bank loans you still owe and any loan interest charged but not yet paid.',
+            'minus the mortgage value of each mortgaged property, the bank loans you still owe (in default too) and any loan interest charged but not yet paid.',
           ],
           example:
             EXAMPLE.kind === 'CITY'
@@ -325,7 +331,10 @@ export function ruleSections(config: RulebookConfig = STANDARD): readonly RuleSe
         {
           title: 'Leaving, pausing and expiry',
           lines: [
-            'A player who leaves keeps their cash and properties, takes no more turns, and is still owed rent. If only one player remains, that player wins.',
+            'A player who leaves settles up first: a payment they owe is paid, then their bank loans. Their properties return to the bank and any cash left leaves the game.',
+            'They take no more turns, collect no rent and can’t win. If only one player remains, that player wins.',
+            'Being offline is not leaving: the game waits for you.',
+            'Money players lend each other is between them: the game never collects it. Only payments the game asks for — rent, taxes, cards, Club, interest — and bank loans are enforced.',
             'Any player can pause the game. Nothing can be done while it is paused, and an auction countdown waits.',
             `A game with no activity for ${R.session.ttlHours} hours expires.`,
             `A single payment to another player can be at most ${formatINR(R.transfers.maxAmount)}.`,

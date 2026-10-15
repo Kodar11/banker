@@ -3,7 +3,7 @@ import { formatINR } from './format.ts';
 import { INTERMEDIATE_RULES as IR } from './intermediateConfig.ts';
 import { crisisOwed, economyOf, isIntermediate, isPledged, loanLiability, pendingCrises, type GameMode, type IntermediateState } from './intermediateState.ts';
 import { BUSINESS_MVP_RULES as RULES } from './rules.ts';
-import type { AuctionState, GameState, LoanState, PlayerState, PropertyState, ResaleResumePhase, ResaleTerms, TradeOffer, UndoableRecord } from './types.ts';
+import type { AuctionState, GameState, LoanState, PlayerState, PropertyState, ResaleResumePhase, ResaleTerms, TradeOffer, TurnState, UndoableRecord } from './types.ts';
 
 type StateLike = Pick<GameState, 'properties'>;
 /** Mode-aware selectors accept states that carry the mode; without one they read as Classic. */
@@ -119,15 +119,51 @@ export function wealthTaxDue(state: StateLike, playerId: string): { houses: numb
   return { houses, hotels, amount };
 }
 
-export function outstandingDebt(loans: LoanState[], playerId: string): number {
-  return loans.filter((l) => l.playerId === playerId && l.status === 'ACTIVE').reduce((sum, l) => sum + l.outstanding, 0);
+/**
+ * A Classic loan the bank can still collect: being repaid, or in default while the borrower plays.
+ * (A loan closed when the borrower's estate was settled keeps the unpaid part on record only.)
+ */
+export function isEnforceableLoan(loan: LoanState): boolean {
+  return loan.status === 'ACTIVE' || (loan.status === 'DEFAULTED' && loan.closedAt === null);
 }
 
+/** Classic principal still owed and collectable: active loans and loans in default. */
+export function outstandingDebt(loans: LoanState[], playerId: string): number {
+  return loans.filter((l) => l.playerId === playerId && isEnforceableLoan(l)).reduce((sum, l) => sum + l.outstanding, 0);
+}
+
+/** Principal that counts against the loan limit. */
 export function outstandingPrincipal(loans: LoanState[], playerId: string): number {
-  return loans.filter((l) => l.playerId === playerId && l.status === 'ACTIVE').reduce((sum, l) => {
+  return loans.filter((l) => l.playerId === playerId && isEnforceableLoan(l)).reduce((sum, l) => {
     // Principal still owed, proportional to what's left of the total.
     return sum + Math.ceil((l.principal * l.outstanding) / l.totalOwed);
   }, 0);
+}
+
+/**
+ * Where a Classic loan stands, judged by the borrower's completed circuits (laps):
+ *   CURRENT      principal not due yet (or a loan signed before loans had a maturity)
+ *   DUE          the borrower has reached the maturity Start: repay it
+ *   OVERDUE      one Start since it fell due without repayment — the next Start defaults it
+ *   DEFAULTED    two Starts in a row missed: still owed, borrowing blocked until cleared
+ *   CLOSED       repaid, or closed when the borrower's estate was settled
+ */
+export type ClassicLoanStanding = 'CURRENT' | 'DUE' | 'OVERDUE' | 'DEFAULTED' | 'CLOSED';
+
+export function classicLoanStanding(loan: LoanState, borrowerCircuits: number): ClassicLoanStanding {
+  if (!isEnforceableLoan(loan)) return 'CLOSED';
+  if (loan.status === 'DEFAULTED') return 'DEFAULTED';
+  if (loan.maturityCircuit === null || borrowerCircuits < loan.maturityCircuit) return 'CURRENT';
+  return borrowerCircuits >= loan.maturityCircuit + RULES.loans.overdueAfterCircuits ? 'OVERDUE' : 'DUE';
+}
+
+/** Why this Classic player may not borrow right now because of an earlier loan, or null. */
+export function classicBorrowingBlock(state: Pick<GameState, 'loans' | 'players'>, playerId: string): string | null {
+  const circuits = state.players.find((p) => p.id === playerId)?.circuits ?? 0;
+  const standings = state.loans.filter((l) => l.playerId === playerId).map((l) => classicLoanStanding(l, circuits));
+  if (standings.includes('DEFAULTED')) return 'You have a loan in default. Repay it before borrowing again.';
+  if (standings.includes('OVERDUE')) return 'You have an overdue loan. Repay it before borrowing again.';
+  return null;
 }
 
 /** The borrower's circuit count at which this loan's next interest is charged, or null if none will be. */
@@ -165,28 +201,102 @@ export function propertyValue(prop: PropertyState): number {
 
 /** Loan interest that has been charged at Start but not paid yet (the player is still raising the money). */
 export function unpaidLoanInterest(loans: LoanState[], playerId: string): number {
-  return loans
-    .filter((l) => l.playerId === playerId && l.status !== 'DEFAULTED')
-    .reduce((sum, l) => sum + Math.max(0, l.interestCharges * l.interestAmount - l.interestPaid), 0);
+  return loans.filter((l) => l.playerId === playerId && isEnforceableLoan(l)).reduce((sum, l) => sum + loanInterestUnpaid(l), 0);
+}
+
+export function loanInterestUnpaid(loan: LoanState): number {
+  return Math.max(0, loan.interestCharges * loan.interestAmount - loan.interestPaid);
 }
 
 /**
- * THE net worth (winner of an early end, standings, every screen):
- * cash + each property at its deed price (less its mortgage value while mortgaged)
- * + houses/hotels at what they cost to build − loan principal still owed
- * − loan interest already charged but not yet paid.
- * Capital Mode: market values instead, less Capital loans and any crisis bill still owed.
+ * A player's financial position, the same way in both modes. Every screen, the standings and the
+ * winner read it, so they can never disagree.
+ *
+ *   assets       cash + properties + buildings at what they cost to build (100%: the bank's 50% is
+ *                what selling one pays, not what it is worth to its owner)
+ *                  Classic: each property at its deed price · Capital: at its current market value
+ *   liabilities  mortgages — Classic: the mortgage value · Capital: the cost to redeem it
+ *                + loans — what would close each one today (Classic: principal still owed + interest
+ *                  charged at Start and unpaid; Capital: loanPayoff)
+ *                + crisis bills still owed (Capital)
+ *   net worth    assets − liabilities
+ *
+ * Each obligation is counted once, in one line. A player's credit score is not money and is not in it.
  */
-export function netWorth(state: Pick<GameState, 'properties' | 'loans' | 'players'> & ModeAware, playerId: string): number {
-  const player = state.players.find((p) => p.id === playerId);
-  if (!player) return 0;
+export interface BalanceSheet {
+  cash: number;
+  propertyValue: number;
+  buildingValue: number;
+  assets: number;
+  mortgages: number;
+  loans: number;
+  crisisBills: number;
+  liabilities: number;
+  netWorth: number;
+}
+
+export function balanceSheet(state: Pick<GameState, 'properties' | 'players'> & { loans?: LoanState[] } & ModeAware, playerId: string): BalanceSheet {
+  const cash = state.players.find((p) => p.id === playerId)?.balance ?? 0;
   const eco = economyOf(state);
-  if (eco) return intermediateNetAssets(state, eco, playerId) - intermediateDebt(eco, playerId) - crisisOwed(eco, playerId);
-  const props = ownedBy(state, playerId).reduce((sum, k) => {
-    const p = state.properties[k];
-    return p ? sum + propertyValue(p) : sum;
-  }, 0);
-  return player.balance + props - outstandingDebt(state.loans, playerId) - unpaidLoanInterest(state.loans, playerId);
+  let propertyValue = 0;
+  let buildingValue = 0;
+  let mortgages = 0;
+  for (const key of ownedBy(state, playerId)) {
+    const p = state.properties[key];
+    propertyValue += eco ? (eco.market[key]?.value ?? getDeed(key).price) : getDeed(key).price;
+    buildingValue += buildingCost(p);
+    if (p.mortgaged) mortgages += eco ? unmortgageCost(key) : getDeed(key).mortgageValue;
+  }
+  const classic = state.loans ?? [];
+  const loans = eco ? intermediateDebt(eco, playerId) : outstandingDebt(classic, playerId) + unpaidLoanInterest(classic, playerId);
+  const crisisBills = eco ? crisisOwed(eco, playerId) : 0;
+  const assets = cash + propertyValue + buildingValue;
+  const liabilities = mortgages + loans + crisisBills;
+  return { cash, propertyValue, buildingValue, assets, mortgages, loans, crisisBills, liabilities, netWorth: assets - liabilities };
+}
+
+/** THE net worth (the final standings, the winner, every screen): balanceSheet(…).netWorth. */
+export function netWorth(state: Pick<GameState, 'properties' | 'loans' | 'players'> & ModeAware, playerId: string): number {
+  if (!state.players.some((p) => p.id === playerId)) return 0;
+  return balanceSheet(state, playerId).netWorth;
+}
+
+/** One place in the final standings. */
+export interface Standing {
+  playerId: string;
+  netWorth: number;
+  /** Total outstanding liabilities (balanceSheet): the tie-breaker. */
+  liabilities: number;
+  /** 1 = winner. Players level on both net worth and liabilities share a rank. */
+  rank: number;
+}
+
+/**
+ * THE final ranking. Only players still in the game are ranked — a bankrupt or departed player
+ * cannot win, whatever is left on record in their name. Highest net worth first; on exactly equal
+ * net worth, lower total liabilities first; equal on both, the players share the place (and, at the
+ * top, the victory). Seat order, player ids and chance never decide anything: players sharing a rank
+ * are listed in seat order for display only.
+ */
+export function rankStandings(state: Pick<GameState, 'properties' | 'loans' | 'players'> & ModeAware): Standing[] {
+  const rows = state.players
+    .filter((p) => p.status === 'ACTIVE')
+    .sort((a, b) => a.seat - b.seat)
+    .map((p) => {
+      const sheet = balanceSheet(state, p.id);
+      return { playerId: p.id, netWorth: sheet.netWorth, liabilities: sheet.liabilities, rank: 0 };
+    })
+    .sort((a, b) => b.netWorth - a.netWorth || a.liabilities - b.liabilities);
+  rows.forEach((row, i) => {
+    const prev = rows[i - 1];
+    row.rank = prev && prev.netWorth === row.netWorth && prev.liabilities === row.liabilities ? prev.rank : i + 1;
+  });
+  return rows;
+}
+
+/** The players ranked first: one winner, several when they share the victory, none when nobody is left. */
+export function winnersOf(standings: readonly Standing[]): string[] {
+  return standings.filter((s) => s.rank === 1).map((s) => s.playerId);
 }
 
 // ---------------------------------------------------------------------------
@@ -198,9 +308,9 @@ export function purchasePrice(state: ModeAware, key: PropertyKey): number {
   return economyOf(state)?.market[key]?.value ?? getDeed(key).price;
 }
 
-/** Everything a player owes on Capital loans today (principal, interest already due, defaulted balances). */
+/** Everything a player owes on Capital loans today: each loan's payoff (principal, interest due or accrued, defaulted balances). */
 export function intermediateDebt(eco: IntermediateState, playerId: string): number {
-  return eco.loans.filter((l) => l.playerId === playerId).reduce((sum, l) => sum + loanLiability(l), 0);
+  return eco.loans.filter((l) => l.playerId === playerId).reduce((sum, l) => sum + loanLiability(eco, l), 0);
 }
 
 /**
@@ -217,10 +327,10 @@ export function intermediateNetAssets(state: Pick<GameState, 'properties' | 'pla
   }, cash);
 }
 
-/** What a player owes the bank on loans, in either mode (Classic: loan principal still owed). */
+/** What a player owes the bank on loans, in either mode: the loans line of their balance sheet. */
 export function totalDebt(state: Pick<GameState, 'loans'> & ModeAware, playerId: string): number {
   const eco = economyOf(state);
-  return eco ? intermediateDebt(eco, playerId) : outstandingDebt(state.loans, playerId);
+  return eco ? intermediateDebt(eco, playerId) : outstandingDebt(state.loans, playerId) + unpaidLoanInterest(state.loans, playerId);
 }
 
 export function ownsWholeGroup(state: StateLike, playerId: string, key: PropertyKey): boolean {
@@ -289,12 +399,69 @@ export function tradePropertyBlocker(state: StateLike & ModeAware & AuctionAware
   return null;
 }
 
+// ---------------------------------------------------------------------------
+// Mandatory payments and raising money
+// ---------------------------------------------------------------------------
+
+/** Selectors that must know about a payment awaited on the turn accept states that carry the turn; without one nothing is owed on it. */
+type TurnAware = { turn?: Pick<TurnState, 'playerId' | 'pending'> | null };
+
+/**
+ * What a player owes right now on game-generated payments they have not settled: the payment their
+ * turn is waiting on (rent, tax, a card, Club, loan interest) and, in Capital Mode, crisis bills.
+ * Not loans — those have their own schedule. While this is above zero the player may not give money away.
+ */
+export function mandatoryPaymentsOwed(state: TurnAware & ModeAware, playerId: string): number {
+  const pending = state.turn?.playerId === playerId ? state.turn.pending : null;
+  const onTurn = pending?.kind === 'PAYMENT' ? pending.amount : 0;
+  const crises = pendingCrises(state)
+    .filter((c) => c.ownerId === playerId)
+    .reduce((sum, c) => sum + c.amount - c.paid, 0);
+  return onTurn + crises;
+}
+
+/**
+ * What one property could still raise from the bank, at the bank's own prices: every building sold
+ * back (building.sellBackRate of its cost, as SELL_BUILDING pays it) and then the property mortgaged
+ * for its mortgage value (selling it to the bank pays the same). Nothing for a property that is
+ * already mortgaged (its buildings are frozen with it) or pledged as loan collateral.
+ */
+export function propertyLiquidationValue(state: StateLike & ModeAware, key: PropertyKey): number {
+  const prop = state.properties[key];
+  if (!prop || prop.ownerId === null || prop.mortgaged || isPledged(state, key)) return 0;
+  const deed = getDeed(key);
+  const buildings = deed.kind !== 'CITY' ? 0 : prop.hotel ? sellBuildingRefund(key, prop) : prop.houses * sellBuildingRefund(key, { ...prop, houses: 1 });
+  return buildings + mortgagePayout(key);
+}
+
+/** Cash plus everything the player's properties could raise from the bank. Borrowing is not counted: it is never required. */
+export function raisableFunds(state: Pick<GameState, 'players' | 'properties'> & ModeAware, playerId: string): number {
+  const cash = state.players.find((p) => p.id === playerId)?.balance ?? 0;
+  return ownedBy(state, playerId).reduce((sum, key) => sum + propertyLiquidationValue(state, key), cash);
+}
+
+/**
+ * The anti-asset-stripping rule for a player who owes a mandatory payment: a trade must not leave them
+ * able to raise less from the bank than before. What they receive (cash + what the properties they get
+ * could raise) must be at least what they give up (cash + what the properties they hand over could
+ * raise). A fair or generous deal goes through — including selling for more than the bank would pay —
+ * but handing property to a friend for a token sum, out of the creditor's reach, does not.
+ * Values are the bank's (propertyLiquidationValue): no appraisal of anyone's opinion of a price.
+ */
+export function tradeStripsDebtor(
+  state: StateLike & ModeAware,
+  side: { giveKeys: readonly PropertyKey[]; giveMoney: number; getKeys: readonly PropertyKey[]; getMoney: number },
+): boolean {
+  const value = (keys: readonly PropertyKey[]) => keys.reduce((sum, k) => sum + propertyLiquidationValue(state, k), 0);
+  return side.getMoney + value(side.getKeys) < side.giveMoney + value(side.giveKeys);
+}
+
 /**
  * Full validation of a trade against the CURRENT state (used when creating and
  * again when accepting). Returns the first problem, or null if it can execute.
  */
 export function tradeBlocker(
-  state: Pick<GameState, 'players' | 'properties' | 'status'> & ModeAware & AuctionAware,
+  state: Pick<GameState, 'players' | 'properties' | 'status'> & ModeAware & AuctionAware & TurnAware,
   trade: Pick<TradeOffer, 'fromPlayerId' | 'toPlayerId' | 'offeredPropertyKeys' | 'requestedPropertyKeys' | 'offeredMoney' | 'requestedMoney'>,
 ): string | null {
   if (state.status !== 'ACTIVE') return 'The game is not running.';
@@ -320,6 +487,14 @@ export function tradeBlocker(
   }
   if (from.balance < trade.offeredMoney) return `${from.name} doesn't have the offered money.`;
   if (to.balance < trade.requestedMoney) return `${to.name} doesn't have the requested money.`;
+  // Ordinary trades are never restricted. Only a player with a payment to settle is held to a fair exchange.
+  const fromSide = { giveKeys: trade.offeredPropertyKeys, giveMoney: trade.offeredMoney, getKeys: trade.requestedPropertyKeys, getMoney: trade.requestedMoney };
+  const toSide = { giveKeys: trade.requestedPropertyKeys, giveMoney: trade.requestedMoney, getKeys: trade.offeredPropertyKeys, getMoney: trade.offeredMoney };
+  for (const [player, side] of [[from, fromSide], [to, toSide]] as const) {
+    if (mandatoryPaymentsOwed(state, player.id) > 0 && tradeStripsDebtor(state, side)) {
+      return `${player.name} has a payment to settle: a trade can’t leave them with less than the bank would pay for what they give up.`;
+    }
+  }
   return null;
 }
 

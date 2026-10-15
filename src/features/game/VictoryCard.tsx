@@ -1,6 +1,6 @@
 import { Animated, Pressable, Text, View } from 'react-native';
 import { formatINR } from '@/utils/currency';
-import { finalResult } from './finalResult';
+import { finalResult, resultTitle } from './finalResult';
 import type { GameView } from './useGameView';
 import { SPARKLES, useVictoryClock, VICTORY_TRACKS } from './victoryMoment';
 
@@ -26,24 +26,24 @@ interface VictoryCardProps {
 export function VictoryCard({ view, height, dense, onStandings }: VictoryCardProps) {
   const { state } = view.snapshot;
   const result = finalResult(view.snapshot);
-  const won = result.winnerId !== null;
+  const won = result.winnerIds.length > 0;
   const clock = useVictoryClock(won ? state.id : null);
-  const tied = result.tiedWithIds.length > 0;
-  const winner = view.playerName(result.winnerId);
   const worth = result.winnerNetWorth === null ? null : formatINR(result.winnerNetWorth);
 
-  const label = !won ? 'Game over' : tied ? 'Game over · Tied finish' : 'Game over · Victory';
-  const title = won ? `${winner} wins!` : 'Game over';
+  const label = !won ? 'Game over' : result.sharedVictory ? 'Game over · Shared victory' : result.wonOnLiabilities ? 'Game over · Won on the tie-break' : 'Game over · Victory';
+  const title = resultTitle(result, view.playerName);
   /** The second line of figures: the lead, the tie, or how the game ended. Null when there is nothing true to add. */
   const second: { label: string; value: string } | null = !won
     ? { label: 'Result', value: 'No winner was declared' }
-    : tied
-      ? { label: 'Tied on net worth', value: `Level with ${result.tiedWithIds.length === 1 ? view.playerName(result.tiedWithIds[0]!) : `${result.tiedWithIds.length} players`}` }
-      : result.lead !== null
-        ? { label: 'Lead over second place', value: formatINR(result.lead) }
-        : result.lastPlayerStanding
-          ? { label: 'Result', value: 'Last player standing' }
-          : null;
+    : result.sharedVictory
+      ? { label: 'Level on net worth and liabilities', value: `${result.winnerIds.length} winners` }
+      : result.wonOnLiabilities
+        ? { label: 'Level on net worth', value: `Fewer liabilities than ${result.tiedWithIds.length === 1 ? view.playerName(result.tiedWithIds[0]!) : `${result.tiedWithIds.length} players`}` }
+        : result.lead !== null
+          ? { label: 'Lead over second place', value: formatINR(result.lead) }
+          : result.lastPlayerStanding
+            ? { label: 'Result', value: 'Last player standing' }
+            : null;
   const spoken = [title, worth ? `Final net worth ${worth}` : null, second ? `${second.label}: ${second.value}` : null].filter(Boolean).join('. ');
 
   const trophySize = dense ? 44 : 52;

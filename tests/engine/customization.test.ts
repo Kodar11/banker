@@ -285,11 +285,12 @@ describe('Classic takes nothing from Capital', () => {
     expect(g.state.objectives).toBeNull();
     expect(g.ledger.some((t) => t.type === 'OBJECTIVE_REWARD')).toBe(false);
     expect(g.results.flatMap((r) => r.events).some((e) => e.type === 'OBJECTIVE_RESULT' || e.type === 'FINANCIAL_YEAR_STARTED')).toBe(false);
-    // Six passes of Start each, nothing else: the result is plain Classic net worth.
+    // Six passes of Start each, nothing else: the result is plain Classic net worth — level, so a shared victory.
     expect(end.events.find((e) => e.type === 'GAME_FINISHED')!.payload.standings).toEqual([
-      { playerId: g.id('Asha'), netWorth: 30000 + 6 * R.start.passReward },
-      { playerId: g.id('Bilal'), netWorth: 30000 + 6 * R.start.passReward },
+      { playerId: g.id('Asha'), netWorth: 30000 + 6 * R.start.passReward, liabilities: 0, rank: 1 },
+      { playerId: g.id('Bilal'), netWorth: 30000 + 6 * R.start.passReward, liabilities: 0, rank: 1 },
     ]);
+    expect(g.state.winnerId).toBeNull();
   });
 
   it('the Classic summary lists only what applies to it', () => {

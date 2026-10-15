@@ -4,11 +4,11 @@ import type { Draft } from './draft.ts';
 import { fail } from './errors.ts';
 import { formatINR } from './format.ts';
 import { INTERMEDIATE_RULES as IR } from './intermediateConfig.ts';
+import { bankruptcyBlockerNow, raiseFundsOptions } from './estate.ts';
 import { pickFrom } from './intermediateFinance.ts';
-import { loanOffers } from './intermediateSelectors.ts';
 import { economyOf, gameClock, insuranceOf, pendingCrises, yearAt, type IntermediateState } from './intermediateState.ts';
 import type { CrisisRecord, InsurancePolicy, InsuranceState } from './insuranceState.ts';
-import { ownedBy, propertyActionBlocker } from './selectors.ts';
+import { ownedBy } from './selectors.ts';
 import type { GameState, PlayerState } from './types.ts';
 
 /**
@@ -401,26 +401,20 @@ export function payCrisisBill(d: Draft, actor: PlayerState, crisisId: string): v
   });
 }
 
-/** The ways this player could still raise money for a crisis bill, in words. Empty = every option is used up. */
+/** The ways this player could still raise money for a crisis bill, in words (estate.raiseFundsOptions). Empty = nothing left to try. */
 export function crisisRecoveryOptions(state: GameState, playerId: string): string[] {
-  const owned = ownedBy(state, playerId);
-  const can = (kind: 'SELL_BUILDING' | 'MORTGAGE_PROPERTY' | 'SELL_PROPERTY') => owned.some((k) => propertyActionBlocker(state, playerId, k, kind) === null);
-  const options: string[] = [];
-  if (can('SELL_BUILDING')) options.push('sell a building');
-  if (can('MORTGAGE_PROPERTY')) options.push('mortgage a property');
-  if (can('SELL_PROPERTY')) options.push('sell a property to the bank');
-  if (loanOffers(state, playerId).some((o) => !o.blocked && o.maxAmount >= IR.loans.minAmount)) options.push('take a loan');
-  return options;
+  return raiseFundsOptions(state, playerId);
 }
 
-/** Why this player may not go bankrupt over a crisis bill right now, or null. Lacking the cash is not enough. */
+/**
+ * Why this player may not go bankrupt over a crisis bill right now, or null. The game's one bankruptcy
+ * rule (estate.bankruptcyBlocker): lacking the cash is not enough, and borrowing is never required.
+ */
 export function crisisBankruptcyBlocker(state: GameState, playerId: string, crisis: CrisisRecord): string | null {
   const player = state.players.find((p) => p.id === playerId);
   if (!player) return 'You are not in this game.';
   if (player.balance >= crisis.amount - crisis.paid) return 'You can afford this bill.';
-  const options = crisisRecoveryOptions(state, playerId);
-  if (options.length) return `You can still raise money: ${options.join(', ')}. Bankruptcy is only possible once nothing is left to try.`;
-  return null;
+  return bankruptcyBlockerNow(state, playerId);
 }
 
 /** Validates a bankruptcy over `crisisId` and returns the bill. The reducer then runs the game's own bankruptcy. */
@@ -431,28 +425,14 @@ export function assertCrisisBankruptcy(d: Draft, actor: PlayerState, crisisId: s
   return crisis;
 }
 
-/** After the bankruptcy took the player's cash (`cash`, already paid to the bank): their bills are closed against it, oldest first. */
-export function closeCrisesInBankruptcy(d: Draft, playerId: string, cash: number): void {
-  let left = cash;
-  for (const crisis of pendingCrises(d.state)) {
-    if (crisis.ownerId !== playerId) continue;
-    const part = Math.min(left, crisis.amount - crisis.paid);
-    left -= part;
-    crisis.paid += part;
-    crisis.status = 'BANKRUPT';
-    crisis.settledAt = d.ctx.now;
-  }
-}
-
 /**
- * Closes pending bills of a player who is leaving (`playerId`), or of everyone when the game is
- * ending (`null`): the bank takes what cash there is towards each bill. Anything it could not
- * collect stays on record as UNPAID and counts against that player's net worth, so the game is
- * never left waiting on someone who is gone and no bill is skipped before the winner is decided.
+ * Closes every pending bill when the game is ending: the bank takes what cash there is towards each
+ * bill. Anything it could not collect stays on record as UNPAID and counts against that player's net
+ * worth, so no bill is skipped before the winner is decided. (A player who goes bankrupt or leaves
+ * settles their bills with the rest of their estate: estate.settleEstate.)
  */
-export function closePendingCrises(d: Draft, playerId: string | null): void {
+export function closePendingCrises(d: Draft): void {
   for (const crisis of pendingCrises(d.state)) {
-    if (playerId !== null && crisis.ownerId !== playerId) continue;
     const owner = d.state.players.find((p) => p.id === crisis.ownerId);
     const name = crisis.propertyKey ? getDeed(crisis.propertyKey).name : 'a property';
     const part = Math.min(crisis.amount - crisis.paid, owner?.balance ?? 0);

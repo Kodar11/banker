@@ -578,7 +578,7 @@ describe('settling an uninsured crisis', () => {
     // A reconnecting device gets the state back from storage: plain JSON, same bill.
     g.state = JSON.parse(JSON.stringify(g.state));
     expect(pendingCrisisOf(g.state, g.id('Asha'))).toMatchObject({ id: crisis.id, amount: BILL, paid: 0, status: 'PENDING' });
-    expect(crisisRecoveryOptions(g.state, g.id('Asha'))).toEqual(['mortgage a property', 'sell a property to the bank', 'take a loan']);
+    expect(crisisRecoveryOptions(g.state, g.id('Asha'))).toEqual(['mortgage a property', 'sell a property to the bank', 'take a loan (optional)']);
     expect(refusal(() => g.act('Bilal', { type: 'END_TURN' })).code).toBe('INVALID_PHASE');
     pay(g, 'Asha');
     g.act('Bilal', { type: 'END_TURN' });
@@ -597,7 +597,8 @@ describe('settling an uninsured crisis', () => {
     expect(g.player('Asha').status).toBe('ACTIVE');
     const bankrupt = refusal(() => g.act('Asha', { type: 'DECLARE_CRISIS_BANKRUPTCY', crisisId: crisis.id }));
     expect(bankrupt.code).toBe('INVALID_PHASE');
-    expect(bankrupt.message).toContain('You can still raise money: mortgage a property, sell a property to the bank, take a loan.');
+    // Borrowing is offered, but never required: it is not one of the reasons bankruptcy is refused.
+    expect(bankrupt.message).toBe('You can still raise the ₹3,000: mortgage a property, sell a property to the bank. Bankruptcy is only possible when even that would not be enough.');
     expect(crisisBankruptcyBlocker(g.state, g.id('Asha'), crisis)).toBe(bankrupt.message);
     // Mortgaging is one of the existing ways to raise money (₹4,250 for Mumbai).
     g.act('Asha', { type: 'MORTGAGE_PROPERTY', propertyKey: 'MUMBAI' });
@@ -616,7 +617,7 @@ describe('settling an uninsured crisis', () => {
     leaveWith(g, 'Asha', 0, 'Bilal');
     rollTo(g, FIRST, 'MUMBAI');
     expect(pendingCrisisOf(g.state, g.id('Asha'))).not.toBeNull();
-    expect(crisisRecoveryOptions(g.state, g.id('Asha'))).toEqual(['sell a building', 'mortgage a property', 'sell a property to the bank', 'take a loan']);
+    expect(crisisRecoveryOptions(g.state, g.id('Asha'))).toEqual(['sell a building', 'mortgage a property', 'sell a property to the bank', 'take a loan (optional)']);
     g.act('Asha', { type: 'SELL_BUILDING', propertyKey: 'MUMBAI' });
     borrow(g, 'Asha', 'EMERGENCY', 1000);
     g.act('Bilal', { type: 'TRANSFER_MONEY', toPlayerId: g.id('Asha'), amount: 1000 });
@@ -646,7 +647,7 @@ describe('bankruptcy over a crisis bill', () => {
     return g;
   }
 
-  it('is allowed only once nothing is left to try; then the game’s own bankruptcy runs', () => {
+  it('is allowed once the bank would not pay enough for what she owns; the estate pays the bill first', () => {
     const g = exhausted(['Asha', 'Bilal', 'Chitra']);
     const last = names3(g);
     leaveWith(g, 'Asha', 100, last);
@@ -660,11 +661,22 @@ describe('bankruptcy over a crisis bill', () => {
 
     const r = g.act('Asha', { type: 'DECLARE_CRISIS_BANKRUPTCY', crisisId: crisis.id });
     expect(types(r)).toContain('PLAYER_BANKRUPT');
-    expect(r.transactions).toMatchObject([{ type: 'BANKRUPTCY_SETTLEMENT', fromPlayerId: g.id('Asha'), toPlayerId: null, amount: 100 + START_REWARD }]);
+    // Delhi could not be sold or mortgaged while pledged; now it is taken for its own loan at market value,
+    // and the surplus is the estate's cash — which pays the crisis bill first, then the other loans.
+    const [secured, ...unsecured] = eco(g).loans;
+    const surplus = r.transactions.find((t) => t.type === 'COLLATERAL_SURPLUS')!.amount;
+    expect(secured).toMatchObject({ status: 'SETTLED', settlement: { propertyKey: 'DELHI', value: eco(g).market.DELHI.value, surplus } });
+    expect(r.transactions.filter((t) => t.type === 'CRISIS_PAYMENT').map((t) => t.amount)).toEqual([BILL]);
+    expect(crisisAt(g, 1)).toMatchObject({ status: 'PAID', paid: BILL });
+    const paidOut = r.transactions.filter((t) => t.fromPlayerId === g.id('Asha')).reduce((s, t) => s + t.amount, 0);
+    expect(paidOut).toBe(100 + START_REWARD + surplus);
+    // What the estate could not pay on the other loans is recorded on them, not forgiven silently.
+    const owedOnLoans = unsecured.reduce((s, l) => s + (l.writtenOff ?? 0), 0);
+    expect(unsecured.map((l) => l.status)).toEqual(['WRITTEN_OFF', 'WRITTEN_OFF']);
+    expect(owedOnLoans).toBeGreaterThan(0);
+    expect(r.events.find((e) => e.type === 'ESTATE_SETTLED')!.payload).toMatchObject({ kind: 'BANKRUPTCY', unpaid: owedOnLoans });
     expect(g.player('Asha')).toMatchObject({ status: 'BANKRUPT', balance: 0 });
     expect(g.state.properties.DELHI).toMatchObject({ ownerId: null, mortgaged: false });
-    expect(eco(g).loans.every((l) => l.status === 'WRITTEN_OFF')).toBe(true);
-    expect(crisisAt(g, 1)).toMatchObject({ status: 'BANKRUPT', paid: 100 + START_REWARD });
     expect(pendingCrises(g.state)).toEqual([]);
     // It was her turn: it passes on, and the game continues for the others.
     expect(g.state.status).toBe('ACTIVE');
@@ -727,19 +739,39 @@ describe('leaving or ending the game with a bill open', () => {
     expect(standings.find((s) => s.playerId === g.id('Asha'))!.netWorth).toBe(cash - BILL + eco(g).market.MUMBAI.value);
   });
 
-  it('a bill that can’t be collected in full still counts against the final net worth', () => {
+  it('a bill the game’s end can’t collect in full still counts against the final net worth', () => {
     const g = newGame();
     g.give('Asha', 'MUMBAI');
     rollTo(g, 10);
     g.act('Asha', { type: 'END_TURN' });
     leaveWith(g, 'Asha', 400, 'Bilal');
     rollTo(g, FIRST);
-    const r = g.act('Asha', { type: 'LEAVE_GAME' });
+    // Bilal walks away: the game ends with Asha's bill open, and the end collects what cash there is.
+    const r = g.act('Bilal', { type: 'LEAVE_GAME' });
     expect(crisisAt(g, 1)).toMatchObject({ status: 'UNPAID', paid: 400 });
     expect(types(r)).toContain('CRISIS_UNPAID');
     expect(g.balance('Asha')).toBe(0);
     expect(netWorth(g.state, g.id('Asha'))).toBe(eco(g).market.MUMBAI.value - (BILL - 400));
-    expect(g.state.winnerId).toBe(g.id('Bilal'));
+    expect(g.state.winnerId).toBe(g.id('Asha'));
+  });
+
+  it('leaving with a bill and too little cash: the estate sells to the bank to pay it in full', () => {
+    const g = newGame(['Asha', 'Bilal', 'Chitra']);
+    g.give('Asha', 'MUMBAI');
+    rollTo(g, 10);
+    g.act('Asha', { type: 'END_TURN' });
+    leaveWith(g, 'Asha', 400, 'Bilal');
+    rollTo(g, crisisCheckpointClock(eco(g), 1));
+    const cash = g.balance('Asha');
+    const r = g.act('Asha', { type: 'LEAVE_GAME' });
+    expect(r.transactions.map((t) => [t.type, t.amount])).toEqual([
+      ['PROPERTY_SALE', 4250],
+      ['CRISIS_PAYMENT', BILL],
+      ['ESTATE_SETTLEMENT', cash + 4250 - BILL],
+    ]);
+    expect(crisisAt(g, 1)).toMatchObject({ status: 'PAID', paid: BILL });
+    expect(g.state.properties.MUMBAI.ownerId).toBeNull();
+    expect(g.player('Asha')).toMatchObject({ status: 'LEFT', balance: 0 });
   });
 
   it('leaving does not dodge the bill and does not leave the table waiting', () => {
@@ -750,8 +782,11 @@ describe('leaving or ending the game with a bill open', () => {
     rollTo(g, crisisCheckpointClock(eco(g), 1));
     const cash = g.balance('Asha');
     const r = g.act('Asha', { type: 'LEAVE_GAME' });
-    expect(r.transactions).toMatchObject([{ type: 'CRISIS_PAYMENT', amount: BILL }]);
-    expect(g.player('Asha')).toMatchObject({ status: 'LEFT', balance: cash - BILL });
+    expect(r.transactions).toMatchObject([
+      { type: 'CRISIS_PAYMENT', amount: BILL },
+      { type: 'ESTATE_SETTLEMENT', amount: cash - BILL, toPlayerId: null },
+    ]);
+    expect(g.player('Asha')).toMatchObject({ status: 'LEFT', balance: 0 });
     expect(crisisAt(g, 1).status).toBe('PAID');
     g.act('Bilal', { type: 'END_TURN' });
     expect(g.current).toBe('Chitra');
