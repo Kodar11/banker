@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { bankruptcyBlockerNow, DECK_LABELS, economyOf, getDeed, BUSINESS_MVP_RULES, INTERMEDIATE_RULES, premiumForYear, type GameAction } from '@/engine/index.ts';
-import { Button, Card, ConfirmDialog, Label, Pill, TextField } from '@/components/ui';
+import { Button, Card, ConfirmDialog, Label, Pill } from '@/components/ui';
 import { useGameStore } from '@/store/gameStore';
 import { formatINR } from '@/utils/currency';
 import { describeWaiting } from './describe';
@@ -274,54 +274,21 @@ function JailChoice({ view, send, onOpenLoan }: ActionPanelProps) {
   );
 }
 
-/** Card entry missing from the supplied data: the player reads the physical card and enters the money effect. */
+/**
+ * A game saved while Chance odd 11 was still entered by hand can be waiting on that card. The app no
+ * longer asks what it says: the server applies it from the card data (the roll-11 bank reward).
+ */
 function ManualCard({ view, send }: { view: GameView; send: ActionPanelProps['send'] }) {
-  const [amount, setAmount] = useState('');
   const pending = useGameStore((s) => s.pendingAction);
   const card = view.snapshot.state.turn.card;
-  const value = Number.parseInt(amount, 10);
-  const valid = Number.isInteger(value) && value > 0 && value <= BUSINESS_MVP_RULES.cards.manualMaxAmount;
   if (!card) return null;
   return (
     <Card testID="manual-card">
       <Pill tone="gold">
-        {DECK_LABELS[card.deck]} · {card.table.toLowerCase()} {card.rollTotal}
+        {DECK_LABELS[card.deck]} · roll of {card.rollTotal}
       </Pill>
-      <Text className="mt-2 text-xl font-black text-ink">
-        Read entry {card.rollTotal} on your physical {DECK_LABELS[card.deck]} card
-      </Text>
-      <Text className="mt-1 text-sm text-stone-600">This entry isn’t in the app’s card data, so enter what your card says.</Text>
-      <View className="mt-3 gap-3 rounded-2xl bg-felt p-3">
-        <TextField label="Amount on the card (₹)" keyboardType="number-pad" value={amount} onChangeText={setAmount} testID="card-amount" />
-      </View>
-      <View className="mt-3 flex-row gap-3">
-        <Button
-          className="flex-1"
-          size="md"
-          title="I pay"
-          testID="card-pay"
-          disabled={!valid || !!pending}
-          onPress={() => send({ type: 'RESOLVE_CARD', resolution: 'PAY', amount: value })}
-        />
-        <Button
-          className="flex-1"
-          size="md"
-          variant="success"
-          title="I receive"
-          testID="card-receive"
-          disabled={!valid || !!pending}
-          onPress={() => send({ type: 'RESOLVE_CARD', resolution: 'RECEIVE', amount: value })}
-        />
-      </View>
-      <Button
-        className="mt-3"
-        size="sm"
-        variant="secondary"
-        title="No money on this card"
-        testID="card-none"
-        disabled={!!pending}
-        onPress={() => send({ type: 'RESOLVE_CARD', resolution: 'NONE' })}
-      />
+      <Text className="mt-2 text-xl font-black text-ink">The bank settles this landing for you</Text>
+      <Button className="mt-3" size="md" title="Apply" testID="card-apply" loading={pending === 'RESOLVE_CARD'} disabled={!!pending} onPress={() => send({ type: 'RESOLVE_CARD' })} />
     </Card>
   );
 }

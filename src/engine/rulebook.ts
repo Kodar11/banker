@@ -258,7 +258,7 @@ export function ruleSections(config: RulebookConfig = STANDARD): readonly RuleSe
           lines: [
             'The dice total that brought you here picks your card: an even total uses the even table, an odd total the odd table, and the total is the card number.',
             'The app applies the card for you, once.',
-            `If the app has no entry for that number, read the physical card and enter its amount (up to ${formatINR(R.cards.manualMaxAmount)}).`,
+            `Chance has no card for an odd 11: a roll of 11 that lands on Chance earns a ${formatINR(R.cards.chanceRoll11Reward)} reward from the Bank instead.`,
             'Birthday: a player who cannot pay the full amount pays what they have.',
           ],
         },

@@ -1370,7 +1370,7 @@ describe.skipIf(!DATABASE_URL)('game-action handler (Postgres)', () => {
           const me = s.players.find((x) => x.id === s.turn.playerId)!;
           const pay = { RENT: 'PAY_RENT', TAX: 'PAY_TAX', CARD: 'PAY_CARD', LOAN_INTEREST: 'PAY_INTEREST', CLUB: 'PAY_CLUB' } as const;
           res = await g.act(who, me.balance >= p.amount ? { type: pay[p.reason] } : { type: 'DECLARE_BANKRUPTCY' });
-        } else if (s.turn.phase === 'AWAITING_CARD') res = await g.act(who, { type: 'RESOLVE_CARD', resolution: pick(['PAY', 'RECEIVE', 'NONE'] as const), amount: 300 });
+        } else if (s.turn.phase === 'AWAITING_CARD') res = await g.act(who, { type: 'RESOLVE_CARD' });
         else res = await g.act(who, { type: 'END_TURN' });
         if (!res.ok) expect(res.error.code).not.toBe('SERVER_ERROR');
       }

@@ -40,13 +40,11 @@ export const GameActionSchema = z.discriminatedUnion('type', [
   bare('PAY_JAIL_FINE'),
   /** In Jail, on your turn: miss this turn (released after the last one). */
   bare('STAY_IN_JAIL'),
-  z
-    .object({
-      type: z.literal('RESOLVE_CARD'),
-      resolution: z.enum(['PAY', 'RECEIVE', 'NONE']),
-      amount: z.number().int().min(0).max(10_000_000).optional(),
-    })
-    .strict(),
+  /**
+   * Only for a game saved while a card was still entered by hand (Pending CARD_MANUAL): the engine
+   * applies the card from its own data. No amount or outcome is accepted from the client.
+   */
+  bare('RESOLVE_CARD'),
   onProperty('BUILD_HOUSE'),
   onProperty('BUILD_HOTEL'),
   onProperty('SELL_BUILDING'),

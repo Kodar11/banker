@@ -148,7 +148,7 @@ export function turnStatus(view: Pick<GameView, 'snapshot' | 'me' | 'current' | 
         primary: me.balance >= pending.amount ? { kind: 'pay', action: PAY_ACTION[pending.reason], amount: pending.amount } : { kind: 'choose', label: 'Raise cash' },
       };
     case 'AWAITING_CARD':
-      return { title, detail: `${turnNo} · ${rolled ?? 'Read your card'}`, primary: { kind: 'choose', label: 'Read card' } };
+      return { title, detail: `${turnNo} · ${rolled ?? 'Card'}`, primary: { kind: 'choose', label: 'Apply card' } };
     case 'TURN_COMPLETE':
       return { title, detail: `${turnNo} · ${rolled ?? 'All done'}`, primary: { kind: 'end-turn' } };
     default:
@@ -380,8 +380,8 @@ export function pickContext(view: Pick<GameView, 'snapshot' | 'me' | 'current' |
           kind: 'decision',
           icon: '🃏',
           label: DECK_LABELS[turn.card.deck],
-          title: `Read entry ${turn.card.rollTotal} on your card`,
-          detail: 'Enter what your physical card says',
+          title: `Roll of ${turn.card.rollTotal}`,
+          detail: 'The bank settles this landing for you',
           cta: { label: 'Choose', target: { kind: 'decision' } },
         };
       }

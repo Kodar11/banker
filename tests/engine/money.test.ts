@@ -261,7 +261,7 @@ describe('money invariant under random play', () => {
             else if (rand() < 0.5) g.act(who, { type: 'REQUEST_LOAN', amount: 1000 });
             else g.act(who, { type: 'DECLARE_BANKRUPTCY' });
           } else if (phase === 'AWAITING_CARD') {
-            g.act(who, { type: 'RESOLVE_CARD', resolution: pick(['PAY', 'RECEIVE', 'NONE'] as const), amount: 500 });
+            g.act(who, { type: 'RESOLVE_CARD' });
           } else if (phase === 'TURN_COMPLETE') {
             const mine = Object.values(g.state.properties).filter((p) => p.ownerId === g.id(who));
             if (mine.length && rand() < 0.3) g.act(who, { type: 'BUILD_HOUSE', propertyKey: pick(mine).key });

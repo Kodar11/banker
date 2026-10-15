@@ -88,7 +88,7 @@ function exampleOf(type: GameActionType, g: TestGame): GameAction {
     SET_LOBBY_LOCK: { type: 'SET_LOBBY_LOCK', locked: true },
     REMOVE_PLAYER: { type: 'REMOVE_PLAYER', playerId: other },
     BUY_PROPERTY: { type: 'BUY_PROPERTY' },
-    RESOLVE_CARD: { type: 'RESOLVE_CARD', resolution: 'NONE' },
+    RESOLVE_CARD: { type: 'RESOLVE_CARD' },
     BUILD_HOUSE: { type: 'BUILD_HOUSE', propertyKey: 'RAILWAY' },
     BUILD_HOTEL: { type: 'BUILD_HOTEL', propertyKey: 'RAILWAY' },
     SELL_BUILDING: { type: 'SELL_BUILDING', propertyKey: 'RAILWAY' },
@@ -252,7 +252,7 @@ describe('actions out of turn, out of order, or malformed', () => {
       expect(`${type}: ${refusal(g, 'Asha', { type })}`).toBe(`${type}: NOT_YOUR_TURN`);
       expect(`${type}: ${refusal(g, 'Chitra', { type })}`).toBe(`${type}: NOT_YOUR_TURN`);
     }
-    expect(refusal(g, 'Asha', { type: 'RESOLVE_CARD', resolution: 'NONE' })).toBe('NOT_YOUR_TURN');
+    expect(refusal(g, 'Asha', { type: 'RESOLVE_CARD' })).toBe('NOT_YOUR_TURN');
   });
 
   it('the right player in the wrong order is refused step by step', () => {

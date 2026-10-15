@@ -13,6 +13,7 @@ import {
   ownedBy,
   resaleBlocker,
   reservePriceBlocker,
+  resaleReserveFloor,
   type GameState,
   type PropertyKey,
   type PropertyState,
@@ -58,7 +59,7 @@ export function ResaleSheet({ view, propertyKey, onClose, onCreated }: ResaleShe
   const prop = state.properties[propertyKey];
   const reserve = amount === '' ? 0 : Number(amount);
   const blocked = resaleBlocker(state, me.id, propertyKey);
-  const badPrice = amount === '' ? null : reservePriceBlocker(reserve);
+  const badPrice = amount === '' ? null : reservePriceBlocker(reserve, resaleReserveFloor(state, me.id, propertyKey));
   const insured = activePolicyFor(state, propertyKey)?.ownerId === me.id;
   const close = () => {
     setAmount('');

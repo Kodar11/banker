@@ -49,10 +49,10 @@ appId: com.clashofcapitals.app
 - runFlow:
     when:
       visible:
-        id: card-none
+        id: card-apply
     commands:
       - tapOn:
-          id: card-none
+          id: card-apply
 - extendedWaitUntil:
     visible:
       id: end-turn-button

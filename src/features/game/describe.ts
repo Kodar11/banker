@@ -13,7 +13,7 @@ export function describeWaiting(state: GameState, name: string): string {
     case 'AWAITING_PAYMENT':
       return pending?.kind === 'PAYMENT' ? `${name} owes ${formatINR(pending.amount)} (${pending.label})` : `${name} is paying`;
     case 'AWAITING_CARD':
-      return `${name} is reading a card`;
+      return `${name} is resolving a card`;
     case 'AUCTION':
       return 'Auction in progress';
     case 'TURN_COMPLETE':

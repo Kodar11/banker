@@ -233,7 +233,7 @@ describe('shared financial years', () => {
 
   it('card movement and Jail placement add nothing to the calendar', () => {
     const g = newGame();
-    const card: CardDefinition = { id: 'TEST', deck: 'CHANCE', table: 'ODD', rollTotal: 9, text: 'test', verified: true, effects: [{ type: 'MOVE_STEPS', steps: 5, resolveLanding: false }] };
+    const card: CardDefinition = { id: 'TEST', deck: 'CHANCE', table: 'ODD', rollTotal: 9, text: 'test', kind: 'CARD', effects: [{ type: 'MOVE_STEPS', steps: 5, resolveLanding: false }] };
     g.absorbResult(applyCardDefinition(g.state, card, 9, g.ctx()));
     expect(gameClock(eco(g))).toBe(0);
     // Asha rolls 4 onto Jail: the 4 dice spaces count, being placed in Jail does not.

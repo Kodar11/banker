@@ -212,7 +212,9 @@ function estateClaims(d: Draft, player: PlayerState, kind: EstateKind, trigger: 
   if (eco) {
     for (const loan of loansOf(eco, player.id)) if (isOpenLoan(loan)) claims.push(capitalLoanClaim(d, player, loan, covered.get(loan.id) ?? 0));
   } else {
-    for (const loan of d.state.loans) if (loan.playerId === player.id && isEnforceableLoan(loan)) claims.push(classicLoanClaim(d, player, loan));
+    // Interest charged at Start that the turn is waiting on is already a claim of its own (above): the loan's claim is its principal.
+    const interestClaimed = new Set([onTurn, queued].flatMap((p) => (p?.reason === 'LOAN_INTEREST' ? (p.loanIds ?? []) : [])));
+    for (const loan of d.state.loans) if (loan.playerId === player.id && isEnforceableLoan(loan)) claims.push(classicLoanClaim(d, player, loan, interestClaimed.has(loan.id)));
   }
   return claims;
 }
@@ -285,15 +287,20 @@ function crisisClaim(d: Draft, player: PlayerState, crisis: CrisisRecord, kind: 
   };
 }
 
-function classicLoanClaim(d: Draft, player: PlayerState, loan: LoanState): Claim {
+/**
+ * `interestClaimed`: the interest charged on this loan is the payment the turn was waiting on, a claim of its
+ * own that comes first — whatever of it that claim could not pay is recorded there, so it is not owed twice here.
+ */
+function classicLoanClaim(d: Draft, player: PlayerState, loan: LoanState, interestClaimed: boolean): Claim {
+  const interestOwed = () => (interestClaimed ? 0 : loanInterestUnpaid(loan));
   return {
     kind: 'LOAN',
     label: 'Bank loan',
     creditorIds: [],
-    // Interest charged at Start and still unpaid (including any the trigger did not cover), then principal.
-    owed: () => loanInterestUnpaid(loan) + loan.outstanding,
+    // Interest charged at Start and still unpaid, then principal.
+    owed: () => interestOwed() + loan.outstanding,
     pay(amount) {
-      const interest = Math.min(amount, loanInterestUnpaid(loan));
+      const interest = Math.min(amount, interestOwed());
       if (interest > 0) {
         d.transfer({ type: 'LOAN_INTEREST', from: player.id, to: null, amount: interest, memo: 'Loan interest (estate settlement)' });
         loan.interestPaid += interest;
@@ -305,8 +312,8 @@ function classicLoanClaim(d: Draft, player: PlayerState, loan: LoanState): Claim
       }
     },
     close(unpaid) {
-      // Paid off: REPAID. Otherwise DEFAULTED and closed: `outstanding` records what the estate could not pay.
-      loan.status = unpaid === 0 && loan.outstanding === 0 ? 'REPAID' : 'DEFAULTED';
+      // Paid off: REPAID. Otherwise DEFAULTED and closed: `outstanding` (and any interest unpaid) records what the estate could not pay.
+      loan.status = unpaid === 0 && loan.outstanding === 0 && loanInterestUnpaid(loan) === 0 ? 'REPAID' : 'DEFAULTED';
       loan.closedAt = d.ctx.now;
     },
   };

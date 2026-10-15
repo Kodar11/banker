@@ -81,7 +81,7 @@ function nextMove(f: Fixture, rnd: () => number): { who: string; action: GameAct
       if (turn.pending?.kind !== 'PAYMENT') return null;
       return { who, action: current.balance >= turn.pending.amount ? { type: PAY_ACTION[turn.pending.reason] } : raiseOrGoBankrupt(state, current.id) };
     case 'AWAITING_CARD':
-      return { who, action: { type: 'RESOLVE_CARD', resolution: 'NONE' } };
+      return { who, action: { type: 'RESOLVE_CARD' } };
     case 'TURN_COMPLETE':
       return { who, action: { type: 'END_TURN' } };
     default:

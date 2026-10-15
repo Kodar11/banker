@@ -183,7 +183,7 @@ describe('state machine', () => {
           continue;
         }
         g.act(who, { type: pay[pending.reason] });
-      } else if (phase === 'AWAITING_CARD') g.act(who, { type: 'RESOLVE_CARD', resolution: 'NONE' });
+      } else if (phase === 'AWAITING_CARD') g.act(who, { type: 'RESOLVE_CARD' });
       g.act(who, { type: 'END_TURN' });
     }
   });

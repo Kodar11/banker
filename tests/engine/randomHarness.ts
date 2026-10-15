@@ -239,8 +239,7 @@ function candidates(table: Table, nowMs: number, random: () => number, tempo: { 
         break;
       }
       case 'AWAITING_CARD': {
-        const resolution = pick(['PAY', 'RECEIVE', 'NONE'] as const, random)!;
-        add(me, resolution === 'NONE' ? { type: 'RESOLVE_CARD', resolution } : { type: 'RESOLVE_CARD', resolution, amount: 100 * (1 + Math.floor(random() * 30)) }, true);
+        add(me, { type: 'RESOLVE_CARD' }, true);
         break;
       }
       case 'TURN_COMPLETE':

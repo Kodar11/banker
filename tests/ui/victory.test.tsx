@@ -206,7 +206,7 @@ describe('Final Standings', () => {
     expect(screen.queryByText(/Net worth = cash/)).toBeNull();
     await fireEvent.press(screen.getByTestId('net-worth-info'));
     expect(screen.getByTestId('net-worth-info-text')).toHaveTextContent(
-      'Net worth = cash + property at its price + buildings at what they cost − mortgages − loans owed (with interest charged and unpaid). The highest net worth wins. Level on net worth, fewer liabilities wins; level on both, the victory is shared.',
+      'Net worth = cash + property at its price + buildings at what they cost − mortgages − loans owed (with interest charged and unpaid). The highest net worth wins. Level on net worth, fewer liabilities wins; level on both, the victory is shared. Players who went bankrupt or left are not ranked.',
     );
     await fireEvent.press(screen.getByTestId('net-worth-info-close'));
     expect(screen.queryByText(/Net worth = cash/)).toBeNull();

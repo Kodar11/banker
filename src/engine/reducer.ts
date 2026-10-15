@@ -67,6 +67,7 @@ import {
   resaleBlocker,
   resaleSaleBlocker,
   reservePriceBlocker,
+  resaleReserveFloor,
   sellBuildingRefund,
   topUndoable,
   tradeBlocker,
@@ -356,7 +357,7 @@ export function applyAction(state: GameState, actorId: string, rawAction: unknow
       stayInJail(d, actor);
       break;
     case 'RESOLVE_CARD':
-      resolveManualCard(d, actor, action.resolution, action.amount ?? 0);
+      resolveLegacyManualCard(d, actor);
       break;
     case 'BUILD_HOUSE':
     case 'BUILD_HOTEL':
@@ -911,14 +912,14 @@ function resolveClub(d: Draft, player: PlayerState): void {
 function resolveCard(d: Draft, player: PlayerState, deck: Deck, rollTotal: number, depth: number, override?: CardDefinition): void {
   const turn = d.state.turn;
   const card: CardDefinition = override ?? findCard(deck, rollTotal);
-  turn.card = { cardId: card.id, deck, table: card.table, rollTotal, text: card.text, verified: card.verified };
-  const cardMessage = card.verified ? card.text : 'check the physical card';
-  d.event('CARD_DRAWN', player.id, `${DECK_LABELS[deck]} (${card.table.toLowerCase()} ${rollTotal}): ${cardMessage}`, {
+  turn.card = { cardId: card.id, deck, table: card.table, rollTotal, text: card.text, kind: card.kind };
+  const heading = card.kind === 'BANK_EVENT' ? `${DECK_LABELS[deck]}, roll of ${rollTotal}` : `${DECK_LABELS[deck]} (${card.table.toLowerCase()} ${rollTotal})`;
+  d.event('CARD_DRAWN', player.id, `${heading}: ${card.text}`, {
     cardId: card.id,
     deck,
     table: card.table,
     rollTotal,
-    verified: card.verified,
+    kind: card.kind,
   });
 
   const txStart = d.transactions.length;
@@ -929,10 +930,6 @@ function resolveCard(d: Draft, player: PlayerState, deck: Deck, rollTotal: numbe
   let landing = false;
   for (const effect of card.effects) {
     switch (effect.type) {
-      case 'MANUAL':
-        turn.pending = { kind: 'CARD_MANUAL', cardId: card.id, deck, rollTotal };
-        d.setPhase('AWAITING_CARD');
-        return;
       case 'PAY_BANK':
         payment += effect.amount;
         break;
@@ -1195,7 +1192,7 @@ function openNewAuction(d: Draft, key: PropertyKey, participantIds: string[], re
 function startResaleAuction(d: Draft, actor: PlayerState, key: PropertyKey, reservePrice: number): void {
   const why = resaleBlocker(d.state, actor.id, key);
   if (why) fail(why.startsWith("You don't own") || why.startsWith('This property belongs') ? 'NOT_OWNER' : 'AUCTION_NOT_ALLOWED', why);
-  const badPrice = reservePriceBlocker(reservePrice);
+  const badPrice = reservePriceBlocker(reservePrice, resaleReserveFloor(d.state, actor.id, key));
   if (badPrice) fail('VALIDATION', badPrice);
   const prop = d.state.properties[key];
   const label = tradePropertyLabel(d.state, key);
@@ -1488,43 +1485,20 @@ function continueAfterPayment(d: Draft, actor: PlayerState): void {
   d.setPhase('TURN_COMPLETE');
 }
 
-function resolveManualCard(d: Draft, actor: PlayerState, resolution: 'PAY' | 'RECEIVE' | 'NONE', amount: number): void {
+/**
+ * A game saved while Chance odd 11 was still entered by hand may be waiting on that card. It is now
+ * resolved from the card data like any other landing (findCard: the roll-11 bank reward); nothing the
+ * client sends decides the effect — RESOLVE_CARD carries no amount. New games never reach this.
+ */
+function resolveLegacyManualCard(d: Draft, actor: PlayerState): void {
   const turn = d.state.turn;
   const pending = turn.pending;
   if (turn.phase !== 'AWAITING_CARD' || pending?.kind !== 'CARD_MANUAL') {
     fail('INVALID_PHASE', 'There is no card to resolve.');
   }
-  const label = `${DECK_LABELS[pending.deck]} ${pending.rollTotal} (entered manually)`;
-  if (resolution !== 'NONE') {
-    if (!Number.isInteger(amount) || amount <= 0) fail('VALIDATION', 'Enter the amount shown on the card.');
-    if (amount > RULES.cards.manualMaxAmount) {
-      fail('VALIDATION', `Manual card amounts are limited to ${formatINR(RULES.cards.manualMaxAmount)}.`);
-    }
-  }
   turn.pending = null;
-  if (resolution === 'NONE') {
-    d.event('CARD_RESOLVED', actor.id, `${label}: no money effect`);
-    d.setPhase('TURN_COMPLETE');
-    return;
-  }
-  if (resolution === 'RECEIVE') {
-    d.setPhase('TRANSACTION');
-    d.transfer({ type: 'CARD_REWARD', from: null, to: actor.id, amount, memo: label });
-    d.event('CARD_RESOLVED', actor.id, `${actor.name} received ${formatINR(amount)} (${label})`);
-    recordUndoable(d, { actionType: 'CARD_EFFECT', actorId: actor.id, description: `${actor.name} received ${formatINR(amount)} (${label})` });
-    d.setPhase('TURN_COMPLETE');
-    return;
-  }
-  if (actor.balance >= amount) {
-    d.setPhase('TRANSACTION');
-    d.transfer({ type: 'CARD_PAYMENT', from: actor.id, to: null, amount, memo: label });
-    d.event('CARD_RESOLVED', actor.id, `${actor.name} paid ${formatINR(amount)} (${label})`);
-    recordUndoable(d, { actionType: 'PAY_CARD', actorId: actor.id, description: `${actor.name} paid ${formatINR(amount)} to Bank` });
-    d.setPhase('TURN_COMPLETE');
-    return;
-  }
-  turn.pending = paymentPending('CARD', amount, label, { cardId: pending.cardId });
-  d.setPhase('AWAITING_PAYMENT');
+  d.setPhase('RESOLVING');
+  resolveCard(d, actor, pending.deck, pending.rollTotal, 0);
 }
 
 /**

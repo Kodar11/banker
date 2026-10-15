@@ -178,6 +178,10 @@ export type Pending =
       /** Split equally between these players instead of toPlayerId (e.g. "pay each player"). */
       payeeIds?: string[];
     }
+  /**
+   * LEGACY: games saved while Chance odd 11 was entered by hand can still hold this. The engine now
+   * resolves it from the card data (RESOLVE_CARD carries no amount); nothing creates it any more.
+   */
   | { kind: 'CARD_MANUAL'; cardId: string; deck: Deck; rollTotal: number };
 
 /** Work left after the current obligation is paid (e.g. resolve the square after paying loan interest). */
@@ -192,7 +196,8 @@ export interface DrawnCard {
   table: CardTable;
   rollTotal: number;
   text: string;
-  verified: boolean;
+  /** CARD: a printed card. BANK_EVENT: a landing with no card, settled by the bank (cards.ts BANK_EVENTS). */
+  kind: 'CARD' | 'BANK_EVENT';
 }
 
 export interface TurnState {

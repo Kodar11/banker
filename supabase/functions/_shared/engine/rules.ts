@@ -94,8 +94,11 @@ export const BUSINESS_MVP_RULES = {
      * (Birthday, Rest House), they pay what they have. No debt is created.
      */
     collectFromEachShortfall: 'PAY_WHAT_THEY_CAN' as const,
-    /** Cap for amounts entered manually (card entries not in the data). */
-    manualMaxAmount: 10000,
+    /**
+     * A roll of 11 that lands on Chance: the Chance ODD table has no 11, so the bank pays this fixed
+     * reward instead (cards.ts CHANCE_ROLL_11_REWARD). No player ever enters a card amount.
+     */
+    chanceRoll11Reward: 2000,
   },
 
   rent: {

@@ -26,6 +26,7 @@ import {
   offeredRate,
   positionOfSpecial,
   PROPERTY_KEYS,
+  formatINR,
   propertyLiquidationValue,
   raiseFundsOptions,
   rankStandings,
@@ -701,5 +702,163 @@ describe('leaving the game', () => {
     // When Bilal is back, the turn is still his.
     lap(g);
     expect(g.current).toBe('Chitra');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Credit score: early repayment stays legitimate
+// ---------------------------------------------------------------------------
+
+describe('credit score — repaying early, and repaying late', () => {
+  it('an installment paid on time, then the rest prepaid: allowed, and the full-repayment bonus is earned once (within the yearly cap)', () => {
+    const g = capital();
+    const loan = borrow(g, 'Asha', 'PERSONAL', 3000);
+    jumpTo(g, YEAR);
+    g.act('Asha', { type: 'PAY_LOAN_INSTALLMENT', loanId: loan.id });
+    const rest = loanOf(g, loan.id).installments.filter((i) => i.status === 'SCHEDULED').reduce((sum, i) => sum + i.principal, 0);
+    expect(rest).toBeGreaterThan(0);
+    g.act('Asha', { type: 'PREPAY_INTERMEDIATE_LOAN', loanId: loan.id, amount: rest });
+    expect(loanOf(g, loan.id).status).toBe('REPAID');
+    expect(eco(g).creditEvents.map((e) => [e.type, e.delta])).toEqual([
+      ['ON_TIME_PAYMENT', 5],
+      ['LOAN_REPAID', 5],
+    ]);
+    expect(eco(g).creditEvents[1]!.reason).toContain('yearly limit');
+    expect(scoreOf(g, 'Asha')).toBe(710);
+    // Nothing is left to repay, so the bonus can't be earned again.
+    expect(refusal(() => g.act('Asha', { type: 'PREPAY_INTERMEDIATE_LOAN', loanId: loan.id, amount: 1000 })).code).toBe('LOAN_NOT_ALLOWED');
+    expect(refusal(() => g.act('Asha', { type: 'PAY_LOAN_INSTALLMENT', loanId: loan.id })).code).toBe('LOAN_NOT_ALLOWED');
+    tick(g);
+    expect(eco(g).creditEvents.filter((e) => e.type === 'LOAN_REPAID')).toHaveLength(1);
+  });
+
+  it('a loan caught up after going overdue is repaid, but earns neither a catch-up nor a full-repayment bonus', () => {
+    const g = capital();
+    const loan = borrow(g, 'Asha', 'EMERGENCY', 1000);
+    jumpTo(g, YEAR + WINDOW);
+    expect(loanOf(g, loan.id).installments[0]!.status).toBe('OVERDUE');
+    expect(loanOffers(g.state, g.id('Asha')).every((o) => o.blocked)).toBe(true);
+    g.act('Asha', { type: 'PAY_LOAN_INSTALLMENT', loanId: loan.id });
+    expect(loanOf(g, loan.id).status).toBe('REPAID');
+    expect(eco(g).creditEvents.map((e) => [e.type, e.delta])).toEqual([['INSTALLMENT_OVERDUE', -20]]);
+    expect(scoreOf(g, 'Asha')).toBe(680);
+    // Paid up: borrowing is open again, at the band the score is now in (Fair: no adjustment).
+    expect(loanOffers(g.state, g.id('Asha')).find((o) => o.product === 'EMERGENCY')).toMatchObject({ blocked: null, ratePercent: IR.loans.products.EMERGENCY.baseRatePercent });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Insolvency on each kind of mandatory payment
+// ---------------------------------------------------------------------------
+
+describe('insolvency on each mandatory payment', () => {
+  it('Income Tax: with nothing left to raise, the cash goes to the bank, the rest is recorded unpaid, and the property returns clean', () => {
+    const g = new TestGame(['Asha', 'Bilal', 'Chitra']);
+    g.give('Asha', 'PATNA', { mortgaged: true });
+    g.give('Asha', 'AGRA', { mortgaged: true });
+    leaveWith(g, 'Asha', 50, 'Chitra');
+    g.landOn('Asha', positionOfSpecial('INCOME_TAX'), 5);
+    expect(g.state.turn.pending).toMatchObject({ kind: 'PAYMENT', reason: 'TAX', amount: 100, toPlayerId: null });
+    expect(bankruptcyBlocker(g.state, g.id('Asha'), 100)).toBeNull();
+    const r = g.act('Asha', { type: 'DECLARE_BANKRUPTCY' });
+    expect(r.transactions.map((t) => [t.type, t.toPlayerId, t.amount])).toEqual([['BANKRUPTCY_SETTLEMENT', null, 50]]);
+    expect(r.events.find((e) => e.type === 'ESTATE_SETTLED')!.payload).toMatchObject({ kind: 'BANKRUPTCY', unpaid: 50, claims: [{ kind: 'PAYMENT', owed: 100, paid: 50, unpaid: 50, creditorIds: [] }], propertiesReturned: ['AGRA', 'PATNA'].sort((a, b) => PROPERTY_KEYS.indexOf(a as PropertyKey) - PROPERTY_KEYS.indexOf(b as PropertyKey)) });
+    for (const key of ['PATNA', 'AGRA'] as const) expect(g.state.properties[key]).toMatchObject({ ownerId: null, mortgaged: false, houses: 0, hotel: false });
+    expect(g.player('Asha')).toMatchObject({ status: 'BANKRUPT', balance: 0 });
+    expect(g.current).toBe('Bilal');
+    sound(g);
+  });
+
+  it('a Chance charge: refused while a building could still raise it, then paid to the bank as charged', () => {
+    const g = new TestGame(['Asha', 'Bilal', 'Chitra']);
+    g.give('Asha', 'MUMBAI', { houses: 1 });
+    leaveWith(g, 'Asha', 100, 'Chitra');
+    g.landOn('Asha', 20, 8);
+    expect(g.state.turn.pending).toMatchObject({ kind: 'PAYMENT', reason: 'CARD', amount: 3000, toPlayerId: null });
+    expect(refusal(() => g.act('Asha', { type: 'DECLARE_BANKRUPTCY' })).code).toBe('INVALID_PHASE');
+    g.act('Asha', { type: 'SELL_BUILDING', propertyKey: 'MUMBAI' });
+    const r = g.act('Asha', { type: 'PAY_CARD' });
+    expect(r.transactions.map((t) => [t.type, t.toPlayerId, t.amount])).toEqual([['CARD_PAYMENT', null, 3000]]);
+    expect(g.state.properties.MUMBAI.ownerId).toBe(g.id('Asha'));
+    sound(g);
+  });
+
+  it('a Chance charge with nothing left to raise: the cash is settled once to the bank, the rest recorded unpaid', () => {
+    const g = new TestGame(['Asha', 'Bilal', 'Chitra']);
+    leaveWith(g, 'Asha', 100, 'Chitra');
+    g.landOn('Asha', 20, 8);
+    const r = g.act('Asha', { type: 'DECLARE_BANKRUPTCY' });
+    expect(r.transactions.map((t) => [t.type, t.toPlayerId, t.amount])).toEqual([['BANKRUPTCY_SETTLEMENT', null, 100]]);
+    expect(r.events.find((e) => e.type === 'ESTATE_SETTLED')!.payload).toMatchObject({ unpaid: 2900, claims: [{ kind: 'PAYMENT', owed: 3000, paid: 100, unpaid: 2900 }] });
+    expect(refusal(() => g.act('Asha', { type: 'DECLARE_BANKRUPTCY' })).code).toBe('FORBIDDEN');
+    sound(g);
+  });
+
+  it('Classic loan interest at Start: the interest is paid first; what it could not cover is recorded once, not again on the loan', () => {
+    const g = new TestGame(['Asha', 'Bilal', 'Chitra']);
+    g.act('Asha', { type: 'REQUEST_LOAN', amount: 20000 });
+    leaveWith(g, 'Asha', 100, 'Chitra');
+    g.placeAt('Asha', BOARD_SIZE - 2);
+    g.roll('Asha', 1, 1);
+    expect(g.state.turn.pending).toMatchObject({ kind: 'PAYMENT', reason: 'LOAN_INTEREST', amount: 2000 });
+    expect(g.balance('Asha')).toBe(100 + RULES.start.passReward);
+    const r = g.act('Asha', { type: 'DECLARE_BANKRUPTCY' });
+    expect(r.transactions.map((t) => [t.type, t.amount])).toEqual([['LOAN_INTEREST', 1600]]);
+    const settled = r.events.find((e) => e.type === 'ESTATE_SETTLED')!.payload as { unpaid: number; claims: { kind: string; owed: number; paid: number; unpaid: number }[] };
+    expect(settled.claims.map((c) => [c.kind, c.owed, c.paid, c.unpaid])).toEqual([
+      ['PAYMENT', 2000, 1600, 400],
+      ['LOAN', 20000, 0, 20000],
+    ]);
+    expect(settled.unpaid).toBe(20400);
+    expect(g.state.loans[0]).toMatchObject({ status: 'DEFAULTED', outstanding: 20000, interestPaid: 1600, closedAt: expect.any(String) });
+    sound(g);
+  });
+
+  it('the bankrupt player is out of every active effect: no turn, no trade, no vote, no rent', () => {
+    const g = owingRent();
+    g.act('Asha', { type: 'DECLARE_BANKRUPTCY' });
+    expect(g.current).toBe('Bilal');
+    expect(refusal(() => g.act('Asha', { type: 'ROLL_DICE' })).code).toBe('FORBIDDEN');
+    expect(refusal(() => g.act('Bilal', { type: 'CREATE_TRADE', toPlayerId: g.id('Asha'), offeredPropertyKeys: ['DELHI'], requestedPropertyKeys: [], offeredMoney: 0, requestedMoney: 0 })).code).toBe('TRADE_NOT_ALLOWED');
+    expect(refusal(() => g.act('Asha', { type: 'REQUEST_END_VOTE' })).code).toBe('FORBIDDEN');
+    expect(rankStandings(g.state).map((s) => s.playerId)).not.toContain(g.id('Asha'));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Resale auctions while a payment is owed (Capital)
+// ---------------------------------------------------------------------------
+
+describe('resale auctions while a payment is owed', () => {
+  function owingRentCapital() {
+    const g = capital(['Asha', 'Bilal', 'Chitra']);
+    g.give('Asha', 'MUMBAI');
+    g.give('Bilal', 'DELHI', { houses: 2 });
+    leaveWith(g, 'Asha', 100, 'Chitra');
+    g.placeBefore('Asha', 'DELHI', 3);
+    g.roll('Asha', 1, 2);
+    expect(g.state.turn.pending).toMatchObject({ kind: 'PAYMENT', reason: 'RENT', toPlayerId: g.id('Bilal') });
+    return g;
+  }
+
+  it('the debtor may auction to raise the money, but not for a token reserve: at least what the bank would pay', () => {
+    const g = owingRentCapital();
+    const floor = propertyLiquidationValue(g.state, 'MUMBAI');
+    expect(floor).toBeGreaterThan(100);
+    expect(refusal(() => g.act('Asha', { type: 'START_RESALE_AUCTION', propertyKey: 'MUMBAI', reservePrice: 100 }))).toEqual({
+      code: 'VALIDATION',
+      message: `You have a payment to settle: the reserve must be at least ${formatINR(floor)}, what the bank would pay for this property.`,
+    });
+    g.act('Asha', { type: 'START_RESALE_AUCTION', propertyKey: 'MUMBAI', reservePrice: floor });
+    expect(g.state.auction).toMatchObject({ propertyKey: 'MUMBAI', resale: { sellerId: g.id('Asha'), reservePrice: floor } });
+    // The rent is still owed, unchanged.
+    expect(mandatoryPaymentsOwed(g.state, g.id('Asha'))).toBeGreaterThan(0);
+  });
+
+  it('with nothing owed, the seller sets any reserve they like', () => {
+    const g = capital(['Asha', 'Bilal', 'Chitra']);
+    g.give('Asha', 'MUMBAI');
+    g.act('Asha', { type: 'START_RESALE_AUCTION', propertyKey: 'MUMBAI', reservePrice: 100 });
+    expect(g.state.auction).toMatchObject({ resale: { reservePrice: 100 } });
   });
 });

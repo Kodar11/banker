@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  applyAction,
   applyCardDefinition,
   BUSINESS_MVP_RULES,
   CARD_TABLES,
   CHANCE_EVEN,
+  CHANCE_ROLL_11_REWARD,
   CHANCE_ODD,
   COMMUNITY_CHEST_EVEN,
   COMMUNITY_CHEST_ODD,
@@ -88,21 +90,21 @@ describe('card tables — exact supplied data', () => {
     expect(findCard('COMMUNITY_CHEST', 3).id).toBe('COMMUNITY_CHEST_ODD_3');
   });
 
-  it('every dice total 2–12 resolves; only totals missing from the data are manual (Chance odd 11)', () => {
-    const manual: string[] = [];
+  it('every dice total 2–12 resolves to a definition; the only one that is not a printed card is the Chance roll-11 bank reward', () => {
+    const events: string[] = [];
     for (const deck of ['CHANCE', 'COMMUNITY_CHEST'] as const) {
       for (let t = 2; t <= 12; t += 1) {
         const c = findCard(deck, t);
-        if (!c.verified) {
-          expect(c.effects).toEqual([{ type: 'MANUAL' }]);
-          manual.push(c.id);
-        }
+        expect(c.effects.length).toBeGreaterThan(0);
+        if (c.kind === 'BANK_EVENT') events.push(c.id);
       }
     }
-    expect(manual).toEqual(['CHANCE_ODD_11']);
+    expect(events).toEqual(['CHANCE_ROLL_11_REWARD']);
     for (const deck of Object.values(CARD_TABLES)) {
-      for (const table of Object.values(deck)) for (const c of table) expect(c.verified).toBe(true);
+      for (const table of Object.values(deck)) for (const c of table) expect(c.kind).toBe('CARD');
     }
+    // Community Chest odd 11 is a printed card (the insurance premium), not a reward.
+    expect(findCard('COMMUNITY_CHEST', 11)).toMatchObject({ id: 'COMMUNITY_CHEST_ODD_11', kind: 'CARD', effects: [{ type: 'PAY_BANK', amount: 1500 }] });
   });
 });
 
@@ -114,7 +116,7 @@ describe('Chance — EVEN', () => {
     [8, 3000],
   ])('Chance %i: pay the bank ₹%i', (total, amount) => {
     const { g } = landOnCard(CHANCE, total);
-    expect(g.state.turn.card).toMatchObject({ cardId: `CHANCE_EVEN_${total}`, table: 'EVEN', verified: true });
+    expect(g.state.turn.card).toMatchObject({ cardId: `CHANCE_EVEN_${total}`, table: 'EVEN', kind: 'CARD' });
     expect(g.state.turn.pending).toMatchObject({ kind: 'PAYMENT', reason: 'CARD', amount, toPlayerId: null });
     const r = g.act('Asha', { type: 'PAY_CARD' });
     expect(r.transactions).toMatchObject([{ type: 'CARD_PAYMENT', amount, fromPlayerId: g.id('Asha'), toPlayerId: null }]);
@@ -176,16 +178,159 @@ describe('Chance — ODD', () => {
     expect(g.balance('Asha')).toBe(START + 2 * REWARD + 3000);
   });
 
-  it('Chance 11 is not in the supplied data → resolved by hand', () => {
-    const { g } = landOnCard(CHANCE, 11);
-    expect(g.state.turn.phase).toBe('AWAITING_CARD');
-    expect(g.state.turn.card).toMatchObject({ cardId: 'CHANCE_ODD_11', verified: false });
-    g.act('Asha', { type: 'RESOLVE_CARD', resolution: 'RECEIVE', amount: 1500 });
-    expect(g.balance('Asha')).toBe(START + 1500);
-    expect(() => {
-      const again = landOnCard(CHANCE, 11).g;
-      again.act('Asha', { type: 'RESOLVE_CARD', resolution: 'PAY', amount: 0 });
-    }).toThrow('Enter the amount shown on the card.');
+});
+
+/** Refusal code of an action, asserting the state is untouched (the engine validates raw input too). */
+function refusal(g: TestGame, name: string, action: unknown): string {
+  const before = JSON.stringify(g.state);
+  let code = 'ACCEPTED';
+  try {
+    applyAction(g.state, g.id(name), action, g.ctx());
+  } catch (error) {
+    code = (error as { code?: string }).code ?? `THROWN ${String(error)}`;
+  }
+  expect(JSON.stringify(g.state)).toBe(before);
+  return code;
+}
+
+describe('Chance on a roll of 11 — the bank reward', () => {
+  const BONUS = BUSINESS_MVP_RULES.cards.chanceRoll11Reward;
+
+  it('is ₹2,000, defined by the engine, with no card behind it', () => {
+    expect(BONUS).toBe(2000);
+    expect(findCard('CHANCE', 11)).toBe(CHANCE_ROLL_11_REWARD);
+    expect(CHANCE_ROLL_11_REWARD).toMatchObject({ deck: 'CHANCE', table: 'ODD', rollTotal: 11, kind: 'BANK_EVENT', effects: [{ type: 'RECEIVE_FROM_BANK', amount: 2000 }] });
+    expect(CHANCE_ROLL_11_REWARD.text).toContain('roll of 11');
+    expect(CHANCE_ROLL_11_REWARD.text).toContain('₹2,000');
+  });
+
+  it.each([
+    ['the second Chance square, from the Jail square (5 + 6)', CHANCE, 0],
+    ['the first Chance square, from square 32 (passing Start on the way)', positionOfSpecial('CHANCE'), REWARD],
+  ])('a real roll of 11 onto %s pays ₹2,000 at once: one bank ledger row, one message, the turn is done', (_label, square, startReward) => {
+    const g = new TestGame();
+    g.placeAt('Asha', (square - 11 + 36) % 36);
+    const r = g.roll('Asha', 5, 6);
+    expect(g.player('Asha').position).toBe(square);
+    expect(r.transactions.filter((t) => t.type === 'CARD_REWARD')).toEqual([
+      expect.objectContaining({ type: 'CARD_REWARD', fromPlayerId: null, toPlayerId: g.id('Asha'), amount: 2000, memo: CHANCE_ROLL_11_REWARD.text }),
+    ]);
+    expect(r.transactions.filter((t) => t.type !== 'CARD_REWARD').map((t) => t.type)).toEqual(startReward ? ['START_REWARD'] : []);
+    expect(g.balance('Asha')).toBe(START + startReward + 2000);
+    expect(g.state.turn).toMatchObject({ phase: 'TURN_COMPLETE', pending: null, card: { cardId: 'CHANCE_ROLL_11_REWARD', kind: 'BANK_EVENT', rollTotal: 11 } });
+    const drawn = r.events.find((e) => e.type === 'CARD_DRAWN')!;
+    expect(drawn.message).toBe(`Chance, roll of 11: ${CHANCE_ROLL_11_REWARD.text}`);
+    expect(g.state.undoStack.at(-1)).toMatchObject({ actionType: 'CARD_EFFECT', actorId: g.id('Asha'), moves: [{ fromPlayerId: null, toPlayerId: g.id('Asha'), amount: 2000 }] });
+  });
+
+  it('only a landing on Chance with 11 earns it: 11 onto another square, or another total onto Chance, never does', () => {
+    const g = new TestGame();
+    g.landOn('Asha', positionOfProperty('DARJEELING'), 11);
+    expect(g.ledger.some((t) => t.type === 'CARD_REWARD')).toBe(false);
+    expect(g.state.turn.card).toBeNull();
+    for (const total of [3, 5, 7, 9]) {
+      const h = new TestGame();
+      h.landOn('Asha', CHANCE, total);
+      expect(h.state.turn.card).toMatchObject({ cardId: `CHANCE_ODD_${total}`, kind: 'CARD' });
+    }
+  });
+
+  it('the client cannot name an amount, an outcome or a card: forged payloads are refused, before and after the reward', () => {
+    const g = new TestGame();
+    const forged = [
+      { type: 'RESOLVE_CARD', resolution: 'RECEIVE', amount: 10000 },
+      { type: 'RESOLVE_CARD', resolution: 'PAY', amount: 0 },
+      { type: 'RESOLVE_CARD', resolution: 'NONE' },
+      { type: 'RESOLVE_CARD', cardId: 'CHANCE_ODD_3' },
+      { type: 'RESOLVE_CARD', amount: 2000 },
+      { type: 'CLAIM_CARD', cardId: 'CHANCE_ROLL_11_REWARD' },
+      { type: 'PAY_CARD', amount: 1 },
+    ];
+    for (const action of forged) expect(refusal(g, 'Asha', action)).toBe('VALIDATION');
+    // Before any roll there is no card: the bare action is refused too.
+    expect(refusal(g, 'Asha', { type: 'RESOLVE_CARD' })).toBe('INVALID_PHASE');
+    g.landOn('Asha', CHANCE, 11);
+    for (const action of forged) expect(refusal(g, 'Asha', action)).toBe('VALIDATION');
+    // The reward is already settled: nothing more to claim, by the lander or anyone else.
+    expect(refusal(g, 'Asha', { type: 'RESOLVE_CARD' })).toBe('INVALID_PHASE');
+    expect(refusal(g, 'Bilal', { type: 'RESOLVE_CARD' })).toBe('NOT_YOUR_TURN');
+    expect(refusal(g, 'Asha', { type: 'ROLL_DICE' })).toBe('INVALID_PHASE');
+    expect(g.ledger.filter((t) => t.type === 'CARD_REWARD').map((t) => t.amount)).toEqual([2000]);
+  });
+
+  it('undo takes back exactly the ₹2,000, once; the landing is not re-run and a stale or repeated undo is refused', () => {
+    const g = new TestGame();
+    const r = g.landOn('Asha', CHANCE, 11);
+    const target = g.state.undoStack.at(-1)!.actionId;
+    // Bank money has no counterparty: everyone else may approve.
+    g.act('Asha', { type: 'REQUEST_UNDO', targetActionId: target });
+    const request = g.state.undoRequest!;
+    expect([...request.approverIds].sort()).toEqual([g.id('Bilal'), g.id('Chitra')].sort());
+    const u = g.act('Bilal', { type: 'APPROVE_UNDO', requestId: request.id });
+    expect(u.transactions).toEqual([
+      expect.objectContaining({ type: 'UNDO_REVERSAL', fromPlayerId: g.id('Asha'), toPlayerId: null, amount: 2000, reversesTransactionId: r.transactions[0]!.id }),
+    ]);
+    expect(g.balance('Asha')).toBe(START);
+    expect(g.state.undoStack).toHaveLength(0);
+    expect(g.state.turn).toMatchObject({ phase: 'TURN_COMPLETE', pending: null });
+    expect(refusal(g, 'Chitra', { type: 'APPROVE_UNDO', requestId: request.id })).toBe('UNDO_NOT_ALLOWED');
+    expect(refusal(g, 'Bilal', { type: 'APPROVE_UNDO', requestId: request.id })).toBe('UNDO_NOT_ALLOWED');
+    expect(refusal(g, 'Asha', { type: 'REQUEST_UNDO', targetActionId: target })).toBe('UNDO_NOT_ALLOWED');
+    expect(refusal(g, 'Asha', { type: 'RESOLVE_CARD' })).toBe('INVALID_PHASE');
+    expect(g.ledger.filter((t) => t.type === 'CARD_REWARD' || t.type === 'UNDO_REVERSAL').map((t) => [t.type, t.amount])).toEqual([
+      ['CARD_REWARD', 2000],
+      ['UNDO_REVERSAL', 2000],
+    ]);
+  });
+
+  it('an undo request overtaken by a newer action is refused, and changes nothing', () => {
+    const g = new TestGame();
+    g.landOn('Asha', CHANCE, 11);
+    g.act('Asha', { type: 'REQUEST_UNDO', targetActionId: g.state.undoStack.at(-1)!.actionId });
+    const request = g.state.undoRequest!;
+    g.act('Asha', { type: 'TRANSFER_MONEY', toPlayerId: g.id('Bilal'), amount: 500 });
+    expect(refusal(g, 'Bilal', { type: 'APPROVE_UNDO', requestId: request.id })).toBe('UNDO_NOT_ALLOWED');
+    expect(g.balance('Asha')).toBe(START + 2000 - 500);
+  });
+
+  it('a game saved while Chance 11 was entered by hand is settled from the card data: ₹2,000, whatever the client asks for', () => {
+    const g = new TestGame();
+    g.landOn('Asha', positionOfProperty('DARJEELING'), 11);
+    // Recreate the legacy state the old manual path left behind (no money had moved yet).
+    g.placeAt('Asha', CHANCE);
+    g.state.turn.phase = 'AWAITING_CARD';
+    g.state.turn.pending = { kind: 'CARD_MANUAL', cardId: 'CHANCE_ODD_11', deck: 'CHANCE', rollTotal: 11 };
+    g.state.turn.card = null;
+    const before = g.balance('Asha');
+    expect(refusal(g, 'Asha', { type: 'RESOLVE_CARD', resolution: 'RECEIVE', amount: 10000 })).toBe('VALIDATION');
+    expect(refusal(g, 'Bilal', { type: 'RESOLVE_CARD' })).toBe('NOT_YOUR_TURN');
+    const r = g.act('Asha', { type: 'RESOLVE_CARD' });
+    expect(r.transactions).toEqual([expect.objectContaining({ type: 'CARD_REWARD', fromPlayerId: null, amount: 2000 })]);
+    expect(g.balance('Asha')).toBe(before + 2000);
+    expect(g.state.turn).toMatchObject({ phase: 'TURN_COMPLETE', pending: null, card: { cardId: 'CHANCE_ROLL_11_REWARD' } });
+    expect(refusal(g, 'Asha', { type: 'RESOLVE_CARD' })).toBe('INVALID_PHASE');
+  });
+});
+
+describe('Community Chest — no client-chosen money either', () => {
+  it('the printed amount is the only one: a card charge is a fixed payment that RESOLVE_CARD or an amount cannot change', () => {
+    const g = new TestGame();
+    g.landOn('Asha', CHEST, 11);
+    expect(g.state.turn.pending).toMatchObject({ kind: 'PAYMENT', reason: 'CARD', amount: 1500, toPlayerId: null });
+    expect(refusal(g, 'Asha', { type: 'RESOLVE_CARD' })).toBe('INVALID_PHASE');
+    expect(refusal(g, 'Asha', { type: 'RESOLVE_CARD', resolution: 'NONE' })).toBe('VALIDATION');
+    expect(refusal(g, 'Asha', { type: 'PAY_CARD', amount: 1 })).toBe('VALIDATION');
+    const r = g.act('Asha', { type: 'PAY_CARD' });
+    expect(r.transactions).toEqual([expect.objectContaining({ type: 'CARD_PAYMENT', fromPlayerId: g.id('Asha'), toPlayerId: null, amount: 1500 })]);
+    expect(refusal(g, 'Asha', { type: 'PAY_CARD' })).toBe('INVALID_PHASE');
+  });
+
+  it('a reward card pays its printed amount once, automatically', () => {
+    const g = new TestGame();
+    const r = g.landOn('Asha', CHEST, 12);
+    expect(r.transactions).toEqual([expect.objectContaining({ type: 'CARD_REWARD', fromPlayerId: null, amount: 3000 })]);
+    expect(refusal(g, 'Asha', { type: 'RESOLVE_CARD' })).toBe('INVALID_PHASE');
+    expect(g.balance('Asha')).toBe(START + 3000);
   });
 });
 
@@ -273,7 +418,7 @@ describe('card engine — movement effects', () => {
     rollTotal: 9,
     text: 'test card',
     effects,
-    verified: true,
+    kind: 'CARD',
   });
 
   it('backward MOVE_TO never collects the Start reward', () => {

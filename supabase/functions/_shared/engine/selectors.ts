@@ -636,11 +636,25 @@ export function auctionOpensAt(auction: Pick<AuctionState, 'createdAt' | 'resale
 /** The phases of their own turn in which a player may list a property; the turn returns to the same one afterwards. */
 export const RESALE_START_PHASES: readonly ResaleResumePhase[] = ['AWAITING_ROLL', 'AWAITING_PAYMENT', 'TURN_COMPLETE'];
 
-/** Why `amount` can't be a reserve price, or null. The seller chooses it freely within the game's money rules. */
-export function reservePriceBlocker(amount: number): string | null {
+/**
+ * Why `amount` can't be a reserve price, or null. The seller chooses it freely within the game's money
+ * rules; `minimum` is the floor that applies to them right now (resaleReserveFloor).
+ */
+export function reservePriceBlocker(amount: number, minimum = 0): string | null {
   if (!Number.isInteger(amount) || amount <= 0) return 'Enter a reserve price in whole rupees.';
   if (amount > IR.resale.maxReservePrice) return `The reserve price can be at most ${formatINR(IR.resale.maxReservePrice)}.`;
+  if (amount < minimum) return `You have a payment to settle: the reserve must be at least ${formatINR(minimum)}, what the bank would pay for this property.`;
   return null;
+}
+
+/**
+ * The lowest reserve this player may set on this property now. Normally none. While they owe a mandatory
+ * payment it is what the bank would pay for the property (propertyLiquidationValue) — the same
+ * anti-asset-stripping rule as trades (tradeStripsDebtor): an auction can raise the money, but it can't
+ * pass the property to an ally for a token bid out of the creditor's reach.
+ */
+export function resaleReserveFloor(state: StateLike & ModeAware & TurnAware, playerId: string, key: PropertyKey): number {
+  return mandatoryPaymentsOwed(state, playerId) > 0 ? propertyLiquidationValue(state, key) : 0;
 }
 
 /**

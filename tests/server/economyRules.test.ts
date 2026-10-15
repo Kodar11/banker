@@ -189,6 +189,53 @@ describe.skipIf(!DATABASE_URL)('debt, insolvency and departure through the handl
     await ledgerOk(g.gameId);
   });
 
+  it('Chance on a roll of 11: the server pays the ₹2,000 itself, once — forged amounts, concurrent and retried requests, and undo included', async () => {
+    const g = await setupGame(['Asha', 'Bilal', 'Chitra']);
+    await g.place('Asha', 9); // 11 to the second Chance square
+    const before = await g.snap('Asha');
+    const version = before.state.version;
+    const rollId = randomUUID();
+    const body = (actionId: string) => ({ op: 'action', gameId: g.gameId, playerId: g.id('Asha'), token: g.seats.Asha!.token, actionId, expectedVersion: version, action: { type: 'ROLL_DICE' } });
+    // Two different requests to roll at once, and a retry of the first: the game row lock lets one through.
+    queuedDice = [5, 6];
+    const results = await Promise.all([call(body(rollId)), call(body(randomUUID()))]);
+    queuedDice = [];
+    expect(results.filter((r) => r.ok)).toHaveLength(1);
+    const retry = await call(body(rollId));
+    expect(retry.ok).toBe(true);
+    const rewards = await sql`select id, from_player_id, to_player_id, amount, memo from public.transactions where game_id = ${g.gameId} and type = 'CARD_REWARD'`;
+    expect(rewards).toHaveLength(1);
+    expect(rewards[0]).toMatchObject({ from_player_id: null, to_player_id: g.id('Asha'), amount: 2000 });
+    expect(rewards[0]!.memo).toContain('roll of 11');
+    const after = await g.snap('Asha');
+    expect(after.state.turn).toMatchObject({ phase: 'TURN_COMPLETE', card: { cardId: 'CHANCE_ROLL_11_REWARD', kind: 'BANK_EVENT' } });
+    expect(after.state.players.find((p) => p.name === 'Asha')!.balance).toBe(START + 2000);
+
+    // A client that skips the app and asks for money is refused, and nothing is stored for it.
+    for (const action of [
+      { type: 'RESOLVE_CARD', resolution: 'RECEIVE', amount: 10000 },
+      { type: 'RESOLVE_CARD', cardId: 'CHANCE_ODD_3' },
+    ]) {
+      expect(await g.act('Asha', action as unknown as GameAction)).toMatchObject({ ok: false, error: { code: 'VALIDATION' } });
+    }
+    expect(await g.act('Asha', { type: 'RESOLVE_CARD' })).toMatchObject({ ok: false, error: { code: 'INVALID_PHASE' } });
+    expect(await g.act('Bilal', { type: 'RESOLVE_CARD' })).toMatchObject({ ok: false, error: { code: 'NOT_YOUR_TURN' } });
+    expect(await sql`select id from public.transactions where game_id = ${g.gameId} and type = 'CARD_REWARD'`).toHaveLength(1);
+
+    // Undo reverses exactly that row, once.
+    ok(await g.act('Asha', { type: 'REQUEST_UNDO', targetActionId: rollId }));
+    const requestId = (await g.snap('Asha')).state.undoRequest!.id;
+    const approveId = randomUUID();
+    const approved = ok(await g.act('Bilal', { type: 'APPROVE_UNDO', requestId }, { actionId: approveId }));
+    const again = await call({ op: 'action', gameId: g.gameId, playerId: g.id('Bilal'), token: g.seats.Bilal!.token, actionId: approveId, expectedVersion: approved.snapshot.state.version - 1, action: { type: 'APPROVE_UNDO', requestId } });
+    expect(again).toMatchObject({ ok: true, duplicate: true });
+    expect(await g.act('Chitra', { type: 'APPROVE_UNDO', requestId })).toMatchObject({ ok: false, error: { code: 'UNDO_NOT_ALLOWED' } });
+    const reversals = await sql`select from_player_id, to_player_id, amount, reverses_transaction_id from public.transactions where game_id = ${g.gameId} and type = 'UNDO_REVERSAL'`;
+    expect(reversals).toEqual([expect.objectContaining({ from_player_id: g.id('Asha'), to_player_id: null, amount: 2000, reverses_transaction_id: rewards[0]!.id })]);
+    expect((await g.snap('Asha')).state.players.find((p) => p.name === 'Asha')!.balance).toBe(START);
+    await ledgerOk(g.gameId);
+  });
+
   it('a game ended with every player level is a shared victory: no single winner is stored', async () => {
     const g = await setupGame(['Asha', 'Bilal']);
     const res = ok(await endByVote(g.act, g.names));

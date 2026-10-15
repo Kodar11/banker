@@ -248,7 +248,7 @@ describe('the in-app rulebook is written from the rule set', () => {
     ['Jail fine', ['Jail'], `pay ${formatINR(R.jail.fine)}`],
     ['Jail turns', ['Jail'], `After ${R.jail.maxTurns} missed turns`],
     ['Rest House', ['Rest House'], `collect ${formatINR(R.restHouse.collectFromEachPlayer)} from every other player`],
-    ['manual card limit', ['Chance and Community Chest'], formatINR(R.cards.manualMaxAmount)],
+    ['Chance roll-11 reward', ['Chance and Community Chest'], `${formatINR(R.cards.chanceRoll11Reward)} reward from the Bank`],
     ['loan minimum', ['Loans'], `at least ${formatINR(R.loans.minAmount)}`],
     ['loan step', ['Loans'], `steps of ${formatINR(R.loans.step)}`],
     ['loan maximum', ['Loans'], formatINR(R.loans.maxOutstandingPrincipal)],

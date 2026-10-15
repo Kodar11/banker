@@ -5,9 +5,10 @@
  * dice total that landed the player on the square picks the EVEN or the ODD
  * table, and the entry with that number (BUSINESS_MVP_RULES.cards.selection).
  *
- * Values and wording are exactly the supplied card data. A dice total with no
- * entry in its table (Chance ODD 11) is `verified: false` with a MANUAL effect:
- * the app asks the player to read the physical card and enter the money effect.
+ * Values and wording are exactly the supplied card data. The one dice total with
+ * no entry in its table (Chance ODD 11) is not a card: it is a BANK_EVENT, a fixed
+ * reward from the bank (CHANCE_ROLL_11_REWARD). Every total 2–12 resolves to a
+ * definition here, so the engine never asks a player what a card says or pays.
  *
  * Note: the supplied Chance ODD table also lists 10 (Go to Jail) and 12 (Go to
  * Rest House). They are kept exactly as supplied, but with parity selection an
@@ -18,6 +19,7 @@
  * and loan-interest rules apply identically to dice and card moves.
  */
 import type { PropertyKey, SquareId } from './businessBoard.ts';
+import { formatINR } from './format.ts';
 import { BUSINESS_MVP_RULES as RULES } from './rules.ts';
 
 export type Deck = 'CHANCE' | 'COMMUNITY_CHEST';
@@ -42,9 +44,7 @@ export type CardEffect =
   | { type: 'GO_TO_JAIL' }
   | { type: 'GO_TO_REST_HOUSE' }
   | { type: 'SKIP_TURNS'; count: number }
-  | { type: 'PAY_PER_BUILDING'; perHouse: number; perHotel: number }
-  /** Entry not in the supplied data — resolve using the physical card. */
-  | { type: 'MANUAL' };
+  | { type: 'PAY_PER_BUILDING'; perHouse: number; perHotel: number };
 
 export interface CardDefinition {
   /** e.g. CHANCE_EVEN_2 */
@@ -55,16 +55,12 @@ export interface CardDefinition {
   rollTotal: number;
   text: string;
   effects: CardEffect[];
-  /** false = not in the supplied card data; resolved by hand. */
-  verified: boolean;
+  /** CARD: an entry of the supplied card tables. BANK_EVENT: a landing the tables have no entry for, settled by the bank. */
+  kind: 'CARD' | 'BANK_EVENT';
 }
 
-function card(deck: Deck, table: CardTable, rollTotal: number, text: string, effects: CardEffect[], verified = true): CardDefinition {
-  return { id: `${deck}_${table}_${rollTotal}`, deck, table, rollTotal, text, effects, verified };
-}
-
-function unknown(deck: Deck, table: CardTable, rollTotal: number): CardDefinition {
-  return card(deck, table, rollTotal, 'Not in the supplied card data — read the physical card.', [{ type: 'MANUAL' }], false);
+function card(deck: Deck, table: CardTable, rollTotal: number, text: string, effects: CardEffect[]): CardDefinition {
+  return { id: `${deck}_${table}_${rollTotal}`, deck, table, rollTotal, text, effects, kind: 'CARD' };
 }
 
 const pay = (amount: number): CardEffect => ({ type: 'PAY_BANK', amount });
@@ -124,6 +120,24 @@ export const COMMUNITY_CHEST_ODD: readonly CardDefinition[] = [
   card('COMMUNITY_CHEST', 'ODD', 11, 'Pay insurance premium — ₹1,500 to Bank', [pay(1500)]),
 ];
 
+/**
+ * A roll of 11 that lands on Chance. The supplied Chance ODD table has no 11, so there is no card to
+ * draw; the agreed rule is a fixed reward from the bank instead (BUSINESS_MVP_RULES.cards.chanceRoll11Reward).
+ * Applied by the engine on landing, like any card, and only ever for that landing.
+ */
+export const CHANCE_ROLL_11_REWARD: CardDefinition = {
+  id: 'CHANCE_ROLL_11_REWARD',
+  deck: 'CHANCE',
+  table: 'ODD',
+  rollTotal: 11,
+  text: `Lucky 11 — there is no Chance card for a roll of 11, so the Bank pays you a ${formatINR(RULES.cards.chanceRoll11Reward)} reward`,
+  effects: [receive(RULES.cards.chanceRoll11Reward)],
+  kind: 'BANK_EVENT',
+};
+
+/** Landings the card tables have no entry for, each settled by the bank. */
+export const BANK_EVENTS: readonly CardDefinition[] = [CHANCE_ROLL_11_REWARD];
+
 export const CARD_TABLES: Readonly<Record<Deck, Readonly<Record<CardTable, readonly CardDefinition[]>>>> = {
   CHANCE: { EVEN: CHANCE_EVEN, ODD: CHANCE_ODD },
   COMMUNITY_CHEST: { EVEN: COMMUNITY_CHEST_EVEN, ODD: COMMUNITY_CHEST_ODD },
@@ -131,7 +145,7 @@ export const CARD_TABLES: Readonly<Record<Deck, Readonly<Record<CardTable, reado
 
 export const CHANCE_CARDS: readonly CardDefinition[] = [...CHANCE_EVEN, ...CHANCE_ODD];
 export const COMMUNITY_CHEST_CARDS: readonly CardDefinition[] = [...COMMUNITY_CHEST_EVEN, ...COMMUNITY_CHEST_ODD];
-export const ALL_CARDS: readonly CardDefinition[] = [...CHANCE_CARDS, ...COMMUNITY_CHEST_CARDS];
+export const ALL_CARDS: readonly CardDefinition[] = [...CHANCE_CARDS, ...COMMUNITY_CHEST_CARDS, ...BANK_EVENTS];
 
 export const DECK_LABELS: Record<Deck, string> = {
   CHANCE: 'Chance',
@@ -142,10 +156,12 @@ export function tableFor(rollTotal: number): CardTable {
   return rollTotal % 2 === 0 ? 'EVEN' : 'ODD';
 }
 
-/** The card for a deck and the dice total that landed the player on the square. */
+/** The card (or bank event) for a deck and the dice total that landed the player on the square. */
 export function findCard(deck: Deck, rollTotal: number): CardDefinition {
   const table = tableFor(rollTotal);
-  return CARD_TABLES[deck][table].find((c) => c.rollTotal === rollTotal) ?? unknown(deck, table, rollTotal);
+  const found = CARD_TABLES[deck][table].find((c) => c.rollTotal === rollTotal) ?? BANK_EVENTS.find((e) => e.deck === deck && e.rollTotal === rollTotal);
+  if (!found) throw new Error(`No ${deck} entry for a dice total of ${rollTotal}`);
+  return found;
 }
 
 export function getCardById(id: string): CardDefinition | undefined {

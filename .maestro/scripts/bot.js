@@ -68,7 +68,7 @@ if (OP === 'play') {
     else if (phase === 'AWAITING_DECISION') act(s, { type: 'BUY_PROPERTY' }).ok || act(state(), { type: 'DECLINE_PROPERTY' });
     else if (phase === 'AWAITING_PAYMENT')
       act(s, { type: PAY_ACTION[p.reason] }).ok || act(state(), { type: 'DECLARE_BANKRUPTCY' });
-    else if (phase === 'AWAITING_CARD') act(s, { type: 'RESOLVE_CARD', resolution: 'NONE' });
+    else if (phase === 'AWAITING_CARD') act(s, { type: 'RESOLVE_CARD' });
     else if (phase === 'AUCTION') act(s, { type: 'PASS_AUCTION', auctionId: s.auction.id });
     else if (phase === 'TURN_COMPLETE') act(s, { type: 'END_TURN' });
   }
