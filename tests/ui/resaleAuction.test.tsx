@@ -153,7 +153,9 @@ describe('Entry point: the auction screen', () => {
     give(f, 'Asha', 'MADRAS', { hotel: true });
     give(f, 'Bilal', 'RAILWAY');
     const rate = offeredRate('SECURED', creditScoreOf(f.state.intermediate!, f.ids.Asha!)).ratePercent;
-    f.act('Asha', { type: 'TAKE_INTERMEDIATE_LOAN', product: 'SECURED', amount: 2000, collateralKey: 'CALCUTTA', expectedRatePercent: rate });
+    // Worth enough on its own to secure the smallest loan (80% of ₹13,000); pledged the way an older app sends one property.
+    f.state.intermediate!.market.CALCUTTA.value = 13000;
+    f.act('Asha', { type: 'TAKE_INTERMEDIATE_LOAN', product: 'SECURED', amount: 10000, collateralKey: 'CALCUTTA', expectedRatePercent: rate });
     await renderAuction(f, 'Asha', NEW_AUCTION);
 
     // The page reads like the app's other screens: a way back, what is going on, then what I can do here.
@@ -259,8 +261,9 @@ describe('Entry point: Auction Property on the property card', () => {
       'pledged as loan collateral',
       (f: Fixture) => {
         give(f, 'Asha', 'MUMBAI');
+        give(f, 'Asha', 'DELHI');
         const rate = offeredRate('SECURED', creditScoreOf(f.state.intermediate!, f.ids.Asha!)).ratePercent;
-        f.act('Asha', { type: 'TAKE_INTERMEDIATE_LOAN', product: 'SECURED', amount: 2000, collateralKey: 'MUMBAI', expectedRatePercent: rate });
+        f.act('Asha', { type: 'TAKE_INTERMEDIATE_LOAN', product: 'SECURED', amount: 10000, collateralKeys: ['MUMBAI', 'DELHI'], expectedRatePercent: rate });
       },
       /^Pledged as loan collateral — repay that loan first\.$/,
     ],

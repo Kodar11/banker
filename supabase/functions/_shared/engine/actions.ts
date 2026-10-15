@@ -67,9 +67,25 @@ export const GameActionSchema = z.discriminatedUnion('type', [
       type: z.literal('TAKE_INTERMEDIATE_LOAN'),
       product: z.enum(LOAN_PRODUCT_KEYS),
       amount: rupees,
-      /** Secured Loan only: the property pledged. */
+      /** Secured Loan only: the properties pledged, with their buildings, as one pool. */
+      collateralKeys: z.array(propertyKey).min(1).max(26).optional(),
+      /** Legacy (an app from before collateral could be pooled): one property pledged. Never together with `collateralKeys`. */
       collateralKey: propertyKey.optional(),
       /** The annual rate on the contract the player confirmed; a different rate now means the offer changed. */
+      expectedRatePercent: z.number().int().min(0).max(100),
+    })
+    .strict(),
+  /**
+   * Pay off one of my active loans with a new loan, in one step. The new loan's terms are chosen and confirmed
+   * exactly as for TAKE_INTERMEDIATE_LOAN; the old loan's collateral may be pledged again for it.
+   */
+  z
+    .object({
+      type: z.literal('REFINANCE_INTERMEDIATE_LOAN'),
+      loanId: id,
+      product: z.enum(LOAN_PRODUCT_KEYS),
+      amount: rupees,
+      collateralKeys: z.array(propertyKey).min(1).max(26).optional(),
       expectedRatePercent: z.number().int().min(0).max(100),
     })
     .strict(),

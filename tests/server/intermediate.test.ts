@@ -150,10 +150,16 @@ describe.skipIf(!DATABASE_URL)('Capital Mode through the handler (Postgres)', ()
     await sql`update public.properties set owner_player_id = ${g.seats[name]!.playerId} where game_id = ${g.gameId} and property_key = ${key}`;
   }
 
-  async function borrow(g: Game, name: string, product: LoanProductKey, amount: number, collateralKey?: PropertyKey, actionId?: string) {
+  async function borrow(g: Game, name: string, product: LoanProductKey, amount: number, collateralKeys?: PropertyKey[], actionId?: string) {
     const snap = await g.snap();
     const expectedRatePercent = offeredRate(product, eco(snap).credit[g.seats[name]!.playerId]!).ratePercent;
-    return g.act(name, { type: 'TAKE_INTERMEDIATE_LOAN', product, amount, expectedRatePercent, ...(collateralKey ? { collateralKey } : {}) }, { actionId });
+    return g.act(name, { type: 'TAKE_INTERMEDIATE_LOAN', product, amount, expectedRatePercent, ...(collateralKeys ? { collateralKeys } : {}) }, { actionId });
+  }
+
+  async function refinance(g: Game, name: string, loanId: string, product: LoanProductKey, amount: number, actionId?: string) {
+    const snap = await g.snap();
+    const expectedRatePercent = offeredRate(product, eco(snap).credit[g.seats[name]!.playerId]!).ratePercent;
+    return g.act(name, { type: 'REFINANCE_INTERMEDIATE_LOAN', loanId, product, amount, expectedRatePercent }, { actionId });
   }
 
   async function ledgerOk(gameId: string) {
@@ -268,34 +274,36 @@ describe.skipIf(!DATABASE_URL)('Capital Mode through the handler (Postgres)', ()
     it('a retried loan request (same action id) creates one loan and pays out once', async () => {
       const g = await setupGame('intermediate');
       const actionId = randomUUID();
-      const first = ok(await borrow(g, 'Asha', 'PERSONAL', 5000, undefined, actionId));
-      const again = ok(await borrow(g, 'Asha', 'PERSONAL', 5000, undefined, actionId));
+      const first = ok(await borrow(g, 'Asha', 'PERSONAL', 10000, undefined, actionId));
+      const again = ok(await borrow(g, 'Asha', 'PERSONAL', 10000, undefined, actionId));
       expect(again.duplicate).toBe(true);
       const snap = await g.snap();
       expect(eco(snap).loans).toHaveLength(1);
       expect(eco(first.snapshot).loans[0]!.id).toBe(eco(snap).loans[0]!.id);
-      expect(snap.state.players.find((p) => p.id === g.seats.Asha!.playerId)!.balance).toBe(30000);
+      expect(snap.state.players.find((p) => p.id === g.seats.Asha!.playerId)!.balance).toBe(35000);
       const paid = await sql`select amount from public.transactions where game_id = ${g.gameId} and type = 'LOAN_DISBURSEMENT'`;
-      expect(paid.map((r) => Number(r.amount))).toEqual([5000]);
+      expect(paid.map((r) => Number(r.amount))).toEqual([10000]);
       await ledgerOk(g.gameId);
     });
 
     it('a contract at a rate the server no longer offers is refused, with nothing written', async () => {
       const g = await setupGame('intermediate');
-      expect(await g.act('Asha', { type: 'TAKE_INTERMEDIATE_LOAN', product: 'PERSONAL', amount: 5000, expectedRatePercent: 5 })).toMatchObject({ ok: false, error: { code: 'STALE_STATE' } });
+      expect(await g.act('Asha', { type: 'TAKE_INTERMEDIATE_LOAN', product: 'PERSONAL', amount: 10000, expectedRatePercent: 5 })).toMatchObject({ ok: false, error: { code: 'STALE_STATE' } });
       expect(eco(await g.snap()).loans).toEqual([]);
-      expect(await g.act('Asha', { type: 'TAKE_INTERMEDIATE_LOAN', product: 'PERSONAL', amount: 5000, expectedRatePercent: 11, ratePercent: 1 } as never)).toMatchObject({ ok: false, error: { code: 'VALIDATION' } });
+      expect(await g.act('Asha', { type: 'TAKE_INTERMEDIATE_LOAN', product: 'PERSONAL', amount: 10000, expectedRatePercent: 12, ratePercent: 1 } as never)).toMatchObject({ ok: false, error: { code: 'VALIDATION' } });
     });
 
     it('two simultaneous loans against the same property: one pledge, one payout', async () => {
       const g = await setupGame('intermediate');
       await give(g, 'Asha', 'MUMBAI');
-      const results = await Promise.all([borrow(g, 'Asha', 'SECURED', 4000, 'MUMBAI'), borrow(g, 'Asha', 'SECURED', 4000, 'MUMBAI'), borrow(g, 'Asha', 'SECURED', 4000, 'MUMBAI')]);
+      await give(g, 'Asha', 'DELHI');
+      const pair: PropertyKey[] = ['MUMBAI', 'DELHI'];
+      const results = await Promise.all([borrow(g, 'Asha', 'SECURED', 10000, pair), borrow(g, 'Asha', 'SECURED', 10000, pair), borrow(g, 'Asha', 'SECURED', 10000, pair)]);
       expect(results.filter((r) => r.ok)).toHaveLength(1);
       for (const r of results.filter((x) => !x.ok)) expect(r).toMatchObject({ ok: false, error: { code: 'LOAN_NOT_ALLOWED' } });
       const snap = await g.snap();
-      expect(eco(snap).loans.filter((l) => l.collateralKey === 'MUMBAI')).toHaveLength(1);
-      expect(snap.state.players.find((p) => p.id === g.seats.Asha!.playerId)!.balance).toBe(29000);
+      expect(eco(snap).loans.filter((l) => (l.collateralKeys ?? []).includes('MUMBAI'))).toHaveLength(1);
+      expect(snap.state.players.find((p) => p.id === g.seats.Asha!.playerId)!.balance).toBe(35000);
       // The pledged property can take no second claim.
       expect(await g.act('Asha', { type: 'MORTGAGE_PROPERTY', propertyKey: 'MUMBAI' })).toMatchObject({ ok: false, error: { code: 'MORTGAGE_NOT_ALLOWED' } });
       expect(await g.act('Asha', { type: 'CREATE_TRADE', toPlayerId: g.seats.Bilal!.playerId, offeredPropertyKeys: ['MUMBAI'], requestedPropertyKeys: [], offeredMoney: 0, requestedMoney: 100 })).toMatchObject({ ok: false, error: { code: 'TRADE_NOT_ALLOWED' } });
@@ -304,7 +312,7 @@ describe.skipIf(!DATABASE_URL)('Capital Mode through the handler (Postgres)', ()
 
     it('simultaneous borrowing never passes the total limit', async () => {
       const g = await setupGame('intermediate');
-      const results = await Promise.all([borrow(g, 'Asha', 'LONG_TERM', 15000), borrow(g, 'Asha', 'PERSONAL', 10000), borrow(g, 'Asha', 'FLEXIBLE', 10000)]);
+      const results = await Promise.all([borrow(g, 'Asha', 'LONG_TERM', 10000), borrow(g, 'Asha', 'PERSONAL', 10000), borrow(g, 'Asha', 'FLEXIBLE', 10000)]);
       const snap = await g.snap();
       const borrowed = eco(snap).loans.reduce((s, l) => s + l.principal, 0);
       expect(borrowed).toBeLessThanOrEqual(20000);
@@ -314,7 +322,7 @@ describe.skipIf(!DATABASE_URL)('Capital Mode through the handler (Postgres)', ()
 
     it('an installment is paid once: double taps and retries deduct the money a single time', async () => {
       const g = await setupGame('intermediate');
-      ok(await borrow(g, 'Asha', 'PERSONAL', 9000));
+      ok(await borrow(g, 'Asha', 'PERSONAL', 15000));
       const due = await jumpTo(g, YEAR);
       const loan = eco(due).loans[0]!;
       const first = loan.installments[0]!;
@@ -342,9 +350,44 @@ describe.skipIf(!DATABASE_URL)('Capital Mode through the handler (Postgres)', ()
       await ledgerOk(g.gameId);
     });
 
+    it('a refinance is applied once: a retry is a duplicate, a racing repayment and refinance cannot both settle the loan', async () => {
+      const g = await setupGame('intermediate');
+      const old = eco(ok(await borrow(g, 'Asha', 'PERSONAL', 15000)).snapshot).loans[0]!;
+      await jumpTo(g, 36);
+      const actionId = randomUUID();
+      const first = ok(await refinance(g, 'Asha', old.id, 'LONG_TERM', 20000, actionId));
+      const again = ok(await refinance(g, 'Asha', old.id, 'LONG_TERM', 20000, actionId));
+      expect(again.duplicate).toBe(true);
+      const snap = await g.snap();
+      expect(eco(snap).loans.map((l) => [l.product, l.status])).toEqual([
+        ['PERSONAL', 'SETTLED'],
+        ['LONG_TERM', 'ACTIVE'],
+      ]);
+      expect(eco(first.snapshot).loans[1]!.refinancedFrom).toBe(old.id);
+      const rows = await sql`select type, amount from public.transactions where game_id = ${g.gameId} and type in ('LOAN_DISBURSEMENT', 'LOAN_REPAYMENT', 'LOAN_INTEREST') order by seq`;
+      expect(rows.map((r) => [r.type, Number(r.amount)])).toEqual([
+        ['LOAN_DISBURSEMENT', 15000],
+        ['LOAN_DISBURSEMENT', 20000],
+        ['LOAN_REPAYMENT', 15000],
+        ['LOAN_INTEREST', 900],
+      ]);
+      // The replacement races its own full repayment and another refinance: whichever wins, the loan is closed once.
+      const replacement = eco(snap).loans[1]!;
+      const results = await Promise.all([
+        g.act('Asha', { type: 'PREPAY_INTERMEDIATE_LOAN', loanId: replacement.id, amount: 20000 }),
+        refinance(g, 'Asha', replacement.id, 'PERSONAL', 20000),
+      ]);
+      expect(results.filter((r) => r.ok).length).toBeGreaterThanOrEqual(1);
+      const after = await g.snap();
+      expect(eco(after).loans.filter((l) => l.status === 'ACTIVE').length).toBeLessThanOrEqual(1);
+      expect(eco(after).loans.find((l) => l.id === replacement.id)!.status).not.toBe('ACTIVE');
+      expect(eco(after).creditEvents).toEqual([]);
+      await ledgerOk(g.gameId);
+    });
+
     it('nobody can pay or repay another player’s loan', async () => {
       const g = await setupGame('intermediate');
-      const loanId = eco(ok(await borrow(g, 'Asha', 'PERSONAL', 3000)).snapshot).loans[0]!.id;
+      const loanId = eco(ok(await borrow(g, 'Asha', 'PERSONAL', 10000)).snapshot).loans[0]!.id;
       expect(await g.act('Bilal', { type: 'PREPAY_INTERMEDIATE_LOAN', loanId, amount: 1000 })).toMatchObject({ ok: false, error: { code: 'NOT_FOUND' } });
       expect(await g.act('Bilal', { type: 'PAY_LOAN_INSTALLMENT', loanId })).toMatchObject({ ok: false, error: { code: 'NOT_FOUND' } });
     });
@@ -353,15 +396,15 @@ describe.skipIf(!DATABASE_URL)('Capital Mode through the handler (Postgres)', ()
   describe('overdue, default and collateral through the database', () => {
     it('overdue and default are each applied once however many requests follow', async () => {
       const g = await setupGame('intermediate');
-      ok(await borrow(g, 'Asha', 'EMERGENCY', 2000));
+      ok(await borrow(g, 'Asha', 'EMERGENCY', 10000));
       await jumpTo(g, YEAR + WINDOW);
       let snap = await g.snap();
       expect(eco(snap).loans[0]!.installments[0]!.status).toBe('OVERDUE');
-      expect(await borrow(g, 'Asha', 'PERSONAL', 1000)).toMatchObject({ ok: false, error: { code: 'LOAN_NOT_ALLOWED' } });
+      expect(await borrow(g, 'Asha', 'PERSONAL', 10000)).toMatchObject({ ok: false, error: { code: 'LOAN_NOT_ALLOWED' } });
       ok(await tick(g));
       ok(await tick(g));
       snap = await jumpTo(g, YEAR + WINDOW + YEAR);
-      expect(eco(snap).loans[0]).toMatchObject({ status: 'DEFAULTED', defaultBalance: 2000 + 380 });
+      expect(eco(snap).loans[0]).toMatchObject({ status: 'DEFAULTED', defaultBalance: 10000 + 1700 });
       ok(await tick(g));
       ok(await tick(g));
       snap = await g.snap();
@@ -377,14 +420,17 @@ describe.skipIf(!DATABASE_URL)('Capital Mode through the handler (Postgres)', ()
     it('secured default: the property returns to the bank once, the surplus is one ledger entry', async () => {
       const g = await setupGame('intermediate');
       await give(g, 'Asha', 'MUMBAI');
-      ok(await borrow(g, 'Asha', 'SECURED', 4000, 'MUMBAI'));
+      await give(g, 'Asha', 'DELHI');
+      ok(await borrow(g, 'Asha', 'SECURED', 10000, ['MUMBAI', 'DELHI']));
       const snap = await jumpTo(g, YEAR + WINDOW + YEAR);
       const loan = eco(snap).loans[0]!;
-      expect(loan.collateralKey).toBeNull();
-      expect(loan.settlement).toMatchObject({ propertyKey: 'MUMBAI' });
+      expect(loan.collateralKeys).toEqual([]);
+      expect(loan.settlement).toMatchObject({ propertyKeys: ['MUMBAI', 'DELHI'] });
       expect(loan.settlement!.applied + loan.settlement!.surplus).toBe(loan.settlement!.value);
-      const [prop] = await sql`select owner_player_id, mortgaged, houses from public.properties where game_id = ${g.gameId} and property_key = 'MUMBAI'`;
-      expect(prop).toMatchObject({ owner_player_id: null, mortgaged: false, houses: 0 });
+      for (const key of ['MUMBAI', 'DELHI']) {
+        const [prop] = await sql`select owner_player_id, mortgaged, houses from public.properties where game_id = ${g.gameId} and property_key = ${key}`;
+        expect(prop).toMatchObject({ owner_player_id: null, mortgaged: false, houses: 0 });
+      }
       ok(await tick(g));
       ok(await tick(g));
       const surplus = await sql`select amount, to_player_id from public.transactions where game_id = ${g.gameId} and type = 'COLLATERAL_SURPLUS'`;
@@ -396,7 +442,7 @@ describe.skipIf(!DATABASE_URL)('Capital Mode through the handler (Postgres)', ()
 
     it('a catch-up payment racing the default: one of them wins, and the books agree with whichever did', async () => {
       const g = await setupGame('intermediate');
-      ok(await borrow(g, 'Asha', 'EMERGENCY', 2000));
+      ok(await borrow(g, 'Asha', 'EMERGENCY', 10000));
       // One roll of 2 away from the default deadline.
       const before = await jumpTo(g, YEAR + WINDOW + YEAR - 2);
       const loan = eco(before).loans[0]!;
@@ -437,8 +483,9 @@ describe.skipIf(!DATABASE_URL)('Capital Mode through the handler (Postgres)', ()
   it('a reconnecting phone reads the whole financial picture back from the server', async () => {
     const g = await setupGame('intermediate');
     await give(g, 'Asha', 'DELHI');
-    ok(await borrow(g, 'Asha', 'SECURED', 2000, 'DELHI'));
-    ok(await borrow(g, 'Asha', 'FLEXIBLE', 3000));
+    await give(g, 'Asha', 'MADRAS');
+    ok(await borrow(g, 'Asha', 'SECURED', 10000, ['DELHI', 'MADRAS']));
+    ok(await borrow(g, 'Asha', 'FLEXIBLE', 10000));
     await jumpTo(g, YEAR + 3);
     const [a, b] = await Promise.all([snapshotFor(g.gameId, g.seats.Asha!), snapshotFor(g.gameId, g.seats.Bilal!)]);
     expect(JSON.stringify(a.state.intermediate)).toBe(JSON.stringify(b.state.intermediate));

@@ -315,14 +315,14 @@ function candidates(table: Table, nowMs: number, random: () => number, tempo: { 
       if (eco) {
         const offer = pick(loanOffers(s, p.id).filter((o) => !o.blocked && o.maxAmount >= IR.loans.minAmount), random);
         if (offer && random() < 0.4) {
-          const pledge = offer.secured ? pick(offer.collateral, random) : undefined;
-          const cap = Math.min(offer.maxAmount, pledge ? pledge.limit : offer.maxAmount);
-          const steps = Math.max(0, Math.floor((cap - IR.loans.minAmount) / IR.loans.step));
+          // Secured: everything that can be pledged, as one pool (offer.maxAmount is what that pool secures).
+          const keys = offer.secured ? offer.collateral.map((c) => c.key) : [];
+          const steps = Math.max(0, Math.floor((offer.maxAmount - IR.loans.minAmount) / IR.loans.step));
           add(who, {
             type: 'TAKE_INTERMEDIATE_LOAN',
             product: offer.product,
             amount: IR.loans.minAmount + IR.loans.step * Math.floor(random() * (steps + 1)),
-            ...(pledge ? { collateralKey: pledge.key } : {}),
+            ...(keys.length ? { collateralKeys: keys } : {}),
             expectedRatePercent: offer.ratePercent,
           });
         }
@@ -330,6 +330,13 @@ function candidates(table: Table, nowMs: number, random: () => number, tempo: { 
           if (l.status === 'ACTIVE') {
             add(who, { type: 'PAY_LOAN_INSTALLMENT', loanId: l.id });
             if (random() < 0.3) add(who, { type: 'PREPAY_INTERMEDIATE_LOAN', loanId: l.id, amount: IR.loans.step * (1 + Math.floor(random() * 4)) });
+            if (random() < 0.15) {
+              const refi = pick(loanOffers(s, p.id, { replacingLoanId: l.id }).filter((o) => !o.blocked && o.maxAmount >= IR.loans.minAmount), random);
+              if (refi) {
+                const keys = refi.secured ? refi.collateral.map((c) => c.key) : [];
+                add(who, { type: 'REFINANCE_INTERMEDIATE_LOAN', loanId: l.id, product: refi.product, amount: refi.maxAmount, ...(keys.length ? { collateralKeys: keys } : {}), expectedRatePercent: refi.ratePercent });
+              }
+            }
           } else if (l.status === 'DEFAULTED' && l.defaultBalance > 0) {
             add(who, { type: 'PAY_DEFAULTED_LOAN', loanId: l.id, amount: random() < 0.5 ? l.defaultBalance : Math.max(1, Math.floor(l.defaultBalance * random())) });
           }

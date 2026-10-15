@@ -5,7 +5,7 @@ import {
   durationLabel,
   FINANCIAL_PRIVACY_LABELS,
   FINANCIAL_PRIVACY_MODES,
-  GAME_CONFIG_LIMITS,
+  configAmountLimits,
   GAME_DURATION_OPTIONS,
   gameConfigSummary,
   isDefaultGameConfig,
@@ -19,8 +19,8 @@ import { Label } from '@/components/ui';
 import { formatINR } from '@/utils/currency';
 
 /** One rupee setting: − value + in the server's own steps, stopping at its limits. */
-function AmountRow({ field, label, hint, value, onChange }: { field: GameConfigAmountKey; label: string; hint: string; value: number; onChange: (next: number) => void }) {
-  const { min, max, step } = GAME_CONFIG_LIMITS[field];
+function AmountRow({ mode, field, label, hint, value, onChange }: { mode: GameMode; field: GameConfigAmountKey; label: string; hint: string; value: number; onChange: (next: number) => void }) {
+  const { min, max, step } = configAmountLimits(mode, field);
   const stepper = (delta: number, symbol: string, name: string) => {
     const next = value + delta;
     const disabled = next < min || next > max;
@@ -99,8 +99,8 @@ export function GameConfigEditor({ mode, value, onChange, privacyEditable = fals
   const isDefault = isDefaultGameConfig(mode, privacyEditable ? value : { ...value, financialPrivacy: defaultGameConfig(mode).financialPrivacy });
   return (
     <View className="gap-4" testID="config-editor">
-      <AmountRow field="startingCash" label="Starting cash" hint="Each player, from the bank" value={value.startingCash} onChange={(startingCash) => set({ startingCash })} />
-      <AmountRow field="loanLimit" label="Loan limit" hint="Most a player can owe the bank in loans" value={value.loanLimit} onChange={(loanLimit) => set({ loanLimit })} />
+      <AmountRow mode={mode} field="startingCash" label="Starting cash" hint="Each player, from the bank" value={value.startingCash} onChange={(startingCash) => set({ startingCash })} />
+      <AmountRow mode={mode} field="loanLimit" label="Loan limit" hint="Most a player can owe the bank in loans" value={value.loanLimit} onChange={(loanLimit) => set({ loanLimit })} />
       <View className="gap-1.5">
         <Text className="text-base font-extrabold text-ink">Game duration</Text>
         <Choice

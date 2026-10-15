@@ -468,7 +468,7 @@ describe('Cash Guardian', () => {
 
   it('failed: enough cash, but an installment is overdue', () => {
     const g = game();
-    borrow(g, 'Asha', 'PERSONAL', 9000);
+    borrow(g, 'Asha', 'PERSONAL', 15000);
     jumpTo(g, YEAR + WINDOW);
     expect(eco(g).loans[0]!.installments[0]!.status).toBe('OVERDUE');
     expect(g.balance('Asha')).toBeGreaterThan(30000);
@@ -479,7 +479,7 @@ describe('Cash Guardian', () => {
 
   it('a loan that is being repaid on time does not fail it', () => {
     const g = game();
-    borrow(g, 'Asha', 'PERSONAL', 9000);
+    borrow(g, 'Asha', 'PERSONAL', 15000);
     jumpTo(g, YEAR);
     expect(eco(g).loans[0]!.installments[0]!.status).toBe('DUE');
     end(g);

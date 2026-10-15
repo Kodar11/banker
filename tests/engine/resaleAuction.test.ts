@@ -70,9 +70,9 @@ function insure(g: TestGame, name: string, key: PropertyKey) {
   return g.act(name, { type: 'INSURE_PROPERTY', propertyKey: key, expectedPremium: premiumForYear(g.state.intermediate!.year) });
 }
 
-function pledge(g: TestGame, name: string, key: PropertyKey, amount = 2000) {
+function pledge(g: TestGame, name: string, keys: PropertyKey[], amount = 10000) {
   const expectedRatePercent = offeredRate('SECURED', creditScoreOf(g.state.intermediate!, g.id(name))).ratePercent;
-  return g.act(name, { type: 'TAKE_INTERMEDIATE_LOAN', product: 'SECURED', amount, collateralKey: key, expectedRatePercent });
+  return g.act(name, { type: 'TAKE_INTERMEDIATE_LOAN', product: 'SECURED', amount, collateralKeys: keys, expectedRatePercent });
 }
 
 describe('listing a property for resale', () => {
@@ -114,7 +114,8 @@ describe('listing a property for resale', () => {
   it('a property pledged as loan collateral cannot be listed', () => {
     const g = newGame();
     g.give('Asha', 'MUMBAI');
-    pledge(g, 'Asha', 'MUMBAI');
+    g.give('Asha', 'DELHI');
+    pledge(g, 'Asha', ['MUMBAI', 'DELHI']);
     expect(refusal(() => g.act('Asha', { type: 'START_RESALE_AUCTION', propertyKey: 'MUMBAI', reservePrice: RESERVE }))).toMatchObject({
       code: 'AUCTION_NOT_ALLOWED',
       message: expect.stringMatching(/^Pledged as loan collateral/),
@@ -365,7 +366,7 @@ describe('an auction that does not sell', () => {
     expect(refusal(() => g.act('Asha', trade))).toEqual({ code: 'TRADE_NOT_ALLOWED', message: 'Mumbai is up for auction.' });
     expect(eligibleCollateral(g.state, g.id('Asha'))).toEqual([]);
     expect(resaleBlocker(g.state, g.id('Asha'), 'MUMBAI')).toBe('Already up for auction.');
-    expect(refusal(() => pledge(g, 'Asha', 'MUMBAI')).code).toBe('LOAN_NOT_ALLOWED');
+    expect(refusal(() => pledge(g, 'Asha', ['MUMBAI'])).code).toBe('LOAN_NOT_ALLOWED');
     expect(g.state.properties.MUMBAI).toMatchObject({ ownerId: g.id('Asha'), houses: 0, mortgaged: false });
   });
 });

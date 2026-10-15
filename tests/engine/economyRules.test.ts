@@ -114,9 +114,9 @@ function jumpTo(g: TestGame, target: number): EngineResult {
   return result;
 }
 
-function borrow(g: TestGame, name: string, product: LoanProductKey, amount: number, collateralKey?: PropertyKey): IntermediateLoan {
+function borrow(g: TestGame, name: string, product: LoanProductKey, amount: number, collateralKeys?: PropertyKey[]): IntermediateLoan {
   const expectedRatePercent = offeredRate(product, scoreOf(g, name)).ratePercent;
-  g.act(name, { type: 'TAKE_INTERMEDIATE_LOAN', product, amount, expectedRatePercent, ...(collateralKey ? { collateralKey } : {}) });
+  g.act(name, { type: 'TAKE_INTERMEDIATE_LOAN', product, amount, expectedRatePercent, ...(collateralKeys ? { collateralKeys } : {}) });
   return eco(g).loans[eco(g).loans.length - 1]!;
 }
 
@@ -196,7 +196,7 @@ describe('final net worth — Capital', () => {
     g.give('Asha', 'MUMBAI');
     g.give('Asha', 'DELHI', { mortgaged: true });
     g.give('Asha', 'AGRA', { houses: 2 });
-    const loan = borrow(g, 'Asha', 'PERSONAL', 9000);
+    const loan = borrow(g, 'Asha', 'PERSONAL', 15000);
     jumpTo(g, YEAR + 12); // installment 1 due (inside its payment window), and 12 spaces of the next loan year accrued
     eco(g).market.MUMBAI.value = 10000; // after the Year 2 market move
     const inst = loanOf(g, loan.id).installments[0]!;
@@ -207,13 +207,13 @@ describe('final net worth — Capital', () => {
     });
     const sheet = balanceSheet(g.state, g.id('Asha'));
     const agra = getDeed('AGRA');
-    const accrued = accruedInterest(9000 - inst.principal, 11, 12, YEAR);
+    const accrued = accruedInterest(15000 - inst.principal, 12, 12, YEAR);
     expect(accrued).toBeGreaterThan(0);
     expect(sheet.propertyValue).toBe(10000 + eco(g).market.DELHI.value + eco(g).market.AGRA.value);
     expect(sheet.buildingValue).toBe(2 * (agra.kind === 'CITY' ? agra.houseCost : 0));
     expect(sheet.mortgages).toBe(unmortgageCost('DELHI'));
     // Installment 1 (principal + its interest), the principal not yet due, and this year's accrued interest on it.
-    expect(sheet.loans).toBe(9000 + inst.interest + accrued);
+    expect(sheet.loans).toBe(15000 + inst.interest + accrued);
     expect(sheet.crisisBills).toBe(3000);
     expect(sheet.netWorth).toBe(sheet.cash + sheet.propertyValue + sheet.buildingValue - sheet.mortgages - sheet.loans - 3000);
     const overview = financialOverview(g.state, g.id('Asha'))!;
@@ -222,10 +222,10 @@ describe('final net worth — Capital', () => {
 
   it('a partial early repayment lowers cash and liability by the same amount: net worth does not move', () => {
     const g = capital();
-    const loan = borrow(g, 'Asha', 'PERSONAL', 9000);
+    const loan = borrow(g, 'Asha', 'PERSONAL', 15000);
     jumpTo(g, 36);
     const before = balanceSheet(g.state, g.id('Asha'));
-    const r = g.act('Asha', { type: 'PREPAY_INTERMEDIATE_LOAN', loanId: loan.id, amount: 3000 });
+    const r = g.act('Asha', { type: 'PREPAY_INTERMEDIATE_LOAN', loanId: loan.id, amount: 5000 });
     const paid = r.transactions.reduce((s, t) => s + t.amount, 0);
     const after = balanceSheet(g.state, g.id('Asha'));
     expect(after.cash).toBe(before.cash - paid);
@@ -235,7 +235,7 @@ describe('final net worth — Capital', () => {
 
   it('a defaulted loan is its default balance — never the balance plus the installments it already contains', () => {
     const g = capital();
-    const loan = borrow(g, 'Asha', 'PERSONAL', 9000);
+    const loan = borrow(g, 'Asha', 'PERSONAL', 15000);
     jumpTo(g, YEAR + WINDOW + YEAR);
     expect(loanOf(g, loan.id).status).toBe('DEFAULTED');
     expect(balanceSheet(g.state, g.id('Asha')).loans).toBe(loanOf(g, loan.id).defaultBalance);
@@ -245,13 +245,17 @@ describe('final net worth — Capital', () => {
 describe('a loan signed just before the end counts in full', () => {
   it.each(['classic', 'intermediate'] as const)('%s: same net worth as before borrowing, the debt in the liabilities — and the tie-break sees it', (mode) => {
     const g = new TestGame(['Asha', 'Bilal'], { mode });
-    if (mode === 'classic') g.act('Asha', { type: 'REQUEST_LOAN', amount: 5000 });
-    else borrow(g, 'Asha', 'PERSONAL', 5000);
+    // Each mode's own loan sizes: Classic lends from ₹1,000, Capital from ₹10,000.
+    const amount = mode === 'classic' ? 5000 : 10000;
+    if (mode === 'classic') g.act('Asha', { type: 'REQUEST_LOAN', amount });
+    else borrow(g, 'Asha', 'PERSONAL', amount);
+    // The borrowed cash is still in hand on the last turn; the debt is not allowed to vanish.
+    expect(g.balance('Asha')).toBe(START + amount);
     const r = g.endByVote('Asha');
     const result = finished(r);
     expect(result.standings).toEqual([
       { playerId: g.id('Bilal'), netWorth: START, liabilities: 0, rank: 1 },
-      { playerId: g.id('Asha'), netWorth: START, liabilities: 5000, rank: 2 },
+      { playerId: g.id('Asha'), netWorth: START, liabilities: amount, rank: 2 },
     ]);
     expect(g.state.winnerId).toBe(g.id('Bilal'));
     sound(g);
@@ -376,19 +380,19 @@ describe('credit score', () => {
   it('borrowing and prepaying at once, ten times over, earns nothing', () => {
     const g = capital();
     for (let i = 0; i < 10; i += 1) {
-      const loan = borrow(g, 'Asha', 'EMERGENCY', 1000);
-      g.act('Asha', { type: 'PREPAY_INTERMEDIATE_LOAN', loanId: loan.id, amount: 1000 });
+      const loan = borrow(g, 'Asha', 'EMERGENCY', 10000);
+      g.act('Asha', { type: 'PREPAY_INTERMEDIATE_LOAN', loanId: loan.id, amount: 10000 });
       expect(loanOf(g, loan.id).status).toBe('REPAID');
     }
     expect(scoreOf(g, 'Asha')).toBe(700);
     expect(eco(g).creditEvents).toEqual([]);
-    expect(offeredRate('LONG_TERM', scoreOf(g, 'Asha')).ratePercent).toBe(9);
+    expect(offeredRate('LONG_TERM', scoreOf(g, 'Asha')).ratePercent).toBe(10);
   });
 
   it('gains are capped at +10 a financial year, however many loans earn them; each event still counts only once', () => {
     const g = capital();
-    const emergency = borrow(g, 'Asha', 'EMERGENCY', 1000);
-    const personal = borrow(g, 'Asha', 'PERSONAL', 3000);
+    const emergency = borrow(g, 'Asha', 'EMERGENCY', 10000);
+    const personal = borrow(g, 'Asha', 'PERSONAL', 10000);
     jumpTo(g, YEAR); // Year 2: installment 1 of each is due
     const a = g.act('Asha', { type: 'PAY_LOAN_INSTALLMENT', loanId: emergency.id }); // +5 on time, then repaid with a good history: +10, of which +5 fits
     const b = g.act('Asha', { type: 'PAY_LOAN_INSTALLMENT', loanId: personal.id }); // +5 on time: nothing left this year
@@ -412,7 +416,7 @@ describe('credit score', () => {
 
   it('overdue −20, no credit for catching up, default −100 once — and the rate of the next loan follows the band', () => {
     const g = capital();
-    const loan = borrow(g, 'Asha', 'EMERGENCY', 2000);
+    const loan = borrow(g, 'Asha', 'EMERGENCY', 10000);
     jumpTo(g, YEAR + WINDOW + YEAR);
     expect(loanOf(g, loan.id).status).toBe('DEFAULTED');
     expect(eco(g).creditEvents.map((e) => [e.type, e.delta])).toEqual([
@@ -551,20 +555,22 @@ describe('bankruptcy', () => {
   it('a pledged property raises nothing while pledged, but in a bankruptcy it is recovered for its own loan and the surplus pays the creditor', () => {
     const g = capital(['Asha', 'Bilal', 'Chitra']);
     g.give('Asha', 'DELHI');
+    g.give('Asha', 'MADRAS');
     g.give('Bilal', 'MUMBAI', { hotel: true });
-    const loan = borrow(g, 'Asha', 'SECURED', 2000, 'DELHI');
+    const loan = borrow(g, 'Asha', 'SECURED', 10000, ['DELHI', 'MADRAS']);
     expect(propertyLiquidationValue(g.state, 'DELHI')).toBe(0);
+    expect(propertyLiquidationValue(g.state, 'MADRAS')).toBe(0);
     leaveWith(g, 'Asha', 100, 'Chitra');
     g.placeBefore('Asha', 'MUMBAI', 5);
     g.rollTotal('Asha', 5);
     const cash = g.balance('Asha');
     const bilal = g.balance('Bilal');
     // What closes the loan now: its principal and the interest accrued over the spaces moved since signing.
-    const payoff = 2000 + accruedInterest(2000, loan.ratePercent, gameClock(eco(g)) - loan.originClock, 108);
-    expect(payoff).toBeGreaterThan(2000);
+    const payoff = 10000 + accruedInterest(10000, loan.ratePercent, gameClock(eco(g)) - loan.originClock, 108);
+    expect(payoff).toBeGreaterThan(10000);
     g.act('Asha', { type: 'DECLARE_BANKRUPTCY' });
-    const value = eco(g).market.DELHI.value;
-    expect(loanOf(g, loan.id)).toMatchObject({ status: 'SETTLED', collateralKey: null, settlement: { propertyKey: 'DELHI', value, applied: payoff, surplus: value - payoff } });
+    const value = eco(g).market.DELHI.value + eco(g).market.MADRAS.value;
+    expect(loanOf(g, loan.id)).toMatchObject({ status: 'SETTLED', collateralKeys: [], settlement: { propertyKeys: ['DELHI', 'MADRAS'], value, applied: payoff, surplus: value - payoff } });
     expect(g.balance('Bilal')).toBe(bilal + cash + value - payoff);
     sound(g);
   });
@@ -676,18 +682,20 @@ describe('leaving the game', () => {
   it('Capital: a secured loan takes its collateral, an unsecured one is repaid from cash, the rest leaves play', () => {
     const g = capital(['Asha', 'Bilal', 'Chitra']);
     g.give('Asha', 'DELHI');
-    const secured = borrow(g, 'Asha', 'SECURED', 2000, 'DELHI');
-    const personal = borrow(g, 'Asha', 'PERSONAL', 5000);
-    const value = eco(g).market.DELHI.value;
+    g.give('Asha', 'MADRAS');
+    const secured = borrow(g, 'Asha', 'SECURED', 10000, ['DELHI', 'MADRAS']);
+    const personal = borrow(g, 'Asha', 'PERSONAL', 10000);
+    const value = eco(g).market.DELHI.value + eco(g).market.MADRAS.value;
     const r = g.act('Asha', { type: 'LEAVE_GAME' });
     expect(r.transactions.map((t) => [t.type, t.amount])).toEqual([
-      ['COLLATERAL_SURPLUS', value - 2000],
-      ['LOAN_REPAYMENT', 5000],
-      ['ESTATE_SETTLEMENT', START + 2000 + value - 2000],
+      ['COLLATERAL_SURPLUS', value - 10000],
+      ['LOAN_REPAYMENT', 10000],
+      ['ESTATE_SETTLEMENT', START + 10000 + value - 10000],
     ]);
-    expect(loanOf(g, secured.id)).toMatchObject({ status: 'SETTLED', settlement: { propertyKey: 'DELHI', applied: 2000 } });
+    expect(loanOf(g, secured.id)).toMatchObject({ status: 'SETTLED', settlement: { propertyKeys: ['DELHI', 'MADRAS'], applied: 10000 } });
     expect(loanOf(g, personal.id)).toMatchObject({ status: 'SETTLED' });
     expect(g.state.properties.DELHI.ownerId).toBeNull();
+    expect(g.state.properties.MADRAS.ownerId).toBeNull();
     sound(g);
   });
 
@@ -712,7 +720,7 @@ describe('leaving the game', () => {
 describe('credit score — repaying early, and repaying late', () => {
   it('an installment paid on time, then the rest prepaid: allowed, and the full-repayment bonus is earned once (within the yearly cap)', () => {
     const g = capital();
-    const loan = borrow(g, 'Asha', 'PERSONAL', 3000);
+    const loan = borrow(g, 'Asha', 'PERSONAL', 10000);
     jumpTo(g, YEAR);
     g.act('Asha', { type: 'PAY_LOAN_INSTALLMENT', loanId: loan.id });
     const rest = loanOf(g, loan.id).installments.filter((i) => i.status === 'SCHEDULED').reduce((sum, i) => sum + i.principal, 0);
@@ -734,7 +742,7 @@ describe('credit score — repaying early, and repaying late', () => {
 
   it('a loan caught up after going overdue is repaid, but earns neither a catch-up nor a full-repayment bonus', () => {
     const g = capital();
-    const loan = borrow(g, 'Asha', 'EMERGENCY', 1000);
+    const loan = borrow(g, 'Asha', 'EMERGENCY', 10000);
     jumpTo(g, YEAR + WINDOW);
     expect(loanOf(g, loan.id).installments[0]!.status).toBe('OVERDUE');
     expect(loanOffers(g.state, g.id('Asha')).every((o) => o.blocked)).toBe(true);

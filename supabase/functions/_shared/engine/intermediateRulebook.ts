@@ -58,11 +58,15 @@ export function intermediateRuleEntries(config: GameConfig = defaultGameConfig('
       lines: [
         ...LOAN_PRODUCT_KEYS.map((key) => {
           const p = L.products[key];
-          return `${p.name}: ${p.baseRatePercent}% ${p.rateType === 'FIXED' ? 'fixed' : 'to start, reviewed yearly'}, ${p.tenureYears} year${p.tenureYears === 1 ? '' : 's'}, up to ${formatINR(p.maxPrincipal)}${p.secured ? ', secured on a property' : ''}.`;
+          return `${p.name}: ${p.baseRatePercent}% ${p.rateType === 'FIXED' ? 'fixed' : 'to start, reviewed yearly'}, ${p.tenureYears} year${p.tenureYears === 1 ? '' : 's'}, ${formatINR(L.minAmount)}–${formatINR(p.maxPrincipal)}${p.secured ? ', secured on property' : ', no property needed'}.`;
         }),
-        `From ${formatINR(L.minAmount)} in steps of ${formatINR(L.step)}; at most ${formatINR(config.loanLimit)} owed in total. No fees.`,
+        `Any amount from ${formatINR(L.minAmount)} in steps of ${formatINR(L.step)}; no single loan above ${formatINR(L.maxSingleLoan)}, and at most ${formatINR(config.loanLimit)} owed in total. No fees.`,
+        'Several loans at once are fine within those limits. A year of payments on all of them can’t be more than your net worth plus a year of Start rewards.',
+        `A Flexible-rate loan is reviewed on each anniversary: its rate moves by ${L.flexibleMoves.map(signed).join(', ')} points (equally likely, kept within ${IR.rates.minPercent}%–${IR.rates.maxPercent}%). Only payments not yet due change.`,
         'One payment a year, the first a full financial year after borrowing. Interest is charged on the principal still owed.',
         'Repay early any time with no penalty: that principal plus the interest built up on it so far.',
+        'Refinance an active loan with a new one: the new loan pays off the old one in the same step. It needs nothing due or overdue, follows every limit, and earns no repayment bonus.',
+        'When the game ends, what would close each loan that day counts against your net worth. Nothing is seized because the game ends.',
       ],
     },
     {
@@ -81,7 +85,7 @@ export function intermediateRuleEntries(config: GameConfig = defaultGameConfig('
       lines: [
         `A payment is on time for a quarter of a financial year after it falls due. Then it is overdue, and you cannot borrow until it is paid.`,
         `Unpaid for ${L.graceYears} more full year${L.graceYears === 1 ? '' : 's'}, the loan defaults: everything still owed is payable at once, with no further interest.`,
-        'A secured loan in default costs you the pledged property: the bank takes it at market value, pays you any surplus, and you still owe any shortfall.',
+        'A secured loan in default costs you what you pledged for it — and nothing else: the bank takes it (property at market value, buildings at half their cost), pays you any surplus, and you still owe any shortfall.',
         'Default is not bankruptcy, and it forgives nothing: the balance stays owed, counts against your net worth, and blocks new loans until it is cleared.',
         'Bankruptcy follows the usual rule: only when even selling everything to the bank would not cover what you owe. Borrowing is never required.',
       ],
@@ -90,8 +94,8 @@ export function intermediateRuleEntries(config: GameConfig = defaultGameConfig('
       title: 'Mortgage or collateral — never both',
       lines: [
         'A mortgage works exactly as in Classic: the printed mortgage value, no rent while mortgaged, mortgage value + 10% to redeem.',
-        `A Secured Loan pledges a property you own outright (no mortgage, no buildings) for up to ${L.collateralAdvancePercent}% of its market value. It keeps earning rent.`,
-        'A pledged property cannot be mortgaged, sold, traded or built on, and a mortgaged property cannot be pledged.',
+        `A Secured Loan pledges one or more unmortgaged properties with their buildings, for up to ${L.collateralAdvancePercent}% of their pooled value (property at market value, buildings at ${L.collateralBuildingPercent}% of their cost). They keep earning rent.`,
+        'A pledged property cannot be mortgaged, sold, traded, auctioned or built on, and its buildings cannot be sold. A mortgaged property cannot be pledged. A property secures one loan at a time.',
       ],
     },
     {

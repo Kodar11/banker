@@ -86,9 +86,18 @@ export function projectedValue(value: number, trendPercent: number, years: numbe
   return Math.max(IR.market.minValue, roundToNearest(grown, IR.market.roundTo));
 }
 
-/** The most a property can secure: a share of its market value, rounded down to ₹500. */
-export function collateralLimit(marketValue: number): number {
-  return floorTo(Math.floor((marketValue * IR.loans.collateralAdvancePercent) / 100), IR.loans.collateralRoundTo);
+/** The most a pool of collateral can secure: a share of its pooled value, rounded down to ₹500. */
+export function collateralLimit(pooledValue: number): number {
+  return floorTo(Math.floor((Math.max(0, pooledValue) * IR.loans.collateralAdvancePercent) / 100), IR.loans.collateralRoundTo);
+}
+
+/**
+ * What buildings count for as collateral: a share of what they cost to build, rounded down — the same
+ * share and rounding the bank pays when they are sold back to it, so a pledge never counts a building
+ * for more than it could raise.
+ */
+export function collateralBuildingValue(constructionCost: number): number {
+  return Math.floor((Math.max(0, constructionCost) * IR.loans.collateralBuildingPercent) / 100);
 }
 
 // ---------------------------------------------------------------------------

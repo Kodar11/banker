@@ -3,9 +3,9 @@ import type { Draft } from './draft.ts';
 import { formatINR } from './format.ts';
 import { configOf } from './gameConfig.ts';
 import { INTERMEDIATE_RULES as IR } from './intermediateConfig.ts';
-import { settleCollateral } from './intermediateFinance.ts';
+import { seizeLoanCollateral } from './intermediateEngine.ts';
 import { loanOffers } from './intermediateSelectors.ts';
-import { economyOf, isOpenLoan, loanPayoff, loansOf, pendingCrises, type IntermediateLoan } from './intermediateState.ts';
+import { economyOf, isOpenLoan, loanPayoff, loansOf, pendingCrises, releaseCollateral, type IntermediateLoan } from './intermediateState.ts';
 import type { CrisisRecord } from './insuranceState.ts';
 import { BUSINESS_MVP_RULES as RULES } from './rules.ts';
 import {
@@ -343,40 +343,27 @@ function capitalLoanClaim(d: Draft, player: PlayerState, loan: IntermediateLoan,
       if (loan.status === 'DEFAULTED') loan.defaultBalance = unpaid;
       loan.status = unpaid === 0 ? 'SETTLED' : 'WRITTEN_OFF';
       if (unpaid > 0) loan.writtenOff = unpaid;
-      loan.collateralKey = null;
+      releaseCollateral(loan);
       loan.closedAt = d.ctx.now;
     },
   };
 }
 
 /**
- * Capital secured loans still being repaid: the pledged property goes to the bank at today's market
- * value, set against that loan's payoff (the same recovery a default makes, recorded the same way);
- * a surplus is paid to the player, a shortfall stays on the loan as an ordinary claim. Once per loan:
- * the claim and the property move together and the loan holds no collateral afterwards.
+ * Capital secured loans still being repaid: the property pledged to each loan goes to the bank with its
+ * buildings, valued today, and is set against that loan's payoff — the same recovery a default makes
+ * (seizeLoanCollateral), recorded the same way. A surplus is paid to the player, a shortfall stays on the
+ * loan as an ordinary claim. Only what each loan holds is taken; once per loan.
  */
 function seizeCollateral(d: Draft, player: PlayerState): Map<string, number> {
   const covered = new Map<string, number>();
   const eco = economyOf(d.state);
   if (!eco) return covered;
   for (const loan of loansOf(eco, player.id)) {
-    const key = loan.collateralKey;
-    if (loan.status !== 'ACTIVE' || !key || d.state.properties[key].ownerId !== player.id) continue;
+    if (loan.status !== 'ACTIVE') continue;
     const payoff = loanPayoff(eco, loan);
-    const value = eco.market[key].value;
-    const { applied, surplus, remaining } = settleCollateral(value, payoff.principal + payoff.interest);
-    loan.collateralKey = null;
-    loan.settlement = { propertyKey: key, value, applied, surplus };
-    covered.set(loan.id, applied);
-    clearProperty(d, key);
-    if (surplus > 0) d.transfer({ type: 'COLLATERAL_SURPLUS', from: null, to: player.id, amount: surplus, propertyKey: key, memo: `Collateral surplus (${getDeed(key).name})` });
-    d.event(
-      'COLLATERAL_SEIZED',
-      player.id,
-      `The bank took ${getDeed(key).name} (worth ${formatINR(value)}) for ${player.name}'s ${IR.loans.products[loan.product].name}` +
-        (surplus > 0 ? ` and returned ${formatINR(surplus)}` : remaining > 0 ? ` — ${formatINR(remaining)} still owed` : ''),
-      { loanId: loan.id, propertyKey: key, value, applied, surplus, remaining },
-    );
+    const seized = seizeLoanCollateral(d, eco, loan, payoff.principal + payoff.interest);
+    if (seized) covered.set(loan.id, seized.applied);
   }
   return covered;
 }

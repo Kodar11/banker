@@ -136,7 +136,13 @@ export const EVENT_PRIVACY: Readonly<Record<string, typeof PUBLIC | EventRule>> 
   CARD_RESOLVED: { publicView: (e, name) => ({ message: `${name(e.actorId)} resolved a card`, payload: {} }) },
   // The property changes hands, which the board shows anyway; the loan behind it stays private.
   COLLATERAL_SEIZED: {
-    publicView: (e, name) => ({ message: `The bank took ${deedName(e.payload.propertyKey)} from ${name(e.actorId)}`, payload: { propertyKey: e.payload.propertyKey } }),
+    publicView: (e, name) => {
+      const keys = Array.isArray(e.payload.propertyKeys) ? e.payload.propertyKeys : [e.payload.propertyKey];
+      return {
+        message: `The bank took ${keys.map(deedName).join(', ')} from ${name(e.actorId)}`,
+        payload: { propertyKey: e.payload.propertyKey, propertyKeys: keys },
+      };
+    },
   },
   // A trade offer that named a property just pledged for a loan: the offer closes for all to see, the reason does not.
   TRADE_EXPIRED: {
@@ -191,6 +197,7 @@ export const EVENT_PRIVACY: Readonly<Record<string, typeof PUBLIC | EventRule>> 
   LOAN_DEFAULTED: PRIVATE,
   LOAN_PREPAID: PRIVATE,
   LOAN_DEFAULT_PAYMENT: PRIVATE,
+  LOAN_REFINANCED: PRIVATE,
   CREDIT_SCORE_CHANGED: PRIVATE,
   // Classic loan principal: due, overdue (LOAN_DEFAULTED above covers the default).
   LOAN_PRINCIPAL_DUE: PRIVATE,

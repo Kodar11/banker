@@ -811,8 +811,9 @@ const L09 = (() => {
 // ---------------------------------------------------------------------------
 
 const L10 = (() => {
-  const price = 8000;
-  const cash = 5000;
+  // Sized so the gap is a loan the bank really makes: at least its minimum.
+  const price = 18000;
+  const cash = 8000;
   const gap = price - cash;
   const product = IR.loans.products.PERSONAL;
   const schedule = repaymentSchedule(gap, Array.from({ length: product.tenureYears }, () => product.baseRatePercent));
@@ -820,8 +821,8 @@ const L10 = (() => {
   const total = totalRepaid(schedule);
   const lapReward = RULES.start.passReward;
   const laps = Math.ceil(gap / lapReward);
-  const income = 3000;
-  const costs = 1200;
+  const income = 7000;
+  const costs = 2000;
   const free = income - costs;
   const site = (tag?: string) => card('Harbour Road', 'BLUE', inr(price), tag);
   const repayments: SceneBlock = {
@@ -836,7 +837,7 @@ const L10 = (() => {
     title: 'Borrowing vs. Waiting',
     collectionId: 'debt',
     estimatedDurationSeconds: 55,
-    summary: 'The site costs ₹3,000 more than you have.',
+    summary: `The site costs ${inr(gap)} more than you have.`,
     visualType: 'schedule',
     situation: {
       title: `${inr(gap)} short`,
@@ -859,7 +860,9 @@ const L10 = (() => {
             { kind: 'cash', start: cash, movements: [{ label: 'Bank loan', amount: gap }, { label: 'Harbour Road bought', amount: -price }] },
             { kind: 'holdings', holders: [{ who: 'you', cash: 0, cards: [site('New')] }] },
             repayments,
-            note(`Eligible in this story: ${inr(gap)} is within this loan’s ${inr(product.maxPrincipal)} maximum and the ${inr(IR.loans.maxOutstandingPrincipal)} total a player may owe.`),
+            note(
+              `Eligible in this story: ${inr(gap)} is within this loan’s ${inr(IR.loans.minAmount)}–${inr(product.maxPrincipal)} range and the ${inr(IR.loans.maxOutstandingPrincipal)} total a player may owe.`,
+            ),
           ],
         },
       },

@@ -56,9 +56,23 @@ export interface RateChange {
   ratePercent: number;
 }
 
+/** One asset pledged for a secured loan, valued as it stood when the loan was signed. */
+export interface CollateralPledge {
+  key: PropertyKey;
+  /** The property's market value at signing. */
+  propertyValue: number;
+  /** Its buildings at signing, at IR.loans.collateralBuildingPercent of what they cost to build. */
+  buildingValue: number;
+  houses: number;
+  hotel: boolean;
+}
+
 export interface CollateralSettlement {
-  propertyKey: PropertyKey;
-  /** Market value of the property when it was seized. */
+  /** Loans signed before collateral could be pooled: the one property seized. */
+  propertyKey?: PropertyKey;
+  /** Every property seized (with its buildings). */
+  propertyKeys?: PropertyKey[];
+  /** What everything seized was worth that day: market value + buildings at their sell-back value. */
   value: number;
   /** Part of the value used against the debt. */
   applied: number;
@@ -79,8 +93,18 @@ export interface IntermediateLoan {
   creditAdjustmentPercent: number;
   rateType: 'FIXED' | 'VARIABLE';
   tenureYears: number;
-  /** The property pledged for this loan while the claim is live; null once released or seized. */
+  /**
+   * Legacy (loans signed before collateral could be pooled): the one property pledged while the claim is live.
+   * New loans keep it null and use `collateralKeys`. Read both through loanCollateralKeys().
+   */
   collateralKey: PropertyKey | null;
+  /** The properties (with their buildings) pledged for this loan while the claim is live; emptied once released or seized. */
+  collateralKeys?: PropertyKey[];
+  /** What was pledged at signing and what it was valued at then. A permanent record; never changes. */
+  pledges?: CollateralPledge[];
+  /** Refinancing: the loan this one replaced, and the loan that replaced this one. */
+  refinancedFrom?: string;
+  refinancedInto?: string;
   /** Game clock and financial year at signing. Installment k is due at originClock + k years. */
   originClock: number;
   originYear: number;
@@ -268,11 +292,28 @@ export function loansOf(eco: IntermediateState, playerId: string): IntermediateL
   return eco.loans.filter((l) => l.playerId === playerId);
 }
 
+/** The properties a loan's live collateral claim covers (none once released or seized). */
+export function loanCollateralKeys(loan: Pick<IntermediateLoan, 'collateralKey' | 'collateralKeys'>): PropertyKey[] {
+  if (loan.collateralKeys?.length) return [...loan.collateralKeys];
+  return loan.collateralKey ? [loan.collateralKey] : [];
+}
+
+/** Ends a loan's collateral claim: whatever it covered is no longer pledged. */
+export function releaseCollateral(loan: Pick<IntermediateLoan, 'collateralKey' | 'collateralKeys'>): void {
+  loan.collateralKey = null;
+  if (loan.collateralKeys) loan.collateralKeys = [];
+}
+
+/** The properties a collateral settlement seized. */
+export function settlementKeys(s: CollateralSettlement): PropertyKey[] {
+  return s.propertyKeys ?? (s.propertyKey ? [s.propertyKey] : []);
+}
+
 /** The loan a property is pledged to, if any. A property secures at most one loan. */
 export function pledgedLoan(state: ModeState, key: PropertyKey): IntermediateLoan | null {
   const eco = economyOf(state);
   if (!eco) return null;
-  return eco.loans.find((l) => l.collateralKey === key && isOpenLoan(l)) ?? null;
+  return eco.loans.find((l) => isOpenLoan(l) && loanCollateralKeys(l).includes(key)) ?? null;
 }
 
 export function isPledged(state: ModeState, key: PropertyKey): boolean {

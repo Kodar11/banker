@@ -375,7 +375,7 @@ describe('hidden finances, Capital', () => {
     g.landOn('Asha', positionOfProperty('MUMBAI'), 7);
     g.act('Asha', { type: 'BUY_PROPERTY' });
     const eco = g.state.intermediate!;
-    g.act('Asha', { type: 'TAKE_INTERMEDIATE_LOAN', product: 'PERSONAL', amount: 5000, expectedRatePercent: offeredRate('PERSONAL', eco.credit[g.id('Asha')]!).ratePercent });
+    g.act('Asha', { type: 'TAKE_INTERMEDIATE_LOAN', product: 'PERSONAL', amount: 10000, expectedRatePercent: offeredRate('PERSONAL', eco.credit[g.id('Asha')]!).ratePercent });
     g.act('Asha', { type: 'INSURE_PROPERTY', propertyKey: 'MUMBAI', expectedPremium: premiumForYear(eco.year) });
     return g;
   }

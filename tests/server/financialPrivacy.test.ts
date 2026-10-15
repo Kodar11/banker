@@ -352,7 +352,7 @@ describe.skipIf(!DATABASE_URL)('open and hidden finances (Postgres)', () => {
       const eco = before.state.intermediate!;
       const rate = offeredRate('PERSONAL', eco.credit[g.id('Asha')]!).ratePercent;
       const premium = premiumForYear(eco.year);
-      ok(await g.act('Asha', { type: 'TAKE_INTERMEDIATE_LOAN', product: 'PERSONAL', amount: 5000, expectedRatePercent: rate }));
+      ok(await g.act('Asha', { type: 'TAKE_INTERMEDIATE_LOAN', product: 'PERSONAL', amount: 10000, expectedRatePercent: rate }));
       ok(await g.act('Asha', { type: 'INSURE_PROPERTY', propertyKey: 'MUMBAI', expectedPremium: premium }));
 
       const asha = await g.view('Asha');

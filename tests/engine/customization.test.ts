@@ -29,6 +29,7 @@ import {
   type IntermediateState,
   type LoanProductKey,
   type PropertyKey,
+  configAmountLimits,
 } from '@/engine/index.ts';
 import { faceToRandom, TestGame } from './harness.ts';
 
@@ -49,9 +50,11 @@ function refusal(fn: () => unknown): { code: string; message: string } {
 
 const eco = (g: TestGame): IntermediateState => g.state.intermediate!;
 
-function borrow(g: TestGame, name: string, product: LoanProductKey, amount: number, collateralKey?: PropertyKey) {
+/** One property is sent the way an app from before pooled collateral sends it (`collateralKey`); several as `collateralKeys`. */
+function borrow(g: TestGame, name: string, product: LoanProductKey, amount: number, collateral?: PropertyKey | PropertyKey[]) {
   const expectedRatePercent = offeredRate(product, eco(g).credit[g.id(name)]!).ratePercent;
-  return g.act(name, { type: 'TAKE_INTERMEDIATE_LOAN', product, amount, expectedRatePercent, ...(collateralKey ? { collateralKey } : {}) });
+  const pledge = collateral === undefined ? {} : Array.isArray(collateral) ? { collateralKeys: collateral } : { collateralKey: collateral };
+  return g.act(name, { type: 'TAKE_INTERMEDIATE_LOAN', product, amount, expectedRatePercent, ...pledge });
 }
 
 // ---------------------------------------------------------------------------
@@ -215,48 +218,55 @@ describe('loan limit — Capital', () => {
   const game = (loanLimit?: number) => new TestGame(['Asha', 'Bilal'], { mode: 'intermediate', config: loanLimit ? { loanLimit } : undefined });
   const max = (g: TestGame, product: LoanProductKey) => loanOffers(g.state, g.id('Asha')).find((o) => o.product === product)!.maxAmount;
 
-  it('default ₹20,000: the offers are what they were', () => {
+  it('default ₹20,000: every product is capped by it', () => {
     const g = game();
-    expect([max(g, 'EMERGENCY'), max(g, 'PERSONAL'), max(g, 'LONG_TERM'), max(g, 'FLEXIBLE')]).toEqual([5000, 10000, 15000, 10000]);
-    borrow(g, 'Asha', 'LONG_TERM', 15000);
-    borrow(g, 'Asha', 'EMERGENCY', 5000);
-    expect(refusal(() => borrow(g, 'Asha', 'PERSONAL', 1000)).message).toMatch(/₹20,000 borrowing limit/);
+    expect([max(g, 'EMERGENCY'), max(g, 'PERSONAL'), max(g, 'LONG_TERM'), max(g, 'FLEXIBLE')]).toEqual([20000, 20000, 20000, 20000]);
+    borrow(g, 'Asha', 'LONG_TERM', 10000);
+    borrow(g, 'Asha', 'EMERGENCY', 10000);
+    expect(refusal(() => borrow(g, 'Asha', 'PERSONAL', 10000)).message).toMatch(/₹20,000 borrowing limit/);
   });
 
-  it('a lower limit caps every offer', () => {
-    const g = game(5000);
-    expect([max(g, 'EMERGENCY'), max(g, 'PERSONAL'), max(g, 'LONG_TERM'), max(g, 'FLEXIBLE')]).toEqual([5000, 5000, 5000, 5000]);
-    expect(loanRequestBlocker(g.state, g.id('Asha'), 'PERSONAL', 6000, null)).toBe('Your total borrowing limit is ₹5,000. You can borrow ₹5,000 more.');
-    borrow(g, 'Asha', 'PERSONAL', 5000);
-    expect(refusal(() => borrow(g, 'Asha', 'EMERGENCY', 1000)).message).toBe('You have reached the ₹5,000 borrowing limit.');
+  it('a lower limit caps every offer — but never below the smallest loan', () => {
+    expect(() => game(5000)).toThrow(/loan limit must be at least ₹10,000 in Capital Mode/);
+    expect(configAmountLimits('intermediate', 'loanLimit').min).toBe(10000);
+    expect(configAmountLimits('classic', 'loanLimit').min).toBe(5000);
+    const g = game(10000);
+    expect([max(g, 'EMERGENCY'), max(g, 'PERSONAL'), max(g, 'LONG_TERM'), max(g, 'FLEXIBLE')]).toEqual([10000, 10000, 10000, 10000]);
+    expect(loanRequestBlocker(g.state, g.id('Asha'), 'PERSONAL', 10500, [])).toBe('Your total borrowing limit is ₹10,000. You can borrow ₹10,000 more.');
+    borrow(g, 'Asha', 'PERSONAL', 10000);
+    expect(refusal(() => borrow(g, 'Asha', 'EMERGENCY', 10000)).message).toBe('You have reached the ₹10,000 borrowing limit.');
   });
 
   it('a higher limit never lifts a product’s own maximum', () => {
     const g = game(50000);
-    expect([max(g, 'EMERGENCY'), max(g, 'PERSONAL'), max(g, 'LONG_TERM'), max(g, 'FLEXIBLE')]).toEqual([5000, 10000, 15000, 10000]);
-    expect(refusal(() => borrow(g, 'Asha', 'PERSONAL', 15000)).message).toBe('Personal Loans go up to ₹10,000.');
-    expect(refusal(() => borrow(g, 'Asha', 'EMERGENCY', 5500)).message).toBe('Emergency Loans go up to ₹5,000.');
+    expect([max(g, 'EMERGENCY'), max(g, 'PERSONAL'), max(g, 'LONG_TERM'), max(g, 'FLEXIBLE')]).toEqual([20000, 30000, 40000, 30000]);
+    expect(refusal(() => borrow(g, 'Asha', 'PERSONAL', 35000)).message).toBe('Personal Loans go up to ₹30,000.');
+    expect(refusal(() => borrow(g, 'Asha', 'EMERGENCY', 20500)).message).toBe('Emergency Loans go up to ₹20,000.');
     // …but several products together may now pass ₹20,000, up to the chosen limit.
-    borrow(g, 'Asha', 'LONG_TERM', 15000);
-    borrow(g, 'Asha', 'PERSONAL', 10000);
-    borrow(g, 'Asha', 'FLEXIBLE', 10000);
-    borrow(g, 'Asha', 'EMERGENCY', 5000);
-    expect(g.balance('Asha')).toBe(25000 + 40000);
-    expect(max(g, 'PERSONAL')).toBe(10000);
+    borrow(g, 'Asha', 'LONG_TERM', 20000);
+    borrow(g, 'Asha', 'PERSONAL', 15000);
+    borrow(g, 'Asha', 'FLEXIBLE', 15000);
+    expect(g.balance('Asha')).toBe(25000 + 50000);
+    expect(max(g, 'PERSONAL')).toBe(0);
   });
 
   it('a higher limit never lifts the collateral requirement of a secured loan', () => {
     const g = game(50000);
     expect(max(g, 'SECURED')).toBe(0);
-    expect(refusal(() => borrow(g, 'Asha', 'SECURED', 5000)).message).toMatch(/Needs a property you own outright/);
-    g.give('Asha', 'DARJEELING'); // ₹2,500 → secures at most ₹1,000 (50%, rounded down to ₹500)
-    expect(max(g, 'SECURED')).toBe(1000);
-    expect(refusal(() => borrow(g, 'Asha', 'SECURED', 5000, 'DARJEELING')).message).toMatch(/can secure up to ₹1,000/);
+    expect(refusal(() => borrow(g, 'Asha', 'SECURED', 10000)).message).toMatch(/Needs property you own that is not mortgaged/);
+    g.give('Asha', 'DARJEELING'); // ₹2,500 → secures at most ₹2,000: below the minimum loan
+    expect(max(g, 'SECURED')).toBe(0);
+    expect(refusal(() => borrow(g, 'Asha', 'SECURED', 10000, 'DARJEELING')).message).toMatch(/80% of it is ₹2,000, below the ₹10,000 minimum/);
+    g.give('Asha', 'MUMBAI');
+    g.give('Asha', 'DELHI');
+    // ₹17,000 pooled → ₹13,600 → ₹13,500.
+    expect(max(g, 'SECURED')).toBe(13500);
+    expect(refusal(() => borrow(g, 'Asha', 'SECURED', 15000, ['DARJEELING', 'MUMBAI', 'DELHI'])).message).toMatch(/can secure up to ₹13,500/);
   });
 
   it('overdue and default blocks still apply under any limit', () => {
     const g = game(50000);
-    borrow(g, 'Asha', 'PERSONAL', 5000);
+    borrow(g, 'Asha', 'PERSONAL', 10000);
     const loan = eco(g).loans[0]!;
     loan.installments[0]!.status = 'OVERDUE';
     expect(loanOffers(g.state, g.id('Asha')).every((o) => o.maxAmount === 0 && /overdue payment/.test(o.blocked ?? ''))).toBe(true);

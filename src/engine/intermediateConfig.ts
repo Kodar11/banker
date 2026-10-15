@@ -78,11 +78,23 @@ const IntermediateRulesSchema = z
       .object({
         minAmount: rupees,
         step: rupees,
+        /** No single loan, of any product, may exceed this. A product's own maximum may be lower. */
+        maxSingleLoan: rupees,
         /** Max total outstanding principal across a player's Capital loans. */
         maxOutstandingPrincipal: rupees,
-        /** A secured loan can be at most this share of the collateral's market value, rounded down to `collateralRoundTo`. */
+        /**
+         * A secured loan can be at most this share of the pooled value of everything pledged for it, rounded down to
+         * `collateralRoundTo`. A property counts at its market value; its buildings at `collateralBuildingPercent` of
+         * what they cost to build (what selling them back to the bank pays).
+         */
         collateralAdvancePercent: z.number().int().min(1).max(100),
+        collateralBuildingPercent: z.number().int().min(0).max(100),
         collateralRoundTo: rupees,
+        /**
+         * Repayment capacity: a year of installments on all of a player's loans, a new one included, may not exceed
+         * their net worth plus this many years of Start rewards (the only income the game guarantees).
+         */
+        affordabilityIncomeYears: z.number().int().min(0),
         /** Annual movement of a Flexible-rate loan's market rate, in percentage points (equally likely). */
         flexibleMoves: z.array(percent).min(1),
         /** After an installment falls due it can be paid on time for this share of a financial year; then it is overdue. */
@@ -145,6 +157,8 @@ const IntermediateRulesSchema = z
       const p = cfg.loans.products[key];
       if (p.maxPrincipal < cfg.loans.minAmount) issue(`${key}: maxPrincipal is below the minimum loan`);
       if (p.maxPrincipal % cfg.loans.step !== 0) issue(`${key}: maxPrincipal must be a multiple of loans.step`);
+      if (p.maxPrincipal > cfg.loans.maxSingleLoan) issue(`${key}: maxPrincipal is above the single-loan maximum`);
+      if (p.baseRatePercent < cfg.rates.minPercent || p.baseRatePercent > cfg.rates.maxPercent) issue(`${key}: baseRatePercent is outside the rate floor and ceiling`);
     }
   });
 
@@ -156,7 +170,7 @@ export function validateIntermediateRules(raw: unknown): IntermediateRules {
 
 export const INTERMEDIATE_RULES: IntermediateRules = validateIntermediateRules({
   /** Stored with every Capital game's economy. Bump when any value below changes. */
-  version: 'INTERMEDIATE-V3',
+  version: 'INTERMEDIATE-V4',
 
   year: {
     spacesPerYear: 36,
@@ -232,11 +246,15 @@ export const INTERMEDIATE_RULES: IntermediateRules = validateIntermediateRules({
   },
 
   loans: {
-    minAmount: 1000,
+    minAmount: 10000,
     step: 500,
+    maxSingleLoan: 50000,
+    /** The host's default total limit (GameConfig.loanLimit); every product maximum still applies within it. */
     maxOutstandingPrincipal: 20000,
-    collateralAdvancePercent: 50,
+    collateralAdvancePercent: 80,
+    collateralBuildingPercent: 50,
     collateralRoundTo: 500,
+    affordabilityIncomeYears: 1,
     flexibleMoves: [-2, -1, 0, 1, 2],
     paymentWindowPercent: 25,
     graceYears: 1,
@@ -246,47 +264,47 @@ export const INTERMEDIATE_RULES: IntermediateRules = validateIntermediateRules({
       EMERGENCY: {
         name: 'Emergency Loan',
         summary: 'Fast cash for one year. The most expensive way to borrow.',
-        baseRatePercent: 20,
+        baseRatePercent: 18,
         tenureYears: 1,
         rateType: 'FIXED',
         secured: false,
-        maxPrincipal: 5000,
+        maxPrincipal: 20000,
       },
       PERSONAL: {
         name: 'Personal Loan',
-        summary: 'A standard three-year loan with equal yearly payments.',
-        baseRatePercent: 12,
+        summary: 'A standard three-year loan with equal yearly payments. No property needed.',
+        baseRatePercent: 13,
         tenureYears: 3,
         rateType: 'FIXED',
         secured: false,
-        maxPrincipal: 10000,
+        maxPrincipal: 30000,
       },
       SECURED: {
         name: 'Secured Loan',
-        summary: 'Cheaper because one of your properties is pledged. Default and the bank takes it.',
-        baseRatePercent: 8,
+        summary: 'The cheapest fixed rate, because you pledge property and buildings. Default and the bank takes them.',
+        baseRatePercent: 7,
         tenureYears: 3,
         rateType: 'FIXED',
         secured: true,
-        maxPrincipal: 10000,
+        maxPrincipal: 50000,
       },
       LONG_TERM: {
         name: 'Long-term Loan',
         summary: 'Smaller yearly payments over five years, more interest in total.',
-        baseRatePercent: 10,
+        baseRatePercent: 11,
         tenureYears: 5,
         rateType: 'FIXED',
         secured: false,
-        maxPrincipal: 15000,
+        maxPrincipal: 40000,
       },
       FLEXIBLE: {
         name: 'Flexible-rate Loan',
-        summary: 'Starts cheapest, but the rate is reviewed every year and can rise or fall.',
-        baseRatePercent: 7,
+        summary: 'Starts cheaper than a Personal Loan, but the rate is reviewed every year and can rise or fall.',
+        baseRatePercent: 9,
         tenureYears: 3,
         rateType: 'VARIABLE',
         secured: false,
-        maxPrincipal: 10000,
+        maxPrincipal: 30000,
       },
     },
   },

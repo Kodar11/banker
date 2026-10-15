@@ -5,7 +5,7 @@ runs them (`supabase/functions/_shared/engine`, a copy of `src/engine`); the app
 Every value below lives in `src/engine/rules.ts` (Classic) or `src/engine/intermediateConfig.ts`
 (Capital); this page explains them and does not override them.
 
-Tests: `tests/engine/economyRules.test.ts`, `tests/engine/cards.test.ts`, `tests/server/economyRules.test.ts`.
+Tests: `tests/engine/economyRules.test.ts`, `tests/engine/loanSystem.test.ts`, `tests/engine/cards.test.ts`, `tests/server/economyRules.test.ts`.
 
 ## 1. Chance and Community Chest
 
@@ -44,14 +44,74 @@ Tests: `tests/engine/economyRules.test.ts`, `tests/engine/cards.test.ts`, `tests
   overdue (borrowing blocked); unpaid at the Start after that it defaults. Default adds no interest and
   blocks borrowing until cleared. Loans signed before maturity existed keep their original contract.
 
-### Capital
+### Capital — the five products (`intermediateConfig.ts` `loans`)
 
-- Products, base rates and schedules are unchanged. An installment is due on its date, overdue a quarter
-  of a financial year later, and the loan defaults a further year later — roughly when the next
-  installment would also be missed.
-- On default the whole loan becomes one fixed balance; a secured loan's collateral goes to the bank at
-  market value, any surplus is paid to the borrower, any shortfall stays owed. Unsecured loans seize
-  nothing. Borrowing is blocked while anything is overdue or in default.
+| Product | Base rate | Term | Principal | Security | Rate |
+|---|---:|---|---|---|---|
+| Emergency | 18% | 1 year | ₹10,000–₹20,000 | none | fixed |
+| Personal | 13% | 3 years | ₹10,000–₹30,000 | none | fixed |
+| Secured | 7% | 3 years | ₹10,000–₹50,000 | pledged property and buildings | fixed |
+| Long-term | 11% | 5 years | ₹10,000–₹40,000 | none | fixed |
+| Flexible-rate | 9% to start | 3 years | ₹10,000–₹30,000 | none | variable |
+
+- Amounts in ₹500 steps. No single loan above ₹50,000; the host's total limit (`GameConfig.loanLimit`,
+  default ₹20,000, at least ₹10,000 in Capital) caps all of a player's loans together. Several loans at once
+  are allowed within those limits. No fees, no prepayment penalty. Unsecured products need no property.
+- **Rate:** base rate + the credit band's points (−2 / −1 / 0 / +3 / +6), kept within 4%–30%. Fixed for the
+  life of the loan, except Flexible-rate.
+- **Interest:** one installment a year, the first a full financial year after signing. Each year's interest is
+  charged on the principal still outstanding; installments are level (the last one clears the remainder), all
+  in whole rupees, rounded half up, computed on the server. Interest accrues pro rata within a loan year; an
+  early repayment, a refinance, a default and the balance sheet all use that one accrual. A payment of an
+  installment is its principal and its interest, as two ledger entries; only the oldest due installment can be
+  paid; early repayment is of principal not yet due, plus its accrued interest, once nothing is due.
+- **Flexible-rate:** on each anniversary the market component moves by −2, −1, 0, +1 or +2 points (equally
+  likely, the server's seeded draw, kept within 4%–30%); the credit adjustment agreed at signing stays. Only
+  installments not yet due are recalculated; nothing already due or paid changes. Every review is recorded.
+- **Repayment capacity:** a year of installments on all of a player's loans (everything due now plus each
+  loan's next installment), a new loan's first-year payment included, may not exceed the player's net worth
+  plus one year of Start rewards (₹1,500 — the only income the game guarantees; rent is never assumed).
+  Borrowing itself does not change it. An offer shows the most that fits.
+
+### Capital — secured loans and collateral
+
+- One or more properties may be pledged to one loan, as a pool, with their buildings. Eligible: owned by the
+  borrower, not mortgaged (a mortgage and a pledge are never both on one property), not pledged to another
+  open loan, not up for auction.
+- Valued when the loan is signed (and recorded with it, `pledges`): property at its current market value;
+  houses and hotels at 50% of what they cost to build (exactly what selling them back pays). The loan can be
+  at most 80% of the pooled value, rounded down to ₹500, and the ₹50,000 product maximum, the total limit
+  and repaying capacity still apply. A pool that cannot secure ₹10,000 is refused, with the reason.
+- While pledged, a property cannot be mortgaged, sold, traded, auctioned or built on, and its buildings
+  cannot be sold back. An undo that would change a pledged property is refused.
+- Repaid in full, the pledge ends with the loan, once. Market changes after signing never change the loan.
+
+### Capital — late payment, default and recovery
+
+- An installment is due on its date, overdue a quarter of a financial year later (−20, once), and the loan
+  defaults a further year later (−100, once) — roughly when the next installment would also be missed.
+- On default the whole loan becomes one fixed balance (installments due + principal not yet due + interest
+  accrued this loan year). A secured loan's pledged properties — only those — go to the bank with their
+  buildings, valued that day (market value + buildings at 50% of cost); the value is set against the balance,
+  any surplus is paid to the borrower, any shortfall stays owed. Unsecured loans seize nothing. Borrowing is
+  blocked while anything is overdue or in default; a default is not bankruptcy.
+
+### Capital — refinancing (`REFINANCE_INTERMEDIATE_LOAN`)
+
+- One active loan with nothing due is paid off by a new loan in one action: the old loan's payoff (principal
+  not yet due + interest accrued this loan year) is paid from the new loan's money, and from cash if the new
+  loan is smaller. The old loan closes SETTLED with its history; the new loan is an ordinary new loan (every
+  limit, the capacity check and the current credit band apply; the old loan's principal and payment are what
+  it frees). Its collateral is released and may be pledged again in the same step — never two live claims.
+- No credit-score bonus, and it is refused while any payment is overdue or a loan is in default.
+
+### Capital — undo and the end of the game
+
+- Taking, paying, prepaying or refinancing a Capital loan is never an undo entry: the debt can't be undone
+  while the cash is kept.
+- When the game ends, each open loan counts at what would close it that day (principal + interest due +
+  interest accrued this loan year) — never future years' interest. Nothing is seized because the game ends,
+  so a loan signed on the last turn counts in full against the cash it paid out.
 
 ### Credit score (Capital; 700 at the start, 300–850)
 
@@ -110,3 +170,10 @@ deterministic id and applies once. Score bands only adjust the base rate of new 
 2. **Default interest** — a defaulted balance (both modes) never grows. No default interest rate has
    been agreed. If one is wanted, a transparent option is simple (non-compounding) interest on the
    remaining default balance, charged once per financial year (Capital) or per Start (Classic).
+3. **Default total loan limit (Capital)** — the host default stays ₹20,000, so with the new ₹10,000 minimum a
+   player can hold at most two loans and the Personal, Long-term, Flexible and Secured maximums are only
+   reachable when the host raises the limit (up to ₹50,000). Confirm, or raise `loans.maxOutstandingPrincipal`.
+4. **Flexible-rate cap** — the rate moves at most 2 points a year and never leaves 4%–30%; there is no
+   separate lifetime cap above the starting rate. Add one (for example +6 points) if wanted.
+5. **Classic secured lending** — Classic has its own single 10% bank loan and no secured product, so the
+   "deed price" collateral basis is not used anywhere. Decide whether Classic should get a secured loan.

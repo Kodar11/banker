@@ -3,6 +3,7 @@ import {
   activePolicyFor,
   averageSpaces,
   BOARD_SIZE,
+  getDeed,
   crisisBankruptcyBlocker,
   crisisCheckpointClock,
   crisisRecoveryOptions,
@@ -101,9 +102,9 @@ const insure = (g: TestGame, name: string, propertyKey: PropertyKey) =>
 
 const pay = (g: TestGame, name: string, crisisId = pendingCrisisOf(g.state, g.id(name))!.id) => g.act(name, { type: 'PAY_CRISIS_BILL', crisisId });
 
-function borrow(g: TestGame, name: string, product: LoanProductKey, amount: number, collateralKey?: PropertyKey) {
+function borrow(g: TestGame, name: string, product: LoanProductKey, amount: number, collateralKeys?: PropertyKey[]) {
   const expectedRatePercent = offeredRate(product, eco(g).credit[g.id(name)]!).ratePercent;
-  g.act(name, { type: 'TAKE_INTERMEDIATE_LOAN', product, amount, expectedRatePercent, ...(collateralKey ? { collateralKey } : {}) });
+  g.act(name, { type: 'TAKE_INTERMEDIATE_LOAN', product, amount, expectedRatePercent, ...(collateralKeys ? { collateralKeys } : {}) });
 }
 
 /** Leaves `name` with exactly `keep` in cash by paying the rest to another player (through the ledger). */
@@ -619,7 +620,7 @@ describe('settling an uninsured crisis', () => {
     expect(pendingCrisisOf(g.state, g.id('Asha'))).not.toBeNull();
     expect(crisisRecoveryOptions(g.state, g.id('Asha'))).toEqual(['sell a building', 'mortgage a property', 'sell a property to the bank', 'take a loan (optional)']);
     g.act('Asha', { type: 'SELL_BUILDING', propertyKey: 'MUMBAI' });
-    borrow(g, 'Asha', 'EMERGENCY', 1000);
+    borrow(g, 'Asha', 'EMERGENCY', 10000);
     g.act('Bilal', { type: 'TRANSFER_MONEY', toPlayerId: g.id('Asha'), amount: 1000 });
     expect(g.balance('Asha')).toBeGreaterThanOrEqual(BILL);
     pay(g, 'Asha');
@@ -636,14 +637,14 @@ describe('settling an uninsured crisis', () => {
 describe('bankruptcy over a crisis bill', () => {
   /**
    * Asha has used up every way of raising money: she is at the borrowing limit, and her one
-   * property (Delhi) is pledged to a loan, so it can be neither mortgaged nor sold.
+   * property (Delhi, with three houses) is pledged to a loan with its buildings, so neither it nor
+   * its houses can be sold or mortgaged.
    */
   function exhausted(names: string[]) {
     const g = newGame(names);
-    g.give('Asha', 'DELHI');
-    borrow(g, 'Asha', 'SECURED', 1000, 'DELHI');
+    g.give('Asha', 'DELHI', { houses: 3 });
+    borrow(g, 'Asha', 'SECURED', 10000, ['DELHI']);
     borrow(g, 'Asha', 'PERSONAL', 10000);
-    borrow(g, 'Asha', 'LONG_TERM', 9000);
     return g;
   }
 
@@ -665,18 +666,20 @@ describe('bankruptcy over a crisis bill', () => {
     // and the surplus is the estate's cash — which pays the crisis bill first, then the other loans.
     const [secured, ...unsecured] = eco(g).loans;
     const surplus = r.transactions.find((t) => t.type === 'COLLATERAL_SURPLUS')!.amount;
-    expect(secured).toMatchObject({ status: 'SETTLED', settlement: { propertyKey: 'DELHI', value: eco(g).market.DELHI.value, surplus } });
+    // Recovered at market value plus the houses at what the bank pays for them (half their cost).
+    const houses = Math.floor((3 * (getDeed('DELHI') as { houseCost: number }).houseCost) / 2);
+    expect(secured).toMatchObject({ status: 'SETTLED', settlement: { propertyKeys: ['DELHI'], value: eco(g).market.DELHI.value + houses, surplus } });
     expect(r.transactions.filter((t) => t.type === 'CRISIS_PAYMENT').map((t) => t.amount)).toEqual([BILL]);
     expect(crisisAt(g, 1)).toMatchObject({ status: 'PAID', paid: BILL });
     const paidOut = r.transactions.filter((t) => t.fromPlayerId === g.id('Asha')).reduce((s, t) => s + t.amount, 0);
     expect(paidOut).toBe(100 + START_REWARD + surplus);
     // What the estate could not pay on the other loans is recorded on them, not forgiven silently.
     const owedOnLoans = unsecured.reduce((s, l) => s + (l.writtenOff ?? 0), 0);
-    expect(unsecured.map((l) => l.status)).toEqual(['WRITTEN_OFF', 'WRITTEN_OFF']);
+    expect(unsecured.map((l) => l.status)).toEqual(['WRITTEN_OFF']);
     expect(owedOnLoans).toBeGreaterThan(0);
     expect(r.events.find((e) => e.type === 'ESTATE_SETTLED')!.payload).toMatchObject({ kind: 'BANKRUPTCY', unpaid: owedOnLoans });
     expect(g.player('Asha')).toMatchObject({ status: 'BANKRUPT', balance: 0 });
-    expect(g.state.properties.DELHI).toMatchObject({ ownerId: null, mortgaged: false });
+    expect(g.state.properties.DELHI).toMatchObject({ ownerId: null, mortgaged: false, houses: 0 });
     expect(pendingCrises(g.state)).toEqual([]);
     // It was her turn: it passes on, and the game continues for the others.
     expect(g.state.status).toBe('ACTIVE');

@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import {
+  accruedLoanInterest,
   borrowingCapacity,
   configOf,
   clockLabel,
@@ -11,16 +12,23 @@ import {
   getDeed,
   INTERMEDIATE_RULES,
   installmentDeadlines,
+  collateralLimit,
+  firstYearPayment,
+  loanCollateralKeys,
   loanOffers,
   loanOutstandingPrincipal,
+  loanPayoff,
   loanRequestBlocker,
   loansOf,
   nextScheduledInstallment,
   payableInstallment,
+  pooledCollateralValue,
   prepaymentBlocker,
   prepaymentQuote,
   previewLoan,
+  refinanceBlocker,
   scheduledPrincipal,
+  settlementKeys,
   yearLength,
   yearProgressPercent,
   type GameAction,
@@ -65,12 +73,21 @@ interface FinanceHubProps {
  */
 export function FinanceHub({ visible, onClose, view, send, initialTab = 'overview' }: FinanceHubProps) {
   const [tab, setTab] = useState<FinanceTab>(initialTab);
+  // Refinancing: the loan the Borrow section is replacing, or null for an ordinary new loan.
+  const [refinancing, setRefinancing] = useState<string | null>(null);
   // Opening the bank again starts on the section it was asked for.
   const [wasVisible, setWasVisible] = useState(visible);
   if (visible !== wasVisible) {
     setWasVisible(visible);
-    if (visible) setTab(initialTab);
+    if (visible) {
+      setTab(initialTab);
+      setRefinancing(null);
+    }
   }
+  const openTab = (next: FinanceTab) => {
+    if (next !== 'borrow') setRefinancing(null);
+    setTab(next);
+  };
 
   const { state } = view.snapshot;
   const eco = economyOf(state);
@@ -85,7 +102,10 @@ export function FinanceHub({ visible, onClose, view, send, initialTab = 'overvie
           return (
             <Pressable
               key={t.key}
-              onPress={() => setTab(t.key)}
+              onPress={() => {
+                setRefinancing(null);
+                setTab(t.key);
+              }}
               accessibilityRole="tab"
               accessibilityState={{ selected: active }}
               accessibilityLabel={t.label}
@@ -99,9 +119,22 @@ export function FinanceHub({ visible, onClose, view, send, initialTab = 'overvie
           );
         })}
       </View>
-      {tab === 'overview' ? <OverviewTab view={view} eco={eco} onOpen={setTab} /> : null}
-      {tab === 'loans' ? <LoansTab view={view} eco={eco} send={send} onBorrow={() => setTab('borrow')} /> : null}
-      {tab === 'borrow' ? <BorrowTab view={view} eco={eco} send={send} onDone={() => setTab('loans')} /> : null}
+      {tab === 'overview' ? <OverviewTab view={view} eco={eco} onOpen={openTab} /> : null}
+      {tab === 'loans' ? (
+        <LoansTab
+          view={view}
+          eco={eco}
+          send={send}
+          onBorrow={() => openTab('borrow')}
+          onRefinance={(loanId) => {
+            setRefinancing(loanId);
+            setTab('borrow');
+          }}
+        />
+      ) : null}
+      {tab === 'borrow' ? (
+        <BorrowTab key={refinancing ?? 'new'} view={view} eco={eco} send={send} replacingLoanId={refinancing} onCancelRefinance={() => openTab('loans')} onDone={() => openTab('loans')} />
+      ) : null}
       {tab === 'credit' ? <CreditTab view={view} eco={eco} /> : null}
     </Sheet>
   );
@@ -204,7 +237,7 @@ function OverviewTab({ view, eco, onOpen }: { view: GameView; eco: IntermediateS
 // My Loans
 // ---------------------------------------------------------------------------
 
-function LoansTab({ view, eco, send, onBorrow }: { view: GameView; eco: IntermediateState; send: Send; onBorrow: () => void }) {
+function LoansTab({ view, eco, send, onBorrow, onRefinance }: { view: GameView; eco: IntermediateState; send: Send; onBorrow: () => void; onRefinance: (loanId: string) => void }) {
   const me = view.me!;
   const loans = loansOf(eco, me.id);
   const open = loans.filter((l) => l.status === 'ACTIVE' || l.status === 'DEFAULTED');
@@ -220,7 +253,7 @@ function LoansTab({ view, eco, send, onBorrow }: { view: GameView; eco: Intermed
         </Card>
       ) : null}
       {open.map((loan) => (
-        <LoanCard key={loan.id} loan={loan} eco={eco} cash={me.balance} playing={playing} send={send} />
+        <LoanCard key={loan.id} loan={loan} eco={eco} cash={me.balance} playing={playing} send={send} onRefinance={() => onRefinance(loan.id)} />
       ))}
       {closed.length ? <Label className="mt-1 text-stone-600">Closed loans</Label> : null}
       {closed.map((loan) => (
@@ -234,7 +267,7 @@ const LOAN_PILL: Record<IntermediateLoan['status'], { tone: 'warn' | 'good' | 'b
   ACTIVE: { tone: 'warn', text: 'Active' },
   REPAID: { tone: 'good', text: 'Repaid' },
   DEFAULTED: { tone: 'bad', text: 'In default' },
-  SETTLED: { tone: 'neutral', text: 'Default settled' },
+  SETTLED: { tone: 'neutral', text: 'Settled' },
   WRITTEN_OFF: { tone: 'neutral', text: 'Written off' },
 };
 
@@ -247,7 +280,7 @@ const INSTALLMENT_TEXT: Record<Installment['status'], string> = {
   DEFAULTED: 'Defaulted',
 };
 
-function LoanCard({ loan, eco, cash, playing, send }: { loan: IntermediateLoan; eco: IntermediateState; cash: number; playing: boolean; send: Send }) {
+function LoanCard({ loan, eco, cash, playing, send, onRefinance }: { loan: IntermediateLoan; eco: IntermediateState; cash: number; playing: boolean; send: Send; onRefinance?: () => void }) {
   const pending = useGameStore((s) => s.pendingAction);
   const [details, setDetails] = useState(false);
   const [early, setEarly] = useState('');
@@ -258,7 +291,11 @@ function LoanCard({ loan, eco, cash, playing, send }: { loan: IntermediateLoan; 
   const next = nextScheduledInstallment(loan);
   const left = loan.installments.filter((i) => i.status === 'SCHEDULED' || i.status === 'DUE' || i.status === 'OVERDUE').length;
   const scheduled = scheduledPrincipal(loan);
-  const pill = LOAN_PILL[loan.status];
+  const pill = loan.refinancedInto ? { tone: 'neutral' as const, text: 'Refinanced' } : LOAN_PILL[loan.status];
+  const pledged = loanCollateralKeys(loan);
+  const pledgedNames = pledged.map((k) => getDeed(k).name).join(', ');
+  const payoff = loanPayoff(eco, loan);
+  const canRefinance = playing && !!onRefinance && refinanceBlocker(eco, loan.playerId, loan.id) === null;
 
   const act = async (action: GameAction, successMessage: string) => {
     setFailure(null);
@@ -285,9 +322,14 @@ function LoanCard({ loan, eco, cash, playing, send }: { loan: IntermediateLoan; 
         <Row label="Annual rate" value={`${loan.ratePercent}% ${rateType(loan)}`} testID="loan-rate" />
         {loan.status === 'ACTIVE' ? <Row label="Payments left" value={String(left)} /> : null}
         {next ? <Row label="Next payment" value={`${formatINR(next.principal + next.interest)} · ${clockLabel(eco, next.dueAt)}`} testID="loan-next-due" /> : null}
-        {loan.collateralKey ? <Row label="Pledged as collateral" value={getDeed(loan.collateralKey).name} testID="loan-collateral" /> : null}
+        {loan.status === 'ACTIVE' ? (
+          <Row label="Accrued interest (this loan year)" value={formatINR(accruedLoanInterest(eco, loan))} testID="loan-accrued" />
+        ) : null}
+        {loan.status === 'ACTIVE' ? <Row label="To close it today" value={formatINR(payoff.principal + payoff.interest)} testID="loan-payoff" /> : null}
+        {loan.status === 'ACTIVE' ? <Row label="Matures" value={clockLabel(eco, loan.installments[loan.installments.length - 1]?.dueAt ?? loan.originClock)} testID="loan-maturity" /> : null}
+        {pledged.length ? <Row label="Pledged as collateral" value={pledgedNames} testID="loan-collateral" /> : null}
         {loan.settlement ? (
-          <Row label={`Bank took ${getDeed(loan.settlement.propertyKey).name}`} value={`${formatINR(loan.settlement.value)} against the debt`} />
+          <Row label={`Bank took ${settlementKeys(loan.settlement).map((k) => getDeed(k).name).join(', ')}`} value={`${formatINR(loan.settlement.value)} against the debt`} />
         ) : null}
       </View>
 
@@ -302,7 +344,7 @@ function LoanCard({ loan, eco, cash, playing, send }: { loan: IntermediateLoan; 
           <Row label="Your cash" value={formatINR(cash)} warn={cash < payable.principal + payable.interest} />
           <Text className="text-xs font-semibold text-stone-700">
             {payable.status === 'OVERDUE'
-              ? `Pay before ${clockLabel(eco, installmentDeadlines(eco, payable).defaultAt)} or this loan defaults (−${Math.abs(IR.credit.events.LOAN_DEFAULT)} credit${loan.collateralKey ? `, and the bank takes ${getDeed(loan.collateralKey).name}` : ''}).`
+              ? `Pay before ${clockLabel(eco, installmentDeadlines(eco, payable).defaultAt)} or this loan defaults (−${Math.abs(IR.credit.events.LOAN_DEFAULT)} credit${pledged.length ? `, and the bank takes ${pledgedNames}` : ''}).`
               : `Pay by ${clockLabel(eco, installmentDeadlines(eco, payable).overdueAt)} to stay on time (${signed(IR.credit.events.ON_TIME_PAYMENT)} credit). After that it is overdue (${signed(IR.credit.events.INSTALLMENT_OVERDUE)}).`}
           </Text>
           <Button
@@ -393,6 +435,10 @@ function LoanCard({ loan, eco, cash, playing, send }: { loan: IntermediateLoan; 
         </View>
       ) : null}
 
+      {canRefinance ? (
+        <Button size="sm" variant="secondary" title="Refinance with a new loan" testID="loan-refinance" disabled={!!pending} onPress={onRefinance} />
+      ) : null}
+
       {failure ? (
         <Text className="text-center text-sm font-bold text-brick" accessibilityRole="alert" testID="loan-error">
           {failure}
@@ -424,6 +470,13 @@ function LoanCard({ loan, eco, cash, playing, send }: { loan: IntermediateLoan; 
               Year {p.year}: repaid {formatINR(p.principal)} early (+ {formatINR(p.interest)} interest)
             </Text>
           ))}
+          {loan.refinancedFrom ? <Text className="text-xs text-stone-600">Signed to refinance an earlier loan.</Text> : null}
+          {loan.refinancedInto ? <Text className="text-xs text-stone-600">Paid off in full by refinancing.</Text> : null}
+          {(loan.pledges ?? []).map((p) => (
+            <Text key={`pledge-${p.key}`} className="text-xs text-stone-600">
+              Pledged {getDeed(p.key).name}: {formatINR(p.propertyValue)} property{p.buildingValue ? ` + ${formatINR(p.buildingValue)} buildings` : ''} at signing
+            </Text>
+          ))}
           {loan.rateHistory.slice(1).map((r, i) => (
             <Text key={`rate-${i}`} className="text-xs text-stone-600">
               Year {r.year} review: {signed(r.movePercent)} point{Math.abs(r.movePercent) === 1 ? '' : 's'} → {r.ratePercent}%
@@ -442,24 +495,68 @@ function LoanCard({ loan, eco, cash, playing, send }: { loan: IntermediateLoan; 
 interface BorrowDraft {
   offer: LoanOffer;
   amount: string;
-  collateralKey: PropertyKey | null;
+  collateralKeys: PropertyKey[];
   review: boolean;
 }
 
-function BorrowTab({ view, eco, send, onDone }: { view: GameView; eco: IntermediateState; send: Send; onDone: () => void }) {
+/** The fewest properties, most valuable first, that together secure at least the minimum loan (all of them if none do). */
+function startingPledge(offer: LoanOffer): PropertyKey[] {
+  const picked: PropertyKey[] = [];
+  let value = 0;
+  for (const c of [...offer.collateral].sort((a, b) => b.value - a.value)) {
+    if (collateralLimit(value) >= offer.minAmount) break;
+    picked.push(c.key);
+    value += c.value;
+  }
+  return picked;
+}
+
+const QUICK_AMOUNTS = [10000, 15000, 20000, 30000, 40000, 50000];
+
+function BorrowTab({
+  view,
+  eco,
+  send,
+  onDone,
+  replacingLoanId,
+  onCancelRefinance,
+}: {
+  view: GameView;
+  eco: IntermediateState;
+  send: Send;
+  onDone: () => void;
+  replacingLoanId: string | null;
+  onCancelRefinance: () => void;
+}) {
   const pending = useGameStore((s) => s.pendingAction);
   const [draft, setDraft] = useState<BorrowDraft | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const { state } = view.snapshot;
   const me = view.me!;
-  const offers = loanOffers(state, me.id);
+  const options = { replacingLoanId };
+  const offers = loanOffers(state, me.id, options);
+  const replacing = replacingLoanId ? (eco.loans.find((l) => l.id === replacingLoanId) ?? null) : null;
+  const payoff = replacing && replacing.status === 'ACTIVE' ? prepaymentQuote(eco, replacing, scheduledPrincipal(replacing)) : null;
+  const score = eco.credit[me.id] ?? IR.credit.start;
+
+  const refinanceBanner = replacing ? (
+    <Note tone="warn" testID="refinance-banner">
+      Refinancing your {LOANS.products[replacing.product].name}: the new loan pays off {payoff ? formatINR(payoff.total) : 'its balance'} (principal{' '}
+      {payoff ? formatINR(payoff.principal) : ''} + {payoff ? formatINR(payoff.accruedInterest) : ''} interest built up this loan year). Its history is kept; it earns no
+      repayment bonus. {loanCollateralKeys(replacing).length ? 'What it has pledged is released and can be pledged again here.' : ''}
+    </Note>
+  ) : null;
 
   if (!draft) {
     return (
       <View className="gap-3" testID="finance-borrow">
+        {replacing ? <Button size="sm" variant="secondary" title="‹ Cancel refinancing" className="self-start" onPress={onCancelRefinance} /> : null}
+        {refinanceBanner}
         <Text className="text-sm text-stone-600">
-          Your credit score is {eco.credit[me.id] ?? IR.credit.start} ({creditBand(eco.credit[me.id] ?? IR.credit.start).label}), so each rate below is already adjusted for you. You can
-          borrow {formatINR(borrowingCapacity(eco, me.id, configOf(state).loanLimit))} more in total.
+          Your credit score is {score} ({creditBand(score).label}), so each rate below is already adjusted for you. You can borrow{' '}
+          {formatINR(Math.max(0, ...offers.map((o) => (o.blocked ? 0 : o.maxAmount)), 0))} at most on one loan right now (total limit{' '}
+          {formatINR(configOf(state).loanLimit)}, {formatINR(borrowingCapacity(eco, me.id, configOf(state).loanLimit))} still free). No single loan is above{' '}
+          {formatINR(LOANS.maxSingleLoan)}.
         </Text>
         {offers.map((o) => (
           <Card key={o.product} className="gap-1 bg-white" testID={`offer-${o.product}`}>
@@ -474,10 +571,22 @@ function BorrowTab({ view, eco, send, onDone }: { view: GameView; eco: Intermedi
             </View>
             <Text className="text-sm text-stone-600">{o.summary}</Text>
             <Row label="Repaid over" value={`${o.tenureYears} year${o.tenureYears === 1 ? '' : 's'}, one payment a year`} />
-            <Row label="Up to" value={formatINR(o.productLimit)} />
-            <Row label="Security" value={o.secured ? `A property (max ${LOANS.collateralAdvancePercent}% of its value)` : 'None'} />
+            <Row label="Amount" value={`${formatINR(o.minAmount)} – ${formatINR(o.productLimit)}`} testID={`offer-range-${o.product}`} />
             <Row label="Rate" value={`${o.marketRatePercent}% base ${signed(o.creditAdjustmentPercent)} for your score`} />
-            {o.rateType === 'VARIABLE' ? <Note tone="warn">The rate is reviewed every year and can move by up to 2 points either way, so later payments can change.</Note> : null}
+            <Row
+              label="Security"
+              value={o.secured ? `Property & buildings, up to ${LOANS.collateralAdvancePercent}% of their value` : 'None — no property needed'}
+            />
+            {o.secured && o.collateral.length ? (
+              <Row label="Everything you could pledge" value={`${formatINR(o.collateralValue)} → up to ${formatINR(o.collateralLimit)}`} testID={`offer-collateral-${o.product}`} />
+            ) : null}
+            {!o.blocked ? <Row label="Most you can borrow now" value={formatINR(o.maxAmount)} bold testID={`offer-max-${o.product}`} /> : null}
+            {o.rateType === 'VARIABLE' ? (
+              <Note tone="warn">
+                The rate is reviewed on each anniversary and can move by up to {Math.max(...LOANS.flexibleMoves.map(Math.abs))} points either way (never outside{' '}
+                {IR.rates.minPercent}%–{IR.rates.maxPercent}%), so later payments can change.
+              </Note>
+            ) : null}
             {o.blocked ? (
               <Note tone="bad" testID={`offer-blocked-${o.product}`}>
                 {o.blocked}
@@ -491,12 +600,16 @@ function BorrowTab({ view, eco, send, onDone }: { view: GameView; eco: Intermedi
                 testID={`offer-choose-${o.product}`}
                 onPress={() => {
                   setFailure(null);
-                  setDraft({ offer: o, amount: String(Math.min(o.maxAmount, LOANS.minAmount)), collateralKey: o.collateral[0]?.key ?? null, review: false });
+                  setDraft({ offer: o, amount: String(Math.min(o.maxAmount, o.minAmount)), collateralKeys: o.secured ? startingPledge(o) : [], review: false });
                 }}
               />
             )}
           </Card>
         ))}
+        <Text className="text-xs text-stone-500" testID="borrow-affordability">
+          Repayment limit: a year of payments on all your loans, the new one included, can’t be more than your net worth plus a year of Start rewards. Room left:{' '}
+          {formatINR(offers[0]?.paymentBudget ?? 0)} a year.
+        </Text>
       </View>
     );
   }
@@ -504,43 +617,57 @@ function BorrowTab({ view, eco, send, onDone }: { view: GameView; eco: Intermedi
   // Always the live offer: if the score or limits moved while this was open, the screen shows the new terms.
   const offer = offers.find((o) => o.product === draft.offer.product) ?? draft.offer;
   const amount = Number.parseInt(draft.amount, 10) || 0;
-  const why = loanRequestBlocker(state, me.id, offer.product, amount, offer.secured ? draft.collateralKey : null);
+  const keys = offer.secured ? draft.collateralKeys : [];
+  const why = loanRequestBlocker(state, me.id, offer.product, amount, keys, options);
   const preview = previewLoan(offer.product, amount, offer.ratePercent);
   const clock = gameClock(eco);
   const length = yearLength(eco);
-  const pledge = offer.collateral.find((c) => c.key === draft.collateralKey) ?? null;
-  const limit = Math.min(offer.maxAmount, pledge ? pledge.limit : offer.maxAmount);
-  const quick = [1000, 2000, 5000, 10000, 15000].filter((q) => q <= limit);
+  const pledged = offer.collateral.filter((c) => keys.includes(c.key));
+  const pledgedValue = pooledCollateralValue(pledged);
+  const secures = collateralLimit(pledgedValue);
+  const limit = Math.min(offer.maxAmount, offer.secured ? secures : offer.maxAmount);
+  const quick = QUICK_AMOUNTS.filter((q) => q >= offer.minAmount && q <= limit);
+  const firstPayment = firstYearPayment(offer.product, amount, offer.ratePercent);
+  const toggle = (key: PropertyKey) =>
+    setDraft({ ...draft, collateralKeys: draft.collateralKeys.includes(key) ? draft.collateralKeys.filter((k) => k !== key) : [...draft.collateralKeys, key] });
 
   if (!draft.review) {
     return (
       <View className="gap-3" testID="borrow-configure">
         <Button size="sm" variant="secondary" title="‹ All offers" className="self-start" onPress={() => setDraft(null)} />
+        {refinanceBanner}
         <Text className="text-xl font-black text-ink">
           {offer.name} · {offer.ratePercent}% {rateType(offer)}
         </Text>
         {offer.secured ? (
           <View className="gap-2" testID="borrow-collateral">
-            <Label>Property to pledge</Label>
+            <Label>Property to pledge — choose one or more</Label>
             {offer.collateral.map((c) => {
-              const active = c.key === draft.collateralKey;
+              const active = keys.includes(c.key);
+              const built = c.hotel ? 'hotel' : c.houses ? `${c.houses} house${c.houses === 1 ? '' : 's'}` : null;
               return (
                 <Pressable
                   key={c.key}
-                  onPress={() => setDraft({ ...draft, collateralKey: c.key })}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected: active }}
+                  onPress={() => toggle(c.key)}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: active }}
                   testID={`collateral-${c.key}`}
                   className={`min-h-[52px] flex-row items-center justify-between rounded-2xl border-2 px-4 py-2 ${active ? 'border-saffron bg-amber-50' : 'border-transparent bg-white'}`}
                 >
-                  <View>
+                  <View className="flex-1">
                     <Text className="text-base font-bold text-ink">{getDeed(c.key).name}</Text>
-                    <Text className="text-xs text-stone-500">Market value {formatINR(c.marketValue)}</Text>
+                    <Text className="text-xs text-stone-500">
+                      Market value {formatINR(c.marketValue)}
+                      {built ? ` + ${built} ${formatINR(c.buildingValue)}` : ''}
+                    </Text>
                   </View>
-                  <Text className="text-sm font-extrabold text-ink">up to {formatINR(c.limit)}</Text>
+                  <Text className="text-sm font-extrabold text-ink">{formatINR(c.value)}</Text>
                 </Pressable>
               );
             })}
+            <Row label="Pledged value" value={formatINR(pledgedValue)} testID="borrow-pledged-value" />
+            <Row label={`Secures up to (${LOANS.collateralAdvancePercent}%)`} value={formatINR(secures)} bold testID="borrow-pledged-limit" />
+            <Text className="text-xs text-stone-500">Buildings count at {LOANS.collateralBuildingPercent}% of what they cost to build — what the bank pays for them.</Text>
           </View>
         ) : null}
         <View className="flex-row flex-wrap gap-2">
@@ -554,7 +681,7 @@ function BorrowTab({ view, eco, send, onDone }: { view: GameView; eco: Intermedi
         {!why ? (
           <Card className="bg-white" testID="borrow-estimate">
             <Row label="You receive now" value={formatINR(amount)} />
-            <Row label={offer.tenureYears === 1 ? 'One payment of' : `Payment each year${offer.rateType === 'VARIABLE' ? ' (first year)' : ''}`} value={formatINR((preview.lines[0]?.principal ?? 0) + (preview.lines[0]?.interest ?? 0))} bold />
+            <Row label={offer.tenureYears === 1 ? 'One payment of' : `Payment each year${offer.rateType === 'VARIABLE' ? ' (first year)' : ''}`} value={formatINR(firstPayment)} bold />
             <Row label="Total you repay" value={`${formatINR(preview.total)}${offer.rateType === 'VARIABLE' ? ' at today’s rate' : ''}`} />
             <Row label="Of which interest" value={formatINR(preview.interest)} />
           </Card>
@@ -565,15 +692,23 @@ function BorrowTab({ view, eco, send, onDone }: { view: GameView; eco: Intermedi
   }
 
   const grace = `${LOANS.graceYears} full financial year${LOANS.graceYears === 1 ? '' : 's'}`;
+  const pledgedNames = pledged.map((c) => getDeed(c.key).name).join(', ');
+  const cashChange = payoff ? amount - payoff.total : amount;
   return (
     <View className="gap-3" testID="borrow-contract">
       <Button size="sm" variant="secondary" title="‹ Change amount" className="self-start" onPress={() => setDraft({ ...draft, review: false })} />
       <Text className="text-xl font-black text-ink">Loan contract · {offer.name}</Text>
       <Card className="bg-white">
-        <Row label="Principal (paid to you now)" value={formatINR(amount)} bold testID="contract-principal" />
+        <Row label={payoff ? 'Principal' : 'Principal (paid to you now)'} value={formatINR(amount)} bold testID="contract-principal" />
+        {payoff ? (
+          <>
+            <Row label="Pays off your old loan" value={`−${formatINR(payoff.total)}`} testID="contract-refinance-payoff" />
+            <Row label={cashChange >= 0 ? 'Paid to you now' : 'You pay now from cash'} value={formatINR(Math.abs(cashChange))} bold warn={cashChange < 0} testID="contract-refinance-cash" />
+          </>
+        ) : null}
         <Row label="Annual interest rate" value={`${offer.ratePercent}% ${rateType(offer)}`} bold testID="contract-rate" />
         <Row label="How the rate is made" value={`${offer.marketRatePercent}% base ${signed(offer.creditAdjustmentPercent)} credit adjustment`} />
-        <Row label="Term" value={`${offer.tenureYears} financial year${offer.tenureYears === 1 ? '' : 's'}`} />
+        <Row label="Term" value={`${offer.tenureYears} financial year${offer.tenureYears === 1 ? '' : 's'}, one payment a year`} />
         <Row label="Fees" value="None" testID="contract-fees" />
       </Card>
 
@@ -604,18 +739,19 @@ function BorrowTab({ view, eco, send, onDone }: { view: GameView; eco: Intermedi
 
       {offer.rateType === 'VARIABLE' ? (
         <Note tone="warn" testID="contract-variable">
-          Variable rate: on each anniversary the bank’s rate moves by −2, −1, 0, +1 or +2 points (kept between {IR.rates.minPercent}% and {IR.rates.maxPercent}%). Your credit
-          adjustment of {signed(offer.creditAdjustmentPercent)} stays. Payments 2 onwards are recalculated, so the amounts above can go up or down.
+          Variable rate: on each anniversary the bank’s rate moves by one of {LOANS.flexibleMoves.map(signed).join(', ')} points, equally likely (kept between{' '}
+          {IR.rates.minPercent}% and {IR.rates.maxPercent}%). Your credit adjustment of {signed(offer.creditAdjustmentPercent)} stays. Payments not yet due are
+          recalculated, so the amounts and the total above can go up or down. Payments already made never change.
         </Note>
       ) : (
         <Note>Fixed rate: {offer.ratePercent}% for the whole loan. It does not change if your credit score changes later.</Note>
       )}
 
-      {offer.secured && pledge ? (
+      {offer.secured && pledged.length ? (
         <Note tone="bad" testID="contract-collateral">
-          Collateral: {getDeed(pledge.key).name} (market value {formatINR(pledge.marketValue)}). It stays yours and keeps earning rent, but you can’t mortgage, sell, trade or
-          build on it until the loan is repaid. If you default, the bank takes it at its market value that day, sets that against what you owe, pays you anything left
-          over, and you still owe any shortfall.
+          Collateral: {pledgedNames} (worth {formatINR(pledgedValue)} today, with buildings at {LOANS.collateralBuildingPercent}% of their cost). They stay yours and keep
+          earning rent, but you can’t mortgage, sell, trade, auction, build on or sell buildings from them until the loan is repaid. If you default, the bank takes all of
+          them at their value that day, sets that against what you owe, pays you anything left over, and you still owe any shortfall. Nothing else you own is taken.
         </Note>
       ) : (
         <Note>Unsecured: no property is pledged, and none is taken if you default.</Note>
@@ -625,7 +761,7 @@ function BorrowTab({ view, eco, send, onDone }: { view: GameView; eco: Intermedi
         <Label>If things change</Label>
         <Text className="mt-1 text-sm text-stone-700">
           <Text className="font-bold">Early repayment.</Text> Any time, in part or in full, with no penalty: you pay that principal plus the interest built up on it so far that
-          loan year, and the remaining payments are recalculated.
+          loan year, and the remaining payments are recalculated. Repaying early earns no credit bonus by itself.
         </Text>
         <Text className="mt-2 text-sm text-stone-700">
           <Text className="font-bold">Paying on time.</Text> Each payment can be made on time for a quarter of a financial year after it falls due ({signed(IR.credit.events.ON_TIME_PAYMENT)}{' '}
@@ -639,6 +775,9 @@ function BorrowTab({ view, eco, send, onDone }: { view: GameView; eco: Intermedi
           payments already due, the remaining principal, and the interest built up so far that year — becomes payable at once, with no further interest, and you can’t
           borrow until it is cleared. Default is not bankruptcy.
         </Text>
+        <Text className="mt-2 text-sm text-stone-700">
+          <Text className="font-bold">End of the game.</Text> What it would cost to close the loan that day counts against your net worth. Nothing is seized because the game ends.
+        </Text>
       </Card>
 
       {why ? <Note tone="bad">{why}</Note> : null}
@@ -648,21 +787,18 @@ function BorrowTab({ view, eco, send, onDone }: { view: GameView; eco: Intermedi
         </Text>
       ) : null}
       <Button
-        title={`I ACCEPT — BORROW ${formatINR(amount)}`}
+        title={payoff ? `I ACCEPT — REFINANCE WITH ${formatINR(amount)}` : `I ACCEPT — BORROW ${formatINR(amount)}`}
         testID="borrow-accept"
-        loading={pending === 'TAKE_INTERMEDIATE_LOAN'}
-        disabled={!!why || !!pending}
+        loading={pending === 'TAKE_INTERMEDIATE_LOAN' || pending === 'REFINANCE_INTERMEDIATE_LOAN'}
+        disabled={!!why || !!pending || (payoff !== null && me.balance + amount < payoff.total)}
         onPress={async () => {
           setFailure(null);
+          const collateral = offer.secured && keys.length ? { collateralKeys: keys } : {};
           const res = await send(
-            {
-              type: 'TAKE_INTERMEDIATE_LOAN',
-              product: offer.product,
-              amount,
-              expectedRatePercent: offer.ratePercent,
-              ...(offer.secured && draft.collateralKey ? { collateralKey: draft.collateralKey } : {}),
-            },
-            { successMessage: `Borrowed ${formatINR(amount)}` },
+            replacing
+              ? { type: 'REFINANCE_INTERMEDIATE_LOAN', loanId: replacing.id, product: offer.product, amount, expectedRatePercent: offer.ratePercent, ...collateral }
+              : { type: 'TAKE_INTERMEDIATE_LOAN', product: offer.product, amount, expectedRatePercent: offer.ratePercent, ...collateral },
+            { successMessage: replacing ? 'Loan refinanced' : `Borrowed ${formatINR(amount)}` },
           );
           if (res.ok) {
             setDraft(null);

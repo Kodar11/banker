@@ -566,6 +566,8 @@ export function propertyActionBlocker(
     if (kind === 'MORTGAGE_PROPERTY') return 'Pledged as loan collateral — it can’t also be mortgaged.';
     if (kind === 'SELL_PROPERTY') return 'Pledged as loan collateral — repay that loan first.';
     if (kind === 'BUILD_HOUSE' || kind === 'BUILD_HOTEL') return 'Pledged as loan collateral — repay that loan before building.';
+    // Its buildings are part of the pledge: selling them would take value out of the bank's security.
+    if (kind === 'SELL_BUILDING') return 'Pledged as loan collateral with its buildings — repay that loan first.';
   }
 
   switch (kind) {

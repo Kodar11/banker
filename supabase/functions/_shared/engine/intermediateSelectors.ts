@@ -1,9 +1,10 @@
-import { getDeed, type PropertyKey } from './businessBoard.ts';
+import { BOARD_SIZE, getDeed, type PropertyKey } from './businessBoard.ts';
 import { formatINR } from './format.ts';
 import { configOf, type ConfigAware } from './gameConfig.ts';
 import { INTERMEDIATE_RULES as IR, LOAN_PRODUCT_KEYS, type LoanProductKey } from './intermediateConfig.ts';
 import {
   buildSchedule,
+  collateralBuildingValue,
   collateralLimit,
   creditBand,
   debtRatio,
@@ -20,6 +21,7 @@ import {
   economyOf,
   gameClock,
   isPledged,
+  loanCollateralKeys,
   loanOutstandingPrincipal,
   loansOf,
   scheduledPrincipal,
@@ -31,6 +33,7 @@ import {
   type IntermediateState,
 } from './intermediateState.ts';
 import { balanceSheet, buildingCost, intermediateDebt, intermediateNetAssets, openResaleFor, ownedBy, unmortgageCost } from './selectors.ts';
+import { BUSINESS_MVP_RULES as RULES } from './rules.ts';
 import type { GameState } from './types.ts';
 
 /**
@@ -142,25 +145,101 @@ export function borrowingBlock(eco: IntermediateState, playerId: string): string
 
 export interface CollateralOption {
   key: PropertyKey;
+  /** The property's market value today. */
   marketValue: number;
-  /** The most this property can secure. */
-  limit: number;
+  /** Its buildings, at IR.loans.collateralBuildingPercent of what they cost to build. */
+  buildingValue: number;
+  houses: number;
+  hotel: boolean;
+  /** What it adds to a pledge: marketValue + buildingValue. */
+  value: number;
 }
 
-/** Properties this player could pledge: owned outright, undeveloped, not mortgaged, not already pledged, not up for auction. */
-export function eligibleCollateral(state: Pick<GameState, 'properties' | 'mode' | 'intermediate'> & { auction?: GameState['auction'] }, playerId: string): CollateralOption[] {
+/**
+ * Properties this player could pledge, with their buildings: owned, not mortgaged (a property carries one
+ * claim at a time — a mortgage or a pledge, never both), not pledged to another live loan, and not up for
+ * auction. `releasing`: a loan being refinanced — what it holds is free for the loan that replaces it.
+ */
+export function eligibleCollateral(
+  state: Pick<GameState, 'properties' | 'mode' | 'intermediate'> & { auction?: GameState['auction'] },
+  playerId: string,
+  releasing: IntermediateLoan | null = null,
+): CollateralOption[] {
   const eco = economyOf(state);
   if (!eco) return [];
+  const freed = new Set(releasing ? loanCollateralKeys(releasing) : []);
   return ownedBy(state, playerId)
     .filter((key) => {
       const p = state.properties[key];
-      return !!p && !p.mortgaged && !p.hotel && p.houses === 0 && !isPledged(state, key) && !openResaleFor(state, key);
+      return !!p && !p.mortgaged && (freed.has(key) || !isPledged(state, key)) && !openResaleFor(state, key);
     })
     .map((key) => {
+      const p = state.properties[key];
       const marketValue = eco.market[key]?.value ?? getDeed(key).price;
-      return { key, marketValue, limit: collateralLimit(marketValue) };
-    })
-    .filter((c) => c.limit >= LOANS.minAmount);
+      const buildings = collateralBuildingValue(buildingCost(p));
+      return { key, marketValue, buildingValue: buildings, houses: p.houses, hotel: p.hotel, value: marketValue + buildings };
+    });
+}
+
+/** The pooled value of a set of collateral options. */
+export function pooledCollateralValue(options: readonly Pick<CollateralOption, 'value'>[]): number {
+  return options.reduce((sum, c) => sum + c.value, 0);
+}
+
+/**
+ * The Start reward a player can count on in one financial year: a year is IR.year.spacesPerYear spaces of
+ * movement each, so this many laps of the board. Rent, sales and cards are never assumed.
+ */
+export function annualStartIncome(): number {
+  return Math.floor((RULES.start.passReward * IR.year.spacesPerYear) / BOARD_SIZE);
+}
+
+/**
+ * What a player's loans ask of them over the coming year: every installment due now, plus each active
+ * loan's next scheduled installment. `excludeLoanId`: a loan being refinanced, whose payments end.
+ */
+export function annualDebtService(eco: IntermediateState, playerId: string, excludeLoanId: string | null = null): number {
+  let total = 0;
+  for (const loan of loansOf(eco, playerId)) {
+    if (loan.status !== 'ACTIVE' || loan.id === excludeLoanId) continue;
+    total += unpaidInstallments(loan).reduce((s, i) => s + i.principal + i.interest, 0);
+    const next = loan.installments.find((i) => i.status === 'SCHEDULED');
+    if (next) total += next.principal + next.interest;
+  }
+  return total;
+}
+
+/**
+ * Repayment capacity: the most a year of installments on all of a player's loans may come to — their net
+ * worth (balanceSheet, so every liability already counted once) plus the Start income of
+ * IR.loans.affordabilityIncomeYears years. Never below zero. Borrowing itself does not move it: the cash a
+ * loan pays out is matched by what is owed on it.
+ */
+export function repaymentBudget(state: Pick<GameState, 'properties' | 'players' | 'mode' | 'intermediate'> & { loans?: GameState['loans'] }, playerId: string): number {
+  return Math.max(0, balanceSheet(state, playerId).netWorth + annualStartIncome() * LOANS.affordabilityIncomeYears);
+}
+
+/** A new loan's first-year payment (for a one-year loan, the whole repayment). */
+export function firstYearPayment(product: LoanProductKey, amount: number, ratePercent: number): number {
+  const first = buildSchedule(amount, ratePercent, LOANS.products[product].tenureYears)[0];
+  return first ? first.principal + first.interest : 0;
+}
+
+/** The largest amount, in loan steps between the minimum and `upper`, whose first-year payment fits `budget`; 0 if none does. */
+function affordableAmount(product: LoanProductKey, ratePercent: number, budget: number, upper: number): number {
+  let lo = Math.ceil(LOANS.minAmount / LOANS.step);
+  let hi = Math.floor(upper / LOANS.step);
+  let best = 0;
+  while (lo <= hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    if (firstYearPayment(product, mid * LOANS.step, ratePercent) <= budget) {
+      best = mid * LOANS.step;
+      lo = mid + 1;
+    } else {
+      hi = mid - 1;
+    }
+  }
+  return best;
 }
 
 export interface LoanOffer {
@@ -170,6 +249,8 @@ export interface LoanOffer {
   rateType: 'FIXED' | 'VARIABLE';
   secured: boolean;
   tenureYears: number;
+  /** The smallest loan the bank makes. */
+  minAmount: number;
   productLimit: number;
   marketRatePercent: number;
   creditAdjustmentPercent: number;
@@ -179,20 +260,43 @@ export interface LoanOffer {
   maxAmount: number;
   /** Why the offer can't be taken at all right now, or null. */
   blocked: string | null;
+  /** Secured only: what could be pledged, its pooled value, and the most all of it could secure. */
   collateral: CollateralOption[];
+  collateralValue: number;
+  collateralLimit: number;
+  /** Repayment capacity (repaymentBudget) less what existing loans already ask of the coming year. */
+  paymentBudget: number;
 }
 
-type OfferState = Pick<GameState, 'properties' | 'players' | 'status' | 'mode' | 'intermediate'> & ConfigAware;
+type OfferState = Pick<GameState, 'properties' | 'players' | 'status' | 'mode' | 'intermediate'> & ConfigAware & { loans?: GameState['loans']; auction?: GameState['auction'] };
+
+/** A loan of this player's that may be refinanced (or null): active, theirs. */
+function replacedLoan(eco: IntermediateState, playerId: string, loanId: string | null | undefined): IntermediateLoan | null {
+  if (!loanId) return null;
+  return loansOf(eco, playerId).find((l) => l.id === loanId && l.status === 'ACTIVE') ?? null;
+}
+
+export interface OfferOptions {
+  /** Refinancing: the loan the new one replaces. Its principal, payments and collateral are freed for the offer. */
+  replacingLoanId?: string | null;
+}
+
+const repaymentMessage = (budget: number) =>
+  `Repayment limit: a year of payments on all your loans can’t exceed your net worth plus a year of Start rewards. You have room for ${formatINR(Math.max(0, budget))} a year more.`;
 
 /** The five loan offers as they stand for one player: personalised rate, limits, and why any is unavailable. */
-export function loanOffers(state: OfferState, playerId: string): LoanOffer[] {
+export function loanOffers(state: OfferState, playerId: string, options: OfferOptions = {}): LoanOffer[] {
   const eco = economyOf(state);
   if (!eco) return [];
   const player = state.players.find((p) => p.id === playerId);
   const score = creditScoreOf(eco, playerId);
   const limit = configOf(state).loanLimit;
-  const capacity = borrowingCapacity(eco, playerId, limit);
-  const collateral = eligibleCollateral(state, playerId);
+  const replacing = replacedLoan(eco, playerId, options.replacingLoanId);
+  const capacity = Math.min(limit, borrowingCapacity(eco, playerId, limit) + (replacing ? loanOutstandingPrincipal(replacing) : 0));
+  const collateral = eligibleCollateral(state, playerId, replacing);
+  const pool = pooledCollateralValue(collateral);
+  const poolLimit = collateralLimit(pool);
+  const budget = repaymentBudget(state, playerId) - annualDebtService(eco, playerId, replacing?.id ?? null);
   const general =
     state.status !== 'ACTIVE'
       ? state.status === 'PAUSED'
@@ -200,20 +304,26 @@ export function loanOffers(state: OfferState, playerId: string): LoanOffer[] {
         : 'Game is not running.'
       : !player || player.status !== 'ACTIVE'
         ? 'You are out of the game.'
-        : borrowingBlock(eco, playerId);
+        : options.replacingLoanId && !replacing
+          ? 'That loan can no longer be refinanced.'
+          : borrowingBlock(eco, playerId);
   return LOAN_PRODUCT_KEYS.map((product) => {
     const def = LOANS.products[product];
     const rate = offeredRate(product, score);
     const secured = def.secured ? collateral : [];
-    const best = def.secured ? Math.max(0, ...secured.map((c) => c.limit)) : Number.POSITIVE_INFINITY;
-    const maxAmount = floorTo(Math.min(def.maxPrincipal, capacity, best), LOANS.step);
+    const upper = floorTo(Math.min(def.maxPrincipal, LOANS.maxSingleLoan, capacity, def.secured ? poolLimit : Number.POSITIVE_INFINITY), LOANS.step);
+    const affordable = upper >= LOANS.minAmount ? affordableAmount(product, rate.ratePercent, budget, upper) : 0;
     const blocked =
       general ??
       (capacity < LOANS.minAmount
         ? `You have reached the ${formatINR(limit)} borrowing limit.`
         : def.secured && secured.length === 0
-          ? 'Needs a property you own outright: not mortgaged, not already pledged, and with no buildings.'
-          : null);
+          ? 'Needs property you own that is not mortgaged, not already pledged and not up for auction.'
+          : def.secured && poolLimit < LOANS.minAmount
+            ? `Everything you could pledge is worth ${formatINR(pool)}: ${LOANS.collateralAdvancePercent}% of it is ${formatINR(poolLimit)}, below the ${formatINR(LOANS.minAmount)} minimum.`
+            : affordable === 0
+              ? repaymentMessage(budget)
+              : null);
     return {
       product,
       name: def.name,
@@ -221,33 +331,67 @@ export function loanOffers(state: OfferState, playerId: string): LoanOffer[] {
       rateType: def.rateType,
       secured: def.secured,
       tenureYears: def.tenureYears,
+      minAmount: LOANS.minAmount,
       productLimit: def.maxPrincipal,
       ...rate,
-      maxAmount: blocked ? 0 : maxAmount,
+      maxAmount: blocked ? 0 : affordable,
       blocked,
       collateral: secured,
+      collateralValue: def.secured ? pool : 0,
+      collateralLimit: def.secured ? poolLimit : 0,
+      paymentBudget: Math.max(0, budget),
     };
   });
 }
 
 /** Why this exact request would be refused, or null. The engine runs it; the Borrow screen shows the same answer. */
-export function loanRequestBlocker(state: OfferState, playerId: string, product: LoanProductKey, amount: number, collateralKey: PropertyKey | null): string | null {
-  const offer = loanOffers(state, playerId).find((o) => o.product === product);
+export function loanRequestBlocker(
+  state: OfferState,
+  playerId: string,
+  product: LoanProductKey,
+  amount: number,
+  collateralKeys: readonly PropertyKey[],
+  options: OfferOptions = {},
+): string | null {
+  const offer = loanOffers(state, playerId, options).find((o) => o.product === product);
   if (!offer) return 'Loans like this are only offered in Capital Mode.';
   if (offer.blocked) return offer.blocked;
   if (!Number.isInteger(amount) || amount < LOANS.minAmount) return `Minimum loan is ${formatINR(LOANS.minAmount)}.`;
   if (amount % LOANS.step !== 0) return `Loans come in steps of ${formatINR(LOANS.step)}.`;
   if (amount > offer.productLimit) return `${offer.name}s go up to ${formatINR(offer.productLimit)}.`;
+  if (amount > LOANS.maxSingleLoan) return `No single loan can be more than ${formatINR(LOANS.maxSingleLoan)}.`;
   const eco = economyOf(state)!;
   const limit = configOf(state).loanLimit;
-  const capacity = borrowingCapacity(eco, playerId, limit);
+  const replacing = replacedLoan(eco, playerId, options.replacingLoanId);
+  const capacity = Math.min(limit, borrowingCapacity(eco, playerId, limit) + (replacing ? loanOutstandingPrincipal(replacing) : 0));
   if (amount > capacity) return `Your total borrowing limit is ${formatINR(limit)}. You can borrow ${formatINR(capacity)} more.`;
-  if (!offer.secured) return collateralKey ? 'This loan takes no collateral.' : null;
-  if (!collateralKey) return 'Choose the property to pledge.';
-  const pledge = offer.collateral.find((c) => c.key === collateralKey);
-  if (!pledge) return `${getDeed(collateralKey).name} can't be pledged: it must be yours outright, unmortgaged, unpledged and without buildings.`;
-  if (amount > pledge.limit) return `${getDeed(collateralKey).name} can secure up to ${formatINR(pledge.limit)} (${LOANS.collateralAdvancePercent}% of its market value).`;
+  if (!offer.secured) {
+    if (collateralKeys.length) return 'This loan takes no collateral.';
+  } else {
+    if (collateralKeys.length === 0) return 'Choose at least one property to pledge.';
+    if (new Set(collateralKeys).size !== collateralKeys.length) return 'A property can only be pledged once.';
+    const pledged: CollateralOption[] = [];
+    for (const key of collateralKeys) {
+      const option = offer.collateral.find((c) => c.key === key);
+      if (!option) return `${getDeed(key).name} can't be pledged: it must be yours, not mortgaged, not already pledged and not up for auction.`;
+      pledged.push(option);
+    }
+    const value = pooledCollateralValue(pledged);
+    const secures = collateralLimit(value);
+    if (amount > secures) return `What you pledged is worth ${formatINR(value)} and can secure up to ${formatINR(secures)} (${LOANS.collateralAdvancePercent}%).`;
+  }
+  if (firstYearPayment(product, amount, offer.ratePercent) > offer.paymentBudget) return repaymentMessage(offer.paymentBudget);
   return null;
+}
+
+/** Why this loan can't be refinanced right now (before choosing new terms), or null. */
+export function refinanceBlocker(eco: IntermediateState, playerId: string, loanId: string): string | null {
+  const loan = loansOf(eco, playerId).find((l) => l.id === loanId);
+  if (!loan) return 'Loan not found.';
+  if (loan.status !== 'ACTIVE') return 'Only a loan being repaid on its schedule can be refinanced.';
+  if (unpaidInstallments(loan).length) return 'Pay the installment that is due first.';
+  if (scheduledPrincipal(loan) <= 0) return 'Nothing left to refinance.';
+  return borrowingBlock(eco, playerId);
 }
 
 export interface LoanPreview {

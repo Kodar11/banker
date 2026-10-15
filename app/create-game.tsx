@@ -1,7 +1,7 @@
 import { goBack } from '@/utils/navigation';
 import { useState } from 'react';
 import { Keyboard, Pressable, Text, View } from 'react-native';
-import { BUSINESS_MVP_RULES, defaultGameConfig, GAME_MODE_NAMES, PROPERTY_KEYS, type GameConfig, type GameMode } from '@/engine/index.ts';
+import { BUSINESS_MVP_RULES, configAmountLimits, defaultGameConfig, GAME_MODE_NAMES, PROPERTY_KEYS, type GameConfig, type GameMode } from '@/engine/index.ts';
 import { Button, Card, Label, Pill, Screen, TextField } from '@/components/ui';
 import { GameConfigEditor, GameConfigSummary } from '@/features/lobby/GameConfigEditor';
 import { useEnterGame } from '@/features/lobby/useEnterGame';
@@ -27,7 +27,14 @@ export default function CreateGame() {
   // The money settings and the duration are the host's own choices, so they follow them to the other mode; everything else takes that mode's default.
   const chooseMode = (mode: GameMode) => {
     setGameMode(mode);
-    setConfig((c) => ({ ...defaultGameConfig(mode), startingCash: c.startingCash, loanLimit: c.loanLimit, financialPrivacy: c.financialPrivacy, durationYears: c.durationYears }));
+    // A loan limit below the new mode's smallest loan rises to it.
+    setConfig((c) => ({
+      ...defaultGameConfig(mode),
+      startingCash: c.startingCash,
+      loanLimit: Math.max(c.loanLimit, configAmountLimits(mode, 'loanLimit').min),
+      financialPrivacy: c.financialPrivacy,
+      durationYears: c.durationYears,
+    }));
   };
 
   return (

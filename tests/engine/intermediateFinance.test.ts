@@ -6,6 +6,7 @@ import {
   applyMarketChange,
   buildSchedule,
   clampScore,
+  collateralBuildingValue,
   collateralLimit,
   creditBand,
   debtRatio,
@@ -40,13 +41,26 @@ describe('Capital config', () => {
     expect(IR.credit.events).toEqual({ ON_TIME_PAYMENT: 5, INSTALLMENT_OVERDUE: -20, CAUGHT_UP: 0, LOAN_DEFAULT: -100, LOAN_REPAID: 10, CLEAN_YEAR: 5 });
     expect(IR.credit.maxGainPerYear).toBe(10);
     expect(IR.rates).toEqual({ minPercent: 4, maxPercent: 30 });
-    expect(IR.loans).toMatchObject({ minAmount: 1000, step: 500, maxOutstandingPrincipal: 20000, collateralAdvancePercent: 50, graceYears: 1, originationFee: 0, prepaymentPenalty: 0 });
+    expect(IR.loans).toMatchObject({
+      minAmount: 10000,
+      step: 500,
+      maxSingleLoan: 50000,
+      maxOutstandingPrincipal: 20000,
+      collateralAdvancePercent: 80,
+      collateralBuildingPercent: 50,
+      graceYears: 1,
+      originationFee: 0,
+      prepaymentPenalty: 0,
+    });
     const p = IR.loans.products;
-    expect([p.EMERGENCY.baseRatePercent, p.EMERGENCY.tenureYears, p.EMERGENCY.maxPrincipal, p.EMERGENCY.secured]).toEqual([20, 1, 5000, false]);
-    expect([p.PERSONAL.baseRatePercent, p.PERSONAL.tenureYears, p.PERSONAL.maxPrincipal, p.PERSONAL.secured]).toEqual([12, 3, 10000, false]);
-    expect([p.SECURED.baseRatePercent, p.SECURED.tenureYears, p.SECURED.maxPrincipal, p.SECURED.secured]).toEqual([8, 3, 10000, true]);
-    expect([p.LONG_TERM.baseRatePercent, p.LONG_TERM.tenureYears, p.LONG_TERM.maxPrincipal, p.LONG_TERM.secured]).toEqual([10, 5, 15000, false]);
-    expect([p.FLEXIBLE.baseRatePercent, p.FLEXIBLE.tenureYears, p.FLEXIBLE.maxPrincipal, p.FLEXIBLE.rateType]).toEqual([7, 3, 10000, 'VARIABLE']);
+    // The agreed five-product structure: [base rate, years, max principal, secured, rate type].
+    const terms = (k: keyof typeof p) => [p[k].baseRatePercent, p[k].tenureYears, p[k].maxPrincipal, p[k].secured, p[k].rateType];
+    expect(terms('EMERGENCY')).toEqual([18, 1, 20000, false, 'FIXED']);
+    expect(terms('PERSONAL')).toEqual([13, 3, 30000, false, 'FIXED']);
+    expect(terms('SECURED')).toEqual([7, 3, 50000, true, 'FIXED']);
+    expect(terms('LONG_TERM')).toEqual([11, 5, 40000, false, 'FIXED']);
+    expect(terms('FLEXIBLE')).toEqual([9, 3, 30000, false, 'VARIABLE']);
+    for (const k of LOAN_PRODUCT_KEYS) expect(p[k].maxPrincipal).toBeLessThanOrEqual(IR.loans.maxSingleLoan);
   });
 
   it('is validated: a broken configuration is rejected', () => {
@@ -120,12 +134,18 @@ describe('property market', () => {
     expect(projectedValue(8500, 10, 1)).toBe(9400); // 9,350 rounds half up
   });
 
-  it('limits a secured loan to 50% of market value, rounded down to ₹500', () => {
-    expect(collateralLimit(8500)).toBe(4000);
-    expect(collateralLimit(10000)).toBe(5000);
-    expect(collateralLimit(2500)).toBe(1000);
-    expect(collateralLimit(1500)).toBe(500);
-    expect(collateralLimit(9900)).toBe(4500);
+  it('limits a secured loan to 80% of the pooled collateral value, rounded down to ₹500', () => {
+    expect(collateralLimit(62500)).toBe(50000); // the agreed example: ₹50,000 of property + ₹12,500 of buildings
+    expect(collateralLimit(10000)).toBe(8000);
+    expect(collateralLimit(12500)).toBe(10000);
+    expect(collateralLimit(12400)).toBe(9500); // 9,920 rounds down
+    expect(collateralLimit(0)).toBe(0);
+  });
+
+  it('values buildings as collateral at 50% of their construction cost, rounded down', () => {
+    expect(collateralBuildingValue(0)).toBe(0);
+    expect(collateralBuildingValue(3000)).toBe(1500);
+    expect(collateralBuildingValue(1001)).toBe(500);
   });
 });
 
@@ -143,12 +163,15 @@ describe('credit score → interest rate', () => {
   });
 
   it('personalised rate = base + adjustment, kept within 4%–30%', () => {
-    expect(offeredRate('PERSONAL', 700)).toEqual({ marketRatePercent: 12, creditAdjustmentPercent: -1, ratePercent: 11 });
-    expect(offeredRate('PERSONAL', 800).ratePercent).toBe(10);
-    expect(offeredRate('PERSONAL', 660).ratePercent).toBe(12);
-    expect(offeredRate('EMERGENCY', 400).ratePercent).toBe(26);
-    expect(offeredRate('FLEXIBLE', 850).ratePercent).toBe(5);
-    expect(offeredRate('SECURED', 600).ratePercent).toBe(11);
+    expect(offeredRate('PERSONAL', 700)).toEqual({ marketRatePercent: 13, creditAdjustmentPercent: -1, ratePercent: 12 });
+    expect(offeredRate('PERSONAL', 800).ratePercent).toBe(11);
+    expect(offeredRate('PERSONAL', 660).ratePercent).toBe(13);
+    expect(offeredRate('EMERGENCY', 400).ratePercent).toBe(24);
+    expect(offeredRate('FLEXIBLE', 850).ratePercent).toBe(7);
+    expect(offeredRate('SECURED', 600).ratePercent).toBe(10);
+    // The agreed example: a Secured Loan at a score of 780 is 7% − 2 points = 5%. Points, not a proportion.
+    expect(offeredRate('SECURED', 780).ratePercent).toBe(5);
+    expect(offeredRate('LONG_TERM', 300).ratePercent).toBe(17);
     for (const product of LOAN_PRODUCT_KEYS) {
       for (const score of [300, 549, 550, 649, 650, 699, 700, 749, 750, 850]) {
         const { ratePercent } = offeredRate(product, score);

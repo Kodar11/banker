@@ -74,7 +74,7 @@ function give(f: Fixture, name: string, key: PropertyKey) {
   f.state.properties[key] = { ...f.state.properties[key], ownerId: f.ids[name]! };
 }
 
-const borrowPersonal = (f: Fixture, amount = 9000) => f.act('Asha', { type: 'TAKE_INTERMEDIATE_LOAN', product: 'PERSONAL', amount, expectedRatePercent: 11 });
+const borrowPersonal = (f: Fixture, amount = 15000) => f.act('Asha', { type: 'TAKE_INTERMEDIATE_LOAN', product: 'PERSONAL', amount, expectedRatePercent: 12 });
 
 async function introSeen(seen: boolean) {
   if (seen) await SecureStore.setItemAsync(INTRO_SEEN_KEY, '1');
@@ -266,12 +266,16 @@ describe('Capital: the bank', () => {
   it('Borrow lists five offers at my credit-adjusted rate and explains an unavailable one', async () => {
     const f = intermediate().loadAs('Asha');
     await render(<FinanceHub visible onClose={jest.fn()} view={viewFor(f, 'Asha')} send={jest.fn()} initialTab="borrow" />);
-    expect(screen.getByTestId('offer-rate-EMERGENCY')).toHaveTextContent('19%');
-    expect(screen.getByTestId('offer-rate-PERSONAL')).toHaveTextContent('11%');
-    expect(screen.getByTestId('offer-rate-SECURED')).toHaveTextContent('7%');
-    expect(screen.getByTestId('offer-rate-LONG_TERM')).toHaveTextContent('9%');
-    expect(screen.getByTestId('offer-rate-FLEXIBLE')).toHaveTextContent('6%');
-    expect(screen.getByTestId('offer-blocked-SECURED')).toHaveTextContent(/own outright/);
+    expect(screen.getByTestId('offer-rate-EMERGENCY')).toHaveTextContent('17%');
+    expect(screen.getByTestId('offer-rate-PERSONAL')).toHaveTextContent('12%');
+    expect(screen.getByTestId('offer-rate-SECURED')).toHaveTextContent('6%');
+    expect(screen.getByTestId('offer-rate-LONG_TERM')).toHaveTextContent('10%');
+    expect(screen.getByTestId('offer-rate-FLEXIBLE')).toHaveTextContent('8%');
+    // Each offer shows its range, and what this player can borrow on it now.
+    expect(screen.getByTestId('offer-range-SECURED')).toHaveTextContent(/₹10,000 – ₹50,000/);
+    expect(screen.getByTestId('offer-max-PERSONAL')).toHaveTextContent(/₹20,000/);
+    expect(screen.getByTestId('borrow-affordability')).toHaveTextContent(/Room left: ₹26,500 a year/);
+    expect(screen.getByTestId('offer-blocked-SECURED')).toHaveTextContent(/not mortgaged, not already pledged/);
     expect(screen.queryByTestId('offer-choose-SECURED')).toBeNull();
     expect(within(screen.getByTestId('offer-FLEXIBLE')).getByText(/can move by up to 2 points either way/)).toBeTruthy();
   });
@@ -282,15 +286,15 @@ describe('Capital: the bank', () => {
     await render(<FinanceHub visible onClose={jest.fn()} view={viewFor(f, 'Asha')} send={send} initialTab="borrow" />);
     await fireEvent.press(screen.getByTestId('offer-choose-PERSONAL'));
     await fireEvent.changeText(screen.getByTestId('borrow-amount'), '10000');
-    expect(within(screen.getByTestId('borrow-estimate')).getByText('₹4,092')).toBeTruthy();
+    expect(within(screen.getByTestId('borrow-estimate')).getByText('₹4,163')).toBeTruthy();
     expect(send).not.toHaveBeenCalled();
     await fireEvent.press(screen.getByTestId('borrow-review'));
     expect(send).not.toHaveBeenCalled();
 
-    const lines = buildSchedule(10000, 11, 3);
+    const lines = buildSchedule(10000, 12, 3);
     const total = lines.reduce((s, l) => s + l.principal + l.interest, 0);
     expect(screen.getByTestId('contract-principal')).toHaveTextContent(/₹10,000/);
-    expect(screen.getByTestId('contract-rate')).toHaveTextContent(/11% fixed/);
+    expect(screen.getByTestId('contract-rate')).toHaveTextContent(/12% fixed/);
     expect(screen.getByTestId('contract-fees')).toHaveTextContent(/None/);
     const schedule = screen.getByTestId('contract-schedule');
     expect(within(schedule).getByText(/Payment 1 · start of Year 2/)).toBeTruthy();
@@ -298,12 +302,12 @@ describe('Capital: the bank', () => {
     expect(within(schedule).getByText(`₹${lines[0]!.principal.toLocaleString('en-IN')} principal + ₹${lines[0]!.interest.toLocaleString('en-IN')} interest`)).toBeTruthy();
     expect(screen.getByTestId('contract-total')).toHaveTextContent(new RegExp(`₹${total.toLocaleString('en-IN')}`));
     const terms = screen.getByTestId('contract-terms');
-    for (const part of [/Early repayment/, /no penalty/, /Grace period/, /1 full financial year/, /Default/, /not bankruptcy/]) expect(within(terms).getByText(part)).toBeTruthy();
+    for (const part of [/Early repayment/, /no penalty/, /Grace period/, /1 full financial year/, /Default/, /not bankruptcy/, /End of the game/]) expect(within(terms).getByText(part)).toBeTruthy();
     expect(screen.getByText(/Unsecured: no property is pledged/)).toBeTruthy();
 
     await fireEvent.press(screen.getByTestId('borrow-accept'));
     expect(send).toHaveBeenCalledTimes(1);
-    expect(send).toHaveBeenCalledWith({ type: 'TAKE_INTERMEDIATE_LOAN', product: 'PERSONAL', amount: 10000, expectedRatePercent: 11 }, expect.anything());
+    expect(send).toHaveBeenCalledWith({ type: 'TAKE_INTERMEDIATE_LOAN', product: 'PERSONAL', amount: 10000, expectedRatePercent: 12 }, expect.anything());
   });
 
   it('refuses an amount over the limit before anything is sent', async () => {
@@ -311,27 +315,41 @@ describe('Capital: the bank', () => {
     const send = jest.fn();
     await render(<FinanceHub visible onClose={jest.fn()} view={viewFor(f, 'Asha')} send={send} initialTab="borrow" />);
     await fireEvent.press(screen.getByTestId('offer-choose-EMERGENCY'));
-    await fireEvent.changeText(screen.getByTestId('borrow-amount'), '5500');
-    expect(screen.getByText(/go up to ₹5,000/)).toBeTruthy();
+    await fireEvent.changeText(screen.getByTestId('borrow-amount'), '20500');
+    expect(screen.getByText(/go up to ₹20,000/)).toBeTruthy();
     expect(screen.getByTestId('borrow-review').props.accessibilityState.disabled).toBe(true);
-    await fireEvent.changeText(screen.getByTestId('borrow-amount'), '1250');
+    await fireEvent.changeText(screen.getByTestId('borrow-amount'), '10250');
     expect(screen.getByText(/steps of ₹500/)).toBeTruthy();
+    await fireEvent.changeText(screen.getByTestId('borrow-amount'), '5000');
+    expect(screen.getByText(/Minimum loan is ₹10,000/)).toBeTruthy();
   });
 
-  it('a secured loan names the pledged property and the risk of losing it', async () => {
+  it('a secured loan pools the pledged properties, names them, and says what is at risk', async () => {
     const f = intermediate();
     give(f, 'Asha', 'MUMBAI');
+    give(f, 'Asha', 'DELHI');
     f.loadAs('Asha');
     const send = jest.fn(async () => ({ ok: true as const }));
     await render(<FinanceHub visible onClose={jest.fn()} view={viewFor(f, 'Asha')} send={send} initialTab="borrow" />);
+    expect(screen.getByTestId('offer-collateral-SECURED')).toHaveTextContent(/₹14,500 → up to ₹11,500/);
     await fireEvent.press(screen.getByTestId('offer-choose-SECURED'));
-    expect(within(screen.getByTestId('collateral-MUMBAI')).getByText('up to ₹4,000')).toBeTruthy();
-    await fireEvent.changeText(screen.getByTestId('borrow-amount'), '4000');
+    // Neither property is enough alone, so both start selected.
+    expect(screen.getByTestId('collateral-MUMBAI').props.accessibilityState.checked).toBe(true);
+    expect(screen.getByTestId('collateral-DELHI').props.accessibilityState.checked).toBe(true);
+    expect(screen.getByTestId('borrow-pledged-value')).toHaveTextContent(/₹14,500/);
+    expect(screen.getByTestId('borrow-pledged-limit')).toHaveTextContent(/₹11,500/);
+    await fireEvent.changeText(screen.getByTestId('borrow-amount'), '10000');
+    // Unpledging Delhi leaves too little: the screen says so before anything is sent.
+    await fireEvent.press(screen.getByTestId('collateral-DELHI'));
+    expect(screen.getByText(/can secure up to ₹6,500/)).toBeTruthy();
+    expect(screen.getByTestId('borrow-review').props.accessibilityState.disabled).toBe(true);
+    await fireEvent.press(screen.getByTestId('collateral-DELHI'));
     await fireEvent.press(screen.getByTestId('borrow-review'));
-    expect(screen.getByTestId('contract-collateral')).toHaveTextContent(/Mumbai/);
-    expect(screen.getByTestId('contract-collateral')).toHaveTextContent(/the bank takes it/);
+    expect(screen.getByTestId('contract-collateral')).toHaveTextContent(/Mumbai, Delhi/);
+    expect(screen.getByTestId('contract-collateral')).toHaveTextContent(/the bank takes all of them/);
+    expect(screen.getByTestId('contract-collateral')).toHaveTextContent(/Nothing else you own is taken/);
     await fireEvent.press(screen.getByTestId('borrow-accept'));
-    expect(send).toHaveBeenCalledWith({ type: 'TAKE_INTERMEDIATE_LOAN', product: 'SECURED', amount: 4000, expectedRatePercent: 7, collateralKey: 'MUMBAI' }, expect.anything());
+    expect(send).toHaveBeenCalledWith({ type: 'TAKE_INTERMEDIATE_LOAN', product: 'SECURED', amount: 10000, expectedRatePercent: 6, collateralKeys: ['MUMBAI', 'DELHI'] }, expect.anything());
   });
 
   it('the variable-rate contract warns that payments can change', async () => {
@@ -340,7 +358,7 @@ describe('Capital: the bank', () => {
     await fireEvent.press(screen.getByTestId('offer-choose-FLEXIBLE'));
     await fireEvent.press(screen.getByTestId('borrow-review'));
     expect(screen.getByTestId('contract-variable')).toHaveTextContent(/can go up or down/);
-    expect(screen.getByTestId('contract-rate')).toHaveTextContent(/6% variable/);
+    expect(screen.getByTestId('contract-rate')).toHaveTextContent(/8% variable/);
   });
 
   it('My Loans shows the contract, and Pay now settles a due installment', async () => {
@@ -351,8 +369,11 @@ describe('Capital: the bank', () => {
     const loan = eco(f).loans[0]!;
     const first = loan.installments[0]!;
     const card = screen.getByTestId('loan-card-PERSONAL');
-    expect(within(card).getByTestId('loan-rate')).toHaveTextContent(/11% fixed/);
-    expect(within(card).getByTestId('loan-principal-remaining')).toHaveTextContent(/₹9,000/);
+    expect(within(card).getByTestId('loan-rate')).toHaveTextContent(/12% fixed/);
+    expect(within(card).getByTestId('loan-principal-remaining')).toHaveTextContent(/₹15,000/);
+    expect(within(card).getByTestId('loan-maturity')).toHaveTextContent(/start of Year 4/);
+    // A payment is due: it must be paid before the loan can be refinanced.
+    expect(within(card).queryByTestId('loan-refinance')).toBeNull();
     const payable = within(card).getByTestId('loan-payable');
     expect(within(payable).getByText(/Payment due · installment 1/)).toBeTruthy();
     expect(within(payable).getByText(/Pay by Year 2 · 25% through/)).toBeTruthy();
@@ -371,13 +392,38 @@ describe('Capital: the bank', () => {
     jumpTo(f, 36).loadAs('Asha');
     const send = jest.fn(async () => ({ ok: true as const }));
     await render(<FinanceHub visible onClose={jest.fn()} view={viewFor(f, 'Asha')} send={send} initialTab="loans" />);
-    await fireEvent.changeText(screen.getByTestId('loan-early-amount'), '3000');
+    // The payoff today: principal plus half a year of interest at 12%.
+    expect(screen.getByTestId('loan-accrued')).toHaveTextContent(/₹900$/);
+    expect(screen.getByTestId('loan-payoff')).toHaveTextContent(/₹15,900$/);
+    expect(screen.getByTestId('loan-early-all')).toHaveTextContent('Repay all ₹15,900');
+    await fireEvent.changeText(screen.getByTestId('loan-early-amount'), '5000');
     const quote = screen.getByTestId('loan-early-quote');
-    expect(within(quote).getByText('₹165')).toBeTruthy();
-    expect(within(quote).getByText('₹3,165')).toBeTruthy();
-    expect(within(quote).getByText('₹6,000')).toBeTruthy();
+    expect(within(quote).getByText('₹300')).toBeTruthy();
+    expect(within(quote).getByText('₹5,300')).toBeTruthy();
+    expect(within(quote).getByText('₹10,000')).toBeTruthy();
     await fireEvent.press(screen.getByTestId('loan-early-part'));
-    expect(send).toHaveBeenCalledWith({ type: 'PREPAY_INTERMEDIATE_LOAN', loanId: eco(f).loans[0]!.id, amount: 3000 }, expect.anything());
+    expect(send).toHaveBeenCalledWith({ type: 'PREPAY_INTERMEDIATE_LOAN', loanId: eco(f).loans[0]!.id, amount: 5000 }, expect.anything());
+  });
+
+  it('refinancing starts from the loan card, shows the payoff, and sends one action naming the old loan', async () => {
+    const f = borrowPersonal(intermediate());
+    jumpTo(f, 36).loadAs('Asha');
+    const loanId = eco(f).loans[0]!.id;
+    const send = jest.fn(async () => ({ ok: true as const }));
+    await render(<FinanceHub visible onClose={jest.fn()} view={viewFor(f, 'Asha')} send={send} initialTab="loans" />);
+    await fireEvent.press(screen.getByTestId('loan-refinance'));
+    expect(screen.getByTestId('refinance-banner')).toHaveTextContent(/pays off ₹15,900/);
+    // The old loan's principal is freed for the replacement: ₹20,000 is open again, not ₹5,000.
+    expect(screen.getByTestId('offer-max-LONG_TERM')).toHaveTextContent(/₹20,000/);
+    await fireEvent.press(screen.getByTestId('offer-choose-LONG_TERM'));
+    await fireEvent.changeText(screen.getByTestId('borrow-amount'), '20000');
+    await fireEvent.press(screen.getByTestId('borrow-review'));
+    expect(screen.getByTestId('contract-refinance-payoff')).toHaveTextContent(/−₹15,900/);
+    expect(screen.getByTestId('contract-refinance-cash')).toHaveTextContent(/Paid to you now.*₹4,100/);
+    expect(screen.getByTestId('borrow-accept')).toHaveTextContent(/REFINANCE WITH ₹20,000/);
+    await fireEvent.press(screen.getByTestId('borrow-accept'));
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledWith({ type: 'REFINANCE_INTERMEDIATE_LOAN', loanId, product: 'LONG_TERM', amount: 20000, expectedRatePercent: 10 }, expect.anything());
   });
 
   it('Credit explains the score, every change, and the debt ratio', async () => {
@@ -406,7 +452,7 @@ describe('Capital: the bank', () => {
   it('the wallet lists Capital contracts and the credit score', async () => {
     const f = borrowPersonal(intermediate()).loadAs('Asha');
     await render(<PlayerView view={viewFor(f, 'Asha')} playerId={f.ids.Asha!} />);
-    expect(within(screen.getByTestId('wallet-contract')).getByText(/Personal Loan · ₹9,000/)).toBeTruthy();
+    expect(within(screen.getByTestId('wallet-contract')).getByText(/Personal Loan · ₹15,000/)).toBeTruthy();
     expect(screen.getByText('Credit score')).toBeTruthy();
     expect(screen.getByText('700')).toBeTruthy();
   });
@@ -519,7 +565,8 @@ describe('Capital: property details', () => {
   it('a pledged property is labelled as loan collateral — not as mortgaged — and its actions are blocked with the reason', async () => {
     const f = intermediate();
     give(f, 'Asha', 'MUMBAI');
-    f.act('Asha', { type: 'TAKE_INTERMEDIATE_LOAN', product: 'SECURED', amount: 2000, expectedRatePercent: 7, collateralKey: 'MUMBAI' }).loadAs('Asha');
+    give(f, 'Asha', 'DELHI');
+    f.act('Asha', { type: 'TAKE_INTERMEDIATE_LOAN', product: 'SECURED', amount: 10000, expectedRatePercent: 6, collateralKeys: ['MUMBAI', 'DELHI'] }).loadAs('Asha');
     await render(<PropertyView view={viewFor(f, 'Asha')} propertyKey="MUMBAI" />);
     expect(screen.getByText('Pledged as loan collateral')).toBeTruthy();
     expect(screen.queryByText(/Mortgaged — no rent/)).toBeNull();
@@ -539,7 +586,9 @@ describe('House rules', () => {
     for (const title of ['Financial years', 'Property values', 'Inflation', 'Loans', 'Credit score', 'Late payments and default', 'Net worth']) {
       expect(within(rules).getByText(title)).toBeTruthy();
     }
-    expect(within(rules).getByText(/Emergency Loan: 20% fixed, 1 year, up to ₹5,000/)).toBeTruthy();
+    expect(within(rules).getByText(/Emergency Loan: 18% fixed, 1 year, ₹10,000–₹20,000, no property needed/)).toBeTruthy();
+    expect(within(rules).getByText(/Secured Loan: 7% fixed, 3 years, ₹10,000–₹50,000, secured on property/)).toBeTruthy();
+    expect(within(rules).getByText(/no single loan above ₹50,000/)).toBeTruthy();
     await view.unmount();
     new Fixture().loadAs('Asha');
     await render(<Settings />);

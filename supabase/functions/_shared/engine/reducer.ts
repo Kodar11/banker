@@ -43,7 +43,7 @@ import {
   forgetUndoFor,
   payCrisisBill,
 } from './insurance.ts';
-import { advanceCalendar, initEconomy, payDefaultedLoan, payInstallment, prepayLoan, recordDiceMovement, takeLoan } from './intermediateEngine.ts';
+import { advanceCalendar, initEconomy, payDefaultedLoan, payInstallment, prepayLoan, recordDiceMovement, refinanceLoan, takeLoan } from './intermediateEngine.ts';
 import { INTERMEDIATE_RULES as IR } from './intermediateConfig.ts';
 import { economyOf, isIntermediate, normalizeGameMode, type GameMode } from './intermediateState.ts';
 import { assignObjectives, finalizeObjectives, forgetObjectiveTrade, recordObjectiveTrade } from './objectives.ts';
@@ -379,7 +379,16 @@ export function applyAction(state: GameState, actorId: string, rawAction: unknow
       break;
     // Capital Mode banking. Each of these refuses a Classic game.
     case 'TAKE_INTERMEDIATE_LOAN':
-      takeLoan(d, actor, { product: action.product, amount: action.amount, collateralKey: action.collateralKey ?? null, expectedRatePercent: action.expectedRatePercent });
+      if (action.collateralKey && action.collateralKeys) fail('VALIDATION', 'Send the pledged properties once.');
+      takeLoan(d, actor, {
+        product: action.product,
+        amount: action.amount,
+        collateralKeys: action.collateralKeys ?? (action.collateralKey ? [action.collateralKey] : []),
+        expectedRatePercent: action.expectedRatePercent,
+      });
+      break;
+    case 'REFINANCE_INTERMEDIATE_LOAN':
+      refinanceLoan(d, actor, action.loanId, { product: action.product, amount: action.amount, collateralKeys: action.collateralKeys ?? [], expectedRatePercent: action.expectedRatePercent });
       break;
     case 'PAY_LOAN_INSTALLMENT':
       payInstallment(d, actor, action.loanId);

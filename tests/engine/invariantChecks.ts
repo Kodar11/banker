@@ -3,7 +3,9 @@ import {
   crisisOwed,
   economyOf,
   getDeed,
+  INTERMEDIATE_RULES as IR,
   isPledged,
+  loanCollateralKeys,
   ledgerViolations,
   netWorth,
   playerViolations,
@@ -271,13 +273,17 @@ export function obligationViolations(state: GameState): string[] {
       if (!byId.has(loan.playerId)) problems.push(`Capital loan ${loan.id}: unknown borrower`);
       if ((loan.status === 'ACTIVE' || loan.status === 'DEFAULTED') && byId.get(loan.playerId)?.status !== 'ACTIVE') problems.push(`Capital loan ${loan.id}: open, but its borrower is out of the game`);
       if (loan.status === 'WRITTEN_OFF' && (loan.writtenOff ?? 0) < 0) problems.push(`Capital loan ${loan.id}: negative write-off`);
-      if (loan.status === 'ACTIVE' && loan.collateralKey && state.properties[loan.collateralKey]?.ownerId !== loan.playerId) {
-        problems.push(`Capital loan ${loan.id}: its collateral ${loan.collateralKey} is no longer the borrower's`);
+      for (const key of loanCollateralKeys(loan)) {
+        if (loan.status === 'ACTIVE' && state.properties[key]?.ownerId !== loan.playerId) problems.push(`Capital loan ${loan.id}: its collateral ${key} is no longer the borrower's`);
+        if (state.properties[key]?.mortgaged) problems.push(`Capital loan ${loan.id}: its collateral ${key} is also mortgaged`);
       }
+      if (loan.status !== 'ACTIVE' && loan.status !== 'DEFAULTED' && loanCollateralKeys(loan).length) problems.push(`Capital loan ${loan.id}: closed, but still holds collateral`);
+      if (loan.principal > IR.loans.maxSingleLoan) problems.push(`Capital loan ${loan.id}: above the single-loan maximum`);
+      if (loan.refinancedInto && loan.status !== 'SETTLED') problems.push(`Capital loan ${loan.id}: refinanced but not settled`);
       if (loan.defaultBalance < 0) problems.push(`Capital loan ${loan.id}: negative default balance`);
       for (const i of loan.installments) if (i.principal < 0 || i.interest < 0) problems.push(`Capital loan ${loan.id}: negative installment`);
     }
-    const pledged = eco.loans.filter((l) => l.collateralKey && (l.status === 'ACTIVE' || l.status === 'DEFAULTED')).map((l) => l.collateralKey);
+    const pledged = eco.loans.filter((l) => l.status === 'ACTIVE' || l.status === 'DEFAULTED').flatMap((l) => loanCollateralKeys(l));
     if (new Set(pledged).size !== pledged.length) problems.push('one property secures two open loans');
     for (const [key, entry] of Object.entries(eco.market)) if (!Number.isInteger(entry.value) || entry.value <= 0) problems.push(`${key}: market value ${entry.value}`);
     const insurance = eco.insurance;

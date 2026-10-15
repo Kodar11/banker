@@ -11,6 +11,7 @@ import {
   applyMarketChange,
   buildSchedule,
   clampScore,
+  collateralBuildingValue,
   offeredRate,
   pickFrom,
   pickMarketChange,
@@ -27,23 +28,28 @@ import {
   payableInstallment,
   prepaymentBlocker,
   prepaymentQuote,
+  refinanceBlocker,
 } from './intermediateSelectors.ts';
 import {
   accruedLoanInterest,
   economyOf,
   gameClock,
   isOpenLoan,
+  loanCollateralKeys,
   loansOf,
+  releaseCollateral,
   scheduledPrincipal,
   unpaidInstallments,
   yearAt,
   yearLength,
+  type CollateralPledge,
   type IntermediateLoan,
   type IntermediateState,
   type MarketEntry,
   type YearReport,
 } from './intermediateState.ts';
-import type { PlayerState } from './types.ts';
+import { buildingCost } from './selectors.ts';
+import type { PlayerState, PropertyState } from './types.ts';
 
 /**
  * Capital Mode's state transitions. Every function works on the action's Draft, so
@@ -316,7 +322,7 @@ function reschedule(loan: IntermediateLoan, principal: number): void {
  *   installments already due (principal + interest)
  *   + the principal not yet due
  *   + the interest accrued on that principal since the current loan year began.
- * A secured loan's property goes to the bank at its market value today; that value is set
+ * A secured loan's pledged property goes to the bank (seizeLoanCollateral); its value is set
  * against the debt, any surplus is paid to the borrower, any shortfall stays owed.
  * An unsecured loan seizes nothing. Either way the borrower is not bankrupt.
  */
@@ -342,29 +348,9 @@ function defaultLoan(d: Draft, eco: IntermediateState, loan: IntermediateLoan): 
   });
   applyCreditEvent(d, eco, { id: `LOAN_DEFAULT:${loan.id}`, playerId: loan.playerId, type: 'LOAN_DEFAULT', loanId: loan.id });
 
-  const key = loan.collateralKey;
-  if (key) {
-    const prop = d.state.properties[key];
-    const value = eco.market[key].value;
-    const { applied, surplus, remaining } = settleCollateral(value, loan.defaultBalance);
-    // The claim and the property move together, once: after this the loan holds no collateral.
-    loan.collateralKey = null;
-    loan.settlement = { propertyKey: key, value, applied, surplus };
-    loan.defaultBalance = remaining;
-    prop.ownerId = null;
-    prop.houses = 0;
-    prop.hotel = false;
-    prop.mortgaged = false;
-    if (surplus > 0) {
-      d.transfer({ type: 'COLLATERAL_SURPLUS', from: null, to: loan.playerId, amount: surplus, propertyKey: key, memo: `Collateral surplus (${getDeed(key).name})` });
-    }
-    d.event(
-      'COLLATERAL_SEIZED',
-      loan.playerId,
-      `The bank took ${getDeed(key).name} (worth ${formatINR(value)}) for ${d.name(loan.playerId)}'s defaulted loan` +
-        (surplus > 0 ? ` and returned ${formatINR(surplus)}` : remaining > 0 ? ` — ${formatINR(remaining)} still owed` : ''),
-      { loanId: loan.id, propertyKey: key, value, applied, surplus, remaining },
-    );
+  const seized = seizeLoanCollateral(d, eco, loan, loan.defaultBalance);
+  if (seized) {
+    loan.defaultBalance = seized.remaining;
     // Ownership changed under any earlier action: none of them can be compensated safely any more.
     d.state.undoStack = [];
     d.state.undoRequest = null;
@@ -372,9 +358,51 @@ function defaultLoan(d: Draft, eco: IntermediateState, loan: IntermediateLoan): 
   if (loan.defaultBalance === 0) closeLoan(d, loan, 'SETTLED');
 }
 
+/** What one pledged property would fetch today: its market value plus its buildings at their sell-back value. */
+function recoveryValue(eco: IntermediateState, prop: PropertyState): number {
+  return eco.market[prop.key].value + collateralBuildingValue(buildingCost(prop));
+}
+
+/**
+ * Enforces a secured loan's collateral claim against `owed` (a default, or the borrower's estate being settled).
+ * Only the properties pledged to THIS loan are taken — never any other asset of the borrower — each with its
+ * buildings, valued today: market value + buildings at what selling them back to the bank pays. The pooled value
+ * goes against `owed`; any surplus is paid to the borrower, any shortfall (`remaining`) stays owed on the loan.
+ *
+ * Once per loan: the claim ends here (releaseCollateral) and the properties go to the bank in the same step,
+ * so running it again finds nothing pledged and returns null. Returns null for a loan with nothing pledged.
+ */
+export function seizeLoanCollateral(d: Draft, eco: IntermediateState, loan: IntermediateLoan, owed: number): { applied: number; surplus: number; remaining: number } | null {
+  const keys = loanCollateralKeys(loan).filter((key) => d.state.properties[key]?.ownerId === loan.playerId);
+  releaseCollateral(loan);
+  if (keys.length === 0) return null;
+  const value = keys.reduce((sum, key) => sum + recoveryValue(eco, d.state.properties[key]), 0);
+  const { applied, surplus, remaining } = settleCollateral(value, owed);
+  loan.settlement = { propertyKeys: keys, value, applied, surplus };
+  for (const key of keys) {
+    const prop = d.state.properties[key];
+    prop.ownerId = null;
+    prop.houses = 0;
+    prop.hotel = false;
+    prop.mortgaged = false;
+  }
+  const names = keys.map((key) => getDeed(key).name).join(', ');
+  if (surplus > 0) {
+    d.transfer({ type: 'COLLATERAL_SURPLUS', from: null, to: loan.playerId, amount: surplus, propertyKey: keys[0]!, memo: `Collateral surplus (${names})` });
+  }
+  d.event(
+    'COLLATERAL_SEIZED',
+    loan.playerId,
+    `The bank took ${names} (worth ${formatINR(value)}) for ${d.name(loan.playerId)}'s ${LOANS.products[loan.product].name}` +
+      (surplus > 0 ? ` and returned ${formatINR(surplus)}` : remaining > 0 ? ` — ${formatINR(remaining)} still owed` : ''),
+    { loanId: loan.id, propertyKey: keys[0]!, propertyKeys: keys, value, applied, surplus, remaining },
+  );
+  return { applied, surplus, remaining };
+}
+
 function closeLoan(d: Draft, loan: IntermediateLoan, status: 'REPAID' | 'SETTLED' | 'WRITTEN_OFF'): void {
   loan.status = status;
-  loan.collateralKey = null;
+  releaseCollateral(loan);
   loan.closedAt = d.ctx.now;
 }
 
@@ -382,22 +410,35 @@ function closeLoan(d: Draft, loan: IntermediateLoan, status: 'REPAID' | 'SETTLED
 // Player actions
 // ---------------------------------------------------------------------------
 
-export function takeLoan(
-  d: Draft,
-  actor: PlayerState,
-  input: { product: LoanProductKey; amount: number; collateralKey: PropertyKey | null; expectedRatePercent: number },
-): void {
-  const eco = economy(d);
-  const why = loanRequestBlocker(d.state, actor.id, input.product, input.amount, input.collateralKey);
-  if (why) fail('LOAN_NOT_ALLOWED', why);
-  const def = LOANS.products[input.product];
+interface LoanRequest {
+  product: LoanProductKey;
+  amount: number;
+  collateralKeys: readonly PropertyKey[];
+  expectedRatePercent: number;
+}
+
+/** The contract the player confirmed must be the contract they get. */
+function confirmedRate(eco: IntermediateState, actor: PlayerState, input: LoanRequest) {
   const rate = offeredRate(input.product, creditScoreOf(eco, actor.id));
-  // The contract the player confirmed must be the contract they get.
   if (rate.ratePercent !== input.expectedRatePercent) {
     fail('STALE_STATE', `Your offer changed: the rate is now ${rate.ratePercent}%. Review the terms and confirm again.`);
   }
+  return rate;
+}
+
+/**
+ * Signs a loan whose request has already been validated (loanRequestBlocker): its schedule, its pledge (valued
+ * as it stands now, for the record), the disbursement and the event. Shared by a new loan and a refinance.
+ */
+function originateLoan(d: Draft, eco: IntermediateState, actor: PlayerState, input: LoanRequest, rate: ReturnType<typeof offeredRate>, refinancedFrom: string | null): IntermediateLoan {
+  const def = LOANS.products[input.product];
   const clock = gameClock(eco);
   const length = yearLength(eco);
+  const keys = def.secured ? [...input.collateralKeys] : [];
+  const pledges: CollateralPledge[] = keys.map((key) => {
+    const prop = d.state.properties[key];
+    return { key, propertyValue: eco.market[key].value, buildingValue: collateralBuildingValue(buildingCost(prop)), houses: prop.houses, hotel: prop.hotel };
+  });
   const loan: IntermediateLoan = {
     id: d.ctx.newId(),
     playerId: actor.id,
@@ -406,7 +447,10 @@ export function takeLoan(
     ...rate,
     rateType: def.rateType,
     tenureYears: def.tenureYears,
-    collateralKey: def.secured ? input.collateralKey : null,
+    collateralKey: null,
+    collateralKeys: keys,
+    pledges,
+    ...(refinancedFrom ? { refinancedFrom } : {}),
     originClock: clock,
     originYear: eco.year,
     // Installment k falls due k full financial years after signing — never sooner.
@@ -429,19 +473,70 @@ export function takeLoan(
   eco.loans.push(loan);
   const flags = eco.yearFlags[actor.id];
   if (flags) flags.borrowed = true;
-  d.transfer({ type: 'LOAN_DISBURSEMENT', from: null, to: actor.id, amount: input.amount, propertyKey: loan.collateralKey, memo: `${def.name} at ${rate.ratePercent}%` });
+  d.transfer({ type: 'LOAN_DISBURSEMENT', from: null, to: actor.id, amount: input.amount, propertyKey: keys[0] ?? null, memo: `${def.name} at ${rate.ratePercent}%` });
   const first = loan.installments[0]!;
-  const secured = loan.collateralKey ? `, secured on ${getDeed(loan.collateralKey).name}` : '';
+  const secured = keys.length ? `, secured on ${keys.map((key) => getDeed(key).name).join(', ')}` : '';
   d.event('INTERMEDIATE_LOAN_TAKEN', actor.id, `${actor.name} took a ${def.name}: ${formatINR(input.amount)} at ${rate.ratePercent}%${secured}`, {
     loanId: loan.id,
     product: input.product,
     principal: input.amount,
     ratePercent: rate.ratePercent,
     tenureYears: def.tenureYears,
-    collateralKey: loan.collateralKey,
+    collateralKey: keys[0] ?? null,
+    collateralKeys: keys,
+    collateralValue: pledges.reduce((sum, p) => sum + p.propertyValue + p.buildingValue, 0),
     firstPaymentDue: clockLabel(eco, first.dueAt),
+    ...(refinancedFrom ? { refinancedFrom } : {}),
   });
-  if (loan.collateralKey) closeTradesWith(d, loan.collateralKey, 'was pledged as loan collateral');
+  for (const key of keys) closeTradesWith(d, key, 'was pledged as loan collateral');
+  return loan;
+}
+
+export function takeLoan(d: Draft, actor: PlayerState, input: LoanRequest): void {
+  const eco = economy(d);
+  const why = loanRequestBlocker(d.state, actor.id, input.product, input.amount, input.collateralKeys);
+  if (why) fail('LOAN_NOT_ALLOWED', why);
+  originateLoan(d, eco, actor, input, confirmedRate(eco, actor, input), null);
+}
+
+/**
+ * Refinancing: one active loan is paid off with a new one, in one action. Nothing about the debt is reset:
+ *   - the old loan's payoff (principal not yet due + the interest accrued on it this loan year, exactly what an
+ *     early repayment in full charges) is paid to the bank from the new loan's money and, if the new loan is
+ *     smaller, from the player's cash;
+ *   - the old loan closes SETTLED (never REPAID), keeps its history, and earns no credit-score bonus;
+ *   - its collateral is released and may be pledged again for the new loan, within the same action — at no
+ *     point does a property back two live loans;
+ *   - the new loan is an ordinary new loan: every limit, the repayment capacity, the product rules and the
+ *     player's current credit band apply (the old loan's principal and payments are what it frees up).
+ * Refused while anything is due, overdue or in default — refinancing never clears a missed payment.
+ */
+export function refinanceLoan(d: Draft, actor: PlayerState, loanId: string, input: LoanRequest): void {
+  const eco = economy(d);
+  const old = ownLoan(eco, actor, loanId);
+  const blocked = refinanceBlocker(eco, actor.id, old.id);
+  if (blocked) fail('LOAN_NOT_ALLOWED', blocked);
+  const why = loanRequestBlocker(d.state, actor.id, input.product, input.amount, input.collateralKeys, { replacingLoanId: old.id });
+  if (why) fail('LOAN_NOT_ALLOWED', why);
+  const rate = confirmedRate(eco, actor, input);
+  const payoff = prepaymentQuote(eco, old, scheduledPrincipal(old));
+  if (actor.balance + input.amount < payoff.principal + payoff.accruedInterest) {
+    fail('INSUFFICIENT_FUNDS', `Not enough money — paying off the old loan needs ${formatINR(payoff.total - input.amount)} from your cash.`);
+  }
+  const oldName = LOANS.products[old.product].name;
+  // The old claim ends before the new one is made, inside this one action.
+  closeLoan(d, old, 'SETTLED');
+  const replacement = originateLoan(d, eco, actor, input, rate, old.id);
+  payBank(d, actor, payoff.principal, payoff.accruedInterest, `${oldName} refinanced`);
+  old.prepayments.push({ clock: gameClock(eco), year: eco.year, principal: payoff.principal, interest: payoff.accruedInterest });
+  old.installments = old.installments.filter((i) => i.status !== 'SCHEDULED');
+  old.refinancedInto = replacement.id;
+  d.event(
+    'LOAN_REFINANCED',
+    actor.id,
+    `${actor.name} refinanced a ${oldName} (${formatINR(payoff.total)} paid off) with a ${LOANS.products[input.product].name} of ${formatINR(input.amount)}`,
+    { loanId: old.id, replacementLoanId: replacement.id, principal: payoff.principal, interest: payoff.accruedInterest, newPrincipal: input.amount },
+  );
 }
 
 /** A pledged property can't change hands, so open offers that include it are closed. */
@@ -481,11 +576,13 @@ export function hasGoodRepaymentHistory(loan: IntermediateLoan): boolean {
 /** The loan has nothing left on its schedule: it is repaid as agreed. The repayment bonus needs a good history (above). */
 function finishIfRepaid(d: Draft, eco: IntermediateState, loan: IntermediateLoan): void {
   if (loan.status !== 'ACTIVE' || loan.installments.some((i) => i.status === 'SCHEDULED' || i.status === 'DUE' || i.status === 'OVERDUE')) return;
-  const released = loan.collateralKey;
+  const released = loanCollateralKeys(loan);
   closeLoan(d, loan, 'REPAID');
-  d.event('INTERMEDIATE_LOAN_REPAID', loan.playerId, `${d.name(loan.playerId)} fully repaid a ${LOANS.products[loan.product].name}${released ? ` — ${getDeed(released).name} is released` : ''}`, {
+  const names = released.map((key) => getDeed(key).name).join(', ');
+  d.event('INTERMEDIATE_LOAN_REPAID', loan.playerId, `${d.name(loan.playerId)} fully repaid a ${LOANS.products[loan.product].name}${released.length ? ` — ${names} ${released.length === 1 ? 'is' : 'are'} released` : ''}`, {
     loanId: loan.id,
-    releasedCollateral: released,
+    releasedCollateral: released[0] ?? null,
+    releasedCollateralKeys: released,
   });
   if (hasGoodRepaymentHistory(loan)) applyCreditEvent(d, eco, { id: `LOAN_REPAID:${loan.id}`, playerId: loan.playerId, type: 'LOAN_REPAID', loanId: loan.id });
 }

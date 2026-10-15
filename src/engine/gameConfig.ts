@@ -49,6 +49,16 @@ export const GAME_CONFIG_LIMITS = {
 
 export type GameConfigAmountKey = keyof typeof GAME_CONFIG_LIMITS;
 
+/**
+ * The range a host may pick for one setting in one mode. Capital's smallest loan is IR.loans.minAmount, so its
+ * loan limit starts there: a lower limit would leave no loan a player could ever take.
+ */
+export function configAmountLimits(mode: GameMode, key: GameConfigAmountKey): { min: number; max: number; step: number } {
+  const limits = GAME_CONFIG_LIMITS[key];
+  if (key === 'loanLimit' && mode === 'intermediate') return { ...limits, min: Math.max(limits.min, IR.loans.minAmount) };
+  return limits;
+}
+
 /** The game durations a host can pick, in financial years: every whole number from the shortest to the longest. */
 export const GAME_DURATION_YEARS = RULES.endGame.duration;
 export const GAME_DURATION_OPTIONS: readonly number[] = Array.from(
@@ -129,7 +139,10 @@ export function parseGameConfig(mode: GameMode, raw: unknown): GameConfig {
     const issue = parsed.error.issues[0];
     fail('VALIDATION', issue?.code === 'unrecognized_keys' || !issue ? 'Those game settings are not valid.' : issue.message);
   }
-  return build(mode, parsed.data, defaultGameConfig(mode));
+  const config = build(mode, parsed.data, defaultGameConfig(mode));
+  const loanMin = configAmountLimits(mode, 'loanLimit').min;
+  if (config.loanLimit < loanMin) fail('VALIDATION', `The loan limit must be at least ${formatINR(loanMin)} in ${mode === 'intermediate' ? 'Capital' : 'Classic'} Mode.`);
+  return config;
 }
 
 /**
