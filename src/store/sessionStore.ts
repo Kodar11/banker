@@ -27,6 +27,8 @@ export const useSessionStore = create<SessionState>((set) => ({
   },
   setSession: async (session) => {
     set({ session });
+    // A solo game lives in this app run's memory only: there is nothing to come back to after a restart.
+    if (session.local) return;
     try {
       await SecureStore.setItemAsync(STORAGE_KEY, JSON.stringify(session));
     } catch {

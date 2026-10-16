@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { Pressable, Share, Text, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import QRCode from 'react-native-qrcode-svg';
-import { BUSINESS_MVP_RULES, configOf, GAME_MODE_NAMES, type GameConfig } from '@/engine/index.ts';
+import { BUSINESS_MVP_RULES, configOf, GAME_MODE_NAMES, type BotSeat, type GameConfig } from '@/engine/index.ts';
 import { Button, Card, ConfirmDialog, ConnectionBanner, Label, Pill, PlayerBadge, Screen, Sheet } from '@/components/ui';
 import { APP_NAME } from '@/constants/app';
+import { AddBotSheet, BotPill } from '@/features/bots/BotSetup';
 import { COLORS } from '@/constants/theme';
 import type { GameView } from '@/features/game/useGameView';
 import { LeaveGameDialog } from '@/features/game/LeaveGameDialog';
@@ -56,6 +57,15 @@ export function LobbyView({ view }: { view: GameView }) {
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [removeError, setRemoveError] = useState<string | null>(null);
   const openPlayer = players.find((p) => p.id === openPlayerId && p.id !== me?.id) ?? null;
+  const [addingBot, setAddingBot] = useState(false);
+  const [addBotError, setAddBotError] = useState<string | null>(null);
+  const full = players.length >= BUSINESS_MVP_RULES.players.max;
+  const addBot = async (bot: BotSeat) => {
+    setAddBotError(null);
+    const failure = sendFailure(await send({ type: 'ADD_BOT', difficulty: bot.difficulty, personality: bot.personality }, { silent: true }));
+    if (failure === null) setAddingBot(false);
+    else setAddBotError(failure);
+  };
   const closePlayer = () => {
     setOpenPlayerId(null);
     setConfirmRemove(false);
@@ -217,7 +227,7 @@ export function LobbyView({ view }: { view: GameView }) {
               disabled={!me || p.id === me.id}
               onPress={() => setOpenPlayerId(p.id)}
               accessibilityRole="button"
-              accessibilityLabel={`${p.name}${p.isHost ? ', host' : p.ready ? ', ready' : ', not ready'}`}
+              accessibilityLabel={`${p.name}${p.bot ? ', bot' : p.isHost ? ', host' : p.ready ? ', ready' : ', not ready'}`}
               accessibilityHint={me && p.id !== me.id ? 'Opens this player' : undefined}
               testID={`lobby-player-${p.name}`}
               className="flex-row items-center justify-between rounded-xl bg-white px-4 py-3 active:opacity-80"
@@ -230,11 +240,26 @@ export function LobbyView({ view }: { view: GameView }) {
                   {p.id === me?.id ? ' (you)' : ''}
                 </Text>
               </View>
-              {p.isHost ? <Pill tone="gold">Host</Pill> : p.ready ? <Pill tone="good">Ready</Pill> : <Pill>Not ready</Pill>}
+              {p.bot ? <BotPill bot={p.bot} testID={`lobby-bot-${p.name}`} /> : p.isHost ? <Pill tone="gold">Host</Pill> : p.ready ? <Pill tone="good">Ready</Pill> : <Pill>Not ready</Pill>}
             </Pressable>
           ))}
         </View>
         {me && players.length > 1 ? <Text className="mt-2 text-xs text-stone-500">Tap a player to add them as a friend{view.isHost ? ' or remove them' : ''}.</Text> : null}
+        {view.isHost ? (
+          <Button
+            className="mt-3 self-stretch"
+            size="sm"
+            variant="secondary"
+            title={full ? 'Table full' : 'Add a bot'}
+            testID="lobby-add-bot"
+            accessibilityHint="Seats a computer player in an empty place at this table"
+            disabled={full || !!pending}
+            onPress={() => {
+              setAddBotError(null);
+              setAddingBot(true);
+            }}
+          />
+        ) : null}
       </Card>
       <Text className="text-center text-sm text-cream/70">
         Everyone starts with {formatINR(config.startingCash)}. Keep your tokens on the real board — the phone is just the bank.
@@ -248,17 +273,17 @@ export function LobbyView({ view }: { view: GameView }) {
           <>
             <View className="flex-row items-center gap-2">
               <PlayerBadge player={openPlayer} size={28} />
-              {openPlayer.isHost ? <Pill tone="gold">Host</Pill> : openPlayer.ready ? <Pill tone="good">Ready</Pill> : <Pill>Not ready</Pill>}
+              {openPlayer.bot ? null : openPlayer.isHost ? <Pill tone="gold">Host</Pill> : openPlayer.ready ? <Pill tone="good">Ready</Pill> : <Pill>Not ready</Pill>}
             </View>
-            <PlayerFriendAction gameId={state.id} seatId={openPlayer.id} />
+            {openPlayer.bot ? <BotPill bot={openPlayer.bot} /> : <PlayerFriendAction gameId={state.id} seatId={openPlayer.id} />}
             {view.isHost ? (
-              <Button size="sm" variant="outline" className="self-start" title="Remove from lobby" testID="lobby-remove-player" disabled={!!pending} onPress={() => setConfirmRemove(true)} />
+              <Button size="sm" variant="outline" className="self-start" title={openPlayer.bot ? 'Remove bot' : 'Remove from lobby'} testID="lobby-remove-player" disabled={!!pending} onPress={() => setConfirmRemove(true)} />
             ) : null}
             <ConfirmDialog
               visible={confirmRemove}
               testID="lobby-remove-confirm"
               title={`Remove ${openPlayer.name}?`}
-              message="They leave this lobby. With the code they could join again — lock the lobby to keep it closed."
+              message={openPlayer.bot ? "The bot leaves this lobby. You can add another at any time." : "They leave this lobby. With the code they could join again — lock the lobby to keep it closed."}
               confirmTitle="Remove"
               intent="warning"
               loading={pending === 'REMOVE_PLAYER'}
@@ -269,6 +294,7 @@ export function LobbyView({ view }: { view: GameView }) {
           </>
         ) : null}
       </Sheet>
+      <AddBotSheet visible={addingBot && view.isHost} onClose={() => setAddingBot(false)} onAdd={(bot) => void addBot(bot)} busy={pending === 'ADD_BOT'} error={addBotError} />
       <Sheet
         visible={!!draft && view.isHost}
         title="Game settings"

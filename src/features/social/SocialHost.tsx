@@ -108,6 +108,8 @@ export function SocialHost() {
   useEffect(() => {
     // Only once this account's social data is there: without it the table has nothing to show anyway.
     if (!userId || !session || !table || !socialVersion) return;
+    // A solo game is on this device only: there is no seat on the server to claim.
+    if (session.local) return;
     void useSocialStore.getState().syncSeat(session);
     // socialVersion: a block or an unblock changes what a seat may show.
   }, [userId, session, table, socialVersion]);

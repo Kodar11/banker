@@ -1,4 +1,5 @@
 export * from './actions.ts';
+export * from './botSeat.ts';
 export * from './businessBoard.ts';
 export * from './cards.ts';
 export * from './errors.ts';

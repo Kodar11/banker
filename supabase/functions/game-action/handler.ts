@@ -30,6 +30,7 @@ import {
   type GameState,
   type StateBroadcast,
 } from '../_shared/engine/index.ts';
+import { hasActiveBots, scheduleBots, type BotRunnerDeps } from './bots.ts';
 import { insertNewGame, insertPlayer, loadSnapshot, loadState, lockGame, persistResult, type Sql, type Tx } from './db.ts';
 
 export interface HandlerDeps {
@@ -45,6 +46,8 @@ export interface HandlerDeps {
   now?: () => Date;
   random?: () => number;
   newId?: () => string;
+  /** Pause between two bot moves (bots.ts BOT_PACE_MS by default; tests use 0). */
+  botPaceMs?: number;
 }
 
 export interface HandlerResult {
@@ -120,8 +123,9 @@ function assertCurrentRules(game: Record<string, unknown>): void {
 }
 
 async function authenticate(tx: Tx, gameId: string, playerId: string, token: string): Promise<void> {
-  const [player] = await tx`select token_hash from public.players where id = ${playerId} and game_id = ${gameId}`;
-  if (!player || player.token_hash !== (await sha256Hex(token))) {
+  const [player] = await tx`select token_hash, bot_difficulty from public.players where id = ${playerId} and game_id = ${gameId}`;
+  // A bot seat has no token: nobody can ever act as one (only the server's bot runner plays it).
+  if (!player || player.bot_difficulty !== null || typeof player.token_hash !== 'string' || player.token_hash !== (await sha256Hex(token))) {
     throw new GameError('FORBIDDEN', 'You are not a player in this game.');
   }
 }
@@ -297,6 +301,14 @@ async function stateOp(req: Extract<ApiRequest, { op: 'state' }>, deps: HandlerD
       });
     }
   }
+  // The same recovery for bot seats: if the bot runner's trigger was lost (a restart, a crash), a read of a
+  // game that has been idle with a bot due arms it again. runBots takes the lease and re-checks everything.
+  if (deps.defer && snapshot.state.status === 'ACTIVE' && hasActiveBots(snapshot.state)) {
+    const [idle] = await deps.sql`
+      select 1 as hit from public.games
+      where id = ${req.gameId} and (bot_runner_until is null or bot_runner_until < now()) and updated_at < now() - interval '2 seconds'`;
+    if (idle) scheduleBots(botDeps(deps), snapshot.state, 0);
+  }
   return { status: 200, body: { ok: true, gameId: req.gameId, playerId: req.playerId, snapshot } };
 }
 
@@ -337,6 +349,10 @@ async function actionOp(
 
     const state = await loadState(tx, game);
     const result = applyAction(state, req.playerId, req.action, { actionId: req.actionId, now: now(), receivedAt, random, newId });
+    // A bot seated by the host (ADD_BOT) is a new row: inserted before the state is written back.
+    for (const p of result.state.players) {
+      if (!state.players.some((x) => x.id === p.id)) await insertPlayer(tx, req.gameId, p, null);
+    }
     await persistResult(tx, currentVersion, result);
     await tx`insert into public.game_actions (action_id, game_id, player_id, type, payload, state_version_after, result)
       values (${req.actionId}, ${req.gameId}, ${req.playerId}, ${String(actionType)},
@@ -354,6 +370,7 @@ async function actionOp(
     if (outcome.deadlineSet) scheduleAuctionClose(deps, outcome.result.state);
     if (outcome.voteDeadlineSet) scheduleEndVoteClose(deps, outcome.result.state);
     await notify(deps, outcome.result.state, outcome.result.events);
+    scheduleBots(botDeps(deps), outcome.result.state);
   }
   return {
     status: 200,
@@ -414,6 +431,7 @@ export async function closeAuctionIfDue(gameId: string, auctionId: string, deps:
   });
   if (!result) return false;
   await notify(deps, result.state, result.events);
+  scheduleBots(botDeps(deps), result.state);
   return true;
 }
 
@@ -469,6 +487,7 @@ export async function closeEndVoteIfDue(gameId: string, voteId: string, deps: Ha
   if (!result) return false;
   // A vote that extended the game may have started a turn; one that ended it finished the game. Either way every phone is told.
   await notify(deps, result.state, result.events);
+  scheduleBots(botDeps(deps), result.state);
   return true;
 }
 
@@ -488,4 +507,27 @@ async function notify(deps: HandlerDeps, state: GameState, events: GameEventReco
     // Committed already; clients also refetch on reconnect/poll, so never fail the action.
     console.error('broadcast failed', error);
   }
+}
+
+/**
+ * The bot runner's view of this function's dependencies: the same database, clock and RNG, and after each
+ * bot move the same follow-ups as a person's action — the auction or vote close timers it may have set, and
+ * the broadcast that tells every phone.
+ */
+function botDeps(deps: HandlerDeps): BotRunnerDeps {
+  return {
+    sql: deps.sql,
+    defer: deps.defer,
+    now: deps.now,
+    random: deps.random,
+    newId: deps.newId,
+    paceMs: deps.botPaceMs,
+    afterCommit: async (before, result) => {
+      if (result.state.auction?.id !== before.auction?.id || result.state.auction?.endsAt !== before.auction?.endsAt) scheduleAuctionClose(deps, result.state);
+      const was = openEndVote(before);
+      const vote = openEndVote(result.state);
+      if (vote && (vote.id !== was?.id || vote.endsAt !== was.endsAt)) scheduleEndVoteClose(deps, result.state);
+      await notify(deps, result.state, result.events);
+    },
+  };
 }

@@ -50,7 +50,7 @@ function PlayerChip({ player: p, isTurn, isMe, isOnline, fit, cashHidden, onSele
     <Pressable
       onPress={() => (onSelect ? onSelect(p.id) : router.push(`/player/${p.id}`))}
       accessibilityRole="button"
-      accessibilityLabel={`${p.name}${isMe ? ' (you)' : ''}, ${out ? out.toLowerCase() : cashHidden ? 'cash private' : cash}${status ? `, ${status}` : ''}${isTurn ? ', current turn' : ''}${isOnline ? '' : ', offline'}${voice ? `, ${voice}` : ''}`}
+      accessibilityLabel={`${p.name}${isMe ? ' (you)' : ''}${p.bot ? ', bot' : ''}, ${out ? out.toLowerCase() : cashHidden ? 'cash private' : cash}${status ? `, ${status}` : ''}${isTurn ? ', current turn' : ''}${isOnline ? '' : ', offline'}${voice ? `, ${voice}` : ''}`}
       testID={`player-chip-${p.id}`}
       style={fit ? { flex: 1, flexBasis: 0, minWidth: 0 } : { minWidth: 96, flexGrow: 1 }}
       className={`min-h-[44px] justify-center rounded-xl px-2.5 py-1 ${isTurn ? 'border-2 border-saffron bg-felt-light' : 'border-2 border-transparent bg-felt-dark'} ${out ? 'opacity-40' : ''}`}
@@ -61,6 +61,7 @@ function PlayerChip({ player: p, isTurn, isMe, isOnline, fit, cashHidden, onSele
           {/* On my own phone my chip just says "You" — unmistakable, and it never truncates. */}
           {isMe ? 'You' : p.name}
         </Text>
+        {p.bot ? <Text className="text-[10px]" testID={`player-chip-bot-${p.id}`}>🤖</Text> : null}
         {isOnline ? null : <View className="h-1.5 w-1.5 rounded-full bg-stone-500" />}
         <VoiceIndicator playerId={p.id} seat={p.seat} isMe={isMe} />
       </View>

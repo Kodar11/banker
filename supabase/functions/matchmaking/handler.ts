@@ -24,6 +24,9 @@
 // Runtime-agnostic so it can be integration-tested in Node against real Postgres.
 import {
   createGame,
+  defaultBotPersonalities,
+  isBotDifficulty,
+  joinBot,
   joinGame,
   startHostlessGame,
   type EngineContext,
@@ -206,10 +209,22 @@ export async function startMatch(matchId: string, deps: MatchmakingDeps): Promis
           await persistResult(tx, state.version, joined);
           state = joined.state;
         }
+        // Bot seats the reservation added (every person in it asked for them): seated by the engine, like
+        // anyone else, with no device token and no account. Personalities alternate, so no two play alike.
+        const botSeats = Math.max(0, Math.min(Number(claim.bot_seats ?? 0), 8 - players.length));
+        const difficulty = isBotDifficulty(claim.bot_difficulty) ? claim.bot_difficulty : 'normal';
+        const personalities = defaultBotPersonalities(botSeats, Math.floor(random() * 4));
+        for (const personality of personalities) {
+          const botId = newId();
+          const joined: EngineResult = joinBot(state, { playerId: botId, bot: { difficulty, personality } }, ctx);
+          await insertPlayer(tx, gameId, joined.state.players.find((p) => p.id === botId)!, null);
+          await persistResult(tx, state.version, joined);
+          state = joined.state;
+        }
         const started = startHostlessGame(state, ctx);
         await persistResult(tx, state.version, started);
         await tx`insert into public.game_actions (action_id, game_id, player_id, type, payload, state_version_after, result)
-          values (${ctx.actionId}, ${gameId}, null, 'MATCHMAKING_START', ${tx.json({ matchId, by: 'MATCHMAKING' })}, ${started.state.version},
+          values (${ctx.actionId}, ${gameId}, null, 'MATCHMAKING_START', ${tx.json({ matchId, by: 'MATCHMAKING', botSeats })}, ${started.state.version},
             ${tx.json({ transactions: started.transactions.map((t) => t.id), events: started.events.map((e) => e.type) })})`;
         deps.fault?.('after-game', { matchId, mode });
 

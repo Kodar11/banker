@@ -11,6 +11,8 @@ import {
   redactObjectives,
   upgradeInsurance,
   type AuctionState,
+  type BotDifficulty,
+  type BotPersonality,
   type EngineResult,
   type GameEventRecord,
   type GameSnapshot,
@@ -62,6 +64,8 @@ function mapPlayer(r: Row): PlayerState {
     inJail: r.in_jail as boolean,
     jailTurnsLeft: Number(r.jail_turns_left ?? 0),
     circuits: Number(r.circuits ?? 0),
+    // A bot seat (no device token, no account): how it plays. Absent for a person.
+    ...(r.bot_difficulty ? { bot: { difficulty: r.bot_difficulty as BotDifficulty, personality: r.bot_personality as BotPersonality } } : {}),
   };
 }
 
@@ -297,12 +301,18 @@ export async function insertNewGame(tx: Tx, result: EngineResult, hostTokenHash:
   await insertLedger(tx, s.id, result);
 }
 
-export async function insertPlayer(tx: Tx, gameId: string, p: PlayerState, tokenHash: string): Promise<void> {
+/**
+ * A person's seat carries the hash of their device token; a bot's seat carries none (`tokenHash` null) and
+ * its settings instead — the database refuses any other combination (players_person_or_bot).
+ */
+export async function insertPlayer(tx: Tx, gameId: string, p: PlayerState, tokenHash: string | null): Promise<void> {
+  if ((tokenHash === null) !== !!p.bot) throw new Error('A seat is a person with a device token, or a bot without one.');
   await tx`
     insert into public.players (id, game_id, name, seat, is_host, ready, balance, position, status, skip_turns, in_jail,
-      jail_turns_left, circuits, token_hash)
+      jail_turns_left, circuits, token_hash, bot_difficulty, bot_personality)
     values (${p.id}, ${gameId}, ${p.name}, ${p.seat}, ${p.isHost}, ${p.ready}, ${p.balance}, ${p.position},
-      ${p.status}, ${p.skipTurns}, ${p.inJail}, ${p.jailTurnsLeft}, ${p.circuits}, ${tokenHash})`;
+      ${p.status}, ${p.skipTurns}, ${p.inJail}, ${p.jailTurnsLeft}, ${p.circuits}, ${tokenHash},
+      ${p.bot?.difficulty ?? null}, ${p.bot?.personality ?? null})`;
 }
 
 async function insertLedger(tx: Tx, gameId: string, result: EngineResult): Promise<void> {

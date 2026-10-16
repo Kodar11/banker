@@ -1,4 +1,5 @@
 import { GameActionSchema, PlayerNameSchema, type GameAction } from './actions.ts';
+import { BOT_NAMES, type BotSeat } from './botSeat.ts';
 import {
   BOARD_SIZE,
   getDeed,
@@ -129,8 +130,11 @@ function freshTurn(): TurnState {
   };
 }
 
-function newPlayer(id: string, name: string, seat: number, isHost: boolean): PlayerState {
-  return { id, name, seat, isHost, ready: isHost, balance: 0, position: 0, status: 'ACTIVE', skipTurns: 0, inJail: false, jailTurnsLeft: 0, circuits: 0 };
+function newPlayer(id: string, name: string, seat: number, isHost: boolean, bot: BotSeat | null = null): PlayerState {
+  const player: PlayerState = { id, name, seat, isHost, ready: isHost, balance: 0, position: 0, status: 'ACTIVE', skipTurns: 0, inJail: false, jailTurnsLeft: 0, circuits: 0 };
+  // A bot is always ready: it never keeps the table waiting in the lobby.
+  if (bot) Object.assign(player, { bot: { difficulty: bot.difficulty, personality: bot.personality }, ready: true });
+  return player;
 }
 
 export function createGame(
@@ -183,20 +187,50 @@ export function joinGame(state: GameState, input: { playerId: string; name: stri
   if (state.status !== 'WAITING') fail('GAME_NOT_ACTIVE', 'This game has already started.');
   // The host closed admission. A code, a link or an invitation is never a way around it.
   if (state.lobbyLocked) fail('LOBBY_LOCKED', 'The host has locked this lobby. Ask them to unlock it.');
-  const name = PlayerNameSchema.safeParse(input.name);
-  if (!name.success) fail('VALIDATION', name.error.issues[0]?.message ?? 'Invalid name.');
-  // People who left the lobby don't take a place. (Their name stays theirs: it still labels their events.)
-  const present = state.players.filter((p) => p.status !== 'LEFT');
-  if (present.length >= RULES.players.max) fail('GAME_FULL', `This game is full (${RULES.players.max} players).`);
-  if (state.players.some((p) => p.name.toLowerCase() === name.data.toLowerCase())) {
-    fail('NAME_TAKEN', 'Someone in this game already has that name.');
-  }
   const d = new Draft(state, ctx);
-  const seat = Math.max(-1, ...state.players.map((p) => p.seat)) + 1;
-  d.state.players.push(newPlayer(input.playerId, name.data, seat, false));
-  d.event('PLAYER_JOINED', input.playerId, `${name.data} joined`);
+  seatPlayer(d, input.playerId, input.name, null);
   bumpVersion(d);
   return d.result();
+}
+
+/**
+ * Seats a bot in a lobby the server is assembling (public matchmaking): the same seat, the same checks
+ * and the same event as anyone joining, marked as a bot. A lock on the lobby keeps people out, not the
+ * server's own seating. A host adds bots to their lobby with the ADD_BOT action instead.
+ */
+export function joinBot(state: GameState, input: { playerId: string; bot: BotSeat; name?: string }, ctx: EngineContext): EngineResult {
+  assertLoadable(state, ctx);
+  if (state.status !== 'WAITING') fail('GAME_NOT_ACTIVE', 'This game has already started.');
+  const d = new Draft(state, ctx);
+  seatPlayer(d, input.playerId, input.name ?? nextBotName(d.state), input.bot);
+  bumpVersion(d);
+  return d.result();
+}
+
+/** The first bot name nobody at this table has (left players included: their name still labels their events). */
+function nextBotName(state: GameState): string {
+  const taken = new Set(state.players.map((p) => p.name.toLowerCase()));
+  const free = BOT_NAMES.find((n) => !taken.has(n.toLowerCase()));
+  if (!free) fail('GAME_FULL', 'There is no room for another bot.');
+  return free;
+}
+
+/** THE way a new seat is added to a lobby, for a person or a bot. */
+function seatPlayer(d: Draft, playerId: string, rawName: string, bot: BotSeat | null): PlayerState {
+  const name = PlayerNameSchema.safeParse(rawName);
+  if (!name.success) fail('VALIDATION', name.error.issues[0]?.message ?? 'Invalid name.');
+  // People who left the lobby don't take a place. (Their name stays theirs: it still labels their events.)
+  const present = d.state.players.filter((p) => p.status !== 'LEFT');
+  if (present.length >= RULES.players.max) fail('GAME_FULL', `This game is full (${RULES.players.max} players).`);
+  if (d.state.players.some((p) => p.name.toLowerCase() === name.data.toLowerCase())) {
+    fail('NAME_TAKEN', 'Someone in this game already has that name.');
+  }
+  if (d.state.players.some((p) => p.id === playerId)) fail('VALIDATION', 'That seat already exists.');
+  const seat = Math.max(-1, ...d.state.players.map((p) => p.seat)) + 1;
+  const player = newPlayer(playerId, name.data, seat, false, bot);
+  d.state.players.push(player);
+  d.event('PLAYER_JOINED', playerId, `${name.data} joined`, bot ? { bot: true, difficulty: bot.difficulty, personality: bot.personality } : {});
+  return player;
 }
 
 // ---------------------------------------------------------------------------
@@ -238,7 +272,7 @@ const TURN_ACTIONS = new Set<GameAction['type']>([
 const DURING_END_VOTE = new Set<GameAction['type']>(['CAST_END_VOTE', 'CLOSE_END_VOTE', 'LEAVE_GAME', 'RESUME_GAME']);
 
 /** Everything a player can do before the game starts. */
-const LOBBY_ACTIONS = new Set<GameAction['type']>(['SET_READY', 'START_GAME', 'LEAVE_GAME', 'UPDATE_CONFIG', 'SET_LOBBY_LOCK', 'REMOVE_PLAYER']);
+const LOBBY_ACTIONS = new Set<GameAction['type']>(['SET_READY', 'START_GAME', 'LEAVE_GAME', 'UPDATE_CONFIG', 'SET_LOBBY_LOCK', 'REMOVE_PLAYER', 'ADD_BOT']);
 
 /**
  * Apply one player action to the authoritative state.
@@ -264,7 +298,7 @@ export function applyAction(state: GameState, actorId: string, rawAction: unknow
     }
   } else if (state.status === 'PAUSED') {
     if (action.type !== 'RESUME_GAME' && action.type !== 'LEAVE_GAME') fail('GAME_PAUSED', 'Game is paused.');
-  } else if (action.type === 'SET_READY' || action.type === 'START_GAME' || action.type === 'SET_LOBBY_LOCK' || action.type === 'REMOVE_PLAYER') {
+  } else if (action.type === 'SET_READY' || action.type === 'START_GAME' || action.type === 'SET_LOBBY_LOCK' || action.type === 'REMOVE_PLAYER' || action.type === 'ADD_BOT') {
     fail('INVALID_PHASE', 'The game has already started.');
   }
 
@@ -317,6 +351,13 @@ export function applyAction(state: GameState, actorId: string, rawAction: unknow
         d.event('PLAYER_REMOVED', actorId, `${actor.name} removed ${target.name} from the lobby`, { playerId: target.id });
         leaveTable(d, target);
       }
+      break;
+    }
+    case 'ADD_BOT': {
+      if (!actor.isHost) fail('FORBIDDEN', 'Only the host can add a bot.');
+      // The host may fill their own table; the lock keeps strangers out, not the host's own choices.
+      const bot = seatPlayer(d, ctx.newId(), nextBotName(d.state), { difficulty: action.difficulty, personality: action.personality });
+      d.event('BOT_ADDED', actorId, `${actor.name} added ${bot.name}`, { playerId: bot.id, difficulty: action.difficulty, personality: action.personality });
       break;
     }
     case 'START_GAME':
@@ -1534,6 +1575,10 @@ function declareBankruptcy(d: Draft, actor: PlayerState): void {
     finishGame(d, 'LAST_PLAYER_STANDING');
     return;
   }
+  if (onlyBotsLeft(d, actor)) {
+    finishGame(d, 'NO_PEOPLE_LEFT');
+    return;
+  }
   d.state.auction = null;
   advanceTurn(d, actor.id);
 }
@@ -1580,6 +1625,10 @@ function declareCrisisBankruptcy(d: Draft, actor: PlayerState, crisisId: string)
   }
   if (RULES.endGame.lastPlayerStandingWins && d.activePlayers().length <= 1) {
     finishGame(d, 'LAST_PLAYER_STANDING');
+    return;
+  }
+  if (onlyBotsLeft(d, actor)) {
+    finishGame(d, 'NO_PEOPLE_LEFT');
     return;
   }
   if (!wasTheirTurn) return;
@@ -1665,7 +1714,8 @@ function walkAway(d: Draft, actor: PlayerState): void {
   if (playing) dropPayee(d, actor.id);
 
   const remaining = d.activePlayers().sort((a, b) => a.seat - b.seat);
-  const heir = remaining[0];
+  // The host role goes to a person: a bot can't run a lobby or speak for the table.
+  const heir = remaining.find((p) => !p.bot) ?? remaining[0];
   if (actor.isHost && heir) {
     actor.isHost = false;
     heir.isHost = true;
@@ -1674,7 +1724,8 @@ function walkAway(d: Draft, actor: PlayerState): void {
     d.event('HOST_CHANGED', heir.id, `${heir.name} is now the host`, { hostPlayerId: heir.id });
   }
   if (!started) {
-    if (remaining.length === 0) finishGame(d, 'PLAYERS_LEFT');
+    // A lobby nobody but bots is left in has nobody to start it.
+    if (remaining.length === 0 || !remaining.some((p) => !p.bot)) finishGame(d, 'PLAYERS_LEFT');
     return;
   }
 
@@ -1691,6 +1742,10 @@ function walkAway(d: Draft, actor: PlayerState): void {
 
   if (remaining.length < 2) {
     finishGame(d, 'PLAYERS_LEFT');
+    return;
+  }
+  if (onlyBotsLeft(d, actor)) {
+    finishGame(d, 'NO_PEOPLE_LEFT');
     return;
   }
 
@@ -1722,6 +1777,7 @@ function walkAway(d: Draft, actor: PlayerState): void {
  *   LAST_PLAYER_STANDING  everyone else is bankrupt        PLAYERS_LEFT      fewer than two players remain
  *   VOTE                  an early vote passed              DURATION_VOTE     the finish-or-extend vote ended it
  *   DURATION_REACHED      the longest a game may be was played out
+ *   NO_PEOPLE_LEFT        the last person left or went bankrupt, and only bots are still playing
  *
  * In this order, once (the game is FINISHED from the first line, and nothing is accepted after):
  *   1. obligations the ending settles: open trades expire; a crisis bill still open is collected;
@@ -1731,7 +1787,19 @@ function walkAway(d: Draft, actor: PlayerState): void {
  *   4. net worth from the one balance sheet; 5. the ranking and its tie-break (rankStandings);
  *   6. the standings and the winner(s) are stored and announced together.
  */
-function finishGame(d: Draft, reason: 'VOTE' | 'DURATION_VOTE' | 'DURATION_REACHED' | 'LAST_PLAYER_STANDING' | 'PLAYERS_LEFT'): void {
+/**
+ * A person has just gone out of the game (left or went bankrupt) and only bots are still playing. Nobody is
+ * left to play for, so the game ends now and is ranked as it stands, rather than run on with nobody at the
+ * table. Never applies to a table that has always been bots only (simulations): it is a person going out
+ * that ends it.
+ */
+function onlyBotsLeft(d: Draft, leaving: PlayerState): boolean {
+  if (leaving.bot) return false;
+  const active = d.activePlayers();
+  return active.length > 0 && active.every((p) => !!p.bot);
+}
+
+function finishGame(d: Draft, reason: 'VOTE' | 'DURATION_VOTE' | 'DURATION_REACHED' | 'LAST_PLAYER_STANDING' | 'PLAYERS_LEFT' | 'NO_PEOPLE_LEFT'): void {
   d.setStatus('FINISHED');
   d.state.pausedFrom = null;
   d.state.pausedAt = null;

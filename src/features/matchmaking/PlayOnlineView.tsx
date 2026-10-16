@@ -106,8 +106,13 @@ function MatchPlayers({ match }: { match: Match }) {
   return (
     <Card testID="match-players">
       <Label>
-        {GAME_MODE_LABELS[match.mode]} · {match.playerCount} players
+        {GAME_MODE_LABELS[match.mode]} · {match.playerCount} players{(match.botSeats ?? 0) > 0 ? ` + ${match.botSeats} bots` : ''}
       </Label>
+      {(match.botSeats ?? 0) > 0 ? (
+        <Text className="mt-1 text-xs text-stone-600" testID="match-bot-seats">
+          🤖 Everyone here asked for bots: {match.botSeats} {match.botSeats === 1 ? 'bot fills' : 'bots fill'} the empty {match.botSeats === 1 ? 'seat' : 'seats'}. Confirm to play with them, or decline.
+        </Text>
+      ) : null}
       <View className="mt-2 gap-3">
         {[...groups.entries()].map(([group, members]) => (
           <View key={group} className={members.length > 1 ? 'gap-2 rounded-2xl border-2 border-saffron/60 p-2' : 'gap-2'} testID={`match-group-${group}`}>
@@ -236,6 +241,8 @@ export function PlayOnlineView() {
   });
   const now = useServerNow(500);
   const [mode, setMode] = useState<GameMode>('classic');
+  /** Opt-in: fill a smaller table's empty seats with bots. Off unless the player turns it on. */
+  const [allowBots, setAllowBots] = useState(false);
   const [failure, setFailure] = useState<MatchmakingError | null>(null);
   const [inviting, setInviting] = useState(false);
 
@@ -390,6 +397,7 @@ export function PlayOnlineView() {
           <Text className="text-center text-base font-semibold text-cream/80" testID="search-hint">
             {searchHint(waited, ticket.playerCount, data.settings)}
           </Text>
+          {ticket.allowBots ? <Text className="text-center text-sm text-cream/70" testID="search-allow-bots">🤖 Empty seats may be filled with bots.</Text> : null}
           {ticket.requeueCount > 0 ? <Text className="text-center text-sm text-cream/70">A match fell through because someone didn’t confirm. You kept your place in the queue.</Text> : null}
         </View>
         {data.party ? <PartyMembers party={data.party} pending={pending} /> : null}
@@ -489,7 +497,7 @@ export function PlayOnlineView() {
       testID="play-online-screen"
       footer={
         <>
-          <Button title="FIND MATCH" subtitle={`Play solo · ${GAME_MODE_LABELS[mode]}`} testID="online-solo" loading={!!pending.enqueue} disabled={!!blocker} onPress={() => void run(() => store().enqueue(mode))} />
+          <Button title="FIND MATCH" subtitle={`Play solo · ${GAME_MODE_LABELS[mode]}`} testID="online-solo" loading={!!pending.enqueue} disabled={!!blocker} onPress={() => void run(() => store().enqueue(mode, allowBots))} />
           <Button title="PLAY WITH FRIENDS" subtitle="Make a party and queue together" variant="secondary" testID="online-party" loading={!!pending.party} disabled={!!blocker} onPress={() => void run(() => store().createParty(mode))} />
         </>
       }
@@ -521,6 +529,23 @@ export function PlayOnlineView() {
       <Text className="text-xs text-cream/60">
         Tables of {data.settings.targetPlayers} are preferred ({data.settings.minPlayers}–{data.settings.maxPlayers} players). Public tables use each mode’s standard settings. When a match is found, everyone has {data.settings.readySeconds} seconds to confirm.
       </Text>
+      <Pressable
+        onPress={() => setAllowBots((v) => !v)}
+        accessibilityRole="switch"
+        accessibilityState={{ checked: allowBots }}
+        accessibilityLabel="Fill empty seats with bots"
+        accessibilityHint="Only for a solo search. Unranked, and only when everyone at the table chose it."
+        testID="online-allow-bots"
+        className={`flex-row items-center gap-3 rounded-2xl border-2 bg-cream p-4 active:opacity-80 ${allowBots ? 'border-saffron' : 'border-transparent'}`}
+      >
+        <Text className="text-2xl">{allowBots ? '☑️' : '⬜'}</Text>
+        <View className="flex-1">
+          <Text className="text-base font-black text-ink">Fill empty seats with bots</Text>
+          <Text className="text-xs text-stone-600">
+            If a smaller table forms, bots take the empty places up to {data.settings.targetPlayers}. Only when everyone at the table chose this. Solo searches only.
+          </Text>
+        </View>
+      </Pressable>
       {blocker ? <Alert testID="online-blocker">{blocker.message}</Alert> : null}
       {resume ? <Button title="Go to your game" size="sm" variant="secondary" testID="online-resume" onPress={() => router.push(resume)} /> : null}
     </Screen>

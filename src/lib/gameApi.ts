@@ -1,5 +1,6 @@
 import { FunctionsHttpError } from '@supabase/supabase-js';
 import type { ApiRequest, ApiResponse, GameAction, GameConfig, GameMode, QuickChatItem, QuickChatResponse } from '@/engine/index.ts';
+import { localAction, localState } from '@/features/solo/localGame';
 import { recordServerTime } from './serverClock';
 import { getSupabase } from './supabase';
 
@@ -60,6 +61,8 @@ export interface Credentials {
   gameId: string;
   playerId: string;
   token: string;
+  /** A solo game against bots, played on this device only (features/solo/localGame.ts): never sent to any server. */
+  local?: boolean;
 }
 
 export const gameApi = {
@@ -70,12 +73,14 @@ export const gameApi = {
   create: (actionId: string, token: string, name: string, mode?: GameMode, config?: GameConfig) =>
     callGameApi({ op: 'create', actionId, token, name, ...(mode && mode !== 'classic' ? { mode } : {}), ...(config ? { config } : {}) }),
   join: (actionId: string, token: string, code: string, name: string) => callGameApi({ op: 'join', actionId, token, code, name }),
-  state: (c: Credentials) => callGameApi({ op: 'state', gameId: c.gameId, playerId: c.playerId, token: c.token }),
+  state: (c: Credentials) => (c.local ? Promise.resolve(localState(c)) : callGameApi({ op: 'state', gameId: c.gameId, playerId: c.playerId, token: c.token })),
   action: (c: Credentials, actionId: string, expectedVersion: number, action: GameAction) =>
-    callGameApi({ op: 'action', gameId: c.gameId, playerId: c.playerId, token: c.token, actionId, expectedVersion, action }),
+    c.local ? Promise.resolve(localAction(c, actionId, expectedVersion, action)) : callGameApi({ op: 'action', gameId: c.gameId, playerId: c.playerId, token: c.token, actionId, expectedVersion, action }),
   /** A quick reaction or preset message to everyone in the game. Not a game action: no version, no snapshot, never retried. */
   chat: (c: Credentials, eventId: string, item: QuickChatItem) =>
-    invoke<QuickChatResponse>({ op: 'chat', gameId: c.gameId, playerId: c.playerId, token: c.token, eventId, kind: item.kind, key: item.key }),
+    c.local
+      ? Promise.resolve({ ok: false, error: { code: 'VALIDATION', message: 'Quick chat is for games with other people.' } } as unknown as QuickChatResponse)
+      : invoke<QuickChatResponse>({ op: 'chat', gameId: c.gameId, playerId: c.playerId, token: c.token, eventId, kind: item.kind, key: item.key }),
 };
 
 /** Errors where resending the SAME action id is safe and useful. */

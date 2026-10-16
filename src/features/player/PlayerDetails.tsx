@@ -1,5 +1,5 @@
 import { Pressable, Text, View } from 'react-native';
-import { canSeeFinances, netWorth, ownedBy, spaceName, totalDebt } from '@/engine/index.ts';
+import { botSeatLabel, canSeeFinances, netWorth, ownedBy, spaceName, totalDebt } from '@/engine/index.ts';
 import { Button, Pill, PlayerBadge } from '@/components/ui';
 import { COLORS } from '@/constants/theme';
 import { ActionIcon } from '@/features/game/ActionIcon';
@@ -53,6 +53,7 @@ export function PlayerDetailsHeader({ view, playerId }: { view: GameView; player
         <View className="flex-row flex-wrap gap-2">
           <Pill tone={status.tone}>{status.text}</Pill>
           {isTurn ? <Pill tone="gold">{isMe ? 'Your turn' : 'Their turn'}</Pill> : null}
+          {player.bot ? <Pill>{botSeatLabel(player.bot)}</Pill> : null}
         </View>
       </View>
     </View>
@@ -170,7 +171,7 @@ export function PlayerDetailsActions({ view, playerId, onMakeOffer, onPayMoney }
           {blocked}
         </Text>
       ) : null}
-      <PlayerFriendAction gameId={state.id} seatId={player.id} />
+      {player.bot ? null : <PlayerFriendAction gameId={state.id} seatId={player.id} />}
     </View>
   );
 }

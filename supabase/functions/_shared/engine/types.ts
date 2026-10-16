@@ -1,3 +1,4 @@
+import type { BotSeat } from './botSeat.ts';
 import type { PropertyKey } from './businessBoard.ts';
 import type { CardTable, Deck } from './cards.ts';
 import type { GameConfig } from './gameConfig.ts';
@@ -54,6 +55,11 @@ export interface PlayerState {
   jailTurnsLeft: number;
   /** Completed circuits (times this player passed or landed on Start by a forward move). */
   circuits: number;
+  /**
+   * Set for a seat the game plays by itself (botSeat.ts): its difficulty and personality. Absent or null for a
+   * person. Public — every device may show which seats are bots. Never changes once the seat exists.
+   */
+  bot?: BotSeat | null;
 }
 
 export interface PropertyState {

@@ -7,12 +7,19 @@ import { PROPERTY_DEEDS, PROPERTY_KEYS, RULES_VERSION } from '@/engine/index.ts'
 const root = join(__dirname, '..', '..');
 
 describe('server/client share one engine', () => {
-  it('supabase/functions/_shared/engine is an exact copy of src/engine (run `npm run sync:engine`)', () => {
-    const src = join(root, 'src/engine');
-    const copy = join(root, 'supabase/functions/_shared/engine');
+  it.each(['engine', 'bots'])('supabase/functions/_shared/%s is an exact copy of src/%s (run `npm run sync:engine`)', (name) => {
+    const src = join(root, 'src', name);
+    const copy = join(root, 'supabase/functions/_shared', name);
     const files = readdirSync(src).filter((f) => f.endsWith('.ts')).sort();
     expect(readdirSync(copy).filter((f) => f.endsWith('.ts')).sort()).toEqual(files);
     for (const f of files) expect(readFileSync(join(copy, f), 'utf8'), f).toBe(readFileSync(join(src, f), 'utf8'));
+  });
+
+  it('the bot engine imports only the engine and itself (it runs on the device, on the server and in Deno)', () => {
+    for (const f of readdirSync(join(root, 'src/bots')).filter((x) => x.endsWith('.ts'))) {
+      const imports = [...readFileSync(join(root, 'src/bots', f), 'utf8').matchAll(/from '([^']+)'/g)].map((m) => m[1]!);
+      for (const spec of imports) expect(spec === '../engine/index.ts' || /^\.\/[A-Za-z]+\.ts$/.test(spec), `${f} imports ${spec}`).toBe(true);
+    }
   });
 
   it('board_properties catalog migration matches the TS source', () => {

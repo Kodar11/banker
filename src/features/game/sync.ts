@@ -1,7 +1,8 @@
 import { useEffect } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
 import { POLL_MS_DEGRADED } from '@/constants/app';
-import type { StateBroadcast } from '@/engine/index.ts';
+import type { GameState, StateBroadcast } from '@/engine/index.ts';
+import { subscribeLocal } from '@/features/solo/localGame';
 import { clearQuickChat, receiveQuickChat } from '@/features/quickChat/quickChatStore';
 import { voice } from '@/features/voice/voice';
 import { gameApi, type Credentials } from '@/lib/gameApi';
@@ -161,16 +162,18 @@ export function useGameSync(credentials: Credentials | null): void {
   const gameId = credentials?.gameId;
   const playerId = credentials?.playerId;
   const token = credentials?.token;
+  const local = credentials?.local === true;
 
   useEffect(() => {
     if (!gameId || !playerId || !token) return;
-    const creds = { gameId, playerId, token };
+    const creds = { gameId, playerId, token, local };
     const store = useGameStore.getState();
     if (store.gameId !== gameId) store.reset(gameId);
     const stop = startGameSync({
       refresh: () => refreshGame(creds),
       localVersion: () => useGameStore.getState().snapshot?.state.version ?? 0,
-      subscribe: (handlers) => subscribeToGame(gameId, playerId, handlers),
+      // A solo game is on this device: its "realtime" is the local game itself, always live.
+      subscribe: (handlers) => (local ? subscribeToLocal(gameId, handlers) : subscribeToGame(gameId, playerId, handlers)),
       setHealth: (health) => {
         const s = useGameStore.getState();
         if (health === 'live') s.setConnection('live');
@@ -190,7 +193,61 @@ export function useGameSync(credentials: Credentials | null): void {
       // Nothing of this game's chatter may show up in the next one.
       clearQuickChat();
     };
+  }, [gameId, playerId, token, local]);
+
+  useBotWatchdog(gameId && playerId && token && !local ? { gameId, playerId, token } : null);
+}
+
+function subscribeToLocal(gameId: string, handlers: GameChannelHandlers): () => void {
+  handlers.onHealth('live');
+  return subscribeLocal(gameId, handlers.onState);
+}
+
+/** How long an online game with bots may sit unchanged, with a bot to move, before this phone reads it again. */
+export const BOT_WATCHDOG_MS = 6000;
+
+/**
+ * Online games with bots: the server plays the bots, triggered by every committed action. If such a trigger
+ * is ever lost (an instance restarted), the game would wait. So while a bot may be the one to move and
+ * nothing has changed for a while, this phone reads the game again — and the server, seeing an idle game
+ * with a bot due, starts its bot runner. The phone never decides or sends anything for a bot.
+ */
+function useBotWatchdog(credentials: Credentials | null): void {
+  const gameId = credentials?.gameId;
+  const playerId = credentials?.playerId;
+  const token = credentials?.token;
+  useEffect(() => {
+    if (!gameId || !playerId || !token) return;
+    let version = -1;
+    let since = Date.now();
+    const timer = setInterval(() => {
+      const state = useGameStore.getState().snapshot?.state;
+      if (!state || state.id !== gameId) return;
+      if (state.version !== version) {
+        version = state.version;
+        since = Date.now();
+        return;
+      }
+      if (Date.now() - since >= BOT_WATCHDOG_MS && botMayBeDue(state)) {
+        since = Date.now();
+        void refreshGame({ gameId, playerId, token });
+      }
+    }, 2000);
+    return () => clearInterval(timer);
   }, [gameId, playerId, token]);
+}
+
+/** A bot could be the one the game is waiting on (its turn, an auction, a vote, an offer made to it). */
+export function botMayBeDue(state: GameState): boolean {
+  if (state.status !== 'ACTIVE') return false;
+  const bots = new Set(state.players.filter((p) => p.status === 'ACTIVE' && p.bot).map((p) => p.id));
+  if (bots.size === 0) return false;
+  return (
+    bots.has(state.turn.playerId ?? '') ||
+    state.auction?.status === 'OPEN' ||
+    !!state.endGame?.vote ||
+    state.trades.some((t) => t.status === 'PENDING' && bots.has(t.toPlayerId))
+  );
 }
 
 /** Mounted once in the root layout: the ONLY place that syncs, whichever screen is open. */

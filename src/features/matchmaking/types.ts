@@ -70,6 +70,8 @@ export interface Ticket {
   queuedAt: string;
   /** How often this search went back into the queue after a match fell through. */
   requeueCount: number;
+  /** This search asked for the table's empty seats to be filled with bots (solo searches only). */
+  allowBots?: boolean;
 }
 
 export interface MatchPlayer extends PublicPlayer {
@@ -89,6 +91,8 @@ export interface Match {
   /** The server's deadline for confirming. */
   readyDeadline: string;
   players: MatchPlayer[];
+  /** Bot seats the table will have besides these players (everyone here asked for bots). */
+  botSeats?: number;
 }
 
 /** The game my last match became, while I am still playing in it. */
@@ -156,6 +160,7 @@ export type MatchmakingErrorCode =
   | 'MEMBER_QUEUED'
   | 'MEMBER_IN_GAME'
   | 'MEMBER_COOLDOWN'
+  | 'BOTS_SOLO_ONLY'
   | 'COOLDOWN'
   | 'STALE_REQUEST'
   | 'MATCH_GONE'
@@ -223,6 +228,7 @@ const ServerStateSchema = z.object({
       status: z.enum(['QUEUED', 'RESERVED']),
       queued_at: z.string(),
       requeue_count: count,
+      allow_bots: z.boolean().optional(),
     })
     .nullable(),
   match: z
@@ -233,6 +239,7 @@ const ServerStateSchema = z.object({
       player_count: count,
       ready_deadline: z.string(),
       players: z.array(publicPlayer.extend({ group: count, party: z.boolean(), ready: z.boolean(), is_me: z.boolean() })),
+      bot_seats: count.optional(),
     })
     .nullable(),
   game: z.object({ match_id: z.string().min(1), game_id: z.string().min(1), seat_id: z.string().min(1), mode }).nullable(),
@@ -285,6 +292,7 @@ export function toMatchmakingState(raw: unknown): MatchmakingState | null {
           status: s.ticket.status,
           queuedAt: s.ticket.queued_at,
           requeueCount: s.ticket.requeue_count,
+          allowBots: s.ticket.allow_bots === true,
         }
       : null,
     match: s.match
@@ -295,6 +303,7 @@ export function toMatchmakingState(raw: unknown): MatchmakingState | null {
           playerCount: s.match.player_count,
           readyDeadline: s.match.ready_deadline,
           players: s.match.players.map((p) => ({ ...toPlayer(p), group: p.group, party: p.party, ready: p.ready, isMe: p.is_me })),
+          botSeats: s.match.bot_seats ?? 0,
         }
       : null,
     game: s.game ? { matchId: s.game.match_id, gameId: s.game.game_id, seatId: s.game.seat_id, mode: s.game.mode } : null,

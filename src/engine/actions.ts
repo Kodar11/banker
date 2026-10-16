@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { BOT_DIFFICULTIES, BOT_PERSONALITIES } from './botSeat.ts';
 import { PROPERTY_KEYS, type PropertyKey } from './businessBoard.ts';
 import { LOAN_PRODUCT_KEYS } from './intermediateConfig.ts';
 
@@ -21,6 +22,11 @@ export const GameActionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('SET_LOBBY_LOCK'), locked: z.boolean() }).strict(),
   /** Lobby only, host only: take another player out of the lobby. Their seat is treated exactly as if they had left. */
   z.object({ type: z.literal('REMOVE_PLAYER'), playerId: id }).strict(),
+  /**
+   * Lobby only, host only: seat a bot (botSeat.ts) with this difficulty and personality, if the table has room.
+   * The engine names it. A bot is taken out again with REMOVE_PLAYER, like anyone else in the lobby.
+   */
+  z.object({ type: z.literal('ADD_BOT'), difficulty: z.enum(BOT_DIFFICULTIES), personality: z.enum(BOT_PERSONALITIES) }).strict(),
   bare('START_GAME'),
   bare('ROLL_DICE'),
   /**

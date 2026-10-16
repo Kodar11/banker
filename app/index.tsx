@@ -88,6 +88,7 @@ export default function Home() {
           <Button title="CREATE GAME" subtitle="You're the host" testID="create-game" onPress={() => router.push('/create-game')} />
           <Button title="JOIN GAME" subtitle="Scan QR or enter code" testID="join-game" variant="secondary" onPress={() => router.push('/join-game')} />
           <PlayOnlineEntry />
+          <Button title="PLAY VS BOTS" subtitle="Practice solo on this phone" testID="play-solo" variant="secondary" onPress={() => router.push('/solo')} />
           <View className="flex-row gap-3">
             <FriendsEntry className="flex-1" />
             <Button className="flex-1" title="Financial Learning" size="sm" variant="ghost" testID="open-learning" onPress={() => router.push('/learning')} />

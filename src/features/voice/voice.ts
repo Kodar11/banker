@@ -33,6 +33,7 @@ export function VoiceHost(): null {
   const gameId = session?.gameId;
   const playerId = session?.playerId;
   const token = session?.token;
+  const local = session?.local === true;
   // In play, and still at the table: the only time a voice channel exists.
   const live = useGameStore((s) => {
     const state = s.snapshot?.state;
@@ -42,10 +43,11 @@ export function VoiceHost(): null {
   });
 
   useEffect(() => {
-    if (!gameId || !playerId || !token) return;
+    // Voice is for games with other people; a solo game never asks the server for a voice room.
+    if (!gameId || !playerId || !token || local) return;
     voice.attach({ gameId, playerId, token });
     return () => voice.detach();
-  }, [gameId, playerId, token]);
+  }, [gameId, playerId, token, local]);
 
   useEffect(() => {
     voice.setGameLive(live);

@@ -46,6 +46,7 @@ const MESSAGES: Record<MatchmakingErrorCode, string> = {
   MEMBER_QUEUED: 'Someone in your party is already searching for a match.',
   MEMBER_IN_GAME: 'Someone in your party is already in a game.',
   MEMBER_COOLDOWN: 'Someone in your party has to wait a moment after missing a match.',
+  BOTS_SOLO_ONLY: 'Bots can fill seats only for a solo search: everyone at a bot table chooses that for themselves.',
   COOLDOWN: 'You missed a match. Please wait a moment before searching again.',
   STALE_REQUEST: 'That search has already ended. Start a new one.',
   MATCH_GONE: 'That match is no longer available.',
@@ -165,7 +166,9 @@ export const matchmakingApi = {
    * Enter the queue: alone in `mode`, or — for a party's leader — with the whole party in the party's mode.
    * `key` identifies one tap: sending it again can never create a second search.
    */
-  enqueue: (mode: GameMode | null, key: string) => done('matchmaking_enqueue', { p_mode: mode, p_idempotency_key: key }),
+  /** `allowBots`: fill the table's empty seats with bots (solo only). Left out, the request is exactly what older apps send. */
+  enqueue: (mode: GameMode | null, key: string, allowBots = false) =>
+    done('matchmaking_enqueue', allowBots ? { p_mode: mode, p_idempotency_key: key, p_allow_bots: true } : { p_mode: mode, p_idempotency_key: key }),
 
   async cancel(): Promise<MatchmakingResult<CancelOutcome>> {
     const res = await rpc('matchmaking_cancel');

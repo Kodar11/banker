@@ -51,7 +51,7 @@ interface MatchmakingStoreState {
   setSeatElsewhere: (gameId: string | null) => void;
 
   /** Search alone in `mode`; or, for a party's leader, with the whole party (`mode` null: the party's). */
-  enqueue: (mode: GameMode | null) => Promise<MatchmakingResult<true>>;
+  enqueue: (mode: GameMode | null, allowBots?: boolean) => Promise<MatchmakingResult<true>>;
   cancel: () => Promise<MatchmakingResult<CancelOutcome>>;
   /** Confirm the match on screen. The seat token is stored on the phone BEFORE the server hears of it. */
   confirmReady: (matchId: string) => Promise<MatchmakingResult<ReadyOutcome>>;
@@ -192,12 +192,12 @@ export const useMatchmakingStore = create<MatchmakingStoreState>((set, get) => {
       if (get().seatElsewhere !== gameId) set({ seatElsewhere: gameId });
     },
 
-    enqueue: (mode) =>
+    enqueue: (mode, allowBots = false) =>
       mutate('enqueue', async () => {
         const userId = get().ownerUserId!;
         if (!enqueueAttempt || enqueueAttempt.userId !== userId || enqueueAttempt.mode !== mode) enqueueAttempt = { userId, mode, key: newActionId() };
         const attempt = enqueueAttempt;
-        const res = await matchmakingApi.enqueue(mode, attempt.key);
+        const res = allowBots ? await matchmakingApi.enqueue(mode, attempt.key, true) : await matchmakingApi.enqueue(mode, attempt.key);
         // Answered, one way or the other: the next tap is a new request. Unanswered: the same key goes again.
         if ((res.ok || res.error.code !== 'NETWORK') && enqueueAttempt === attempt) enqueueAttempt = null;
         if (res.ok) void matchmakingApi.nudge();

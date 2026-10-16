@@ -57,7 +57,7 @@ function AmountRow({ mode, field, label, hint, value, onChange }: { mode: GameMo
 }
 
 /** A row of mutually exclusive choices (same look as the mode cards: saffron edge on the chosen one). */
-function Choice<T extends string>({ value, options, onChange, testID }: { value: T; options: { value: T; label: string; accessibilityLabel?: string }[]; onChange: (next: T) => void; testID: string }) {
+export function Choice<T extends string>({ value, options, onChange, testID }: { value: T; options: { value: T; label: string; accessibilityLabel?: string }[]; onChange: (next: T) => void; testID: string }) {
   return (
     <View className="flex-row gap-2" accessibilityRole="radiogroup" testID={testID}>
       {options.map((o) => {
