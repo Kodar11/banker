@@ -4,7 +4,7 @@ import { fail } from './errors.ts';
 import { formatINR } from './format.ts';
 import { configOf } from './gameConfig.ts';
 import { financialYearCap } from './gameEnd.ts';
-import { processCrisisCheckpoints } from './insurance.ts';
+import { processCrisisCheckpoints, releaseInsurance } from './insurance.ts';
 import { freshInsurance } from './insuranceState.ts';
 import { INTERMEDIATE_RULES as IR, type CreditEventType, type LoanProductKey } from './intermediateConfig.ts';
 import {
@@ -381,6 +381,7 @@ export function seizeLoanCollateral(d: Draft, eco: IntermediateState, loan: Inte
   loan.settlement = { propertyKeys: keys, value, applied, surplus };
   for (const key of keys) {
     const prop = d.state.properties[key];
+    releaseInsurance(d, key, loan.playerId, 'COLLATERAL_SEIZED');
     prop.ownerId = null;
     prop.houses = 0;
     prop.hotel = false;

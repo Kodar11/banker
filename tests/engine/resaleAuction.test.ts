@@ -557,7 +557,7 @@ describe('insurance on a sold property', () => {
 
     const policies = g.state.intermediate!.insurance!.policies;
     expect(policies).toHaveLength(1);
-    expect(policies[0]).toMatchObject({ id: policyId, ownerId: g.id('Asha'), status: 'EXPIRED', claimedCrisisId: null });
+    expect(policies[0]).toMatchObject({ id: policyId, ownerId: g.id('Asha'), status: 'ENDED', propertyKeys: [], boughtKeys: ['MUMBAI'], claimedTotal: 0 });
     expect(policies[0]!.closedAt).not.toBeNull();
     expect(types(sold)).toEqual(['AUCTION_PASSED', 'INSURANCE_ENDED', 'AUCTION_WON']);
     // The only money that moved is the bid: nothing came back for unused cover.

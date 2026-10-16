@@ -157,7 +157,7 @@ describe.skipIf(!DATABASE_URL)('Property insurance through the handler (Postgres
   }
 
   const insure = (g: Game, name: string, propertyKey: PropertyKey, opts: { actionId?: string; expectedPremium?: number } = {}) =>
-    g.act(name, { type: 'INSURE_PROPERTY', propertyKey, expectedPremium: opts.expectedPremium ?? 500 }, { actionId: opts.actionId });
+    g.act(name, { type: 'INSURE_PROPERTY', propertyKey, expectedPremium: opts.expectedPremium ?? 250 }, { actionId: opts.actionId });
 
   const policyRows = (g: Game) => sql`select * from public.insurance_policies where game_id = ${g.gameId} order by created_at, id`;
   const crisisRows = (g: Game) => sql`select * from public.crisis_events where game_id = ${g.gameId} order by checkpoint`;
@@ -179,14 +179,32 @@ describe.skipIf(!DATABASE_URL)('Property insurance through the handler (Postgres
       const before = (await g.snap()).state.version;
       const res = ok(await insure(g, 'Asha', 'MUMBAI'));
       expect(res.snapshot.state.version).toBe(before + 1);
-      expect(await balance(g, 'Asha')).toBe(START_CASH - 500);
-      expect(await txRows(g, 'INSURANCE_PREMIUM')).toMatchObject([{ amount: 500, from_player_id: idOf(g, 'Asha'), to_player_id: null, property_key: 'MUMBAI' }]);
+      expect(await balance(g, 'Asha')).toBe(START_CASH - 250);
+      expect(await txRows(g, 'INSURANCE_PREMIUM')).toMatchObject([{ amount: 250, from_player_id: idOf(g, 'Asha'), to_player_id: null, property_key: 'MUMBAI' }]);
       expect(await policyRows(g)).toMatchObject([
-        { property_key: 'MUMBAI', owner_player_id: idOf(g, 'Asha'), purchase_year: 1, premium_paid: 500, start_clock: 0, expiry_clock: COVER, status: 'ACTIVE', claimed_crisis_id: null, closed_at: null },
+        {
+          property_key: 'MUMBAI',
+          property_keys: ['MUMBAI'],
+          bought_keys: ['MUMBAI'],
+          owner_player_id: idOf(g, 'Asha'),
+          purchase_year: 1,
+          entry_year: 1,
+          premium_paid: 250,
+          base_premium: 250,
+          payout_limit: 3000,
+          deductible: 0,
+          claimed_total: 0,
+          renewal_of: null,
+          start_clock: 0,
+          expiry_clock: COVER,
+          status: 'ACTIVE',
+          claimed_crisis_id: null,
+          closed_at: null,
+        },
       ]);
       const seen = await Promise.all(g.names.map((n) => snapshotFor(g.gameId, g.seats[n]!)));
       for (const s of seen) expect(JSON.stringify(ins(s))).toBe(JSON.stringify(ins(seen[0]!)));
-      expect(ins(seen[0]!).policies).toMatchObject([{ propertyKey: 'MUMBAI', premiumPaid: 500, startClock: 0, expiryClock: COVER, status: 'ACTIVE' }]);
+      expect(ins(seen[0]!).policies).toMatchObject([{ propertyKeys: ['MUMBAI'], premiumPaid: 250, startClock: 0, expiryClock: COVER, status: 'ACTIVE' }]);
       // Every device is told the state moved on (realtime), with the public event.
       const mine = broadcasts.filter((b) => b.gameId === g.gameId);
       const told = mine[mine.length - 1]!;
@@ -201,26 +219,26 @@ describe.skipIf(!DATABASE_URL)('Property insurance through the handler (Postgres
       const actionId = randomUUID();
       const version = (await g.snap()).state.version;
       const [a, b] = await Promise.all([
-        g.act('Asha', { type: 'INSURE_PROPERTY', propertyKey: 'MUMBAI', expectedPremium: 500 }, { actionId, expectedVersion: version }),
-        g.act('Asha', { type: 'INSURE_PROPERTY', propertyKey: 'MUMBAI', expectedPremium: 500 }, { actionId, expectedVersion: version }),
+        g.act('Asha', { type: 'INSURE_PROPERTY', propertyKey: 'MUMBAI', expectedPremium: 250 }, { actionId, expectedVersion: version }),
+        g.act('Asha', { type: 'INSURE_PROPERTY', propertyKey: 'MUMBAI', expectedPremium: 250 }, { actionId, expectedVersion: version }),
       ]);
       expect(ok(a).snapshot.state.version).toBe(ok(b).snapshot.state.version);
       expect(ok(await insure(g, 'Asha', 'MUMBAI', { actionId })).duplicate).toBe(true);
       expect(await policyRows(g)).toHaveLength(1);
       expect(await txRows(g, 'INSURANCE_PREMIUM')).toHaveLength(1);
-      expect(await balance(g, 'Asha')).toBe(START_CASH - 500);
+      expect(await balance(g, 'Asha')).toBe(START_CASH - 250);
     });
 
     it('two different purchase requests for one property at once: exactly one policy, one premium', async () => {
       const g = await setupGame('intermediate');
       await give(g, 'Asha', 'MUMBAI');
       const version = (await g.snap()).state.version;
-      const results = await Promise.all([0, 1, 2].map(() => g.act('Asha', { type: 'INSURE_PROPERTY', propertyKey: 'MUMBAI', expectedPremium: 500 }, { expectedVersion: version })));
+      const results = await Promise.all([0, 1, 2].map(() => g.act('Asha', { type: 'INSURE_PROPERTY', propertyKey: 'MUMBAI', expectedPremium: 250 }, { expectedVersion: version })));
       expect(results.filter((r) => r.ok)).toHaveLength(1);
       for (const r of results) if (!r.ok) expect(r.error.code).toBe('INSURANCE_NOT_ALLOWED');
       expect(await policyRows(g)).toHaveLength(1);
       expect(await txRows(g, 'INSURANCE_PREMIUM')).toHaveLength(1);
-      expect(await balance(g, 'Asha')).toBe(START_CASH - 500);
+      expect(await balance(g, 'Asha')).toBe(START_CASH - 250);
       await ledgerOk(g);
     });
 
@@ -230,11 +248,11 @@ describe.skipIf(!DATABASE_URL)('Property insurance through the handler (Postgres
       const version = (await g.snap()).state.version;
       expect(await insure(g, 'Asha', 'MUMBAI', { expectedPremium: 1 })).toMatchObject({ ok: false, error: { code: 'STALE_STATE' } });
       expect(await insure(g, 'Bilal', 'MUMBAI')).toMatchObject({ ok: false, error: { code: 'NOT_OWNER' } });
-      ok(await g.act('Asha', { type: 'TRANSFER_MONEY', toPlayerId: idOf(g, 'Bilal'), amount: START_CASH - 499 }));
+      ok(await g.act('Asha', { type: 'TRANSFER_MONEY', toPlayerId: idOf(g, 'Bilal'), amount: START_CASH - 249 }));
       expect(await insure(g, 'Asha', 'MUMBAI')).toMatchObject({ ok: false, error: { code: 'INSUFFICIENT_FUNDS' } });
       expect(await policyRows(g)).toHaveLength(0);
       expect(await txRows(g, 'INSURANCE_PREMIUM')).toHaveLength(0);
-      expect(await balance(g, 'Asha')).toBe(499);
+      expect(await balance(g, 'Asha')).toBe(249);
       expect((await g.snap()).state.version).toBe(version + 1); // only the transfer
     });
 
@@ -243,9 +261,9 @@ describe.skipIf(!DATABASE_URL)('Property insurance through the handler (Postgres
       await give(g, 'Asha', 'MUMBAI');
       await setClock(g, 3 * COVER + 4);
       await sql`update public.games set intermediate = jsonb_set(intermediate, '{insurance,nextCheckpoint}', '99'::jsonb) where id = ${g.gameId}`;
-      expect(await insure(g, 'Asha', 'MUMBAI', { expectedPremium: 500 })).toMatchObject({ ok: false, error: { code: 'STALE_STATE' } });
-      ok(await insure(g, 'Asha', 'MUMBAI', { expectedPremium: 800 }));
-      expect(await policyRows(g)).toMatchObject([{ purchase_year: 4, premium_paid: 800, start_clock: 3 * COVER + 4, expiry_clock: 4 * COVER + 4 }]);
+      expect(await insure(g, 'Asha', 'MUMBAI', { expectedPremium: 250 })).toMatchObject({ ok: false, error: { code: 'STALE_STATE' } });
+      ok(await insure(g, 'Asha', 'MUMBAI', { expectedPremium: 400 }));
+      expect(await policyRows(g)).toMatchObject([{ purchase_year: 4, premium_paid: 400, start_clock: 3 * COVER + 4, expiry_clock: 4 * COVER + 4 }]);
     });
   });
 
@@ -256,7 +274,7 @@ describe.skipIf(!DATABASE_URL)('Property insurance through the handler (Postgres
       await give(g, 'Asha', 'MUMBAI');
       const asha = g.seats.Asha!;
       const outsider = other.seats.Asha!;
-      const action = { type: 'INSURE_PROPERTY', propertyKey: 'MUMBAI', expectedPremium: 500 };
+      const action = { type: 'INSURE_PROPERTY', propertyKey: 'MUMBAI', expectedPremium: 250 };
       const version = (await g.snap()).state.version;
       const forged = await call({ op: 'action', gameId: g.gameId, playerId: asha.playerId, token: token(), actionId: randomUUID(), expectedVersion: version, action });
       expect(forged).toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } });
@@ -363,7 +381,7 @@ describe.skipIf(!DATABASE_URL)('Property insurance through the handler (Postgres
       await ledgerOk(g);
     });
 
-    it('an insured property: the policy is claimed, the bill is waived and no money moves', async () => {
+    it('an insured property: the claim is paid automatically from the policy limit and no money moves', async () => {
       const g = await setupGame('intermediate');
       await give(g, 'Bilal', 'AGRA', true);
       ok(await insure(g, 'Bilal', 'AGRA'));
@@ -371,8 +389,8 @@ describe.skipIf(!DATABASE_URL)('Property insurance through the handler (Postgres
       const { name: roller } = await rollTo(g, FIRST);
       const [policy] = await policyRows(g);
       const [crisis] = await crisisRows(g);
-      expect(crisis).toMatchObject({ checkpoint: 1, property_key: 'AGRA', mortgaged: true, amount: BILL, paid: 0, status: 'COVERED', policy_id: policy!.id });
-      expect(policy).toMatchObject({ status: 'CLAIMED', claimed_crisis_id: crisis!.id });
+      expect(crisis).toMatchObject({ checkpoint: 1, property_key: 'AGRA', mortgaged: true, amount: BILL, covered: BILL, paid: 0, status: 'COVERED', policy_id: policy!.id });
+      expect(policy).toMatchObject({ status: 'ACTIVE', claimed_total: BILL, claimed_crisis_id: null });
       expect(await txRows(g, 'CRISIS_PAYMENT')).toHaveLength(0);
       expect(await balance(g, 'Bilal')).toBe(cash + (roller === 'Bilal' ? START_REWARD : 0));
       // The mortgage is exactly as it was.
@@ -400,7 +418,7 @@ describe.skipIf(!DATABASE_URL)('Property insurance through the handler (Postgres
         queuedDice = [1, 1];
         const [roll, bought] = await Promise.all([
           g.act(name, { type: 'ROLL_DICE' }, { expectedVersion: version }),
-          g.act('Bilal', { type: 'INSURE_PROPERTY', propertyKey: 'AGRA', expectedPremium: 500 }, { expectedVersion: version }),
+          g.act('Bilal', { type: 'INSURE_PROPERTY', propertyKey: 'AGRA', expectedPremium: 250 }, { expectedVersion: version }),
         ]);
         queuedDice = [];
         const policies = await policyRows(g);
@@ -422,7 +440,7 @@ describe.skipIf(!DATABASE_URL)('Property insurance through the handler (Postgres
           ok(await g.act(name, { type: 'ROLL_DICE' }));
           queuedDice = [];
           expect(await crisisRows(g)).toMatchObject([{ status: 'COVERED', policy_id: policies[0]!.id }]);
-          expect(await policyRows(g)).toMatchObject([{ status: 'CLAIMED' }]);
+          expect(await policyRows(g)).toMatchObject([{ status: 'ACTIVE', claimed_total: BILL }]);
           expect(await txRows(g, 'CRISIS_PAYMENT')).toHaveLength(0);
         }
         await ledgerOk(g);
@@ -448,6 +466,54 @@ describe.skipIf(!DATABASE_URL)('Property insurance through the handler (Postgres
     });
   });
 
+  describe('renewals and portfolios', () => {
+    it('a renewal is written once and linked to the period it renews, however many times it is sent at once', async () => {
+      const g = await setupGame('intermediate');
+      await give(g, 'Bilal', 'AGRA');
+      ok(await insure(g, 'Bilal', 'AGRA'));
+      await rollTo(g, FIRST); // the claim is paid: no no-claim discount, the early-buyer one stays
+      const [old] = await policyRows(g);
+      expect(old).toMatchObject({ claimed_total: BILL });
+      const version = (await g.snap()).state.version;
+      const results = await Promise.all(
+        [0, 1, 2].map(() => g.act('Bilal', { type: 'RENEW_INSURANCE', policyId: old!.id as string, expectedPremium: 200 }, { expectedVersion: version })),
+      );
+      expect(results.filter((r) => r.ok)).toHaveLength(1);
+      for (const r of results) if (!r.ok) expect(r.error).toMatchObject({ code: 'INSURANCE_NOT_ALLOWED', message: 'This policy has already been renewed.' });
+      const rows = await policyRows(g);
+      expect(rows).toHaveLength(2);
+      expect(rows[1]).toMatchObject({
+        renewal_of: old!.id,
+        premium_paid: 200,
+        base_premium: 250,
+        loyalty_percent: 20,
+        no_claim_percent: 0,
+        no_claim_periods: 0,
+        entry_year: 1,
+        start_clock: COVER,
+        expiry_clock: 2 * COVER,
+        claimed_total: 0,
+        status: 'ACTIVE',
+      });
+      expect((await txRows(g, 'INSURANCE_PREMIUM')).map((t) => Number(t.amount))).toEqual([250, 200]);
+      await ledgerOk(g);
+    });
+
+    it('a portfolio policy loses a traded property in the database too, and nothing else about it changes', async () => {
+      const g = await setupGame('intermediate');
+      await give(g, 'Asha', 'MUMBAI');
+      await give(g, 'Asha', 'DELHI');
+      ok(await g.act('Asha', { type: 'INSURE_PROPERTIES', propertyKeys: ['MUMBAI', 'DELHI'], expectedPremium: 475 }));
+      ok(await g.act('Asha', { type: 'CREATE_TRADE', toPlayerId: idOf(g, 'Bilal'), offeredPropertyKeys: ['MUMBAI'], requestedPropertyKeys: [], offeredMoney: 0, requestedMoney: 100 }));
+      const tradeId = (await g.snap()).state.trades[0]!.id;
+      ok(await g.act('Bilal', { type: 'ACCEPT_TRADE', tradeId }));
+      expect(await policyRows(g)).toMatchObject([
+        { property_keys: ['DELHI'], bought_keys: ['MUMBAI', 'DELHI'], status: 'ACTIVE', premium_paid: 475, portfolio_percent: 5, claimed_total: 0, closed_at: null },
+      ]);
+      await ledgerOk(g);
+    });
+  });
+
   describe('the database’s own guarantees', () => {
     it('a second crisis for the same checkpoint, a reopened bill and a deleted row are all refused', async () => {
       const g = await setupGame('intermediate');
@@ -465,7 +531,7 @@ describe.skipIf(!DATABASE_URL)('Property insurance through the handler (Postgres
       await expect(sql`update public.crisis_events set status = 'PENDING', paid = 0, settled_at = null where id = ${crisis!.id}`).rejects.toThrow(/already paid/);
     });
 
-    it('a policy’s terms cannot be rewritten, a closed policy is final, and a property has one running policy per owner', async () => {
+    it('a policy’s terms cannot be rewritten, its claims match its crises, a closed policy is final, and it is renewed once', async () => {
       const g = await setupGame('intermediate');
       await give(g, 'Bilal', 'AGRA');
       ok(await insure(g, 'Bilal', 'AGRA'));
@@ -473,12 +539,35 @@ describe.skipIf(!DATABASE_URL)('Property insurance through the handler (Postgres
       await expect(sql`update public.insurance_policies set expiry_clock = 9999 where id = ${policy!.id}`).rejects.toThrow(/cannot be changed/);
       await expect(sql`update public.insurance_policies set premium_paid = 1 where id = ${policy!.id}`).rejects.toThrow(/cannot be changed/);
       await expect(sql`delete from public.insurance_policies where id = ${policy!.id}`).rejects.toThrow(/permanent/);
+      // Claims: never written by hand, never above the limit, never taken back; a property is never added.
+      await expect(sql`update public.insurance_policies set claimed_total = 1000 where id = ${policy!.id}`).rejects.toThrow(/claims 1000 but its crises record 0/);
+      await expect(sql`update public.insurance_policies set claimed_total = 9000 where id = ${policy!.id}`).rejects.toThrow(/claims 9000 but its crises record 0|insurance_policies_limit_check/);
+      await expect(sql`update public.insurance_policies set payout_limit = 9000 where id = ${policy!.id}`).rejects.toThrow(/cannot be changed/);
+      await expect(sql`update public.insurance_policies set property_keys = '{AGRA,MUMBAI}' where id = ${policy!.id}`).rejects.toThrow(/insurance_policies_keys_check|cannot be added/);
+      const insert = (renewalOf: unknown, claimed = 0) => sql`
+        insert into public.insurance_policies (id, game_id, property_key, property_keys, bought_keys, owner_player_id, purchase_year, premium_paid,
+          base_premium, payout_limit, claimed_total, entry_year, renewal_of, start_clock, expiry_clock)
+        values (${randomUUID()}, ${g.gameId}, 'AGRA', '{AGRA}', '{AGRA}', ${idOf(g, 'Bilal')}, 1, 175, 250, 3000, ${claimed}, 1, ${renewalOf as string}, 72, 144)`;
+      await expect(insert(null, 3000)).rejects.toThrow(/nothing claimed/);
+      await insert(policy!.id);
+      await expect(insert(policy!.id)).rejects.toThrow(/insurance_policies_renewed_once_idx/);
+      // The claim is fixed with its crisis, and the policy's total follows it.
+      const { name: roller } = await rollTo(g, FIRST);
+      const [crisis] = await crisisRows(g);
+      expect(crisis).toMatchObject({ status: 'COVERED', covered: BILL, policy_id: policy!.id });
+      await expect(sql`update public.crisis_events set covered = 0 where id = ${crisis!.id}`).rejects.toThrow(/cannot be changed/);
+      await expect(sql`update public.insurance_policies set claimed_total = 0 where id = ${policy!.id}`).rejects.toThrow(/cannot be taken back/);
+      // A second claim on an exhausted policy is refused by the database itself.
       await expect(
-        sql`insert into public.insurance_policies (id, game_id, property_key, owner_player_id, purchase_year, premium_paid, start_clock, expiry_clock)
-            values (${randomUUID()}, ${g.gameId}, 'AGRA', ${idOf(g, 'Bilal')}, 1, 500, 0, 72)`,
-      ).rejects.toThrow(/insurance_policies_one_active_idx/);
-      await rollTo(g, FIRST);
-      await expect(sql`update public.insurance_policies set status = 'ACTIVE', claimed_crisis_id = null, closed_at = null where id = ${policy!.id}`).rejects.toThrow(/already claimed/);
+        sql`insert into public.crisis_events (id, game_id, checkpoint, checkpoint_clock, financial_year, property_key, owner_player_id, amount, covered, policy_id, status)
+            values (${randomUUID()}, ${g.gameId}, 50, 3600, 1, 'AGRA', ${idOf(g, 'Bilal')}, 3000, 1, ${policy!.id}, 'PENDING')`,
+      ).rejects.toThrow(/has only 0 of cover left/);
+      // Closed is final.
+      await sql`update public.games set intermediate = jsonb_set(intermediate, '{insurance,nextCheckpoint}', '99'::jsonb) where id = ${g.gameId}`;
+      ok(await g.act(roller, { type: 'END_TURN' }));
+      await rollTo(g, COVER + 2);
+      expect((await policyRows(g))[0]).toMatchObject({ status: 'EXPIRED' });
+      await expect(sql`update public.insurance_policies set status = 'ACTIVE', closed_at = null where id = ${policy!.id}`).rejects.toThrow(/already expired/);
     });
 
     it('the app’s own database roles cannot read or write policies or crises', async () => {

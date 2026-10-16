@@ -102,10 +102,15 @@ export const GameActionSchema = z.discriminatedUnion('type', [
    */
   z.object({ type: z.literal('INSURE_PROPERTY'), propertyKey, expectedPremium: rupees }).strict(),
   /**
-   * Insure several properties I own in one step ("insure all"): every one of them, or none.
-   * `expectedPremium` is the per-property price the player confirmed.
+   * Insure several properties I own under one portfolio policy ("insure all"): every one of them, or none.
+   * `expectedPremium` is the policy's total premium the player confirmed.
    */
   z.object({ type: z.literal('INSURE_PROPERTIES'), propertyKeys: z.array(propertyKey).min(1).max(26), expectedPremium: rupees }).strict(),
+  /**
+   * Renew a policy of mine for another coverage period (optional, never automatic). `expectedPremium` is the
+   * renewal price the player confirmed, discounts included. A policy is renewed once at most.
+   */
+  z.object({ type: z.literal('RENEW_INSURANCE'), policyId: id, expectedPremium: rupees }).strict(),
   /** Pay a pending crisis bill of mine in full. */
   z.object({ type: z.literal('PAY_CRISIS_BILL'), crisisId: id }).strict(),
   /** Go bankrupt over a crisis bill I cannot pay — only once every way of raising money is used up. */

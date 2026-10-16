@@ -288,15 +288,33 @@ export function obligationViolations(state: GameState): string[] {
     for (const [key, entry] of Object.entries(eco.market)) if (!Number.isInteger(entry.value) || entry.value <= 0) problems.push(`${key}: market value ${entry.value}`);
     const insurance = eco.insurance;
     if (insurance) {
-      const inForce = insurance.policies.filter((p) => p.status === 'ACTIVE').map((p) => `${p.propertyKey}:${p.ownerId}`);
-      if (new Set(inForce).size !== inForce.length) problems.push('two active policies on one property for one owner');
+      const running = insurance.policies.filter((p) => p.status === 'ACTIVE');
+      for (const [i, a] of running.entries()) {
+        for (const b of running.slice(i + 1)) {
+          const overlap = a.startClock < b.expiryClock && b.startClock < a.expiryClock;
+          if (a.ownerId === b.ownerId && overlap && a.propertyKeys.some((k) => b.propertyKeys.includes(k))) problems.push(`policies ${a.id} and ${b.id} cover one property at once`);
+        }
+        for (const key of a.propertyKeys) if (state.properties[key]?.ownerId !== a.ownerId) problems.push(`policy ${a.id}: insures ${key}, which its buyer no longer owns`);
+      }
+      const renewed = insurance.policies.flatMap((p) => (p.renewalOf ? [p.renewalOf] : []));
+      if (new Set(renewed).size !== renewed.length) problems.push('a policy renewed twice');
+      for (const p of insurance.policies) {
+        const paid = insurance.crises.filter((c) => c.policyId === p.id).reduce((sum, c) => sum + c.covered, 0);
+        if (paid !== p.claimedTotal) problems.push(`policy ${p.id}: claims ${p.claimedTotal}, crises say ${paid}`);
+        if (p.claimedTotal < 0 || p.claimedTotal > p.payoutLimit) problems.push(`policy ${p.id}: paid ${p.claimedTotal} of a ${p.payoutLimit} limit`);
+        if (p.premiumPaid <= 0 || p.premiumPaid !== p.pricing.premium) problems.push(`policy ${p.id}: premium ${p.premiumPaid} vs pricing ${p.pricing.premium}`);
+        if (p.propertyKeys.some((k) => !p.boughtKeys.includes(k))) problems.push(`policy ${p.id}: insures a property it was not bought for`);
+        if ((p.status === 'ACTIVE') !== (p.closedAt === null)) problems.push(`policy ${p.id}: ${p.status} with closedAt ${p.closedAt}`);
+      }
       for (const c of insurance.crises) {
-        if (c.paid < 0 || c.paid > c.amount) problems.push(`crisis ${c.id}: paid ${c.paid} of ${c.amount}`);
+        if (c.paid < 0 || c.covered < 0 || c.paid + c.covered > c.amount) problems.push(`crisis ${c.id}: paid ${c.paid} + covered ${c.covered} of ${c.amount}`);
+        if (c.status === 'COVERED' && c.covered !== c.amount) problems.push(`crisis ${c.id}: COVERED with ${c.covered} of ${c.amount}`);
+        if ((c.covered > 0) !== (c.policyId !== null)) problems.push(`crisis ${c.id}: covered ${c.covered} by policy ${c.policyId}`);
         if (c.status === 'PENDING') {
           if (state.status === 'FINISHED') problems.push(`crisis ${c.id}: still pending after the game finished`);
           if (!c.ownerId || byId.get(c.ownerId)?.status !== 'ACTIVE') problems.push(`crisis ${c.id}: pending on a player who is out of the game`);
         }
-        if (c.status === 'PAID' && c.paid !== c.amount) problems.push(`crisis ${c.id}: PAID with ${c.paid} of ${c.amount}`);
+        if (c.status === 'PAID' && c.paid + c.covered !== c.amount) problems.push(`crisis ${c.id}: PAID with ${c.paid} + ${c.covered} of ${c.amount}`);
       }
       for (const p of state.players) if (crisisOwed(eco, p.id) < 0) problems.push(`${p.name}: negative crisis debt`);
     }

@@ -9,6 +9,7 @@ import {
   redactEndVote,
   redactFinances,
   redactObjectives,
+  upgradeInsurance,
   type AuctionState,
   type EngineResult,
   type GameEventRecord,
@@ -201,7 +202,7 @@ export async function loadState(tx: Tx, game: Row): Promise<GameState> {
     // A row without a config (written before settings existed) plays by the rules as they were then.
     config: normalizeGameConfig(mode, game.config),
     objectives: mapObjectives(objectiveRows, game.objective_trades),
-    intermediate: (game.intermediate as GameState['intermediate']) ?? null,
+    intermediate: upgradeEconomy((game.intermediate as GameState['intermediate']) ?? null),
     status: game.status as GameState['status'],
     lobbyLocked: game.lobby_locked === true,
     pausedFrom: (game.paused_from as GameState['pausedFrom']) ?? null,
@@ -230,6 +231,12 @@ export async function loadState(tx: Tx, game: Row): Promise<GameState> {
  * This is the full, unredacted state — the engine needs every assignment. Only loadSnapshot may send
  * it to a device, and it removes the other players' objectives first.
  */
+/** A Capital game's economy document as the engine reads it today: insurance stored before the redesign is brought up to date. */
+function upgradeEconomy(eco: GameState['intermediate']): GameState['intermediate'] {
+  if (eco?.insurance) upgradeInsurance(eco.insurance);
+  return eco;
+}
+
 function mapObjectives(rows: readonly Row[], trades: unknown): ObjectivesState | null {
   if (rows.length === 0) return null;
   const assignments = Object.fromEntries(rows.map((r) => [r.player_id as string, r.objective_id as ObjectiveId]));
@@ -496,48 +503,60 @@ export async function persistResult(tx: Tx, prevVersion: number, result: EngineR
 /**
  * Property insurance (Capital Mode). The economy document written above is the state the engine
  * reads; these rows are its record, written from it in the same transaction, with the database's own
- * guarantees on top: one crisis per checkpoint per game, one active policy per property and owner,
- * and nothing final ever rewritten. If the two could ever disagree — a checkpoint resolved twice, a
- * settled bill reopened — the write fails and the whole action rolls back.
- * One statement per table, and only rows whose status moved are touched.
+ * guarantees on top: one crisis per checkpoint per game, a claim fixed when its crisis is written and never
+ * above the policy's limit, a policy renewed once, and nothing final ever rewritten. If the two could ever
+ * disagree — a checkpoint resolved twice, a claim paid twice, a settled bill reopened — the write fails and
+ * the whole action rolls back.
+ * Order matters: new policies first (a crisis names the policy that paid it), then crises (with their claims),
+ * then the policies whose status, properties or claims moved (their guard checks the claims against the crises).
  */
 async function persistInsurance(tx: Tx, s: GameState): Promise<void> {
   const insurance = s.intermediate?.insurance;
   if (!insurance) return;
-  if (insurance.policies.length) {
-    const rows = insurance.policies.map((p) => ({
+  const policies = tx.json(
+    insurance.policies.map((p) => ({
       id: p.id,
-      property_key: p.propertyKey,
+      property_key: p.boughtKeys[0],
+      property_keys: p.propertyKeys,
+      bought_keys: p.boughtKeys,
       owner_player_id: p.ownerId,
       purchase_year: p.purchaseYear,
       premium_paid: p.premiumPaid,
+      base_premium: p.pricing.basePremium,
+      portfolio_percent: p.pricing.portfolioPercent,
+      loyalty_percent: p.pricing.loyaltyPercent,
+      no_claim_percent: p.pricing.noClaimPercent,
       start_clock: p.startClock,
       expiry_clock: p.expiryClock,
+      payout_limit: p.payoutLimit,
+      deductible: p.deductible,
+      claimed_total: p.claimedTotal,
+      renewal_of: p.renewalOf,
+      entry_year: p.entryYear,
+      no_claim_periods: p.noClaimPeriods,
       status: p.status,
-      claimed_crisis_id: p.claimedCrisisId,
+      claimed_crisis_id: p.claimedCrisisId ?? null,
       created_at: p.createdAt,
       closed_at: p.closedAt,
-    }));
-    // Two statements, not one upsert: the table's insert guard ("a policy is bought active") runs on every
-    // row an INSERT proposes, before any conflict is looked at — so a policy that has since been claimed,
-    // expired or ended by a sale must never be proposed for insert again. New policies are inserted
-    // (always ACTIVE); a policy whose status moved is updated, once.
-    const policies = tx.json(rows as unknown as postgres.JSONValue);
+    })) as unknown as postgres.JSONValue,
+  );
+  if (insurance.policies.length) {
+    // Only policies the table does not have yet are proposed: the insert guard ("a policy is bought active,
+    // with nothing claimed") runs on every proposed row before any conflict is looked at. A new policy is
+    // written as bought; anything that moved since (in this action too) is updated below.
     await tx`
-      insert into public.insurance_policies (id, game_id, property_key, owner_player_id, purchase_year, premium_paid,
-        start_clock, expiry_clock, status, claimed_crisis_id, created_at, closed_at)
-      select x.id, ${s.id}::uuid, x.property_key, x.owner_player_id, x.purchase_year, x.premium_paid,
-        x.start_clock, x.expiry_clock, x.status, x.claimed_crisis_id, x.created_at, x.closed_at
+      insert into public.insurance_policies (id, game_id, property_key, property_keys, bought_keys, owner_player_id, purchase_year,
+        premium_paid, base_premium, portfolio_percent, loyalty_percent, no_claim_percent, start_clock, expiry_clock, payout_limit,
+        deductible, claimed_total, renewal_of, entry_year, no_claim_periods, status, claimed_crisis_id, created_at, closed_at)
+      select x.id, ${s.id}::uuid, x.property_key, x.bought_keys, x.bought_keys, x.owner_player_id, x.purchase_year,
+        x.premium_paid, x.base_premium, x.portfolio_percent, x.loyalty_percent, x.no_claim_percent, x.start_clock, x.expiry_clock, x.payout_limit,
+        x.deductible, 0, x.renewal_of, x.entry_year, x.no_claim_periods, 'ACTIVE', null, x.created_at, null
       from jsonb_to_recordset(${policies}) as x(
-        id uuid, property_key text, owner_player_id uuid, purchase_year int, premium_paid bigint,
-        start_clock int, expiry_clock int, status text, claimed_crisis_id uuid, created_at timestamptz, closed_at timestamptz)
-      where x.status = 'ACTIVE'
+        id uuid, property_key text, bought_keys text[], owner_player_id uuid, purchase_year int, premium_paid bigint, base_premium bigint,
+        portfolio_percent int, loyalty_percent int, no_claim_percent int, start_clock int, expiry_clock int, payout_limit bigint,
+        deductible bigint, renewal_of uuid, entry_year int, no_claim_periods int, created_at timestamptz)
+      where not exists (select 1 from public.insurance_policies p where p.id = x.id)
       on conflict (id) do nothing`;
-    await tx`
-      update public.insurance_policies p
-      set status = x.status, claimed_crisis_id = x.claimed_crisis_id, closed_at = x.closed_at
-      from jsonb_to_recordset(${policies}) as x(id uuid, status text, claimed_crisis_id uuid, closed_at timestamptz)
-      where p.id = x.id and p.game_id = ${s.id} and p.status is distinct from x.status`;
   }
   if (insurance.crises.length) {
     const rows = insurance.crises.map((c) => ({
@@ -549,21 +568,38 @@ async function persistInsurance(tx: Tx, s: GameState): Promise<void> {
       owner_player_id: c.ownerId,
       mortgaged: c.mortgaged,
       amount: c.amount,
+      covered: c.covered,
       paid: c.paid,
       policy_id: c.policyId,
       status: c.status,
       created_at: c.createdAt,
       settled_at: c.settledAt,
     }));
+    const crises = tx.json(rows as unknown as postgres.JSONValue);
+    // New crises only (the insert guard checks a claim against its policy's limit when the claim is made, once);
+    // then the bills settled since are closed. A second record for a checkpoint still fails on its unique key.
     await tx`
       insert into public.crisis_events (id, game_id, checkpoint, checkpoint_clock, financial_year, property_key,
-        owner_player_id, mortgaged, amount, paid, policy_id, status, created_at, settled_at)
+        owner_player_id, mortgaged, amount, covered, paid, policy_id, status, created_at, settled_at)
       select x.id, ${s.id}::uuid, x.checkpoint, x.checkpoint_clock, x.financial_year, x.property_key,
-        x.owner_player_id, x.mortgaged, x.amount, x.paid, x.policy_id, x.status, x.created_at, x.settled_at
-      from jsonb_to_recordset(${tx.json(rows as unknown as postgres.JSONValue)}) as x(
+        x.owner_player_id, x.mortgaged, x.amount, x.covered, x.paid, x.policy_id, x.status, x.created_at, x.settled_at
+      from jsonb_to_recordset(${crises}) as x(
         id uuid, checkpoint int, checkpoint_clock int, financial_year int, property_key text, owner_player_id uuid,
-        mortgaged boolean, amount bigint, paid bigint, policy_id uuid, status text, created_at timestamptz, settled_at timestamptz)
-      on conflict (id) do update set status = excluded.status, paid = excluded.paid, settled_at = excluded.settled_at
-      where public.crisis_events.status is distinct from excluded.status`;
+        mortgaged boolean, amount bigint, covered bigint, paid bigint, policy_id uuid, status text, created_at timestamptz, settled_at timestamptz)
+      where not exists (select 1 from public.crisis_events c where c.id = x.id)`;
+    await tx`
+      update public.crisis_events c
+      set status = x.status, paid = x.paid, settled_at = x.settled_at
+      from jsonb_to_recordset(${crises}) as x(id uuid, status text, paid bigint, settled_at timestamptz)
+      where c.id = x.id and c.game_id = ${s.id} and c.status is distinct from x.status`;
+  }
+  if (insurance.policies.length) {
+    await tx`
+      update public.insurance_policies p
+      set status = x.status, property_keys = x.property_keys, claimed_total = x.claimed_total,
+        claimed_crisis_id = x.claimed_crisis_id, closed_at = x.closed_at
+      from jsonb_to_recordset(${policies}) as x(id uuid, status text, property_keys text[], claimed_total bigint, claimed_crisis_id uuid, closed_at timestamptz)
+      where p.id = x.id and p.game_id = ${s.id}
+        and (p.status is distinct from x.status or p.property_keys is distinct from x.property_keys or p.claimed_total is distinct from x.claimed_total)`;
   }
 }

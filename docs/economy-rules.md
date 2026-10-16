@@ -164,6 +164,21 @@ deterministic id and applies once. Score bands only adjust the base rate of new 
 - A disconnected player is not removed: the game has no timeout of its own and nobody can remove a
   player after the start.
 
+## 8. Property insurance (Capital, `insurance.ts`)
+
+- Covered: the scheduled `PROPERTY_CRISIS` only. A policy covers one property or a portfolio for one
+  36-space period and pays each covered crisis automatically (loss − deductible ₹0) until it has paid its
+  limit, ₹3,000 a period; the owner pays anything above it. Premiums are deducted only when the player has
+  the cash: no debt is ever created for one.
+- Price (`insuranceQuote`): ₹250 × properties in Year 1, +₹50 a year, max ₹450 each; discounts add up and are
+  capped at 50%: portfolio 5% per extra property (max 25%); renewals only: early-buyer 20%/10% (line first
+  bought in Year 1/2) and no-claim 10% per claim-free period in a row (max 30%). A claim resets the no-claim
+  run only.
+- Renewal is optional; it opens after the period's crisis checkpoint and closes 12 spaces after cover ends.
+  No cancellation and no refunds, including at the end of the game. A property leaving its buyer leaves the
+  policy for good; the new owner is not covered. Paid claims reduce the crisis bill and so never appear in
+  net worth twice.
+
 ## Open decisions
 
 1. **Classic maturity duration** — 3 Starts is a proposal (matches the 3-year Personal Loan). Confirm or change `loans.maturityCircuits`.
@@ -177,3 +192,6 @@ deterministic id and applies once. Score bands only adjust the base rate of new 
    separate lifetime cap above the starting rate. Add one (for example +6 points) if wanted.
 5. **Classic secured lending** — Classic has its own single 10% bank loan and no secured product, so the
    "deed price" collateral basis is not used anywhere. Decide whether Classic should get a secured loan.
+6. **Insurance payout limit** — ₹3,000 a period (one crisis bill) is derived, not agreed: the schedule puts
+   exactly one crisis in each 36-space period, so the limit never binds by default and only matters if the
+   schedule is tightened or the bill raised. Confirm, or set `insurance.payoutLimit` (must be ≥ one bill).

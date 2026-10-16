@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { Button } from './Button';
 
@@ -9,6 +10,8 @@ interface ConfirmDialogProps {
   summary?: string;
   message: string;
   detail?: string;
+  /** Structured terms shown between the message and the detail (e.g. a price breakdown). */
+  children?: ReactNode;
   confirmTitle: string;
   cancelTitle?: string;
   /** How weighty the confirm is: an ordinary choice, one to think about, or one that can't be taken back. */
@@ -43,6 +46,7 @@ export function ConfirmDialog({
   summary,
   message,
   detail,
+  children,
   confirmTitle,
   cancelTitle = 'Cancel',
   intent,
@@ -80,6 +84,7 @@ export function ConfirmDialog({
               </View>
             ) : null}
             <Text className={`text-center text-base font-semibold leading-6 text-stone-700 ${summary ? 'mt-3' : 'mt-2'}`}>{message}</Text>
+            {children ? <View className="mt-3 self-stretch">{children}</View> : null}
             {detail ? <Text className="mt-1 text-center text-sm leading-5 text-stone-500">{detail}</Text> : null}
             {error ? (
               <Text accessibilityRole="alert" className="mt-3 self-stretch rounded-xl bg-red-50 px-3 py-2 text-center text-sm font-bold text-brick" testID={testID ? `${testID}-error` : undefined}>

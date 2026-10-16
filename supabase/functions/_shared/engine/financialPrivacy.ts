@@ -179,6 +179,7 @@ export const EVENT_PRIVACY: Readonly<Record<string, typeof PUBLIC | EventRule>> 
   // A player's own business.
   // Whether a property is insured is its owner's secret until a crisis strikes it (CRISIS_COVERED / CRISIS_STRUCK tell the table then).
   INSURANCE_PURCHASED: PRIVATE,
+  INSURANCE_RENEWED: PRIVATE,
   INSURANCE_ENDED: PRIVATE,
   INSURANCE_EXPIRED: PRIVATE,
   CARD_SHORTFALL: PRIVATE,

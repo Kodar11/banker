@@ -3,10 +3,13 @@ import { Pressable, Text, View } from 'react-native';
 import {
   activePolicyFor,
   averageSpaces,
+  coverageLength,
+  crisisDue,
   financesHidden,
   economyOf,
   gameClock,
   getDeed,
+  insuranceQuote,
   insureAllBlocker,
   INTERMEDIATE_RULES,
   nextCrisisClock,
@@ -15,10 +18,16 @@ import {
   policyStanding,
   premiumForYear,
   PROPERTY_KEYS,
+  remainingCover,
+  renewalBlocker,
+  renewalOf,
+  renewalOffer,
+  renewalWindow,
   uninsuredProperties,
   type CrisisRecord,
   type InsurancePolicy,
   type IntermediateState,
+  type PremiumBreakdown,
 } from '@/engine/index.ts';
 import { Button, Card, ConfirmDialog, Label, Pill, Screen } from '@/components/ui';
 import { useGameAction } from '@/features/game/useGameAction';
@@ -26,6 +35,7 @@ import type { GameView } from '@/features/game/useGameView';
 import { useGameStore } from '@/store/gameStore';
 import { formatINR } from '@/utils/currency';
 import { goBack, openProperty } from '@/utils/navigation';
+import { PolicyTerms } from './PolicyTerms';
 import { InsureButton } from './PropertyInsurance';
 
 const INS = INTERMEDIATE_RULES.insurance;
@@ -50,31 +60,110 @@ function Section({ title, count, children, testID }: { title: string; count: num
   );
 }
 
+const STANDING_PILL = {
+  IN_FORCE: <Pill tone="good">Active</Pill>,
+  UPCOMING: <Pill tone="good">Renewed · starts later</Pill>,
+  CLAIMED: <Pill tone="gold">Used up</Pill>,
+  ENDED: <Pill tone="warn">Ended</Pill>,
+  EXPIRED: <Pill>Expired</Pill>,
+} as const;
+
+const discounts = (p: PremiumBreakdown) =>
+  [p.portfolioPercent && `portfolio ${p.portfolioPercent}%`, p.loyaltyPercent && `early-buyer ${p.loyaltyPercent}%`, p.noClaimPercent && `no-claim ${p.noClaimPercent}%`]
+    .filter(Boolean)
+    .join(' · ') || 'none';
+
 function PolicyCard({ view, eco, policy }: { view: GameView; eco: IntermediateState; policy: InsurancePolicy }) {
-  const standing = policyStanding(view.snapshot.state, policy);
+  const { state } = view.snapshot;
+  const standing = policyStanding(state, policy);
+  const removed = policy.boughtKeys.filter((k) => !policy.propertyKeys.includes(k));
+  const claims = (eco.insurance?.crises ?? []).filter((c) => c.policyId === policy.id);
   return (
     <View className="rounded-2xl bg-white p-3" testID={`policy-${policy.id}`}>
       <View className="flex-row items-center justify-between gap-2">
-        <Text className="flex-1 text-base font-extrabold text-ink">{getDeed(policy.propertyKey).name}</Text>
-        {standing === 'IN_FORCE' ? (
-          <Pill tone="good">Active</Pill>
-        ) : standing === 'NOT_OWNED' ? (
-          <Pill tone="warn">Not in force</Pill>
-        ) : standing === 'CLAIMED' ? (
-          <Pill tone="gold">Claimed</Pill>
-        ) : (
-          <Pill>Expired</Pill>
-        )}
+        <Text className="flex-1 text-base font-extrabold text-ink">{policy.boughtKeys.map((k) => getDeed(k).name).join(', ')}</Text>
+        {STANDING_PILL[standing]}
       </View>
-      <Row label="Owner" value={view.playerName(policy.ownerId)} />
-      <Row label={`Premium paid · Year ${policy.purchaseYear}`} value={formatINR(policy.premiumPaid)} />
-      <Row label="Cover from" value={`${averageSpaces(eco, policy.startClock)} avg. spaces`} />
-      <Row label="Cover until" value={`${averageSpaces(eco, policy.expiryClock)} avg. spaces`} />
+      <Row label={`Premium paid · Year ${policy.purchaseYear}`} value={formatINR(policy.premiumPaid)} testID={`policy-${policy.id}-premium`} />
+      <Row label="Discounts" value={discounts(policy.pricing)} />
+      <Row label="Cover" value={`${averageSpaces(eco, policy.startClock)} → ${averageSpaces(eco, policy.expiryClock)} avg. spaces`} />
       {standing === 'IN_FORCE' ? <Row label="Cover left" value={`${policySpacesLeft(eco, policy)} spaces`} /> : null}
-      <Row label="Claimed" value={policy.status === 'CLAIMED' ? 'Yes — it waived one crisis bill' : 'No'} />
-      {standing === 'NOT_OWNED' ? (
-        <Text className="mt-1 text-xs font-semibold text-amber-800">You no longer own this property, so this policy protects nothing. It does not pass to the new owner.</Text>
+      <Row label="Claimed" value={`${formatINR(policy.claimedTotal)} of ${formatINR(policy.payoutLimit)}${claims.length ? ` · ${claims.length} crisis${claims.length > 1 ? 'es' : ''}` : ''}`} testID={`policy-${policy.id}-claimed`} />
+      {policy.status === 'ACTIVE' ? <Row label="Payout left" value={formatINR(remainingCover(policy))} testID={`policy-${policy.id}-remaining`} /> : null}
+      <Row label="Deductible" value={formatINR(policy.deductible)} />
+      {removed.length ? (
+        <Text className="mt-1 text-xs font-semibold text-amber-800" testID={`policy-${policy.id}-removed`}>
+          No longer insured: {removed.map((k) => getDeed(k).name).join(', ')} — it left your hands, and the cover does not pass to a new owner. Claims already paid stay paid.
+        </Text>
       ) : null}
+      <RenewPolicy view={view} eco={eco} policy={policy} />
+    </View>
+  );
+}
+
+/**
+ * Renewal of one policy: optional, and only ever on the player's say-so. Shows when renewal opens and, once it
+ * is open, the renewal price with its early-buyer and no-claim discounts before anything is paid.
+ */
+function RenewPolicy({ view, eco, policy }: { view: GameView; eco: IntermediateState; policy: InsurancePolicy }) {
+  const send = useGameAction();
+  const pending = useGameStore((s) => s.pendingAction);
+  const [ask, setAsk] = useState<{ premium: number; busy: boolean; error: string | null } | null>(null);
+  const { state } = view.snapshot;
+  const me = view.me;
+  const ins = eco.insurance;
+  if (!me || !ins || policy.ownerId !== me.id || renewalOf(ins, policy) || policy.status === 'ENDED' || policy.status === 'CLAIMED') return null;
+  const offer = renewalOffer(state, policy);
+  if (!offer) return null;
+  const clock = gameClock(eco);
+  const { opensAt, closesAt } = renewalWindow(eco, policy);
+  if (clock >= closesAt) return null;
+  const why = renewalBlocker(state, me.id, policy.id);
+  const timing =
+    clock < opensAt
+      ? `Renewal opens after this period's crisis, at ${averageSpaces(eco, opensAt)} avg. spaces.`
+      : `Renew by ${averageSpaces(eco, closesAt)} avg. spaces to keep your discounts${clock >= policy.expiryClock ? ' — cover has ended' : ''}.`;
+  const confirm = async () => {
+    if (!ask || ask.busy) return;
+    setAsk({ ...ask, busy: true, error: null });
+    const res = await send({ type: 'RENEW_INSURANCE', policyId: policy.id, expectedPremium: ask.premium }, { silent: true });
+    setAsk(res.ok ? null : { ...ask, busy: false, error: res.error.message });
+  };
+  return (
+    <View className="mt-2 gap-1" testID={`renew-${policy.id}`}>
+      <Text className="text-xs font-semibold text-stone-600" testID={`renew-${policy.id}-timing`}>
+        {timing}
+      </Text>
+      {clock >= opensAt ? (
+        <Button
+          title={`Renew · ${formatINR(offer.pricing.premium)}`}
+          size="sm"
+          variant="secondary"
+          testID={`renew-${policy.id}-button`}
+          disabled={!!why || !!pending}
+          onPress={() => setAsk({ premium: offer.pricing.premium, busy: false, error: null })}
+        />
+      ) : null}
+      {why && clock >= opensAt ? (
+        <Text className="text-center text-xs font-semibold text-stone-600" testID={`renew-${policy.id}-note`}>
+          {why}
+        </Text>
+      ) : null}
+      <ConfirmDialog
+        visible={!!ask}
+        icon="🛡️"
+        title="Renew this policy?"
+        summary={`Renewal premium ${formatINR(offer.pricing.premium)} · Year ${eco.year}`}
+        message={`Another ${INTERMEDIATE_RULES.insurance.coverageSpaces} spaces of cover for ${policy.propertyKeys.map((k) => getDeed(k).name).join(', ')}.`}
+        confirmTitle={`Pay ${formatINR(offer.pricing.premium)}`}
+        loading={ask?.busy}
+        error={ask?.error}
+        testID="renew-dialog"
+        onCancel={() => setAsk(null)}
+        onConfirm={confirm}
+      >
+        <PolicyTerms eco={eco} pricing={offer.pricing} startClock={offer.startClock} expiryClock={offer.expiryClock} claimedBefore={policy.claimedTotal} testID="renew-terms" />
+      </ConfirmDialog>
     </View>
   );
 }
@@ -86,7 +175,7 @@ function PolicyCard({ view, eco, policy }: { view: GameView; eco: IntermediateSt
 function InsureAll({ view }: { view: GameView }) {
   const send = useGameAction();
   const pending = useGameStore((s) => s.pendingAction);
-  const [ask, setAsk] = useState<{ keys: ReturnType<typeof uninsuredProperties>; premium: number; busy: boolean; error: string | null } | null>(null);
+  const [ask, setAsk] = useState<{ keys: ReturnType<typeof uninsuredProperties>; pricing: PremiumBreakdown; busy: boolean; error: string | null } | null>(null);
   const { state } = view.snapshot;
   const eco = economyOf(state);
   const me = view.me;
@@ -94,23 +183,24 @@ function InsureAll({ view }: { view: GameView }) {
   const keys = uninsuredProperties(state, me.id);
   // One property is insured from its own row; this is for the rest of the list at once.
   if (keys.length < 2) return null;
-  const premium = premiumForYear(eco.year);
+  const pricing = insuranceQuote({ year: eco.year, properties: keys.length });
   const why = insureAllBlocker(state, me.id, keys);
+  const clock = gameClock(eco);
   const confirm = async () => {
     if (!ask || ask.busy) return;
     setAsk({ ...ask, busy: true, error: null });
-    const res = await send({ type: 'INSURE_PROPERTIES', propertyKeys: ask.keys, expectedPremium: ask.premium }, { silent: true });
+    const res = await send({ type: 'INSURE_PROPERTIES', propertyKeys: ask.keys, expectedPremium: ask.pricing.premium }, { silent: true });
     setAsk(res.ok ? null : { ...ask, busy: false, error: res.error.message });
   };
   return (
     <View className="gap-1" testID="insure-all">
       <Button
-        title={`Insure all ${keys.length} · ${formatINR(keys.length * premium)}`}
+        title={`Insure all ${keys.length} · ${formatINR(pricing.premium)}`}
         size="md"
         testID="insure-all-button"
         disabled={!!why || !!pending}
-        accessibilityHint={`${formatINR(premium)} for each property that is not insured`}
-        onPress={() => setAsk({ keys, premium, busy: false, error: null })}
+        accessibilityHint={`One portfolio policy for every property that is not insured, ${pricing.portfolioPercent}% off`}
+        onPress={() => setAsk({ keys, pricing, busy: false, error: null })}
       />
       {why ? (
         <Text className="text-center text-xs font-semibold text-stone-600" testID="insure-all-note">
@@ -121,23 +211,25 @@ function InsureAll({ view }: { view: GameView }) {
         visible={!!ask}
         icon="🛡️"
         title={ask ? `Insure ${ask.keys.length} properties?` : 'Insure all?'}
-        summary={ask ? `${ask.keys.length} × ${formatINR(ask.premium)} = ${formatINR(ask.keys.length * ask.premium)} · Year ${eco.year}` : undefined}
-        message={ask ? ask.keys.map((k) => getDeed(k).name).join(', ') : ''}
-        detail={`Each gets its own policy: ${INS.coverageSpaces} spaces of average movement, one crisis bill waived, no refund and no automatic renewal.`}
-        confirmTitle={ask ? `Pay ${formatINR(ask.keys.length * ask.premium)}` : 'Pay'}
+        summary={ask ? `${formatINR(ask.pricing.premium)} for ${ask.keys.length} · Year ${eco.year}` : undefined}
+        message={ask ? `One portfolio policy: ${ask.keys.map((k) => getDeed(k).name).join(', ')}` : ''}
+        detail={ask ? `Separately they would cost ${formatINR(ask.keys.length * ask.pricing.basePremium)}.` : undefined}
+        confirmTitle={ask ? `Pay ${formatINR(ask.pricing.premium)}` : 'Pay'}
         loading={ask?.busy}
         error={ask?.error}
         testID="insure-all-dialog"
         onCancel={() => setAsk(null)}
         onConfirm={confirm}
-      />
+      >
+        {ask ? <PolicyTerms eco={eco} pricing={ask.pricing} startClock={clock} expiryClock={clock + coverageLength(eco)} testID="insure-all-terms" /> : null}
+      </ConfirmDialog>
     </View>
   );
 }
 
 const OUTCOME: Record<CrisisRecord['status'], string> = {
   SKIPPED: 'Nobody owned a property',
-  COVERED: 'Insured — bill waived',
+  COVERED: 'Insured — paid in full by insurance',
   PENDING: 'Bill pending',
   PAID: 'Bill paid',
   BANKRUPT: 'Owner went bankrupt',
@@ -174,9 +266,9 @@ export function InsuranceView({ view }: { view: GameView }) {
   const myKeys = me ? ownedBy(state, me.id) : [];
   const myPolicies = me ? insurance.policies.filter((p) => p.ownerId === me.id) : [];
   const standingOf = (p: InsurancePolicy) => policyStanding(state, p);
-  const active = myPolicies.filter((p) => standingOf(p) === 'IN_FORCE' || standingOf(p) === 'NOT_OWNED');
-  const claimed = myPolicies.filter((p) => standingOf(p) === 'CLAIMED');
-  const expired = myPolicies.filter((p) => standingOf(p) === 'EXPIRED');
+  const active = myPolicies.filter((p) => standingOf(p) === 'IN_FORCE' || standingOf(p) === 'UPCOMING');
+  const claimed = myPolicies.filter((p) => p.claimedTotal > 0 && standingOf(p) !== 'IN_FORCE' && standingOf(p) !== 'UPCOMING');
+  const expired = myPolicies.filter((p) => !active.includes(p) && !claimed.includes(p));
   const others = PROPERTY_KEYS.filter((k) => {
     const owner = state.properties[k].ownerId;
     return owner !== null && owner !== me?.id;
@@ -205,8 +297,9 @@ export function InsuranceView({ view }: { view: GameView }) {
         </View>
         <Text className="mt-3 text-sm text-stone-700" testID="insurance-explainer">
           Every {INS.crisisIntervalSpaces} spaces of average movement (the first after {INS.firstCrisisSpaces}) a crisis strikes one owned property, picked at random across all players. Its
-          owner owes {formatINR(INS.crisisBill)} at once, and the game waits until it is paid. A policy on that property waives the bill — one crisis only — and lasts{' '}
-          {INS.coverageSpaces} spaces of average movement. It is never renewed or refunded automatically.
+          owner owes {formatINR(INS.crisisBill)} at once, and the game waits until it is paid. A policy lasts {INS.coverageSpaces} spaces of average movement and pays every crisis on
+          its properties automatically, up to {formatINR(INS.payoutLimit)} in total ({formatINR(INS.deductible)} deductible). Insure several at once for up to {INS.portfolioMaxPercent}% off;
+          renewing keeps early-buyer and no-claim discounts. No cancellation, no refunds.
         </Text>
         <View className="mt-3 rounded-2xl bg-white p-3">
           <Row label="Average spaces moved so far" value={String(averageSpaces(eco, clock))} testID="insurance-clock" />
@@ -236,7 +329,7 @@ export function InsuranceView({ view }: { view: GameView }) {
                     <View className="flex-1">
                       <Text className="text-base font-extrabold text-ink">{getDeed(key).name}</Text>
                       <Text className="text-xs font-semibold text-stone-500">
-                        {policy ? `Covered for ${policySpacesLeft(eco, policy)} more spaces` : `Not insured · ${formatINR(INS.crisisBill)} at risk`}
+                        {policy ? `Covered for ${policySpacesLeft(eco, policy)} more spaces · ${formatINR(remainingCover(policy))} payout left` : `Not insured · ${formatINR(INS.crisisBill)} at risk`}
                         {mortgaged ? ' · Mortgaged' : ''}
                       </Text>
                     </View>
@@ -263,12 +356,12 @@ export function InsuranceView({ view }: { view: GameView }) {
                 <PolicyCard key={p.id} view={view} eco={eco} policy={p} />
               ))}
             </Section>
-            <Section title="Claimed" count={claimed.length} testID="policies-claimed">
+            <Section title="Paid out" count={claimed.length} testID="policies-claimed">
               {claimed.map((p) => (
                 <PolicyCard key={p.id} view={view} eco={eco} policy={p} />
               ))}
             </Section>
-            <Section title="Expired" count={expired.length} testID="policies-expired">
+            <Section title="Expired or ended" count={expired.length} testID="policies-expired">
               {expired.map((p) => (
                 <PolicyCard key={p.id} view={view} eco={eco} policy={p} />
               ))}
@@ -308,6 +401,8 @@ export function InsuranceView({ view }: { view: GameView }) {
                 <Text className={`text-xs font-semibold ${c.status === 'PENDING' ? 'text-brick' : 'text-stone-600'}`}>
                   {OUTCOME[c.status]}
                   {c.propertyKey && c.status !== 'COVERED' ? ` · ${formatINR(c.amount)}` : ''}
+                  {c.covered > 0 && c.status !== 'COVERED' ? ` · insurance paid ${formatINR(c.covered)}, owner ${formatINR(c.amount - c.covered)}` : ''}
+                  {c.status === 'PENDING' && crisisDue(c) !== c.amount ? ` · ${formatINR(crisisDue(c))} due` : ''}
                 </Text>
               </View>
             ))}

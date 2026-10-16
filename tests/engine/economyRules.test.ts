@@ -203,7 +203,7 @@ describe('final net worth — Capital', () => {
     expect(inst.status).toBe('DUE');
     eco(g).insurance!.crises.push({
       id: 'crisis-1', checkpoint: 99, checkpointClock: 0, year: 2, propertyKey: 'MUMBAI', ownerId: g.id('Asha'), mortgaged: false,
-      amount: 3000, paid: 0, policyId: null, status: 'PENDING', createdAt: g.ctx().now, settledAt: null,
+      amount: 3000, covered: 0, paid: 0, policyId: null, status: 'PENDING', createdAt: g.ctx().now, settledAt: null,
     });
     const sheet = balanceSheet(g.state, g.id('Asha'));
     const agra = getDeed('AGRA');
@@ -600,7 +600,7 @@ describe('gifts and trades while a payment is owed', () => {
     const g = capital();
     eco(g).insurance!.crises.push({
       id: 'crisis-1', checkpoint: 99, checkpointClock: 0, year: 1, propertyKey: null, ownerId: g.id('Asha'), mortgaged: false,
-      amount: 3000, paid: 0, policyId: null, status: 'PENDING', createdAt: g.ctx().now, settledAt: null,
+      amount: 3000, covered: 0, paid: 0, policyId: null, status: 'PENDING', createdAt: g.ctx().now, settledAt: null,
     });
     expect(mandatoryPaymentsOwed(g.state, g.id('Asha'))).toBe(3000);
     const before = JSON.stringify(g.state);

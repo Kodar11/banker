@@ -6,7 +6,8 @@ import { INTERMEDIATE_RULES as IR } from './intermediateConfig.ts';
 import { seizeLoanCollateral } from './intermediateEngine.ts';
 import { loanOffers } from './intermediateSelectors.ts';
 import { economyOf, isOpenLoan, loanPayoff, loansOf, pendingCrises, releaseCollateral, type IntermediateLoan } from './intermediateState.ts';
-import type { CrisisRecord } from './insuranceState.ts';
+import { releaseInsurance } from './insurance.ts';
+import { crisisDue, type CrisisRecord } from './insuranceState.ts';
 import { BUSINESS_MVP_RULES as RULES } from './rules.ts';
 import {
   classicBorrowingBlock,
@@ -269,7 +270,7 @@ function crisisClaim(d: Draft, player: PlayerState, crisis: CrisisRecord, kind: 
     kind: 'CRISIS',
     label: `Crisis bill (${name})`,
     creditorIds: [],
-    owed: () => crisis.amount - crisis.paid,
+    owed: () => crisisDue(crisis),
     pay(amount) {
       d.transfer({ type: 'CRISIS_PAYMENT', from: player.id, to: null, amount, propertyKey: crisis.propertyKey, memo: `Crisis bill (${name})` });
       crisis.paid += amount;
@@ -280,8 +281,8 @@ function crisisClaim(d: Draft, player: PlayerState, crisis: CrisisRecord, kind: 
       d.event(
         unpaid === 0 ? 'CRISIS_SETTLED' : 'CRISIS_UNPAID',
         player.id,
-        unpaid === 0 ? `${player.name} paid the ${formatINR(crisis.amount)} crisis bill for ${name}` : `${player.name} left ${formatINR(unpaid)} of the crisis bill for ${name} unpaid`,
-        { crisisId: crisis.id, checkpoint: crisis.checkpoint, propertyKey: crisis.propertyKey, amount: crisis.amount, paid: crisis.paid },
+        unpaid === 0 ? `${player.name} paid the ${formatINR(crisis.paid)} crisis bill for ${name}` : `${player.name} left ${formatINR(unpaid)} of the crisis bill for ${name} unpaid`,
+        { crisisId: crisis.id, checkpoint: crisis.checkpoint, propertyKey: crisis.propertyKey, amount: crisis.amount, covered: crisis.covered, paid: crisis.paid },
       );
     },
   };
@@ -409,6 +410,8 @@ function liquidate(d: Draft, player: PlayerState, target: number): number {
 
 function clearProperty(d: Draft, key: PropertyKey): void {
   const prop = d.state.properties[key];
+  // Its owner's insurance on it ends (claims already paid stay paid; no refund).
+  releaseInsurance(d, key, prop.ownerId, 'RETURNED_TO_BANK');
   prop.ownerId = null;
   prop.houses = 0;
   prop.hotel = false;

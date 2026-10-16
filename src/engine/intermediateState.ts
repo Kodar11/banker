@@ -1,5 +1,5 @@
 import type { PropertyKey } from './businessBoard.ts';
-import type { CrisisRecord, InsuranceState } from './insuranceState.ts';
+import { crisisDue, type CrisisRecord, type InsuranceState } from './insuranceState.ts';
 import { INTERMEDIATE_RULES as IR, type CreditEventType, type LoanProductKey } from './intermediateConfig.ts';
 import { accruedInterest } from './intermediateFinance.ts';
 
@@ -206,7 +206,7 @@ export function pendingCrises(state: ModeState): CrisisRecord[] {
 export function crisisOwed(eco: Pick<IntermediateState, 'insurance'>, playerId: string): number {
   return (eco.insurance?.crises ?? [])
     .filter((c) => c.ownerId === playerId && (c.status === 'PENDING' || c.status === 'UNPAID'))
-    .reduce((sum, c) => sum + (c.amount - c.paid), 0);
+    .reduce((sum, c) => sum + crisisDue(c), 0);
 }
 
 /** Total spaces moved by all starting players: the shared game clock every loan timeline runs on. */

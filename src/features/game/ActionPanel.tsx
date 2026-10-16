@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { bankruptcyBlockerNow, DECK_LABELS, economyOf, getDeed, BUSINESS_MVP_RULES, INTERMEDIATE_RULES, premiumForYear, type GameAction } from '@/engine/index.ts';
+import { bankruptcyBlockerNow, DECK_LABELS, economyOf, getDeed, BUSINESS_MVP_RULES, INTERMEDIATE_RULES, insuranceQuote, type GameAction } from '@/engine/index.ts';
 import { Button, Card, ConfirmDialog, Label, Pill } from '@/components/ui';
 import { useGameStore } from '@/store/gameStore';
 import { formatINR } from '@/utils/currency';
@@ -75,7 +75,7 @@ export function ActionPanel({ view, send, onOpenLoan }: ActionPanelProps) {
       const canAfford = me.balance >= price;
       // Capital Mode with insurance only: buy and insure in one tap. Null in a Classic game.
       const eco = economyOf(state);
-      const premium = eco?.insurance ? premiumForYear(eco.year) : null;
+      const premium = eco?.insurance ? insuranceQuote({ year: eco.year, properties: 1 }).premium : null;
       return (
         <Card testID="buy-card">
           <Pill tone="good">Property available</Pill>
@@ -108,7 +108,7 @@ export function ActionPanel({ view, send, onOpenLoan }: ActionPanelProps) {
                 <Text className="text-center text-xs font-semibold text-stone-600" testID="buy-insured-note">
                   {canAfford && me.balance < price + premium
                     ? `Not enough money to insure it as well (${formatINR(premium)}).`
-                    : `Insurance waives one ${formatINR(INTERMEDIATE_RULES.insurance.crisisBill)} crisis bill within ${INTERMEDIATE_RULES.insurance.coverageSpaces} spaces of average movement. You can also insure it later from its deed.`}
+                    : `Insurance pays its crisis bills for ${INTERMEDIATE_RULES.insurance.coverageSpaces} spaces of average movement, up to ${formatINR(INTERMEDIATE_RULES.insurance.payoutLimit)}. No refunds. You can also insure it later from its deed.`}
                 </Text>
               </View>
             ) : null}

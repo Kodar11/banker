@@ -35,13 +35,13 @@ import {
 import {
   assertCrisisBankruptcy,
   buyInsurance,
-  buyInsuranceForAll,
-
   closePendingCrises,
   crisisGate,
-  endInsuranceOnSale,
+  expireInsuranceAtGameEnd,
   forgetUndoFor,
   payCrisisBill,
+  releaseInsurance,
+  renewInsurance,
 } from './insurance.ts';
 import { advanceCalendar, initEconomy, payDefaultedLoan, payInstallment, prepayLoan, recordDiceMovement, refinanceLoan, takeLoan } from './intermediateEngine.ts';
 import { INTERMEDIATE_RULES as IR } from './intermediateConfig.ts';
@@ -328,7 +328,7 @@ export function applyAction(state: GameState, actorId: string, rawAction: unknow
     case 'BUY_PROPERTY': {
       const bought = buyProperty(d, actor);
       // Capital Mode: "buy and insure" is one action — if the policy can't be bought, nothing is.
-      if (action.insurePremium !== undefined) buyInsurance(d, actor, bought, action.insurePremium);
+      if (action.insurePremium !== undefined) buyInsurance(d, actor, [bought], action.insurePremium);
       break;
     }
     case 'DECLINE_PROPERTY':
@@ -401,10 +401,13 @@ export function applyAction(state: GameState, actorId: string, rawAction: unknow
       break;
     // Property insurance and crisis bills. Each of these refuses a game without insurance.
     case 'INSURE_PROPERTY':
-      buyInsurance(d, actor, action.propertyKey, action.expectedPremium);
+      buyInsurance(d, actor, [action.propertyKey], action.expectedPremium);
       break;
     case 'INSURE_PROPERTIES':
-      buyInsuranceForAll(d, actor, action.propertyKeys, action.expectedPremium);
+      buyInsurance(d, actor, action.propertyKeys, action.expectedPremium);
+      break;
+    case 'RENEW_INSURANCE':
+      renewInsurance(d, actor, action.policyId, action.expectedPremium);
       break;
     case 'PAY_CRISIS_BILL':
       payCrisisBill(d, actor, action.crisisId);
@@ -1296,7 +1299,7 @@ function finalizeResale(d: Draft, auction: AuctionState, resale: ResaleTerms): v
     propertyKey: deed.key,
     memo: `${deed.name} sold at auction by ${sellerName}`,
   });
-  endInsuranceOnSale(d, deed.key, resale.sellerId);
+  releaseInsurance(d, deed.key, resale.sellerId, 'PROPERTY_SOLD');
   // Only the owner changes: houses, hotel and everything else on the property go with it untouched.
   prop.ownerId = winner.id;
   auction.winnerId = winner.id;
@@ -1737,8 +1740,10 @@ function finishGame(d: Draft, reason: 'VOTE' | 'DURATION_VOTE' | 'DURATION_REACH
   expireTrades(d, () => true);
   d.state.undoStack = [];
   d.state.undoRequest = null;
-  // Capital Mode: a crisis bill still open is collected first, so it is in the final balances.
+  // Capital Mode: a crisis bill still open is collected first, so it is in the final balances. Insurance cover
+  // ends with the game: no refund for the unused part, and no payout because it ended.
   closePendingCrises(d);
+  expireInsuranceAtGameEnd(d);
   // Secret-objective bonuses are checked and paid here, before the ranking: the winner below is decided
   // on the final balances, so the declared result and the money always agree. (Nothing to do in Classic.)
   finalizeObjectives(d);
@@ -1970,6 +1975,8 @@ function propertyAction(d: Draft, actor: PlayerState, key: PropertyKey, kind: Pr
       prop.ownerId = null;
       d.event('PROPERTY_SOLD', actor.id, `${actor.name} sold ${deed.name} to the bank for ${formatINR(amount)}`, { propertyKey: key });
       undoable(`${actor.name} sold ${deed.name} to the bank`);
+      // Insurance on it ends with the sale. An undo could give the property back but not the cover, so it is final.
+      if (releaseInsurance(d, key, actor.id, 'PROPERTY_SOLD')) forgetUndoFor(d, key);
       return;
     }
     case 'MORTGAGE_PROPERTY': {
@@ -2170,6 +2177,13 @@ function acceptTrade(d: Draft, actor: PlayerState, tradeId: string): void {
     requestedMoney: trade.requestedMoney,
   });
   recordUndoable(d, { actionType: 'ACCEPT_TRADE', actorId: actor.id, description: `Trade: ${summary}`, before });
+  // Insurance does not travel with a property: each side's cover on what it gave away ends here, and the trade is
+  // then final (an undo could hand the properties back, but not the cover).
+  const released = [
+    ...trade.offeredPropertyKeys.filter((key) => releaseInsurance(d, key, from.id, 'PROPERTY_TRADED')),
+    ...trade.requestedPropertyKeys.filter((key) => releaseInsurance(d, key, actor.id, 'PROPERTY_TRADED')),
+  ];
+  for (const key of released) forgetUndoFor(d, key);
   recordObjectiveTrade(d, trade);
   pruneTrades(d);
 }

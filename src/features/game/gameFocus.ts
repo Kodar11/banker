@@ -3,6 +3,7 @@ import {
   clockLabel,
   DECK_LABELS,
   economyOf,
+  crisisDue,
   getDeed,
   INTERMEDIATE_RULES,
   isPropertyKey,
@@ -305,8 +306,8 @@ export function pickContext(view: Pick<GameView, 'snapshot' | 'me' | 'current' |
       kind: 'payment',
       icon: '⚠️',
       label: 'Crisis · payment required',
-      title: `${mine ? 'You owe' : `${view.playerName(crisis.ownerId)} owes`} ${formatINR(crisis.amount - crisis.paid)}`,
-      detail: `Crisis at ${getDeed(crisis.propertyKey).name}, not insured · the game waits until it is settled`,
+      title: `${mine ? 'You owe' : `${view.playerName(crisis.ownerId)} owes`} ${formatINR(crisisDue(crisis))}`,
+      detail: `Crisis at ${getDeed(crisis.propertyKey).name}, ${crisis.covered > 0 ? `insurance paid ${formatINR(crisis.covered)}` : 'not insured'} · the game waits until it is settled`,
       cta: squareTarget(positionOfProperty(crisis.propertyKey), 'property'),
     };
   }

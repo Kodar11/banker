@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Text, View } from 'react-native';
-import { averageSpaces, crisisBankruptcyBlocker, crisisRecoveryOptions, economyOf, getDeed, type CrisisRecord, type GameAction } from '@/engine/index.ts';
+import { averageSpaces, crisisBankruptcyBlocker, crisisDue, crisisRecoveryOptions, economyOf, getDeed, remainingCover, type CrisisRecord, type GameAction } from '@/engine/index.ts';
 import { Button, Card, ConfirmDialog, Label, Pill, Sheet } from '@/components/ui';
 import { sendFailure } from '@/features/game/useGameAction';
 import type { GameView } from '@/features/game/useGameView';
@@ -36,7 +36,7 @@ export function CrisisSettlement({ view, crisis, send, onOpenLoan, onOpenPropert
   if (!me || !eco || !crisis.propertyKey) return null;
 
   const deed = getDeed(crisis.propertyKey);
-  const due = crisis.amount - crisis.paid;
+  const due = crisisDue(crisis);
   const short = due - me.balance;
   const options = crisisRecoveryOptions(state, me.id);
   const bankruptcyBlocked = crisisBankruptcyBlocker(state, me.id, crisis);
@@ -57,7 +57,10 @@ export function CrisisSettlement({ view, crisis, send, onOpenLoan, onOpenPropert
             {formatINR(due)}
           </Text>
           <Text className="mt-1 text-sm font-semibold text-stone-700" testID="crisis-reason">
-            {deed.name} was not insured{crisis.mortgaged ? ' (a mortgaged property can be struck too)' : ''}. Nothing else about it changes.
+            {crisis.covered > 0
+              ? `The bill is ${formatINR(crisis.amount)}. Your insurance paid ${formatINR(crisis.covered)} — all it had left this period — so the rest is yours.`
+              : `${deed.name} was not insured${crisis.mortgaged ? ' (a mortgaged property can be struck too)' : ''}.`}{' '}
+            Nothing else about it changes.
           </Text>
           <Text className="mt-2 text-sm text-stone-700" testID="crisis-cash">
             Your cash: {formatINR(me.balance)}
@@ -160,6 +163,8 @@ export function CrisisNotice({ view, suspended }: CrisisNoticeProps) {
   const owner = latest.ownerId === view.me?.id ? 'You' : view.playerName(latest.ownerId);
   const covered = latest.status === 'COVERED';
   const pending = latest.status === 'PENDING';
+  // Only the policy's owner is sent the policy: what it has left is theirs to see.
+  const policy = latest.policyId ? eco.insurance?.policies.find((p) => p.id === latest.policyId) : undefined;
   const close = () => setAnnounced(latest.id);
   return (
     <Sheet visible title={`Crisis at ${deed.name}`} onClose={close} testID="crisis-notice">
@@ -175,9 +180,16 @@ export function CrisisNotice({ view, suspended }: CrisisNoticeProps) {
         </Text>
         <Text className="mt-2 text-sm font-semibold text-stone-700" testID="crisis-notice-outcome">
           {covered
-            ? `Insured: the bill is waived and the policy is used up. ${owner === 'You' ? 'You pay' : `${owner} pays`} nothing.`
-            : `Not insured: ${owner === 'You' ? 'you owe' : `${owner} owes`} the bank ${formatINR(latest.amount)}.`}
+            ? `Covered: insurance paid the ${formatINR(latest.covered)} bill. ${owner === 'You' ? 'You pay' : `${owner} pays`} nothing.`
+            : latest.covered > 0
+              ? `Partly covered: insurance paid ${formatINR(latest.covered)}, its limit; ${owner === 'You' ? 'you owe' : `${owner} owes`} the bank ${formatINR(latest.amount - latest.covered)}.`
+              : `Not insured: ${owner === 'You' ? 'you owe' : `${owner} owes`} the bank ${formatINR(latest.amount)}.`}
         </Text>
+        {policy ? (
+          <Text className="mt-1 text-sm text-stone-700" testID="crisis-notice-remaining">
+            Your policy has {formatINR(remainingCover(policy))} of {formatINR(policy.payoutLimit)} left to pay this period.
+          </Text>
+        ) : null}
         <Text className={`mt-2 text-sm font-extrabold ${pending ? 'text-brick' : 'text-green-700'}`} testID="crisis-notice-status">
           {pending ? `Pending — the game waits until ${owner === 'You' ? 'you settle' : `${owner} settles`} it.` : covered ? 'Settled by insurance.' : 'Settled.'}
         </Text>

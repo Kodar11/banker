@@ -77,7 +77,7 @@ function rollTo(f: Fixture, target: number): Fixture {
   return f;
 }
 
-const insure = (f: Fixture, name: string, propertyKey: PropertyKey) => f.act(name, { type: 'INSURE_PROPERTY', propertyKey, expectedPremium: 500 });
+const insure = (f: Fixture, name: string, propertyKey: PropertyKey) => f.act(name, { type: 'INSURE_PROPERTY', propertyKey, expectedPremium: 250 });
 
 /** The server, played by the fixture: applies what the phone sends as `name` and answers with the new snapshot. */
 function serveAs(f: Fixture, name: string) {
@@ -156,29 +156,34 @@ describe('Insurance screen', () => {
     f.loadAs('Asha');
     await render(<InsuranceView view={viewFor(f, 'Asha')} />);
     expect(screen.getByTestId('insurance-year')).toHaveTextContent('Year 1');
-    expect(screen.getByTestId('insurance-current-premium')).toHaveTextContent('₹500');
+    expect(screen.getByTestId('insurance-current-premium')).toHaveTextContent('₹250');
     expect(screen.getByTestId('insurance-explainer')).toHaveTextContent(/owes ₹3,000 at once/);
-    expect(screen.getByTestId('insurance-explainer')).toHaveTextContent(/one crisis only/);
+    expect(screen.getByTestId('insurance-explainer')).toHaveTextContent(/up to ₹3,000 in total \(₹0 deductible\)/);
+    expect(screen.getByTestId('insurance-explainer')).toHaveTextContent(/No cancellation, no refunds/);
     expect(screen.getByTestId('insurance-next-crisis')).toHaveTextContent(/18 avg\. spaces/);
 
     // My properties: what protects each, and the way to insure the one that is not.
-    expect(screen.getByTestId('insurance-property-MUMBAI')).toHaveTextContent(/Covered for 36 more spaces/);
+    expect(screen.getByTestId('insurance-property-MUMBAI')).toHaveTextContent(/Covered for 36 more spaces · ₹3,000 payout left/);
     expect(screen.queryByTestId('insure-MUMBAI')).toBeNull();
     expect(screen.getByTestId('insurance-property-DELHI')).toHaveTextContent(/Not insured · ₹3,000 at risk · Mortgaged/);
-    expect(screen.getByTestId('insure-DELHI')).toHaveTextContent('Insure property · ₹500');
+    expect(screen.getByTestId('insure-DELHI')).toHaveTextContent('Insure property · ₹250');
 
     // My policy, in full.
     const mine = ins(f).policies.find((p) => p.ownerId === f.ids.Asha)!;
     const active = within(screen.getByTestId('policies-active'));
     const card = active.getByTestId(`policy-${mine.id}`);
     expect(card).toHaveTextContent(/Mumbai/);
-    expect(card).toHaveTextContent(/Owner\s*Asha/);
-    expect(card).toHaveTextContent(/Premium paid · Year 1\s*₹500/);
-    expect(card).toHaveTextContent(/Cover from\s*0 avg\. spaces/);
-    expect(card).toHaveTextContent(/Cover until\s*36 avg\. spaces/);
-    expect(card).toHaveTextContent(/Claimed\s*No/);
-    expect(screen.getByTestId('policies-claimed')).toHaveTextContent('Claimed · 0');
-    expect(screen.getByTestId('policies-expired')).toHaveTextContent('Expired · 0');
+    expect(card).toHaveTextContent(/Premium paid · Year 1\s*₹250/);
+    expect(card).toHaveTextContent(/Discounts\s*none/);
+    expect(card).toHaveTextContent(/Cover\s*0 → 36 avg\. spaces/);
+    expect(screen.getByTestId(`policy-${mine.id}-claimed`)).toHaveTextContent(/Claimed\s*₹0 of ₹3,000/);
+    expect(screen.getByTestId(`policy-${mine.id}-remaining`)).toHaveTextContent(/Payout left\s*₹3,000/);
+    expect(card).toHaveTextContent(/Deductible\s*₹0/);
+    // Renewal is not open yet: it opens once this period's crisis has passed.
+    expect(screen.getByTestId(`renew-${mine.id}-timing`)).toHaveTextContent(/Renewal opens after this period's crisis, at 18 avg\. spaces/);
+    expect(screen.queryByTestId(`renew-${mine.id}-button`)).toBeNull();
+    expect(screen.getByTestId('policies-claimed')).toHaveTextContent('Paid out · 0');
+    expect(screen.getByTestId('policies-expired')).toHaveTextContent('Expired or ended · 0');
 
     // Other players: whether a property is insured, and nothing more.
     const theirs = ins(f).policies.find((p) => p.ownerId === f.ids.Bilal)!;
@@ -195,19 +200,23 @@ describe('Insurance screen', () => {
     expect(router.back).toHaveBeenCalledTimes(1);
   });
 
-  it('a claimed policy moves to Claimed, the crisis is listed, and the property can be insured again', async () => {
+  it('after a claim the policy shows what it paid and has left, the crisis is listed, and renewal opens', async () => {
     const f = game();
     give(f, 'Asha', 'MUMBAI');
     insure(f, 'Asha', 'MUMBAI');
     rollTo(f, FIRST).loadAs('Asha');
     await render(<InsuranceView view={viewFor(f, 'Asha')} />);
-    expect(screen.getByTestId('policies-active')).toHaveTextContent('Active · 0');
-    const claimed = within(screen.getByTestId('policies-claimed'));
-    expect(claimed.getByText('Mumbai')).toBeTruthy();
-    expect(screen.getByTestId('policies-claimed')).toHaveTextContent(/Claimed\s*Yes — it waived one crisis bill/);
+    const p = ins(f).policies[0]!;
+    // Still in force for the rest of its period, with its limit used.
+    const active = within(screen.getByTestId('policies-active'));
+    expect(active.getByText('Mumbai')).toBeTruthy();
+    expect(screen.getByTestId(`policy-${p.id}-claimed`)).toHaveTextContent(/Claimed\s*₹3,000 of ₹3,000 · 1 crisis/);
+    expect(screen.getByTestId(`policy-${p.id}-remaining`)).toHaveTextContent(/Payout left\s*₹0/);
     expect(screen.getByTestId('crisis-row-1')).toHaveTextContent(/18 avg\. spaces · Mumbai \(Asha\)/);
-    expect(screen.getByTestId('crisis-row-1')).toHaveTextContent(/Insured — bill waived/);
-    expect(screen.getByTestId('insure-MUMBAI')).toHaveTextContent('Insure again · ₹500');
+    expect(screen.getByTestId('crisis-row-1')).toHaveTextContent(/Insured — paid in full by insurance/);
+    // It can't be bought over while it runs; renewal is open, with the early-buyer discount and no no-claim discount.
+    expect(screen.queryByTestId('insure-MUMBAI')).toBeNull();
+    expect(screen.getByTestId(`renew-${p.id}-button`)).toHaveTextContent('Renew · ₹200');
   });
 });
 
@@ -220,25 +229,33 @@ describe('Property details → Insure property', () => {
     await render(<Live>{(v) => <PropertyView view={v} propertyKey="MUMBAI" />}</Live>);
     expect(screen.getByTestId('insurance-status')).toHaveTextContent('Not insured');
     expect(screen.getByTestId('insurance-policy-state')).toHaveTextContent(/Policy\s*None/);
-    expect(screen.getByTestId('insurance-premium')).toHaveTextContent(/Premium · Year 1\s*₹500/);
+    expect(screen.getByTestId('insurance-premium')).toHaveTextContent(/Premium · Year 1\s*₹250/);
     expect(screen.getByTestId('insurance-mortgaged')).toHaveTextContent(/Mortgaged\s*No/);
     expect(screen.queryByTestId('insure-dialog')).toBeNull();
 
     await fireEvent.press(screen.getByTestId('insure-MUMBAI'));
     const dialog = screen.getByTestId('insure-dialog');
     expect(within(dialog).getByText('Insure Mumbai?')).toBeTruthy();
-    expect(screen.getByTestId('insure-dialog-summary')).toHaveTextContent('Premium ₹500 · Year 1');
+    expect(screen.getByTestId('insure-dialog-summary')).toHaveTextContent('Premium ₹250 · Year 1');
     expect(dialog).toHaveTextContent(/36 spaces of average movement/);
-    expect(dialog).toHaveTextContent(/the ₹3,000 bill is waived/);
-    expect(dialog).toHaveTextContent(/One crisis only/);
-    expect(dialog).toHaveTextContent(/does not renew by itself/);
+    expect(dialog).toHaveTextContent(/every crisis, up to ₹3,000 in total/);
+    // The policy summary: price, discounts, period, cover, limit, deductible, renewal and cancellation.
+    expect(screen.getByTestId('policy-terms-total')).toHaveTextContent(/Total premium\s*₹250/);
+    expect(screen.getByTestId('policy-terms-loyalty')).toHaveTextContent(/Early-buyer discount\s*Renewals only/);
+    expect(screen.getByTestId('policy-terms-no-claim')).toHaveTextContent(/No-claim discount\s*Renewals only/);
+    expect(screen.getByTestId('policy-terms-period')).toHaveTextContent(/0 → 36 avg\. spaces/);
+    expect(screen.getByTestId('policy-terms-limit')).toHaveTextContent(/₹3,000 per period/);
+    expect(dialog).toHaveTextContent(/Property crisis/);
+    expect(dialog).toHaveTextContent(/Deductible\s*₹0/);
+    expect(dialog).toHaveTextContent(/Optional, never automatic/);
+    expect(dialog).toHaveTextContent(/cannot be cancelled, and unused cover is never refunded/);
     // Nothing is sent until the player confirms.
     expect(api.action).not.toHaveBeenCalled();
 
     await fireEvent.press(screen.getByTestId('insure-dialog-confirm'));
     await waitFor(() => expect(screen.getByTestId('insurance-status')).toHaveTextContent('Insured'));
     expect(api.action).toHaveBeenCalledTimes(1);
-    expect(api.action.mock.calls[0]![3]).toEqual({ type: 'INSURE_PROPERTY', propertyKey: 'MUMBAI', expectedPremium: 500 });
+    expect(api.action.mock.calls[0]![3]).toEqual({ type: 'INSURE_PROPERTY', propertyKey: 'MUMBAI', expectedPremium: 250 });
     expect(screen.queryByTestId('insure-dialog')).toBeNull();
     expect(screen.queryByTestId('insure-MUMBAI')).toBeNull();
     expect(screen.getByTestId('insurance-policy-state')).toHaveTextContent(/Policy\s*Active/);
@@ -268,11 +285,11 @@ describe('Property details → Insure property', () => {
   it('an unavailable purchase is disabled and explained, not silently ignored', async () => {
     const f = game();
     give(f, 'Asha', 'MUMBAI', { mortgaged: true });
-    f.act('Asha', { type: 'TRANSFER_MONEY', toPlayerId: f.ids.Bilal!, amount: 25000 - 300 });
+    f.act('Asha', { type: 'TRANSFER_MONEY', toPlayerId: f.ids.Bilal!, amount: 25000 - 200 });
     f.loadAs('Asha');
     await render(<PropertyView view={viewFor(f, 'Asha')} propertyKey="MUMBAI" />);
     expect(screen.getByTestId('insure-MUMBAI').props.accessibilityState.disabled).toBe(true);
-    expect(screen.getByTestId('insure-note-MUMBAI')).toHaveTextContent('Not enough money — the premium is ₹500.');
+    expect(screen.getByTestId('insure-note-MUMBAI')).toHaveTextContent('Not enough money — the premium is ₹250.');
     expect(screen.getByTestId('insurance-mortgaged')).toHaveTextContent(/Mortgaged\s*Yes/);
     await fireEvent.press(screen.getByTestId('insure-MUMBAI'));
     expect(screen.queryByTestId('insure-dialog')).toBeNull();
@@ -453,7 +470,7 @@ describe('Crisis: everyone else', () => {
     expect(screen.getByTestId('turn-waiting')).toBeTruthy();
   });
 
-  it('an insured property: the owner is told the bill was waived, and nothing waits', async () => {
+  it('an insured property: the owner is told the claim paid the bill and what cover is left, and nothing waits', async () => {
     const f = game();
     give(f, 'Asha', 'MUMBAI');
     insure(f, 'Asha', 'MUMBAI');
@@ -462,7 +479,8 @@ describe('Crisis: everyone else', () => {
     await arrive(f);
     await waitFor(() => screen.getByTestId('crisis-notice'));
     expect(screen.getByTestId('crisis-notice-property')).toHaveTextContent('Mumbai · yours');
-    expect(screen.getByTestId('crisis-notice-outcome')).toHaveTextContent('Insured: the bill is waived and the policy is used up. You pay nothing.');
+    expect(screen.getByTestId('crisis-notice-outcome')).toHaveTextContent('Covered: insurance paid the ₹3,000 bill. You pay nothing.');
+    expect(screen.getByTestId('crisis-notice-remaining')).toHaveTextContent('Your policy has ₹0 of ₹3,000 left to pay this period.');
     expect(screen.getByTestId('crisis-notice-status')).toHaveTextContent('Settled by insurance.');
     expect(screen.queryByTestId('crisis-settlement')).toBeNull();
     await fireEvent.press(screen.getByTestId('crisis-notice-dismiss'));
@@ -495,15 +513,15 @@ describe('Buying a property: buy and insure in one tap', () => {
     await renderTable(f, 'Asha');
     await fireEvent.press(screen.getByTestId('turn-choose'));
     expect(screen.getByTestId('buy-button')).toHaveTextContent(`BUY ${formatINR(price)}`);
-    expect(screen.getByTestId('buy-insured-button')).toHaveTextContent(`BUY + INSURE ${formatINR(price + 500)}🛡️ ${formatINR(price)} + ₹500 premium`);
-    expect(screen.getByTestId('buy-insured-note')).toHaveTextContent(/waives one ₹3,000 crisis bill/);
+    expect(screen.getByTestId('buy-insured-button')).toHaveTextContent(`BUY + INSURE ${formatINR(price + 250)}🛡️ ${formatINR(price)} + ₹250 premium`);
+    expect(screen.getByTestId('buy-insured-note')).toHaveTextContent(/pays its crisis bills for 36 spaces of average movement, up to ₹3,000/);
     expect(screen.getByTestId('buy-insured-note')).toHaveTextContent(/insure it later from its deed/);
 
     await fireEvent.press(screen.getByTestId('buy-insured-button'));
     await waitFor(() => expect(f.state.properties.AGRA.ownerId).toBe(f.ids.Asha));
     expect(api.action).toHaveBeenCalledTimes(1);
-    expect(api.action.mock.calls[0]![3]).toEqual({ type: 'BUY_PROPERTY', insurePremium: 500 });
-    expect(ins(f).policies).toMatchObject([{ propertyKey: 'AGRA', status: 'ACTIVE' }]);
+    expect(api.action.mock.calls[0]![3]).toEqual({ type: 'BUY_PROPERTY', insurePremium: 250 });
+    expect(ins(f).policies).toMatchObject([{ propertyKeys: ['AGRA'], status: 'ACTIVE' }]);
   });
 
   it('with money for the property but not the premium, only the plain purchase is open, and it says why', async () => {
@@ -515,7 +533,7 @@ describe('Buying a property: buy and insure in one tap', () => {
     await fireEvent.press(screen.getByTestId('turn-choose'));
     expect(screen.getByTestId('buy-button').props.accessibilityState.disabled).toBe(false);
     expect(screen.getByTestId('buy-insured-button').props.accessibilityState.disabled).toBe(true);
-    expect(screen.getByTestId('buy-insured-note')).toHaveTextContent('Not enough money to insure it as well (₹500).');
+    expect(screen.getByTestId('buy-insured-note')).toHaveTextContent('Not enough money to insure it as well (₹250).');
   });
 
   it('a property bought without insurance can be insured later from its card', async () => {
@@ -547,17 +565,20 @@ describe('Insurance screen: insure all', () => {
     return f;
   }
 
-  it('one button insures every uninsured property after one confirmation showing the total', async () => {
+  it('one button insures every uninsured property under one portfolio policy, after one confirmation showing the total', async () => {
     const f = owning();
     insure(f, 'Asha', 'DELHI');
     f.loadAs('Asha');
     serveAs(f, 'Asha');
     await render(<Live>{(v) => <InsuranceView view={v} />}</Live>);
-    expect(screen.getByTestId('insure-all-button')).toHaveTextContent('Insure all 2 · ₹1,000');
+    expect(screen.getByTestId('insure-all-button')).toHaveTextContent('Insure all 2 · ₹475');
     await fireEvent.press(screen.getByTestId('insure-all-button'));
     const dialog = screen.getByTestId('insure-all-dialog');
     expect(within(dialog).getByText('Insure 2 properties?')).toBeTruthy();
-    expect(screen.getByTestId('insure-all-dialog-summary')).toHaveTextContent('2 × ₹500 = ₹1,000 · Year 1');
+    expect(screen.getByTestId('insure-all-dialog-summary')).toHaveTextContent('₹475 for 2 · Year 1');
+    expect(screen.getByTestId('insure-all-terms-per-property')).toHaveTextContent(/Per property \(2\)\s*₹238/);
+    expect(screen.getByTestId('insure-all-terms-portfolio')).toHaveTextContent(/Portfolio discount\s*−5%/);
+    expect(dialog).toHaveTextContent(/Separately they would cost ₹500/);
     expect(dialog).toHaveTextContent(/Mumbai/);
     expect(dialog).toHaveTextContent(/Agra/);
     expect(dialog).not.toHaveTextContent(/Delhi/);
@@ -567,19 +588,20 @@ describe('Insurance screen: insure all', () => {
     await waitFor(() => expect(screen.queryByTestId('insure-all')).toBeNull());
     expect(api.action).toHaveBeenCalledTimes(1);
     const sent = api.action.mock.calls[0]![3] as { type: string; propertyKeys: string[]; expectedPremium: number };
-    expect(sent).toMatchObject({ type: 'INSURE_PROPERTIES', expectedPremium: 500 });
+    expect(sent).toMatchObject({ type: 'INSURE_PROPERTIES', expectedPremium: 475 });
     expect([...sent.propertyKeys].sort()).toEqual(['AGRA', 'MUMBAI']);
-    expect(screen.getByTestId('policies-active')).toHaveTextContent(/Active · 3/);
+    expect(screen.getByTestId('policies-active')).toHaveTextContent(/Active · 2/);
+    expect(ins(f).policies[1]).toMatchObject({ propertyKeys: ['MUMBAI', 'AGRA'], premiumPaid: 475 });
     for (const key of ['MUMBAI', 'DELHI', 'AGRA']) expect(screen.queryByTestId(`insure-${key}`)).toBeNull();
   });
 
   it('short of the total it is disabled with the reason; single properties can still be insured', async () => {
     const f = owning();
-    f.act('Asha', { type: 'TRANSFER_MONEY', toPlayerId: f.ids.Bilal!, amount: 25000 - 1200 });
+    f.act('Asha', { type: 'TRANSFER_MONEY', toPlayerId: f.ids.Bilal!, amount: 25000 - 600 });
     f.loadAs('Asha');
     await render(<InsuranceView view={viewFor(f, 'Asha')} />);
     expect(screen.getByTestId('insure-all-button').props.accessibilityState.disabled).toBe(true);
-    expect(screen.getByTestId('insure-all-note')).toHaveTextContent('Not enough money — insuring 3 properties costs ₹1,500.');
+    expect(screen.getByTestId('insure-all-note')).toHaveTextContent('Not enough money — insuring 3 properties costs ₹675.');
     expect(screen.getByTestId('insure-MUMBAI').props.accessibilityState.disabled).toBe(false);
   });
 
@@ -601,5 +623,64 @@ describe('Insurance screen: insure all', () => {
     await render(<InsuranceView view={viewFor(f, 'Asha')} />);
     expect(screen.queryByTestId('insure-all')).toBeNull();
     expect(screen.getByTestId('insure-MUMBAI')).toBeTruthy();
+  });
+});
+
+describe('Insurance screen: renewal, partial claims and traded properties', () => {
+  it('renewal opens after the period’s crisis, shows the price with its discounts and terms, and is sent only on confirmation', async () => {
+    const f = game();
+    give(f, 'Asha', 'MUMBAI');
+    insure(f, 'Asha', 'MUMBAI');
+    const p = ins(f).policies[0]!;
+    // The period's checkpoint passed without striking Mumbai (test surgery on the schedule): a claim-free period.
+    ins(f).nextCheckpoint = 2;
+    rollTo(f, 40).loadAs('Asha');
+    serveAs(f, 'Asha');
+    await render(<Live>{(v) => <InsuranceView view={v} />}</Live>);
+    expect(screen.getByTestId(`renew-${p.id}-timing`)).toHaveTextContent(/Renew by 48 avg\. spaces to keep your discounts/);
+    expect(screen.getByTestId(`renew-${p.id}-button`)).toHaveTextContent('Renew · ₹175');
+    await fireEvent.press(screen.getByTestId(`renew-${p.id}-button`));
+    expect(screen.getByTestId('renew-dialog-summary')).toHaveTextContent('Renewal premium ₹175 · Year 1');
+    expect(screen.getByTestId('renew-terms-loyalty')).toHaveTextContent(/Early-buyer discount\s*−20%/);
+    expect(screen.getByTestId('renew-terms-no-claim')).toHaveTextContent(/No-claim discount\s*−10%/);
+    expect(screen.getByTestId('renew-terms-period')).toHaveTextContent(/36 → 72 avg\. spaces/);
+    expect(screen.getByTestId('renew-terms-claimed')).toHaveTextContent(/₹0 · new period starts with the full ₹3,000/);
+    expect(api.action).not.toHaveBeenCalled();
+    await fireEvent.press(screen.getByTestId('renew-dialog-confirm'));
+    await waitFor(() => expect(ins(f).policies).toHaveLength(2));
+    expect(api.action.mock.calls[0]![3]).toEqual({ type: 'RENEW_INSURANCE', policyId: p.id, expectedPremium: 175 });
+    await waitFor(() => expect(screen.getByTestId('policies-active')).toHaveTextContent(/Active · 2/));
+    expect(screen.getByTestId('policies-active')).toHaveTextContent(/Renewed · starts later/);
+    expect(screen.queryByTestId(`renew-${p.id}`)).toBeNull();
+  });
+
+  it('a partly covered crisis: the bill shows what insurance paid and only the rest is owed', async () => {
+    const f = game();
+    give(f, 'Asha', 'MUMBAI');
+    insure(f, 'Asha', 'MUMBAI');
+    // Test surgery: only ₹1,000 of cover in this policy.
+    ins(f).policies[0]!.payoutLimit = 1000;
+    rollTo(f, FIRST);
+    serveAs(f, 'Asha');
+    await renderTable(f, 'Asha');
+    expect(screen.getByTestId('crisis-amount')).toHaveTextContent('₹2,000');
+    expect(screen.getByTestId('crisis-reason')).toHaveTextContent(/The bill is ₹3,000\. Your insurance paid ₹1,000/);
+    await fireEvent.press(screen.getByTestId('crisis-pay'));
+    await waitFor(() => expect(screen.queryByTestId('crisis-settlement')).toBeNull());
+    expect(ins(f).crises[0]).toMatchObject({ status: 'PAID', covered: 1000, paid: 2000 });
+  });
+
+  it('a property traded away is shown as no longer insured on its portfolio policy', async () => {
+    const f = game();
+    give(f, 'Asha', 'MUMBAI');
+    give(f, 'Asha', 'DELHI');
+    f.act('Asha', { type: 'INSURE_PROPERTIES', propertyKeys: ['MUMBAI', 'DELHI'], expectedPremium: 475 });
+    f.act('Asha', { type: 'CREATE_TRADE', toPlayerId: f.ids.Bilal!, offeredPropertyKeys: ['MUMBAI'], requestedPropertyKeys: [], offeredMoney: 0, requestedMoney: 100 });
+    f.act('Bilal', { type: 'ACCEPT_TRADE', tradeId: f.state.trades[0]!.id });
+    const p = ins(f).policies[0]!;
+    f.loadAs('Asha');
+    await render(<InsuranceView view={viewFor(f, 'Asha')} />);
+    expect(screen.getByTestId(`policy-${p.id}-removed`)).toHaveTextContent(/No longer insured: Mumbai/);
+    expect(screen.getByTestId('insurance-property-DELHI')).toHaveTextContent(/Covered for 36 more spaces/);
   });
 });

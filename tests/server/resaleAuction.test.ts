@@ -223,7 +223,7 @@ describe.skipIf(!DATABASE_URL)('Property resale auctions through the handler (Po
     expect(await auctionRow(auctionId)).toMatchObject({ status: 'CLOSED', winner_player_id: g.id('Bilal'), high_bid: 6000, resale_outcome: 'SOLD' });
     const policies = await sql`select * from public.insurance_policies where game_id = ${g.gameId}`;
     expect(policies).toHaveLength(1);
-    expect(policies[0]).toMatchObject({ owner_player_id: g.id('Asha'), status: 'EXPIRED', claimed_crisis_id: null });
+    expect(policies[0]).toMatchObject({ owner_player_id: g.id('Asha'), status: 'ENDED', property_keys: [], bought_keys: ['MUMBAI'], claimed_total: 0 });
     expect(policies[0]!.closed_at).not.toBeNull();
     // No refund: the bid and the original premium are the only money on this property.
     const refunds = await sql`select 1 from public.transactions where game_id = ${g.gameId} and to_player_id = ${g.id('Asha')} and type <> 'AUCTION_PAYMENT' and type <> 'STARTING_FUNDS'`;
@@ -238,7 +238,7 @@ describe.skipIf(!DATABASE_URL)('Property resale auctions through the handler (Po
     // … and the buyer may insure the property themselves, through the ordinary purchase.
     const insured = ok(await g.act('Bilal', { type: 'INSURE_PROPERTY', propertyKey: 'MUMBAI', expectedPremium: premiumForYear(1) })).snapshot;
     expect(insured.state.intermediate!.insurance!.policies.map((p) => [p.ownerId, p.status])).toEqual([
-      [g.id('Asha'), 'EXPIRED'],
+      [g.id('Asha'), 'ENDED'],
       [g.id('Bilal'), 'ACTIVE'],
     ]);
     await ledgerOk(g.gameId);

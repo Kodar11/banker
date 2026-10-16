@@ -1,6 +1,6 @@
 import { formatINR } from './format.ts';
 import { defaultGameConfig, MARKET_VOLATILITY_LABELS, type GameConfig } from './gameConfig.ts';
-import { premiumForYear } from './insurance.ts';
+import { insuranceQuote, premiumForYear } from './insurance.ts';
 import { INTERMEDIATE_RULES as IR, LOAN_PRODUCT_KEYS } from './intermediateConfig.ts';
 import { realValue } from './intermediateFinance.ts';
 import { objectiveTerms, OBJECTIVE_IDS, OBJECTIVES } from './objectives.ts';
@@ -102,12 +102,14 @@ export function intermediateRuleEntries(config: GameConfig = defaultGameConfig('
       title: 'Property insurance and crises',
       lines: [
         `After the first ${I.firstCrisisSpaces} spaces of average movement, and then every ${I.crisisIntervalSpaces}, a crisis strikes one owned property, picked at random across all players. Its owner owes the bank ${formatINR(I.crisisBill)} at once — whether or not the property is mortgaged.`,
-        `Insurance is bought per property: ${formatINR(premiumForYear(1))} in Year 1, ${formatINR(I.premiumStepPerYear)} more each financial year, never above ${formatINR(I.premiumMax)}. You are shown the price and must confirm it.`,
-        `A policy lasts ${I.coverageSpaces} spaces of average movement from the moment you buy it and waives one crisis bill on that property. Used or run out, it is over: no refund, no automatic renewal.`,
-        'Insurance pays nothing else — not rent, taxes, loans or mortgages. A crisis leaves the property, its buildings and its mortgage exactly as they were. A policy protects the player who bought it, not a later owner.',
+        `Premium: ${formatINR(premiumForYear(1))} a property in Year 1, ${formatINR(I.premiumStepPerYear)} more each financial year, never above ${formatINR(I.premiumMax)} — buying early is cheaper. Insure several properties under one portfolio policy and each one after the first takes ${I.portfolioStepPercent}% off, up to ${I.portfolioMaxPercent}%. You are shown the price and must confirm it.`,
+        `A policy covers its properties for ${I.coverageSpaces} spaces of average movement. Every crisis that strikes one of them in that time is paid automatically — the whole bill, with a ${formatINR(I.deductible)} deductible — until the policy has paid ${formatINR(I.payoutLimit)} in total. Beyond that you pay the rest yourself.`,
+        `Renewing is optional and never automatic. It opens once the period's crisis has passed and closes ${I.renewalGraceSpaces} spaces after the cover ends. A renewal keeps an early-buyer discount (${I.loyaltyPercentByEntryYear.map((p, i) => `${p}% if first insured in Year ${i + 1}`).join(', ')}) and earns ${I.noClaimStepPercent}% for each claim-free period in a row, up to ${I.noClaimMaxPercent}%. A claim resets the no-claim run but never the early-buyer discount. All discounts together are capped at ${I.maxTotalDiscountPercent}%.`,
+        'A policy cannot be cancelled and nothing is refunded — not for an unused period, not when the game ends. Insurance pays only for crises: never rent, taxes, cards, loans or mortgages. A crisis leaves the property, its buildings and its mortgage exactly as they were.',
+        'Insurance protects the player who bought it. A property you sell, trade or lose leaves your policy for good (claims already paid stay paid); its new owner is not covered unless they insure it themselves.',
         'An unpaid crisis bill stops the game for everyone until it is settled. Raise the money the usual ways: sell a building, sell or mortgage a property, or take a loan if you choose. Bankruptcy is possible only when even selling everything to the bank would not cover it.',
       ],
-      example: `Insuring three properties costs ${formatINR(3 * premiumForYear(1))} in Year 1 and ${formatINR(3 * premiumForYear(4))} in Year 4.`,
+      example: `Three properties under one policy cost ${formatINR(insuranceQuote({ year: 1, properties: 3 }).premium)} in Year 1 (3 × ${formatINR(premiumForYear(1))} less ${insuranceQuote({ year: 1, properties: 3 }).portfolioPercent}%) and ${formatINR(insuranceQuote({ year: 4, properties: 3 }).premium)} for a newcomer in Year 4. Renewed in Year 4 after a claim-free year, a Year 1 policy costs ${formatINR(insuranceQuote({ year: 4, properties: 3, renewal: { entryYear: 1, noClaimPeriods: 1 } }).premium)}.`,
     },
     {
       title: 'Auctioning your property',

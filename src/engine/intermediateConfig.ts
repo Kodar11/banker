@@ -108,17 +108,35 @@ const IntermediateRulesSchema = z
       .strict(),
     insurance: z
       .object({
-        /** Premium for one property bought in Year 1; it rises by `premiumStepPerYear` each financial year up to `premiumMax`. */
+        /** Premium for one property on a policy bought in Year 1; it rises by `premiumStepPerYear` each financial year up to `premiumMax`. */
         premiumYear1: rupees,
         premiumStepPerYear: z.number().int().min(0),
         premiumMax: rupees,
-        /** A policy lasts this many spaces of average movement from the moment it is bought. */
+        /** A coverage period lasts this many spaces of average movement from the moment its cover starts. */
         coverageSpaces: z.number().int().positive(),
-        /** The bill a crisis puts on the property it strikes. A policy in force waives it; nothing else is paid out. */
+        /** The bill a crisis puts on the property it strikes: the loss a policy pays towards. */
         crisisBill: rupees,
         /** The first crisis strikes after this many spaces of average movement, then one every `crisisIntervalSpaces`. */
         firstCrisisSpaces: z.number().int().positive(),
         crisisIntervalSpaces: z.number().int().positive(),
+        /** The crisis types a policy pays for. Nothing else the game charges (rent, tax, cards, Club, loans, market moves) is ever covered. */
+        coveredCrises: z.array(z.enum(['PROPERTY_CRISIS'])).min(1),
+        /** The most one policy pays in total over its coverage period, across every crisis it covers. */
+        payoutLimit: rupees,
+        /** What the owner bears of each covered loss before the policy pays. */
+        deductible: z.number().int().min(0),
+        /** Portfolio policy: each insured property after the first takes this much off the premium, up to `portfolioMaxPercent`. */
+        portfolioStepPercent: z.number().int().min(0).max(100),
+        portfolioMaxPercent: z.number().int().min(0).max(100),
+        /** Early-buyer loyalty discount on renewals, by the financial year the policy was first bought: [Year 1, Year 2, …]; later years get none. */
+        loyaltyPercentByEntryYear: z.array(z.number().int().min(0).max(100)),
+        /** No-claim discount on a renewal: this much per claim-free coverage period in a row, up to `noClaimMaxPercent`. */
+        noClaimStepPercent: z.number().int().min(0).max(100),
+        noClaimMaxPercent: z.number().int().min(0).max(100),
+        /** Every discount added together is capped here, so cover is never close to free. */
+        maxTotalDiscountPercent: z.number().int().min(0).max(90),
+        /** A policy can still be renewed this many spaces of average movement after its cover ended. */
+        renewalGraceSpaces: z.number().int().min(0),
       })
       .strict(),
     resale: z
@@ -153,6 +171,8 @@ const IntermediateRulesSchema = z
     if (cfg.rates.minPercent > cfg.rates.maxPercent) issue('rates.minPercent must not exceed maxPercent');
     if (cfg.loans.minAmount % cfg.loans.step !== 0) issue('loans.minAmount must be a multiple of loans.step');
     if (cfg.insurance.premiumMax < cfg.insurance.premiumYear1) issue('insurance.premiumMax must not be below premiumYear1');
+    if (cfg.insurance.deductible >= cfg.insurance.crisisBill) issue('insurance.deductible must be below the crisis bill');
+    if (cfg.insurance.payoutLimit < cfg.insurance.crisisBill - cfg.insurance.deductible) issue('insurance.payoutLimit must pay at least one crisis in full');
     for (const key of LOAN_PRODUCT_KEYS) {
       const p = cfg.loans.products[key];
       if (p.maxPrincipal < cfg.loans.minAmount) issue(`${key}: maxPrincipal is below the minimum loan`);
@@ -170,7 +190,7 @@ export function validateIntermediateRules(raw: unknown): IntermediateRules {
 
 export const INTERMEDIATE_RULES: IntermediateRules = validateIntermediateRules({
   /** Stored with every Capital game's economy. Bump when any value below changes. */
-  version: 'INTERMEDIATE-V4',
+  version: 'INTERMEDIATE-V5',
 
   year: {
     spacesPerYear: 36,
@@ -311,13 +331,27 @@ export const INTERMEDIATE_RULES: IntermediateRules = validateIntermediateRules({
 
   /** Property insurance and the global crisis that makes it worth buying. */
   insurance: {
-    premiumYear1: 500,
-    premiumStepPerYear: 100,
-    premiumMax: 900,
+    // ₹250 a property in Year 1, +₹50 each financial year, never above ₹450 (Year 5 on).
+    premiumYear1: 250,
+    premiumStepPerYear: 50,
+    premiumMax: 450,
     coverageSpaces: 36,
     crisisBill: 3000,
     firstCrisisSpaces: 18,
     crisisIntervalSpaces: 36,
+    coveredCrises: ['PROPERTY_CRISIS'],
+    // One crisis bill. A 36-space coverage period always holds exactly one crisis checkpoint (one every 36) and a
+    // crisis strikes one property, so this pays in full every crisis a period can bring, while still bounding what
+    // a policy can pay out if the schedule is ever tightened.
+    payoutLimit: 3000,
+    deductible: 0,
+    portfolioStepPercent: 5,
+    portfolioMaxPercent: 25,
+    loyaltyPercentByEntryYear: [20, 10],
+    noClaimStepPercent: 10,
+    noClaimMaxPercent: 30,
+    maxTotalDiscountPercent: 50,
+    renewalGraceSpaces: 12,
   },
 
   /** A player auctioning a property they own. Bidding opens at the seller's reserve; increments and the bidding countdown are the game's auction rules. */

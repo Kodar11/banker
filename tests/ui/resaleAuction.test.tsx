@@ -496,7 +496,7 @@ describe('The auction screen during a resale', () => {
   it('the buyer is offered insurance for their new property — optional, through the ordinary purchase', async () => {
     const f = game();
     give(f, 'Asha', 'MUMBAI', { houses: 2 });
-    f.act('Asha', { type: 'INSURE_PROPERTY', propertyKey: 'MUMBAI', expectedPremium: 500 });
+    f.act('Asha', { type: 'INSURE_PROPERTY', propertyKey: 'MUMBAI', expectedPremium: 250 });
     f.act('Asha', { type: 'START_RESALE_AUCTION', propertyKey: 'MUMBAI', reservePrice: RESERVE });
     const auctionId = f.state.auction!.id;
     bid(f, 'Bilal', 6000);
@@ -506,10 +506,10 @@ describe('The auction screen during a resale', () => {
     expect(screen.getByTestId('auction-result-text')).toHaveTextContent('Sold to Bilal');
     expect(screen.getByTestId('auction-insure-offer')).toHaveTextContent(/The seller’s insurance ended with the sale/);
     // Nothing was bought for them, and nothing is required of them.
-    expect(f.state.intermediate!.insurance!.policies.map((p) => p.status)).toEqual(['EXPIRED']);
+    expect(f.state.intermediate!.insurance!.policies.map((p) => p.status)).toEqual(['ENDED']);
     await fireEvent.press(screen.getByTestId('insure-MUMBAI'));
     await fireEvent.press(screen.getByTestId('insure-dialog-confirm'));
-    await waitFor(() => expect(api.action.mock.calls[0]![3]).toEqual({ type: 'INSURE_PROPERTY', propertyKey: 'MUMBAI', expectedPremium: 500 }));
+    await waitFor(() => expect(api.action.mock.calls[0]![3]).toEqual({ type: 'INSURE_PROPERTY', propertyKey: 'MUMBAI', expectedPremium: 250 }));
     expect(f.state.intermediate!.insurance!.policies.at(-1)).toMatchObject({ ownerId: f.ids.Bilal, status: 'ACTIVE' });
     await result.unmount();
 
@@ -523,7 +523,7 @@ describe('The auction screen during a resale', () => {
   it('the new owner who declines insurance just owns an uninsured property; the seller keeps nothing of it', async () => {
     const f = game();
     give(f, 'Asha', 'MUMBAI');
-    f.act('Asha', { type: 'INSURE_PROPERTY', propertyKey: 'MUMBAI', expectedPremium: 500 });
+    f.act('Asha', { type: 'INSURE_PROPERTY', propertyKey: 'MUMBAI', expectedPremium: 250 });
     f.act('Asha', { type: 'START_RESALE_AUCTION', propertyKey: 'MUMBAI', reservePrice: RESERVE });
     bid(f, 'Bilal', 6000);
     pass(f, 'Chitra');
