@@ -214,16 +214,21 @@ function expectedCrisisBills(vc: ValuationContext, state: GameState, playerId: s
   }).length;
   if (tableOwned === 0) return 0;
   // Early on most of the board is still for sale and will be bought before most crises strike: the share of
-  // a crisis a property carries is judged against the ownership the table is heading for, not today's few.
+  // a crisis a property carries is judged against the ownership the table is heading for. But that takes
+  // time, and a crisis soon strikes among the few properties owned by then: the projected ownership closes
+  // half of the remaining gap by each checkpoint (UNVALIDATED). Judging the NEXT checkpoint against the
+  // final ownership made an early-game policy look worthless when it is the best value insurance has.
   const unowned = PROPERTY_KEYS.filter((k) => state.properties[k]?.ownerId === null).length;
-  const sharedBy = Math.max(tableOwned, (tableOwned + unowned) * 0.75);
+  const target = Math.max(tableOwned, (tableOwned + unowned) * BOT_POLICY.value.crisisOwnershipTarget);
   const clock = gameClock(eco);
   const until = clock + vc.horizon.planningYears * yearLength(eco);
   let total = 0;
-  for (let n = ins.nextCheckpoint; n < ins.nextCheckpoint + 12; n += 1) {
+  for (let k = 0; k < 12; k += 1) {
+    const n = ins.nextCheckpoint + k;
     const at = crisisCheckpointClock(eco, n);
     if (at > until) break;
-    const exposed = mine.filter((k) => !ins.policies.some((p) => p.ownerId === playerId && policyCovers(state, p, k, at))).length;
+    const sharedBy = Math.max(1, target - (target - tableOwned) * 0.5 ** (k + 1));
+    const exposed = mine.filter((key) => !ins.policies.some((p) => p.ownerId === playerId && policyCovers(state, p, key, at))).length;
     total += (IR.insurance.crisisBill * exposed) / sharedBy;
   }
   return total;
@@ -328,7 +333,10 @@ export function assess(vc: ValuationContext, state: GameState, playerId: string 
       else if (loan.status === 'ACTIVE') arrears += loan.installments.filter((i) => i.status === 'OVERDUE').reduce((s, i) => s + i.principal + i.interest, 0);
     }
   }
-  c.risk = -(BOT_POLICY.value.leverageRisk * principal + BOT_POLICY.value.crisisDownside * crisis + arrears);
+  // A crisis bill the cash on hand could not pay is settled by selling or mortgaging (buildings fetch half
+  // their cost): its downside counts double then.
+  const downside = BOT_POLICY.value.crisisDownside * (sheet.cash < IR.insurance.crisisBill ? 2 : 1);
+  c.risk = -(BOT_POLICY.value.leverageRisk * principal + downside * crisis + arrears);
   c.objectives = objectiveValue(state, playerId);
   return { components: c, income, cash: sheet.cash, reserve };
 }

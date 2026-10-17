@@ -158,6 +158,8 @@ export const BOT_POLICY = {
     negotiationShare: 0.5,
     /** Share of an uninsured crisis bill's downside counted as risk on top of its expected cost. */
     crisisDownside: 0.5,
+    /** Share of the board the table is expected to own once buying has run its course (Capital crisis odds). UNVALIDATED. */
+    crisisOwnershipTarget: 0.75,
   },
   decisions: {
     /** A management action must improve the weighted score by at least this much (rupee-equivalents). */
@@ -172,8 +174,15 @@ export const BOT_POLICY = {
     minimumGain: 300,
     /** Candidate deals scored per proactive decision (bounded work). */
     maxCandidates: 12,
-    /** A trade the bot proposed and the other side turned down is not proposed again while it is on record. */
+    /** A trade the bot proposed and the other side turned down is never proposed again (GameState.botTradeMemory). */
     noRepeatWhileRecorded: true,
+    /**
+     * How the bot expects a PERSON to judge its offer (a bot partner's own settings are public and used
+     * instead): the gain they need, as a share of what they give, and how much the bot's own gain from the
+     * deal puts them off. UNVALIDATED; a typical Normal bot's values.
+     */
+    personMargin: 0.1,
+    personRivalry: 0.25,
   },
   auction: {
     /** Jump size when raising its own bid: this share of the gap to its limit (rounded to the increment). */

@@ -12,6 +12,7 @@ import {
   isEnforceableLoan,
   loanOffers,
   loansOf,
+  mandatoryPaymentsOwed,
   outstandingPrincipal,
   ownedBy,
   payableInstallment,
@@ -141,12 +142,14 @@ export interface Planned {
  * Loan obligations, in priority order: Capital installments that have fallen due (late ones first), Classic
  * principal that has fallen due (before the next Start makes it overdue or defaulted), and balances in
  * default once that leaves a sensible reserve. Only what the cash on hand covers: an obligation that is not
- * the turn's payment never forces a sale by itself.
+ * the turn's payment never forces a sale by itself, and never takes the money the turn's own payment needs
+ * (that would raise money for the rent, spend it on the loan, and borrow again for the rent).
  */
 export function obligationAction(vc: ValuationContext, exclude?: ReadonlySet<string>): Planned | null {
   const s = vc.obs.state;
   const me = vc.obs.me;
   const ok = (a: GameAction) => !exclude?.has(actionKey(a));
+  const free = me.balance - mandatoryPaymentsOwed(s, me.id);
   const eco = economyOf(s);
   if (eco) {
     const loans = loansOf(eco, me.id);
@@ -157,13 +160,13 @@ export function obligationAction(vc: ValuationContext, exclude?: ReadonlySet<str
     for (const { loan, installment } of due) {
       const amount = installment!.principal + installment!.interest;
       const action: GameAction = { type: 'PAY_LOAN_INSTALLMENT', loanId: loan.id };
-      if (me.balance >= amount && ok(action)) {
+      if (free >= amount && ok(action)) {
         return { action, kind: 'PAY_INSTALLMENT', reason: `Pays a ${installment!.status === 'OVERDUE' ? 'late' : 'due'} loan installment of ${formatINR(amount)} to protect its credit score.` };
       }
     }
     for (const loan of loans) {
       if (loan.status !== 'DEFAULTED' || loan.defaultBalance <= 0) continue;
-      const amount = Math.min(loan.defaultBalance, me.balance - vc.reserveBase);
+      const amount = Math.min(loan.defaultBalance, free - vc.reserveBase);
       const action: GameAction = { type: 'PAY_DEFAULTED_LOAN', loanId: loan.id, amount: Math.floor(amount) };
       if (amount >= Math.min(loan.defaultBalance, 1000) && ok(action)) return { action, kind: 'PAY_DEFAULT', reason: 'Pays down a loan in default to lift the borrowing block.' };
     }
@@ -174,10 +177,10 @@ export function obligationAction(vc: ValuationContext, exclude?: ReadonlySet<str
     const standing = classicLoanStanding(loan, me.circuits);
     const action: GameAction = { type: 'REPAY_LOAN', loanId: loan.id, amount: loan.outstanding };
     if (!ok(action)) continue;
-    if ((standing === 'DUE' || standing === 'OVERDUE') && me.balance >= loan.outstanding) {
+    if ((standing === 'DUE' || standing === 'OVERDUE') && free >= loan.outstanding) {
       return { action, kind: 'REPAY_DUE_LOAN', reason: `Repays a bank loan of ${formatINR(loan.outstanding)} that has fallen due, before it defaults.` };
     }
-    if (standing === 'DEFAULTED' && me.balance - loan.outstanding >= vc.reserveBase) {
+    if (standing === 'DEFAULTED' && free - loan.outstanding >= vc.reserveBase) {
       return { action, kind: 'REPAY_DEFAULTED_LOAN', reason: 'Clears a defaulted bank loan to be able to borrow again.' };
     }
   }

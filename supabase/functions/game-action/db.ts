@@ -222,6 +222,7 @@ export async function loadState(tx: Tx, game: Row): Promise<GameState> {
     undoStack: (game.undo_stack as GameState['undoStack']) ?? [],
     undoRequest: (game.undo_request as GameState['undoRequest']) ?? null,
     trades,
+    botTradeMemory: (game.bot_trade_memory as GameState['botTradeMemory']) ?? {},
     // Null for a lobby, a matchmade game, and a row written before games had a duration.
     endGame: (game.end_game as GameState['endGame']) ?? null,
     createdAt: iso(game.created_at),
@@ -392,6 +393,7 @@ export async function persistResult(tx: Tx, prevVersion: number, result: EngineR
       intermediate = ${json(s.intermediate)},
       end_game = ${json(s.endGame)},
       objective_trades = ${tx.json((s.objectives?.trades ?? []) as unknown as postgres.JSONValue)},
+      bot_trade_memory = ${tx.json((s.botTradeMemory ?? {}) as unknown as postgres.JSONValue)},
       current_auction_id = ${s.auction?.id ?? null},
       expires_at = ${s.expiresAt},
       updated_at = now()

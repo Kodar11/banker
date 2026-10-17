@@ -1,4 +1,4 @@
-import type { GameAction, GameState, PlayerState } from '../engine/index.ts';
+import { auctionOpensAt, type GameAction, type GameState, type PlayerState } from '../engine/index.ts';
 import { observe } from './observation.ts';
 import { decide } from './policy.ts';
 import { seatSeed } from './random.ts';
@@ -67,6 +67,21 @@ export function decideFor(state: GameState, bot: BotSeatRef, options: NextMoveOp
     exclude: options.exclude?.[bot.id],
     debug: options.debug,
   });
+}
+
+/**
+ * The next instant at which a bot may have something to do purely because time passed, or null. Today that
+ * is a resale auction's "get ready" countdown: bots must wait for it, and nothing else happens when it ends,
+ * so a runner that found nothing to do has to wake up then (the device's timer, the server's deferred run).
+ */
+export function nextBotWakeAt(state: GameState, nowMs: number): number | null {
+  if (state.status !== 'ACTIVE') return null;
+  const auction = state.auction;
+  if (!auction || auction.status !== 'OPEN') return null;
+  const opensAt = auctionOpensAt(auction);
+  if (opensAt <= nowMs) return null;
+  const bidders = activeBots(state).filter((b) => auction.participantIds.includes(b.id) && !auction.passedIds.includes(b.id) && auction.resale?.sellerId !== b.id);
+  return bidders.length > 0 ? opensAt : null;
 }
 
 /** Whether any bot could need to act in this state (cheap; no decision is computed). */

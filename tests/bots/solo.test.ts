@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { GameAction } from '@/engine/index.ts';
 
 vi.mock('@/lib/device', () => ({ newActionId: () => randomUUID() }));
 
@@ -83,5 +84,50 @@ describe('solo games on the device', () => {
     if (!res.ok) throw new Error();
     for (const p of res.snapshot.state.players) expect(p.balance).toBe(p.id === c.playerId ? 25000 : 0);
     discardSoloGame(c.gameId);
+  });
+
+  it('the bots bid in a resale the person lists, with nothing more from the person', async () => {
+    vi.useFakeTimers();
+    const c = createSoloGame({ name: 'Tanmay', mode: 'intermediate', bots: soloBots(2, 'normal', 'opportunist') });
+    const pay = { RENT: 'PAY_RENT', TAX: 'PAY_TAX', CARD: 'PAY_CARD', CLUB: 'PAY_CLUB', LOAN_INTEREST: 'PAY_INTEREST' } as const;
+    let listed = false;
+    let events: string[] = [];
+    for (let round = 0; round < 400 && !listed; round += 1) {
+      const res = localState(c);
+      if (!res.ok) throw new Error(res.error.message);
+      const s = res.snapshot.state;
+      const me = s.players.find((p) => p.id === c.playerId)!;
+      const owned = (Object.keys(s.properties) as (keyof typeof s.properties)[]).filter((k) => s.properties[k].ownerId === c.playerId && !s.properties[k].mortgaged && s.properties[k].houses === 0);
+      let action: GameAction | null = null;
+      if (s.auction?.status === 'OPEN') {
+        if (s.auction.participantIds.includes(c.playerId) && !s.auction.passedIds.includes(c.playerId)) action = { type: 'PASS_AUCTION', auctionId: s.auction.id };
+      } else if (s.turn.playerId === c.playerId) {
+        const phase = s.turn.phase;
+        if (phase === 'AWAITING_ROLL' && owned.length > 0 && !me.inJail) {
+          action = { type: 'START_RESALE_AUCTION', propertyKey: owned[0]!, reservePrice: 500 };
+          listed = true;
+        } else if (phase === 'AWAITING_ROLL') action = me.inJail ? { type: 'STAY_IN_JAIL' } : { type: 'ROLL_DICE' };
+        else if (phase === 'AWAITING_DECISION') action = { type: 'BUY_PROPERTY' };
+        else if (phase === 'TURN_COMPLETE') action = { type: 'END_TURN' };
+        else if (phase === 'AWAITING_PAYMENT' && s.turn.pending?.kind === 'PAYMENT') action = { type: pay[s.turn.pending.reason] };
+      }
+      if (action) {
+        const r = localAction(c, randomUUID(), s.version, action);
+        if (!r.ok && action.type === 'START_RESALE_AUCTION') listed = false;
+      }
+      if (listed) {
+        // The whole auction runs out with no input from the person: the device's own timers and bots only.
+        await vi.advanceTimersByTimeAsync(20_000);
+        const after = localState(c);
+        if (!after.ok) throw new Error(after.error.message);
+        events = after.snapshot.events.map((e) => e.type);
+        break;
+      }
+      await vi.advanceTimersByTimeAsync(SOLO_BOT_PACE_MS * 4 + 6500);
+    }
+    discardSoloGame(c.gameId);
+    expect(listed).toBe(true);
+    expect(events).toContain('BID_PLACED');
+    expect(events).not.toContain('AUCTION_UNSOLD');
   });
 });

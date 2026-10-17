@@ -16,9 +16,9 @@ import type { BotDifficulty, BotPersonality, Dimension } from './types.ts';
  */
 export const PERSONALITY_WEIGHTS: Readonly<Record<BotPersonality, Readonly<Record<Dimension, number>>>> = {
   investor: { wealth: 30, liquidity: 15, group: 20, negotiation: 5, market: 15, risk: 10, objectives: 5 },
-  banker: { wealth: 20, liquidity: 35, group: 10, negotiation: 5, market: 5, risk: 20, objectives: 5 },
-  dealmaker: { wealth: 15, liquidity: 15, group: 15, negotiation: 30, market: 10, risk: 10, objectives: 5 },
-  opportunist: { wealth: 20, liquidity: 10, group: 10, negotiation: 10, market: 30, risk: 5, objectives: 15 },
+  banker: { wealth: 20, liquidity: 30, group: 25, negotiation: 5, market: 5, risk: 10, objectives: 5 },
+  dealmaker: { wealth: 15, liquidity: 15, group: 20, negotiation: 30, market: 5, risk: 10, objectives: 5 },
+  opportunist: { wealth: 20, liquidity: 15, group: 10, negotiation: 5, market: 30, risk: 10, objectives: 10 },
 };
 
 /** Behaviour that follows from a personality but is not a weight. Each is explained where it is used. */
@@ -46,7 +46,7 @@ export interface PersonalityTuning {
 
 export const PERSONALITY_TUNING: Readonly<Record<BotPersonality, PersonalityTuning>> = {
   investor: { constructionHurdle: 1.2, tradeMargin: 0.1, tradeCadence: 3, offerSplit: 0.45, auctionOpening: 0.5, endVoteLead: 0.1, jailFineReserveShare: 0.5, reservePercentile: 0.75 },
-  banker: { constructionHurdle: 1.3, tradeMargin: 0.15, tradeCadence: 5, offerSplit: 0.3, auctionOpening: 0.4, endVoteLead: 0.05, jailFineReserveShare: 1, reservePercentile: 0.8 },
+  banker: { constructionHurdle: 1.2, tradeMargin: 0.1, tradeCadence: 5, offerSplit: 0.3, auctionOpening: 0.4, endVoteLead: 0.05, jailFineReserveShare: 1, reservePercentile: 0.8 },
   dealmaker: { constructionHurdle: 1.3, tradeMargin: 0.05, tradeCadence: 1, offerSplit: 0.5, auctionOpening: 0.5, endVoteLead: 0.1, jailFineReserveShare: 0.6, reservePercentile: 0.75 },
   opportunist: { constructionHurdle: 1.2, tradeMargin: 0.1, tradeCadence: 2, offerSplit: 0.2, auctionOpening: 0.3, endVoteLead: 0.2, jailFineReserveShare: 0.3, reservePercentile: 0.6 },
 };
@@ -138,6 +138,8 @@ export const BOT_POLICY = {
     /** Liquidity penalty for a shortfall s below the target R: s × (linear + quadratic × s / R). */
     shortfallLinear: 0.25,
     shortfallQuadratic: 0.5,
+    /** Share of what mortgaging could raise at once that counts towards the reserve (valuation.mortgageable). UNVALIDATED. */
+    mortgageableShare: 0.25,
   },
   horizon: {
     /** A matchmade game has no end date: its income is planned over this many financial years. NOT a game rule. */
@@ -158,6 +160,8 @@ export const BOT_POLICY = {
     negotiationShare: 0.5,
     /** Share of an uninsured crisis bill's downside counted as risk on top of its expected cost. */
     crisisDownside: 0.5,
+    /** Share of the board the table is expected to own once buying has run its course (Capital crisis odds). UNVALIDATED. */
+    crisisOwnershipTarget: 0.75,
   },
   decisions: {
     /** A management action must improve the weighted score by at least this much (rupee-equivalents). */
@@ -172,8 +176,15 @@ export const BOT_POLICY = {
     minimumGain: 300,
     /** Candidate deals scored per proactive decision (bounded work). */
     maxCandidates: 12,
-    /** A trade the bot proposed and the other side turned down is not proposed again while it is on record. */
+    /** A trade the bot proposed and the other side turned down is never proposed again (GameState.botTradeMemory). */
     noRepeatWhileRecorded: true,
+    /**
+     * How the bot expects a PERSON to judge its offer (a bot partner's own settings are public and used
+     * instead): the gain they need, as a share of what they give, and how much the bot's own gain from the
+     * deal puts them off. UNVALIDATED; a typical Normal bot's values.
+     */
+    personMargin: 0.1,
+    personRivalry: 0.25,
   },
   auction: {
     /** Jump size when raising its own bid: this share of the gap to its limit (rounded to the increment). */

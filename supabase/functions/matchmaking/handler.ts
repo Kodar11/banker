@@ -64,6 +64,11 @@ export interface MatchmakingDeps {
    * cannot be reached. Absent: no player's request is accepted.
    */
   verifyUser?: (accessToken: string) => Promise<{ id: string } | null>;
+  /**
+   * Starts the bot runner of a game this worker has just started with bot seats (game-action's
+   * startBotRunner). Without it, the bots wait for the first player request or watchdog read.
+   */
+  startBots?: (gameId: string) => void;
 }
 
 /** What the request itself presented. Nothing in the body is ever taken as proof of who is asking. */
@@ -170,7 +175,7 @@ interface StartPlayer {
   token_hash: string;
 }
 
-export type StartOutcome = { started: true; gameId: string } | { started: false; code: string };
+export type StartOutcome = { started: true; gameId: string; botSeats: number } | { started: false; code: string };
 
 /**
  * Creates the game of one reservation whose players are all ready. Safe to call any number of
@@ -230,7 +235,7 @@ export async function startMatch(matchId: string, deps: MatchmakingDeps): Promis
 
         const seats = players.map((p, i) => ({ user_id: p.user_id, player_id: seatIds[i]! }));
         await tx`select public.matchmaking_finish_start(${matchId}, ${gameId}, ${tx.json(seats)}) as r`;
-        return { started: true, gameId };
+        return { started: true, gameId, botSeats };
       });
     } catch (error) {
       if (isUniqueViolation(error, 'games_live_code_idx')) continue;
@@ -256,7 +261,11 @@ export async function startDueMatches(deps: MatchmakingDeps): Promise<{ started:
   let failed = 0;
   for (const row of due) {
     const outcome = await startMatch(row.id as string, deps);
-    if (outcome.started) started += 1;
+    if (outcome.started) {
+      started += 1;
+      // Committed: a bot may hold the first turn, and no player action will come to wake the bots up.
+      if (outcome.botSeats > 0) deps.startBots?.(outcome.gameId);
+    }
     else if (outcome.code === 'START_FAILED') failed += 1;
   }
   return { started, failed };

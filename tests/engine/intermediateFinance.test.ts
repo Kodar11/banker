@@ -59,7 +59,7 @@ describe('Capital config', () => {
     expect(terms('PERSONAL')).toEqual([13, 3, 30000, false, 'FIXED']);
     expect(terms('SECURED')).toEqual([7, 3, 50000, true, 'FIXED']);
     expect(terms('LONG_TERM')).toEqual([11, 5, 40000, false, 'FIXED']);
-    expect(terms('FLEXIBLE')).toEqual([9, 3, 30000, false, 'VARIABLE']);
+    expect(terms('FLEXIBLE')).toEqual([12, 3, 30000, false, 'VARIABLE']);
     for (const k of LOAN_PRODUCT_KEYS) expect(p[k].maxPrincipal).toBeLessThanOrEqual(IR.loans.maxSingleLoan);
   });
 
@@ -167,7 +167,7 @@ describe('credit score → interest rate', () => {
     expect(offeredRate('PERSONAL', 800).ratePercent).toBe(11);
     expect(offeredRate('PERSONAL', 660).ratePercent).toBe(13);
     expect(offeredRate('EMERGENCY', 400).ratePercent).toBe(24);
-    expect(offeredRate('FLEXIBLE', 850).ratePercent).toBe(7);
+    expect(offeredRate('FLEXIBLE', 850).ratePercent).toBe(10);
     expect(offeredRate('SECURED', 600).ratePercent).toBe(10);
     // The agreed example: a Secured Loan at a score of 780 is 7% − 2 points = 5%. Points, not a proportion.
     expect(offeredRate('SECURED', 780).ratePercent).toBe(5);
@@ -186,6 +186,38 @@ describe('credit score → interest rate', () => {
     expect(reviewedRate(7, -2, 6)).toEqual({ marketRatePercent: 5, ratePercent: 11 });
     expect(reviewedRate(5, -2, -2)).toEqual({ marketRatePercent: 4, ratePercent: 4 });
     expect(reviewedRate(29, 2, 6)).toEqual({ marketRatePercent: 30, ratePercent: 30 });
+  });
+
+  it('the Flexible-rate Loan is a real choice against the Personal Loan: cheaper on average, dearer when rates rise', () => {
+    const products = IR.loans.products;
+    const years = products.FLEXIBLE.tenureYears;
+    expect(products.PERSONAL.tenureYears).toBe(years);
+    const principal = Math.min(products.FLEXIBLE.maxPrincipal, products.PERSONAL.maxPrincipal);
+    const personal = scheduleTotal(buildSchedule(principal, products.PERSONAL.baseRatePercent, years)).interest;
+    // Every path the yearly reviews can take, re-amortised after each review as the engine does.
+    const paths: number[][] = [[]];
+    for (let y = 1; y < years; y += 1) {
+      const next: number[][] = [];
+      for (const path of paths) for (const move of IR.loans.flexibleMoves) next.push([...path, move]);
+      paths.splice(0, paths.length, ...next);
+    }
+    const costs = paths.map((moves) => {
+      let rate = products.FLEXIBLE.baseRatePercent;
+      let balance = principal;
+      let interest = 0;
+      for (let y = 0; y < years; y += 1) {
+        if (y > 0) rate = reviewedRate(rate, moves[y - 1]!, 0).ratePercent;
+        const line = buildSchedule(balance, rate, years - y)[0]!;
+        interest += line.interest;
+        balance -= line.principal;
+      }
+      return interest;
+    });
+    const mean = costs.reduce((s, c) => s + c, 0) / costs.length;
+    expect(mean).toBeLessThan(personal);
+    // Neither product is always the cheaper one.
+    expect(costs.some((c) => c > personal)).toBe(true);
+    expect(costs.some((c) => c < personal)).toBe(true);
   });
 });
 

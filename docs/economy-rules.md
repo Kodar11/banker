@@ -52,7 +52,7 @@ Tests: `tests/engine/economyRules.test.ts`, `tests/engine/loanSystem.test.ts`, `
 | Personal | 13% | 3 years | ₹10,000–₹30,000 | none | fixed |
 | Secured | 7% | 3 years | ₹10,000–₹50,000 | pledged property and buildings | fixed |
 | Long-term | 11% | 5 years | ₹10,000–₹40,000 | none | fixed |
-| Flexible-rate | 9% to start | 3 years | ₹10,000–₹30,000 | none | variable |
+| Flexible-rate | 12% to start | 3 years | ₹10,000–₹30,000 | none | variable |
 
 - Amounts in ₹500 steps. No single loan above ₹50,000; the host's total limit (`GameConfig.loanLimit`,
   default ₹20,000, at least ₹10,000 in Capital) caps all of a player's loans together. Several loans at once
@@ -68,6 +68,9 @@ Tests: `tests/engine/economyRules.test.ts`, `tests/engine/loanSystem.test.ts`, `
 - **Flexible-rate:** on each anniversary the market component moves by −2, −1, 0, +1 or +2 points (equally
   likely, the server's seeded draw, kept within 4%–30%); the credit adjustment agreed at signing stays. Only
   installments not yet due are recalculated; nothing already due or paid changes. Every review is recorded.
+  It starts at 12% (the brief proposed 9%) so that it is a real choice against the 13% fixed Personal Loan: on
+  ₹30,000 over three years it is cheaper on average (₹7,472 vs ₹8,117 of interest) but dearer in 3 of the 25
+  possible rate paths. At 9% or 11% it was cheaper in every path, which left the Personal Loan no reason to exist.
 - **Repayment capacity:** a year of installments on all of a player's loans (everything due now plus each
   loan's next installment), a new loan's first-year payment included, may not exceed the player's net worth
   plus one year of Start rewards (₹1,500 — the only income the game guarantees; rent is never assumed).

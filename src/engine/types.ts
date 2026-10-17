@@ -312,6 +312,12 @@ export interface GameState {
   /** Open trade offers plus recently resolved ones. */
   trades: TradeOffer[];
   /**
+   * Per bot seat: the exchanges (tradeSignature) it offered and saw rejected, newest last, at most
+   * BOT_TRADE_MEMORY each. Outlives the pruning of `trades`, so a bot never makes the same rejected offer
+   * twice. Public (trades are public). Missing in games stored before it existed.
+   */
+  botTradeMemory?: Record<string, string[]>;
+  /**
    * How a hosted game ends: its duration, the vote in progress and the last result (gameEnd.ts).
    * Null or missing in the lobby, in a matchmade game (no duration, no votes) and in a game stored
    * before votes existed — a hosted one of those gets it the first time it is needed.

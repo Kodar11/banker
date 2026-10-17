@@ -13,6 +13,8 @@
 // Secrets (supabase secrets set NAME=value): MATCHMAKING_WORKER_SECRET — at least 32 characters,
 // random, server-only. It never goes into the app or any EXPO_PUBLIC_* variable.
 import { createSql } from '../game-action/db.ts';
+import { startBotRunner } from '../game-action/handler.ts';
+import { broadcast, defer } from '../game-action/runtime.ts';
 import { handleMatchmakingRequest, MIN_WORKER_SECRET_LENGTH, WORKER_SECRET_HEADER } from './handler.ts';
 
 const dbUrl = Deno.env.get('SUPABASE_DB_URL');
@@ -54,7 +56,9 @@ Deno.serve(async (req: Request) => {
   const apiKey = anonKey ?? req.headers.get('apikey') ?? '';
   const result = await handleMatchmakingRequest(
     body,
-    { sql, workerSecret, verifyUser: (token) => verifyUser(token, apiKey) },
+    // A game started with bot seats gets its bot runner at once: the game-action function's own runner,
+    // broadcast and timers, run in this worker's background.
+    { sql, workerSecret, verifyUser: (token) => verifyUser(token, apiKey), startBots: (gameId) => startBotRunner({ sql, broadcast, defer }, gameId) },
     { authorization: req.headers.get('Authorization'), workerSecret: req.headers.get(WORKER_SECRET_HEADER) },
   );
   return new Response(JSON.stringify(result.body), { status: result.status, headers: { ...CORS, ...(result.headers ?? {}), 'Content-Type': 'application/json' } });

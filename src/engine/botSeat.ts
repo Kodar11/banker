@@ -54,6 +54,17 @@ export function isBotPersonality(value: unknown): value is BotPersonality {
   return typeof value === 'string' && (BOT_PERSONALITIES as readonly string[]).includes(value);
 }
 
+/** How many rejected exchanges each bot remembers (GameState.botTradeMemory). */
+export const BOT_TRADE_MEMORY = 64;
+
+/**
+ * An exchange, whatever the money: who it is offered to, and which properties go each way. Two offers with
+ * the same signature are the same deal at possibly different prices.
+ */
+export function tradeSignature(t: { toPlayerId: string; offeredPropertyKeys: readonly string[]; requestedPropertyKeys: readonly string[] }): string {
+  return `${t.toPlayerId}|${[...t.offeredPropertyKeys].sort().join(',')}|${[...t.requestedPropertyKeys].sort().join(',')}`;
+}
+
 /** "Bot · Normal · Investor" — how a bot seat is described next to its name. */
 export function botSeatLabel(bot: BotSeat): string {
   return `Bot · ${BOT_DIFFICULTY_LABELS[bot.difficulty].label} · ${BOT_PERSONALITY_LABELS[bot.personality].label}`;

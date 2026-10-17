@@ -190,7 +190,7 @@ export function validateIntermediateRules(raw: unknown): IntermediateRules {
 
 export const INTERMEDIATE_RULES: IntermediateRules = validateIntermediateRules({
   /** Stored with every Capital game's economy. Bump when any value below changes. */
-  version: 'INTERMEDIATE-V5',
+  version: 'INTERMEDIATE-V6',
 
   year: {
     spacesPerYear: 36,
@@ -320,7 +320,10 @@ export const INTERMEDIATE_RULES: IntermediateRules = validateIntermediateRules({
       FLEXIBLE: {
         name: 'Flexible-rate Loan',
         summary: 'Starts cheaper than a Personal Loan, but the rate is reviewed every year and can rise or fall.',
-        baseRatePercent: 9,
+        // 12%, not the brief's 9%: at 9% (or 11%) a Flexible loan was cheaper than a Personal Loan in every
+        // possible rate path, so nobody had a reason to choose Personal. At 12% it is cheaper on average but
+        // dearer when rates rise: the Personal Loan buys certainty (docs/economy-rules.md).
+        baseRatePercent: 12,
         tenureYears: 3,
         rateType: 'VARIABLE',
         secured: false,

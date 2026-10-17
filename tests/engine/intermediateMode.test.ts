@@ -400,13 +400,13 @@ describe('borrowing', () => {
       ['PERSONAL', 13, 12, 3, 10000, 30000, 20000],
       ['SECURED', 7, 6, 3, 10000, 50000, 0],
       ['LONG_TERM', 11, 10, 5, 10000, 40000, 20000],
-      ['FLEXIBLE', 9, 8, 3, 10000, 30000, 20000],
+      ['FLEXIBLE', 12, 11, 3, 10000, 30000, 20000],
     ]);
     // No property needed for the unsecured four; the secured one needs something to pledge.
     expect(offers.filter((o) => o.product !== 'SECURED').every((o) => o.blocked === null)).toBe(true);
     expect(offers.find((o) => o.product === 'SECURED')?.blocked).toMatch(/not mortgaged, not already pledged/);
     eco(g).credit[g.id('Asha')] = 600;
-    expect(loanOffers(g.state, g.id('Asha')).map((o) => o.ratePercent)).toEqual([21, 16, 10, 14, 12]);
+    expect(loanOffers(g.state, g.id('Asha')).map((o) => o.ratePercent)).toEqual([21, 16, 10, 14, 15]);
     eco(g).credit[g.id('Asha')] = 400;
     // A low score makes loans dearer, not unavailable.
     expect(loanOffers(g.state, g.id('Asha')).filter((o) => o.product !== 'SECURED').every((o) => o.blocked === null)).toBe(true);
@@ -671,18 +671,18 @@ describe('flexible-rate loan', () => {
     const g = newGame();
     jumpTo(g, 10);
     const loan = borrow(g, 'Asha', 'FLEXIBLE', 10000);
-    expect(loan).toMatchObject({ ratePercent: 8, marketRatePercent: 9, creditAdjustmentPercent: -1, rateType: 'VARIABLE' });
+    expect(loan).toMatchObject({ ratePercent: 11, marketRatePercent: 12, creditAdjustmentPercent: -1, rateType: 'VARIABLE' });
     const first = { ...loan.installments[0]! };
     jumpTo(g, YEAR + 5); // Year 2 starts; no loan checkpoint yet
     const r = jumpTo(g, YEAR + 10, [0.95]); // anniversary: +2 points
     const after = loanOf(g, loan.id);
-    expect(after).toMatchObject({ ratePercent: 10, marketRatePercent: 11, creditAdjustmentPercent: -1 });
+    expect(after).toMatchObject({ ratePercent: 13, marketRatePercent: 14, creditAdjustmentPercent: -1 });
     expect(after.installments[0]).toMatchObject({ status: 'DUE', principal: first.principal, interest: first.interest });
     const remaining = 10000 - first.principal;
-    expect(after.installments.slice(1).map((i) => [i.principal, i.interest])).toEqual(buildSchedule(remaining, 10, 2).map((l) => [l.principal, l.interest]));
+    expect(after.installments.slice(1).map((i) => [i.principal, i.interest])).toEqual(buildSchedule(remaining, 13, 2).map((l) => [l.principal, l.interest]));
     expect(after.rateHistory).toEqual([
-      { clock: 10, year: 1, movePercent: 0, ratePercent: 8 },
-      { clock: YEAR + 10, year: 2, movePercent: 2, ratePercent: 10 },
+      { clock: 10, year: 1, movePercent: 0, ratePercent: 11 },
+      { clock: YEAR + 10, year: 2, movePercent: 2, ratePercent: 13 },
     ]);
     expect(eventsOf(r, 'LOAN_RATE_CHANGED')).toHaveLength(1);
 
@@ -690,16 +690,16 @@ describe('flexible-rate loan', () => {
     g.act('Asha', { type: 'PAY_LOAN_INSTALLMENT', loanId: loan.id });
     tick(g, 6);
     tick(g, 6);
-    expect(loanOf(g, loan.id).ratePercent).toBe(10);
+    expect(loanOf(g, loan.id).ratePercent).toBe(13);
     expect(loanOf(g, loan.id).rateHistory).toHaveLength(2);
 
     // Second anniversary: −2 points. Year 3 has started by now, so its 26 market draws come first.
     jumpTo(g, YEAR * 2 + 5);
     jumpTo(g, YEAR * 2 + 10, [0.01]);
     const last = loanOf(g, loan.id);
-    expect(last).toMatchObject({ ratePercent: 8, marketRatePercent: 9 });
+    expect(last).toMatchObject({ ratePercent: 11, marketRatePercent: 12 });
     expect(last.installments[2]).toMatchObject({ status: 'SCHEDULED', principal: after.installments[2]!.principal });
-    expect(last.installments[2]!.interest).toBe(buildSchedule(after.installments[2]!.principal, 8, 1)[0]!.interest);
+    expect(last.installments[2]!.interest).toBe(buildSchedule(after.installments[2]!.principal, 11, 1)[0]!.interest);
     // The final installment has no review after it: nothing left to reprice.
     jumpTo(g, YEAR * 3 + 5);
     jumpTo(g, YEAR * 3 + 10, [0.95]);

@@ -24,7 +24,7 @@ import {
   type StateBroadcast,
   type TransactionRecord,
 } from '@/engine/index.ts';
-import { actionKey, nextBotMove } from '@/bots/index.ts';
+import { actionKey, nextBotMove, nextBotWakeAt } from '@/bots/index.ts';
 import { newActionId } from '@/lib/device';
 import type { Credentials } from '@/lib/gameApi';
 
@@ -213,6 +213,12 @@ function step(game: LocalGame): void {
       (game.refused[move.botId] ??= []).push(actionKey(move.action));
     }
     schedule(game);
+    return;
+  }
+  // A resale's "get ready" countdown: the bots bid once it is over, so wake up then (nothing else will).
+  const wake = nextBotWakeAt(game.state, nowMs);
+  if (wake !== null) {
+    game.timer = setTimeout(() => step(game), Math.max(50, wake - nowMs + 25));
     return;
   }
   // Nothing for a bot to do: a person is to move, or a timer is running. Close what has run out, as the server's timers do.

@@ -6,12 +6,13 @@ import {
   mandatoryPaymentsOwed,
   ownedBy,
   BUSINESS_MVP_RULES as RULES,
+  tradeSignature,
   type GameAction,
   type GameState,
   type PropertyKey,
   type TradeOffer,
 } from '../engine/index.ts';
-import { BOT_POLICY } from './config.ts';
+import { BOT_POLICY, DIFFICULTY_TUNING, PERSONALITY_TUNING } from './config.ts';
 import { dryRun } from './engineAccess.ts';
 import { believedState } from './observation.ts';
 import { mixSeed } from './random.ts';
@@ -56,40 +57,66 @@ export interface TradeValue {
   partnerGain: number;
   /** What the bot needs the gain to clear to agree. */
   threshold: number;
+  /**
+   * The other side's verdict as the bot predicts it: their gain less their rivalry towards the bot's own gain
+   * (partnerScore), against the bar they apply (partnerThreshold). It is the rule a bot uses to answer an
+   * offer (respondToOffer), with a bot partner's public settings, or a typical player's for a person.
+   */
+  partnerScore: number;
   partnerThreshold: number;
 }
 
 const sum = (c: Components) => DIMENSIONS.reduce((s, d) => s + c[d], 0);
+
+/**
+ * One side's change in position from a deal, by dimension. Selling income for cash is never "safer" just
+ * because cash is below the strategic reserve: a liquidity gain counts only as far as it covers what that
+ * side actually owes (O_known). Paying cash in a deal still costs its full liquidity. (Without this a
+ * cautious bot sells its properties away. See docs/bots.)
+ */
+function sideChange(vc: ValuationContext, believed: GameState, after: GameState, playerId: string): Components {
+  const before = assess(vc, believed, playerId);
+  const c = delta(assess(vc, after, playerId).components, before.components);
+  if (c.liquidity <= 0) return c;
+  const owed = knownOutflows(believed, playerId);
+  const cashAfter = after.players.find((p) => p.id === playerId)?.balance ?? before.cash;
+  const relief = shortfallPenalty(owed - before.cash, Math.max(1, owed)) - shortfallPenalty(owed - cashAfter, Math.max(1, owed));
+  return { ...c, liquidity: Math.min(c.liquidity, Math.max(0, relief)) };
+}
+
+/** How the other side judges a deal: a bot's public settings (its seat label), or a typical player's. */
+function partnerRule(state: GameState, partnerId: string): { margin: number; rivalry: number } {
+  const bot = state.players.find((p) => p.id === partnerId)?.bot;
+  if (bot) return { margin: PERSONALITY_TUNING[bot.personality].tradeMargin, rivalry: DIFFICULTY_TUNING[bot.difficulty].rivalryWeight };
+  return { margin: BOT_POLICY.trade.personMargin, rivalry: BOT_POLICY.trade.personRivalry };
+}
 
 /** Values trade `t` (between the bot and one other player) from the bot's side, on the bot's beliefs. */
 export function valueTrade(vc: ValuationContext, t: TradeShape, believed: GameState = believedState(vc.obs)): TradeValue {
   const me = vc.obs.botId;
   const partner = t.fromPlayerId === me ? t.toPlayerId : t.fromPlayerId;
   const after = afterTrade(believed, t);
-  const before = assess(vc, believed, me);
-  let c = delta(assess(vc, after, me).components, before.components);
-  // Selling income for cash is never "safer" just because cash is below the strategic reserve: a deal's
-  // liquidity gain counts only as far as it covers what is actually owed (O_known). Paying cash in a deal
-  // still costs its full liquidity. (Without this a cautious bot sells its properties away. See docs/bots.)
-  if (c.liquidity > 0) {
-    const owed = knownOutflows(believed, me);
-    const cashAfter = after.players.find((p) => p.id === me)?.balance ?? before.cash;
-    const relief = shortfallPenalty(owed - before.cash, Math.max(1, owed)) - shortfallPenalty(owed - cashAfter, Math.max(1, owed));
-    c = { ...c, liquidity: Math.min(c.liquidity, Math.max(0, relief)) };
-  }
+  let c = sideChange(vc, believed, after, me);
   const raw = sum(c);
   if (raw > 0) c = attribute(c, 'wealth', 'negotiation', raw * BOT_POLICY.value.negotiationShare);
-  const partnerGain = sum(delta(assess(vc, after, partner).components, assess(vc, believed, partner).components));
+  const partnerGain = sum(sideChange(vc, believed, after, partner));
   const score = weigh(vc, c) - vc.tuning.rivalryWeight * Math.max(0, partnerGain);
   const threshold = Math.max(BOT_POLICY.trade.minimumGain, vc.personality.tradeMargin * givenValue(believed, t, me));
-  const partnerThreshold = Math.max(BOT_POLICY.trade.minimumGain / 2, 0.05 * givenValue(believed, t, partner));
-  return { score, components: c, partnerGain, threshold, partnerThreshold };
+  const rule = partnerRule(believed, partner);
+  const partnerScore = partnerGain - rule.rivalry * Math.max(0, raw);
+  const partnerThreshold = Math.max(BOT_POLICY.trade.minimumGain, rule.margin * givenValue(believed, t, partner));
+  return { score, components: c, partnerGain, threshold, partnerScore, partnerThreshold };
 }
 
 const sameKeys = (a: readonly PropertyKey[], b: readonly PropertyKey[]) => a.length === b.length && a.every((k) => b.includes(k));
 
-/** The bot already proposed this exchange (same partner, same properties), whatever became of it, as far as the record goes. */
+/**
+ * The bot already proposed this exchange (same partner, same properties): it is still on record in the
+ * game's trades, whatever became of it, or it was turned down at any time (GameState.botTradeMemory, which
+ * outlives the trades a game keeps).
+ */
 function alreadyProposed(state: GameState, me: string, to: string, offered: readonly PropertyKey[], requested: readonly PropertyKey[]): boolean {
+  if (state.botTradeMemory?.[me]?.includes(tradeSignature({ toPlayerId: to, offeredPropertyKeys: offered, requestedPropertyKeys: requested }))) return true;
   return state.trades.some((t) => t.fromPlayerId === me && t.toPlayerId === to && sameKeys(t.offeredPropertyKeys, offered) && sameKeys(t.requestedPropertyKeys, requested));
 }
 
@@ -178,7 +205,7 @@ function counterOffer(vc: ValuationContext, trade: TradeOffer, believed: GameSta
   if (extra === null) return null;
   const t = shape(extra);
   const v = valueTrade(vc, t, believed);
-  if (v.partnerGain < v.partnerThreshold) return null;
+  if (v.partnerScore < v.partnerThreshold) return null;
   const action: GameAction = { type: 'CREATE_TRADE', toPlayerId: partner, offeredPropertyKeys: [...t.offeredPropertyKeys], requestedPropertyKeys: [...t.requestedPropertyKeys], offeredMoney: t.offeredMoney, requestedMoney: t.requestedMoney };
   if (!dryRun(believed, me, action, vc.obs.nowMs)) return null;
   return { action, kind: 'TRADE_COUNTER', reason: `Counters with ${formatINR(extra)} more in its favour: the original offer fell short of its threshold.` };
@@ -261,7 +288,7 @@ export function proposeTrade(vc: ValuationContext): TradeMove | null {
     };
     const theirsOk = (x: number) => {
       const v = valueTrade(vc, shape(x), believed);
-      return v.partnerGain >= v.partnerThreshold;
+      return v.partnerScore >= v.partnerThreshold;
     };
     const most = lastTrue(lo, hi, step, mineOk);
     if (most === null) continue;

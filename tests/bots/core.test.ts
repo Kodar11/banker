@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  auctionOpensAt,
   computeRent,
   positionOfProperty,
   positionOfSpecial,
   PROPERTY_KEYS,
   topUndoable,
+  tradeSignature,
   type GameAction,
 } from '@/engine/index.ts';
 import {
@@ -21,6 +23,8 @@ import {
   knownOutflows,
   landingModel,
   maximumBid,
+  nextBotMove,
+  nextBotWakeAt,
   observe,
   PERSONALITY_WEIGHTS,
   personalityMultipliers,
@@ -356,6 +360,55 @@ describe('decisions on every phase', () => {
     expect(proposals.length).toBeGreaterThan(0);
     const keys = proposals.map((p) => JSON.stringify([(p as { toPlayerId: string }).toPlayerId, (p as { requestedPropertyKeys: string[] }).requestedPropertyKeys, (p as { offeredPropertyKeys: string[] }).offeredPropertyKeys]));
     expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it('remembers a rejected offer beyond the trades the game keeps, and never makes it again', () => {
+    const g = botTable(undefined, { difficulty: 'normal', personality: 'dealmaker' });
+    g.give('Asha', 'MUMBAI');
+    g.give('Asha', 'CALCUTTA');
+    g.give('Bilal', 'AHMEDABAD');
+    g.landOn('Asha', positionOfSpecial('START'), 2);
+    let proposal: Extract<GameAction, { type: 'CREATE_TRADE' }> | null = null;
+    let guard = 0;
+    while (!proposal && g.state.turn.playerId === g.id('Asha') && guard++ < 30) {
+      const d = decideAs(g, 'Asha');
+      if (!d.action || d.action.type === 'END_TURN') break;
+      if (d.action.type === 'CREATE_TRADE') proposal = d.action;
+      else g.act('Asha', d.action);
+    }
+    expect(proposal).not.toBeNull();
+    g.act('Asha', proposal!);
+    const offer = g.state.trades.find((t) => t.status === 'PENDING' && t.fromPlayerId === g.id('Asha'))!;
+    g.act(g.state.players.find((p) => p.id === offer.toPlayerId)!.name, { type: 'REJECT_TRADE', tradeId: offer.id });
+    expect(g.state.botTradeMemory?.[g.id('Asha')]).toEqual([tradeSignature(offer)]);
+    // The game keeps only its most recent trades: forget every one of them. The memory still holds.
+    g.state = { ...g.state, trades: [] };
+    const again = decideAs(g, 'Asha').action;
+    expect(again?.type === 'CREATE_TRADE' && tradeSignature(again) === tradeSignature(offer)).toBe(false);
+  });
+
+  it('a person’s rejected offer is not a bot’s memory', () => {
+    const g = botTable(['Asha', 'Bilal', 'Chitra']);
+    g.state = { ...g.state, players: g.state.players.map((p) => (p.name === 'Asha' ? { ...p, bot: null } : p)) };
+    g.give('Bilal', 'AHMEDABAD');
+    g.act('Asha', { type: 'CREATE_TRADE', toPlayerId: g.id('Bilal'), offeredPropertyKeys: [], requestedPropertyKeys: ['AHMEDABAD'], offeredMoney: 1000, requestedMoney: 0 });
+    g.act('Bilal', { type: 'REJECT_TRADE', tradeId: g.state.trades[0]!.id });
+    expect(g.state.botTradeMemory ?? {}).toEqual({});
+  });
+
+  it('wakes up when a person’s resale opens for bids, and bids then', () => {
+    const g = botTable(['Asha', 'Bilal', 'Chitra'], { difficulty: 'normal', personality: 'opportunist' }, { mode: 'intermediate' });
+    g.state = { ...g.state, players: g.state.players.map((p) => (p.name === 'Asha' ? { ...p, bot: null } : p)) };
+    g.give('Asha', 'MUMBAI');
+    g.act('Asha', { type: 'START_RESALE_AUCTION', propertyKey: 'MUMBAI', reservePrice: 1000 });
+    const auction = g.state.auction!;
+    // During the "get ready" countdown no bot may bid, and nothing else will happen when it ends…
+    expect(nextBotMove(g.state, { nowMs: g.nowMs })).toBeNull();
+    // …so the runners are told when to look again,
+    expect(nextBotWakeAt(g.state, g.nowMs)).toBe(auctionOpensAt(auction));
+    // and then a bot bids.
+    expect(nextBotMove(g.state, { nowMs: auctionOpensAt(auction) })?.action.type).toBe('PLACE_BID');
+    expect(nextBotWakeAt(g.state, auctionOpensAt(auction))).toBeNull();
   });
 
   it('chooses a legal alternative when its preferred action is refused', () => {

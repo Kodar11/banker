@@ -1,5 +1,5 @@
 import { GameActionSchema, PlayerNameSchema, type GameAction } from './actions.ts';
-import { BOT_NAMES, type BotSeat } from './botSeat.ts';
+import { BOT_NAMES, BOT_TRADE_MEMORY, tradeSignature, type BotSeat } from './botSeat.ts';
 import {
   BOARD_SIZE,
   getDeed,
@@ -2265,6 +2265,12 @@ function closeTrade(d: Draft, actor: PlayerState, tradeId: string, status: 'REJE
   d.event(status === 'REJECTED' ? 'TRADE_REJECTED' : 'TRADE_CANCELLED', actor.id, `${actor.name} ${status.toLowerCase()} a trade offer`, {
     tradeId,
   });
+  // A bot remembers what was turned down, beyond the trades kept in the state, so it never offers it again.
+  if (status === 'REJECTED' && d.player(trade.fromPlayerId).bot) {
+    const memory = (d.state.botTradeMemory ??= {});
+    const signature = tradeSignature(trade);
+    memory[trade.fromPlayerId] = [...(memory[trade.fromPlayerId] ?? []).filter((s) => s !== signature), signature].slice(-BOT_TRADE_MEMORY);
+  }
   pruneTrades(d);
 }
 

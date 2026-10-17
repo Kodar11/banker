@@ -9,7 +9,7 @@
  */
 import { randomBytes, randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { botActionId, runBots } from '../../supabase/functions/game-action/bots.ts';
+import { botActionId, nextBotCheck, runBots } from '../../supabase/functions/game-action/bots.ts';
 import { createSql, type Sql, type Tx } from '../../supabase/functions/game-action/db.ts';
 import { handleRequest, type HandlerDeps } from '../../supabase/functions/game-action/handler.ts';
 import { runTick, type MatchmakingDeps } from '../../supabase/functions/matchmaking/handler.ts';
@@ -169,6 +169,49 @@ describe.skipIf(!DATABASE_URL)('bots (Postgres)', { timeout: 120_000 }, () => {
       expect(await runBots(g.host.gameId, deps)).toMatchObject({ moves: 0 });
     });
 
+    it('wakes itself for a person’s resale: nothing during the countdown, a bot bid once bidding opens', async () => {
+      const t = token();
+      const created = ok(await call({ op: 'create', actionId: randomUUID(), token: t, name: 'Host', mode: 'intermediate' }));
+      const host = { gameId: created.gameId, playerId: created.playerId, token: t };
+      let snap = created.snapshot;
+      const act = async (action: GameAction) => {
+        const res = ok(await call({ op: 'action', gameId: host.gameId, playerId: host.playerId, token: host.token, actionId: randomUUID(), expectedVersion: snap.state.version, action }));
+        snap = res.snapshot;
+      };
+      for (const personality of ['opportunist', 'investor'] as const) await act({ type: 'ADD_BOT', difficulty: 'normal', personality });
+      await act({ type: 'START_GAME' });
+      // The bots play until it is the person's turn to roll.
+      for (let i = 0; i < 6; i += 1) {
+        snap = ok(await call({ op: 'state', ...host })).snapshot;
+        if (snap.state.turn.playerId === host.playerId && snap.state.turn.phase === 'AWAITING_ROLL') break;
+        await runBots(host.gameId, { sql, paceMs: 0 });
+      }
+      snap = ok(await call({ op: 'state', ...host })).snapshot;
+      expect(snap.state.turn).toMatchObject({ playerId: host.playerId, phase: 'AWAITING_ROLL' });
+      // Test setup: the person owns Mumbai (ownership lives in the properties table).
+      await sql`update public.properties set owner_player_id = ${host.playerId} where game_id = ${host.gameId} and property_key = 'MUMBAI'`;
+      await act({ type: 'START_RESALE_AUCTION', propertyKey: 'MUMBAI', reservePrice: 1000 });
+      const auction = snap.state.auction!;
+      const opensAt = Date.parse(auction.createdAt) + 3000;
+
+      // During the countdown: no move, and the runner arms itself for the moment bidding opens.
+      const armed: number[] = [];
+      const report = await runBots(host.gameId, { sql, paceMs: 0, defer: (delayMs) => void armed.push(delayMs) });
+      expect(report.moves).toBe(0);
+      expect(await nextBotCheck(host.gameId, { sql })).toMatchObject({ due: false });
+      expect(armed).toHaveLength(1);
+      expect(armed[0]!).toBeGreaterThan(1000);
+      expect(armed[0]!).toBeLessThanOrEqual(3100);
+
+      // When it wakes, a bot bids.
+      const at = () => new Date(Math.max(Date.now(), opensAt + 100));
+      expect(await nextBotCheck(host.gameId, { sql, now: at })).toMatchObject({ due: true });
+      await runBots(host.gameId, { sql, paceMs: 0, now: at });
+      const bids = await sql`select a.type from public.game_actions a join public.players p on p.id = a.player_id where a.game_id = ${host.gameId} and p.bot_difficulty is not null and a.type = 'PLACE_BID'`;
+      expect(bids.length).toBeGreaterThan(0);
+      await ledgerOk(host.gameId);
+    });
+
     it('with hidden finances, a person’s snapshot never carries a bot’s cash', async () => {
       const g = await hostWithBots(2, { financialPrivacy: 'hidden' });
       ok(await g.act({ type: 'START_GAME' }));
@@ -224,6 +267,32 @@ describe.skipIf(!DATABASE_URL)('bots (Postgres)', { timeout: 120_000 }, () => {
       expect(seats.filter((s) => s.bot_difficulty).length).toBe(2);
       expect(seats.filter((s) => s.user_id).length).toBe(2);
       expect((await sql`select status from public.games where id = ${game.game_id}`)[0]!.status).toBe('ACTIVE');
+    });
+
+    it('a game started with bot seats starts its bot runner at once; one without bots does not', async () => {
+      const started: string[] = [];
+      const withHook: MatchmakingDeps = { ...worker, startBots: (gameId) => void started.push(gameId) };
+      const users = [await newPlayer(), await newPlayer()];
+      for (const u of users) expect(await rpc(u, 'matchmaking_enqueue', 'classic', null, true)).toMatchObject({ ok: true });
+      await waitInQueue();
+      await runTick(withHook, { force: true });
+      const match = (await rpc(users[0]!, 'matchmaking_state')).match as Json;
+      for (const u of users) expect(await rpc(u, 'matchmaking_ready', match.id, token())).toMatchObject({ ok: true });
+      await runTick(withHook, { force: true });
+      const game = (await rpc(users[0]!, 'matchmaking_state')).live_game as Json;
+      expect(started).toEqual([game.game_id]);
+
+      await sql`delete from public.matchmaking_tickets`;
+      await sql`delete from public.matchmaking_matches`;
+      await sql`update public.matchmaking_runs set last_run_at = null`;
+      const people = [await newPlayer(), await newPlayer()];
+      for (const u of people) expect(await rpc(u, 'matchmaking_enqueue', 'classic', null, false)).toMatchObject({ ok: true });
+      await waitInQueue();
+      await runTick(withHook, { force: true });
+      const plain = (await rpc(people[0]!, 'matchmaking_state')).match as Json;
+      for (const u of people) expect(await rpc(u, 'matchmaking_ready', plain.id, token())).toMatchObject({ ok: true });
+      await runTick(withHook, { force: true });
+      expect(started).toHaveLength(1);
     });
 
     it('no bots unless every person asked; parties cannot ask; the setting switches it off', async () => {

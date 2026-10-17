@@ -18,7 +18,7 @@
 //     game is paused or finished, or when its budget is spent (it then re-arms itself).
 //
 // Runtime-agnostic so it can be integration-tested in Node against real Postgres.
-import { actionKey, nextBotMove } from '../_shared/bots/index.ts';
+import { actionKey, nextBotMove, nextBotWakeAt } from '../_shared/bots/index.ts';
 import { applyAction, isGameError, RULES_VERSION, type EngineResult, type GameState } from '../_shared/engine/index.ts';
 import { loadState, lockGame, persistResult, type Sql } from './db.ts';
 
@@ -53,7 +53,8 @@ export function scheduleBots(deps: BotRunnerDeps, state: Pick<GameState, 'id' | 
   if (hasActiveBots(state)) armRunner(deps, state.id, delayMs);
 }
 
-function armRunner(deps: BotRunnerDeps, gameId: string, delayMs: number): void {
+/** Arms the runner for one game after `delayMs`, whatever its state (runBots re-checks everything under the lease). */
+export function armRunner(deps: BotRunnerDeps, gameId: string, delayMs: number): void {
   if (!deps.defer) return;
   deps.defer(delayMs, async () => {
     try {
@@ -168,19 +169,39 @@ export async function runBots(gameId: string, deps: BotRunnerDeps): Promise<RunR
   // A person may have acted after this run last looked and before it let go of the lease (their own
   // trigger found the lease taken): look once more, and hand over to a fresh run if a bot is due.
   // (Not after moves the engine kept refusing: that would only loop. Those are logged and left to the next trigger.)
-  if (more || (report.refused === 0 && (await botMoveDue(gameId, deps)))) armRunner(deps, gameId, deps.paceMs ?? BOT_PACE_MS);
-  else if (report.refused > 0) console.error('bot runner: moves refused by the engine', { gameId, refused: report.refused });
+  if (more) {
+    armRunner(deps, gameId, deps.paceMs ?? BOT_PACE_MS);
+  } else if (report.refused > 0) {
+    console.error('bot runner: moves refused by the engine', { gameId, refused: report.refused });
+  } else {
+    const next = await nextBotCheck(gameId, deps);
+    if (next.due) armRunner(deps, gameId, deps.paceMs ?? BOT_PACE_MS);
+    // Nothing to do yet, but a bot will have something once a resale's countdown ends: nothing else
+    // happens at that moment, so the runner wakes itself then.
+    else if (next.wakeInMs !== null) armRunner(deps, gameId, next.wakeInMs + WAKE_SLACK_MS);
+  }
   return report;
 }
 
+/** Past a wake-up instant by this much before the runner looks again. */
+const WAKE_SLACK_MS = 25;
+
 /** Whether a bot has a move to make in the game as it stands (read-only). */
 export async function botMoveDue(gameId: string, deps: Pick<BotRunnerDeps, 'sql' | 'now'>): Promise<boolean> {
+  return (await nextBotCheck(gameId, deps)).due;
+}
+
+/** A read-only look at the game: is a bot move due now, and if not, in how long a bot will have one (nextBotWakeAt). */
+export async function nextBotCheck(gameId: string, deps: Pick<BotRunnerDeps, 'sql' | 'now'>): Promise<{ due: boolean; wakeInMs: number | null }> {
   return deps.sql.begin(async (tx) => {
     await tx`set transaction isolation level repeatable read read only`;
     const [game] = await tx`select * from public.games where id = ${gameId}`;
-    if (!game || game.status !== 'ACTIVE' || game.rules_version !== RULES_VERSION) return false;
+    if (!game || game.status !== 'ACTIVE' || game.rules_version !== RULES_VERSION) return { due: false, wakeInMs: null };
     const state = await loadState(tx, game);
-    if (!hasActiveBots(state)) return false;
-    return nextBotMove(state, { nowMs: (deps.now ? deps.now() : new Date()).getTime() }) !== null;
+    if (!hasActiveBots(state)) return { due: false, wakeInMs: null };
+    const nowMs = (deps.now ? deps.now() : new Date()).getTime();
+    if (nextBotMove(state, { nowMs }) !== null) return { due: true, wakeInMs: null };
+    const wake = nextBotWakeAt(state, nowMs);
+    return { due: false, wakeInMs: wake === null ? null : Math.max(0, wake - nowMs) };
   });
 }

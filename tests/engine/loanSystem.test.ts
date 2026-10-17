@@ -317,7 +317,7 @@ describe('repayment capacity', () => {
     const c = borrow(g, 'Asha', 'EMERGENCY', 10000);
     expect([a, b, c].map((l) => [l.product, l.ratePercent, l.tenureYears, l.rateType])).toEqual([
       ['PERSONAL', 12, 3, 'FIXED'],
-      ['FLEXIBLE', 8, 3, 'VARIABLE'],
+      ['FLEXIBLE', 11, 3, 'VARIABLE'],
       ['EMERGENCY', 17, 1, 'FIXED'],
     ]);
     jumpTo(g, YEAR);

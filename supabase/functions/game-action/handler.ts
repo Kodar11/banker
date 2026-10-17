@@ -30,7 +30,7 @@ import {
   type GameState,
   type StateBroadcast,
 } from '../_shared/engine/index.ts';
-import { hasActiveBots, scheduleBots, type BotRunnerDeps } from './bots.ts';
+import { armRunner, BOT_PACE_MS, hasActiveBots, scheduleBots, type BotRunnerDeps } from './bots.ts';
 import { insertNewGame, insertPlayer, loadSnapshot, loadState, lockGame, persistResult, type Sql, type Tx } from './db.ts';
 
 export interface HandlerDeps {
@@ -507,6 +507,14 @@ async function notify(deps: HandlerDeps, state: GameState, events: GameEventReco
     // Committed already; clients also refetch on reconnect/poll, so never fail the action.
     console.error('broadcast failed', error);
   }
+}
+
+/**
+ * Starts a game's bot runner from outside a request of this function (the matchmaking worker, right after it
+ * started a game with bot seats): the same runner, with the same broadcast and close timers as here.
+ */
+export function startBotRunner(deps: HandlerDeps, gameId: string, delayMs = deps.botPaceMs ?? BOT_PACE_MS): void {
+  armRunner(botDeps(deps), gameId, delayMs);
 }
 
 /**

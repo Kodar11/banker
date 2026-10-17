@@ -58,7 +58,11 @@ How the pieces are computed:
 - **Terminal value is not discounted.** The final standings count property at full value, exactly like cash. Income *is* discounted per turn, and also for a possible early end.
 - **Construction** must also pass the personality's hurdle: rent gain + terminal value ≥ hurdle × cost. The brief's starting value was 1.25.
 - **Auctions.** Maximum bid = the highest price on the auction's increments whose weighted value still clears the minimum improvement, never above cash − amounts owed. The bot bids only while the next legal bid is within that, and never just because it has been bidding. Hard adds a "denial" value: keeping a property from the opponent who would gain most from it.
-- **Trades** are valued on both sides. The bot's side uses its full personality valuation. The partner's side uses the same model, neutrally, on public information. Accepting needs gain ≥ max(₹300, margin × what it gives up). A counteroffer happens at most once per exchange. The bot proposes at most one offer at a time and never repeats an exchange it already proposed while that is on record. Its own stale offers are withdrawn. In trades, a liquidity *gain* counts only as far as it covers what is actually owed (see calibration).
+- **Trades** are valued on both sides. The bot's side uses its full personality valuation. The partner's side uses the same model, neutrally, on public information. Accepting needs gain ≥ max(₹300, margin × what it gives up) after the rivalry adjustment.
+  - **Proposals are pitched at what the other side will actually accept.** The bot predicts the partner's verdict with the same rule a bot uses to answer an offer: their gain minus their rivalry towards the bot's own gain, against max(₹300, margin × what they give up). For a bot partner it uses that bot's public settings (its seat label). For a person it uses `BOT_POLICY.trade.personMargin` / `personRivalry`.
+  - A counteroffer happens at most once per exchange. The bot proposes at most one offer at a time. Its own stale offers are withdrawn.
+  - **A rejected offer is never made again.** The engine records each exchange a bot offered and saw rejected (`GameState.botTradeMemory`, up to 64 per bot, column `games.bot_trade_memory`). This memory outlives the 20 resolved trades a game keeps in its state.
+  - In trades, a liquidity *gain* counts only as far as it covers what is actually owed, for either side (see calibration).
 - **Raising money** (rent, tax, crisis bill or overdue installment the bot can't cover): the bot picks the least value destroyed per rupee raised among selling buildings, mortgaging, selling to the bank, and loans. It declares bankruptcy only when the engine allows it *and* liquidation plus every loan on offer could not cover the debt.
 
 ### Reserve
@@ -136,7 +140,7 @@ Decisions are deterministic for the same state, seat and seed. The Monte Carlo i
 | `SELL_BUILDING`, `SELL_PROPERTY`, `MORTGAGE_PROPERTY` | Raising money, or funding a purchase. |
 | `REQUEST_LOAN`, `REPAY_LOAN` (Classic) | Recovery and funding. Repays principal that has fallen due before it defaults; voluntary repayment is scored. |
 | `TAKE_INTERMEDIATE_LOAN`, `PAY_LOAN_INSTALLMENT`, `PREPAY_INTERMEDIATE_LOAN`, `PAY_DEFAULTED_LOAN` (Capital) | The engine's own offers (rate, limits, pooled collateral). Pays installments as they fall due, and raises money for an overdue one. |
-| `INSURE_PROPERTY`, `INSURE_PROPERTIES`, `RENEW_INSURANCE` | Scored against expected crisis bills: 1 / (properties owned at the table) per checkpoint, at the real premiums. |
+| `INSURE_PROPERTY`, `INSURE_PROPERTIES`, `RENEW_INSURANCE` | Scored against expected crisis bills at the real premiums. A crisis strikes one of the properties owned at the table. The ownership it is shared over is projected per checkpoint: halfway from today's count towards 75% of the board by the next checkpoint, and so on. A policy covers only the next checkpoint, when few properties are owned, so early policies are good value and late ones usually are not. An uninsured bill the bot could not pay from cash counts double as risk. |
 | `CREATE_TRADE`, `ACCEPT_TRADE`, `REJECT_TRADE`, `CANCEL_TRADE` | As described above. |
 | `APPROVE_UNDO`, `REJECT_UNDO` | Approves when reversing costs it nothing; otherwise rejects. |
 | `CAST_END_VOTE`, `CLOSE_END_VOTE` | Votes END when its own estimate of the standings shows it ahead by its margin. Closes a vote whose time is up. |
@@ -153,6 +157,7 @@ Decisions are deterministic for the same state, seat and seed. The Monte Carlo i
   - Takes a 30 s per-game lease (`games.bot_runner_until`) and plays at most 30 moves per run, 700 ms apart.
   - Each move runs in its own transaction: lock the game row, load state, decide, `applyAction`, persist, and record the action under the bot's seat with a deterministic id (SHA-256 of game, version, seat, action). A repeat is refused by the primary key.
   - It releases the lease, then checks once more for a due move. It stops when a person is to move, a timer is running, or the game is paused or finished.
+  - **Wake-ups.** When the only thing a bot is waiting for is a resale's "get ready" countdown (`nextBotWakeAt`), the runner arms itself for the moment bidding opens. Nothing else happens at that moment, so without this the bots would never bid in a person's resale.
   - Moves the engine keeps refusing are logged and not looped on.
 - **When only bots are left.** When the last person leaves or goes bankrupt in a started game, it ends and is ranked as it stands (`NO_PEOPLE_LEFT`). A lobby with only bots closes. The host role always passes to a person.
 
@@ -162,7 +167,7 @@ Decisions are deterministic for the same state, seat and seed. The Monte Carlo i
 - **Grouping is unchanged.** Below the preferred size, groups still form only after the oldest ticket has waited past `prefer_target_seconds`.
 - **When bots are added.** `matchmaking_reserve` adds bot seats only when every ticket in the group allowed bots and `bot_fill_enabled` is on. It fills up to `target_players`, within 8 seats, and the count is fixed on the reservation (`bot_seats`).
 - **Consent at ready-up.** The ready-up screen shows "+N bots". Confirming is consenting; declining is the ordinary decline.
-- **Game creation.** The worker seats the bots with `joinBot` in the same transaction as the game. Personalities alternate, and the difficulty comes from `bot_fill_difficulty` (default Normal).
+- **Game creation.** The worker seats the bots with `joinBot` in the same transaction as the game. Personalities alternate, and the difficulty comes from `bot_fill_difficulty` (default Normal). Once the game is committed, the worker starts its bot runner at once (`startBotRunner`: the referee's own runner and broadcast), so a bot holding the first turn plays without waiting for a phone.
 - **Ranking.** The app has no ratings or leaderboards, so nothing changes there. Bot involvement is recorded on the seats and the reservation.
 - **Older apps** call the two-argument form and queue exactly as before.
 
@@ -175,7 +180,7 @@ Decisions are deterministic for the same state, seat and seed. The Monte Carlo i
 ## Solo play
 
 - **Home → Play vs bots.** Pick a mode, 1–7 bots, a difficulty, and a personality (or Mixed), plus the usual game settings.
-- **Fully local.** The device keeps the game and applies every action with the engine. It runs the same bot runner, sends the person the same redacted snapshot the server would, and runs the auction and vote timers. The game screens are unchanged because `gameApi` and the sync layer route a `local` session to it.
+- **Fully local.** The device keeps the game and applies every action with the engine. It runs the same bot runner, sends the person the same redacted snapshot the server would, and runs the auction and vote timers, plus the wake-up when a resale opens for bids. The game screens are unchanged because `gameApi` and the sync layer route a `local` session to it.
 - **Nothing leaves the phone.** No referee, matchmaking, voice, chat or seat claim. Solo games are unranked.
 - **Limitation:** a solo game lives in memory for the app run only and is not saved.
 
